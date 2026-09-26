@@ -2,9 +2,17 @@
 """Validate a deployed .criterion/ against catalyst's structural invariants.
 
 This is the enforcement layer of the anti-drift architecture: the invariants an
-agent is asked to uphold (INV-5..INV-8, INV-14, INV-15, INV-16, INV-17, INV-26) are re-checked here deterministically, so
-they hold every time regardless of what any agent or human did. Mirrors the
-existing scripts/check_plugins.py pattern.
+agent is asked to uphold (INV-5..INV-8, INV-16, INV-17, INV-23, INV-24,
+INV-26) are re-checked here deterministically, so they hold every time
+regardless of what any agent or human did. Mirrors the existing
+scripts/check_plugins.py pattern.
+
+Module-agnostic: entity folders, index names and definition types come from
+the kernel's own entity types (framework/kernel/entities/) plus the ETDs of
+the project's active module (resolved through module_loader from the
+*.catalyst pointer's `module` field). A module's own always-present paths
+are declared in its module.yaml `required_paths:`. When no module resolves,
+only the kernel checks run.
 
 Exit 0 = clean, exit 1 = violations found (fails CI / Stop hook).
 
@@ -17,14 +25,22 @@ from __future__ import annotations
 import json
 import re
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from module_loader import (
+    ModuleManifest,
+    RequiredPath,
+    load_kernel_entities,
+    load_module,
+)
 
 DEPLOY_DIRNAME = ".criterion"
 # <app-name>.catalyst — the tracked pointer file at a target project's root.
 # Its "agent-source" field names where the actual .criterion/ working
 # copy lives (agent-owned space, not necessarily inside the project tree).
 POINTER_SUFFIX = ".catalyst"
-# <id>-<short-summary>.md ; id like req-000001, bug-000007, rule prefixes, domains, etc.
+# <id>-<short-summary>.md ; id like recon-000001, rule prefixes, domains, etc.
 NAME_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*-[a-z0-9][a-z0-9-]*\.md$", re.I)
 # A trailing all-digit segment (e.g. "br-AUTH-002.md") is a bare ID with no
 # descriptive summary — NAME_RE alone can't reject it, since a run of digits
@@ -32,6 +48,9 @@ NAME_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*-[a-z0-9][a-z0-9-]*\.md$", re
 BARE_ID_RE = re.compile(r"-\d+\.md$", re.I)
 # TEMPLATE-<TYPE>.md (legacy, pre-INV-20) or TEMPLATE-<TYPE>-vN.md (current).
 TEMPLATE_RE = re.compile(r"^TEMPLATE-[A-Z-]+(?:-v\d+)?\.md$")
+# An all-uppercase name (README.md, DEPLOYMENT.md, a module's own fixed
+# documents) is a fixed document, never an <id>-<summary> artifact.
+FIXED_DOC_RE = re.compile(r"^[A-Z][A-Z_-]*\.md$")
 # templates-<type>.md — the per-artifact-type templates catalog (INV-20).
 TEMPLATES_CATALOG_RE = re.compile(r"^templates-[a-z-]+\.md$")
 # git hash-object is a 40-char hex SHA-1.
@@ -50,15 +69,87 @@ JOURNAL_REQUIRED_FIELDS = (
     "timestamp", "actor", "command", "action", "artifact", "targets",
     "intent", "files",
 )
+# Kernel index/fixed file names. Each entity type's own `<folder>.md` index
+# (kernel and active module alike) is added by DeploymentModel.
 INDEX_NAMES = {
-    "rules.md", "domains.md", "requirements.md", "features.md", "bugs.md",
-    "house-keeping.md", "meta-tags.md", "epics.md", "stories.md", "tasks.md",
-    "spikes.md", "sprints.md", "boards.md", "workflows.md", "tickets.md",
-    "reconciliations.md",
+    "rules.md", "domains.md", "meta-tags.md", "epics.md", "stories.md",
+    "tasks.md", "spikes.md", "sprints.md", "boards.md", "workflows.md",
+    "tickets.md", "reconciliations.md",
     "README.md", "CODE-OF-CONDUCT.md", "version.txt",
-    "Rules-of-Rules.md", "rules-of-work-items.md", "DEPLOYMENT.md", "BACKLOG.md",
-    "roadmaps.md",
+    "Rules-of-Rules.md", "rules-of-work-items.md", "DEPLOYMENT.md",
 }
+# Kernel directories walked by the INV-7 naming check. Entity folders (kernel
+# and active module) are added by DeploymentModel.
+KERNEL_CHECKED_DIRS = ("rules", "reconciliations", "workflows", "IAM",
+                       "development", "work-items")
+# Kernel entity types that must each have a definitions/<type>.md (INV-23).
+KERNEL_ENTITY_TYPES = (
+    "rule", "domain", "user", "role", "reconciliation", "meta-tag",
+    "journal", "ledger", "slash-command", "templates-catalog", "workflow",
+    "entity",
+)
+
+
+@dataclass
+class DeploymentModel:
+    """What the checks need to know about entity types: the kernel's plus the
+    active module's (if any)."""
+    checked_dirs: tuple[str, ...] = KERNEL_CHECKED_DIRS
+    index_names: set[str] = field(default_factory=lambda: set(INDEX_NAMES))
+    entity_types: tuple[str, ...] = KERNEL_ENTITY_TYPES
+    # Entity folders whose files are keyed by a free-form name (ETD
+    # `naming: free-form`), exempt from the <id>-<summary> naming check.
+    free_form_folders: set[str] = field(default_factory=set)
+    # Active-module entity folders, each expected to carry <folder>.md.
+    module_folders: tuple[str, ...] = ()
+    required_paths: list[RequiredPath] = field(default_factory=list)
+    module_id: str | None = None
+
+
+def _definition_type(name: str) -> str:
+    return "-".join(name.lower().split())
+
+
+def build_model(module: ModuleManifest | None = None) -> DeploymentModel:
+    """Derive the DeploymentModel from the kernel's entity types and the
+    given active module manifest (None = kernel only)."""
+    kernel = load_kernel_entities()
+    dirs = list(KERNEL_CHECKED_DIRS)
+    index_names = set(INDEX_NAMES)
+    types = list(KERNEL_ENTITY_TYPES)
+    free_form: set[str] = set()
+    for etd in kernel.values():
+        if etd.folder not in dirs:
+            dirs.append(etd.folder)
+        index_names.add(f"{etd.folder}.md")
+        if etd.naming == "free-form":
+            free_form.add(etd.folder)
+    if module is None:
+        return DeploymentModel(tuple(dirs), index_names, tuple(types), free_form)
+
+    module_folders: list[str] = []
+    for etd in module.entity_types.values():
+        module_folders.append(etd.folder)
+        if etd.folder not in dirs:
+            dirs.append(etd.folder)
+        index_names.add(f"{etd.folder}.md")
+        if etd.naming == "free-form":
+            free_form.add(etd.folder)
+    # Definition types: the module's definitions/<type>/ directories when it
+    # ships them (they may cover non-entity concepts too), else one per ETD.
+    defs_dir = module.path / "definitions" if module.path else None
+    if defs_dir is not None and defs_dir.is_dir():
+        module_types = sorted(d.name for d in defs_dir.iterdir() if d.is_dir())
+    else:
+        module_types = [_definition_type(e.name) for e in module.entity_types.values()]
+    for t in module_types:
+        if t not in types:
+            types.append(t)
+    for req in module.required_paths:
+        index_names.add(Path(req.path).name)
+    return DeploymentModel(tuple(dirs), index_names, tuple(types), free_form,
+                           tuple(module_folders), list(module.required_paths),
+                           module.id)
 
 
 def _resolve_pointer(pointer_path: Path) -> Path | None:
@@ -74,6 +165,19 @@ def _resolve_pointer(pointer_path: Path) -> Path | None:
         return None
     candidate = Path(source).expanduser()
     return candidate if candidate.is_dir() else None
+
+
+def find_project_root(start: Path) -> Path | None:
+    """The directory at or above `start` holding the *.catalyst pointer (or,
+    for a legacy deployment, the .criterion/ directory) — where the active
+    module is declared."""
+    for base in (start, *start.parents):
+        if any(_resolve_pointer(p) is not None
+               for p in base.glob(f"*{POINTER_SUFFIX}")):
+            return base
+        if (base / DEPLOY_DIRNAME).is_dir():
+            return base
+    return None
 
 
 def find_deploy_root(start: Path) -> Path | None:
@@ -92,30 +196,29 @@ def find_deploy_root(start: Path) -> Path | None:
     return None
 
 
-def check_naming(root: Path) -> list[str]:
+def check_naming(root: Path, model: DeploymentModel | None = None) -> list[str]:
     """INV-7: every rule/domain/artifact file is <id>-<short-summary>.md."""
+    model = model or build_model()
     errors: list[str] = []
     # "domains" is no longer top-level (INV-20): it nests under rules/, so
     # the "rules" walk below already covers rules/domains/**/*.md.
-    checked_dirs = ("rules", "requirements", "features", "reconciliations",
-                    "workflows", "IAM", "development", "work-items")
-    for sub in checked_dirs:
+    for sub in model.checked_dirs:
         d = root / sub
         if not d.is_dir():
             continue
         for f in d.rglob("*.md"):
             name = f.name
-            if (name in INDEX_NAMES or TEMPLATE_RE.match(name)
+            if (name in model.index_names or TEMPLATE_RE.match(name)
+                    or FIXED_DOC_RE.match(name)
                     or TEMPLATES_CATALOG_RE.match(name)):
                 continue
             # Every templates/ subdirectory (INV-20) accepts files only —
             # already covered by the two exemptions above (README.md via
             # INDEX_NAMES, the catalog, and the TEMPLATE-*-vN.md itself) —
             # nothing else should ever be there, so no separate skip needed.
-            # Named roadmaps (development/roadmaps/<name>.md) are keyed by a
-            # free-form name, not a sequential <id>-<summary> scheme — see
-            # Rules-of-Rules.md §10.
-            if f.parent.name == "roadmaps":
+            # An entity type declaring `naming: free-form` keys its files by
+            # a free-form name, not a sequential <id>-<summary> scheme.
+            if f.parent.name in model.free_form_folders:
                 continue
             if not NAME_RE.match(name) or BARE_ID_RE.search(name):
                 errors.append(f"INV-7 naming: {f.relative_to(root)} is not "
@@ -175,7 +278,7 @@ def check_rule_indexing(root: Path) -> list[str]:
 
 
 def check_required_headings(root: Path) -> list[str]:
-    """INV-8: rule docs carry ## Contents and ## Known Bugs — Quick Index."""
+    """INV-8: rule docs carry ## Contents and ## Linked Artifacts — Quick Index."""
     rules = root / "rules"
     errors = []
     for f in rules.rglob("*.md"):
@@ -187,9 +290,9 @@ def check_required_headings(root: Path) -> list[str]:
         if "## Contents" not in text:
             errors.append(f"INV-8 heading: {f.relative_to(root)} missing "
                           f"'## Contents'")
-        if "Known Bugs" not in text:
+        if "Linked Artifacts" not in text:
             errors.append(f"INV-8 heading: {f.relative_to(root)} missing "
-                          f"'## Known Bugs — Quick Index'")
+                          f"'## Linked Artifacts — Quick Index'")
     return errors
 
 
@@ -260,22 +363,38 @@ def check_rule_id_shape(root: Path) -> list[str]:
     return errors
 
 
-def check_backlog_exists(root: Path) -> list[str]:
-    """INV-14: development/BACKLOG.md always exists."""
-    backlog = root / "development" / "BACKLOG.md"
-    if not backlog.is_file():
-        return ["INV-14: development/BACKLOG.md is missing — seed it from "
-                "templates/backlog.template.md"]
-    return []
+def check_module_required_paths(root: Path, model: DeploymentModel) -> list[str]:
+    """The active module's `required_paths:` (module.yaml) always exist."""
+    errors: list[str] = []
+    for req in model.required_paths:
+        if (root / req.path).exists():
+            continue
+        label = req.invariant or f"module {model.module_id}"
+        msg = f"{label}: {req.path} is missing"
+        if req.seed:
+            msg += f" — seed it from {req.seed}"
+        errors.append(msg)
+    return errors
 
 
-def check_roadmaps_index_exists(root: Path) -> list[str]:
-    """INV-15: development/roadmaps/roadmaps.md index always exists."""
-    index = root / "development" / "roadmaps" / "roadmaps.md"
-    if not index.is_file():
-        return ["INV-15: development/roadmaps/roadmaps.md is missing — seed "
-                "development/roadmaps/ from templates/roadmap.template.md"]
-    return []
+def _locate_folder(root: Path, folder: str) -> Path | None:
+    """An entity folder sits at the deployment root or under development/."""
+    for cand in (root / folder, root / "development" / folder):
+        if cand.is_dir():
+            return cand
+    return None
+
+
+def check_module_indexes(root: Path, model: DeploymentModel) -> list[str]:
+    """Every active-module entity folder present in the deployment carries
+    its own <folder>.md index."""
+    errors: list[str] = []
+    for folder in model.module_folders:
+        d = _locate_folder(root, folder)
+        if d is not None and not (d / f"{folder}.md").is_file():
+            errors.append(f"module index: {d.relative_to(root)}/{folder}.md "
+                          f"is missing (module {model.module_id})")
+    return errors
 
 
 def check_workflows_index_exists(root: Path) -> list[str]:
@@ -393,27 +512,23 @@ def check_journal_exists(root: Path) -> list[str]:
     return errors
 
 
-ENTITY_TYPES = (
-    "bug", "requirement", "house-keeping", "rule", "domain", "feature",
-    "roadmap", "user", "role", "reconciliation", "meta-tag", "journal",
-    "backlog", "ledger", "slash-command", "templates-catalog", "workflow",
-    "step", "test", "entity",
-)
-
-
-def check_definitions_exist(root: Path) -> list[str]:
-    """INV-23: definitions/<type>.md exists for every real entity type."""
+def check_definitions_exist(root: Path, model: DeploymentModel | None = None) -> list[str]:
+    """INV-23: definitions/<type>.md exists for every real entity type
+    (kernel types plus the active module's)."""
+    model = model or build_model()
     definitions = root / "definitions"
     if not definitions.is_dir():
         return ["INV-23: definitions/ is missing — seed it from "
                 "framework/kernel/definitions/"]
 
     errors: list[str] = []
-    for entity_type in ENTITY_TYPES:
+    for entity_type in model.entity_types:
         if not (definitions / f"{entity_type}.md").is_file():
+            source = ("framework/kernel/definitions" if entity_type in KERNEL_ENTITY_TYPES
+                      else f"the {model.module_id} module's definitions")
             errors.append(
                 f"INV-23: definitions/{entity_type}.md is missing — seed it "
-                f"from framework/kernel/definitions/{entity_type}/"
+                f"from {source}/{entity_type}/"
             )
     return errors
 
@@ -428,26 +543,31 @@ def main() -> int:
         )
         return 0
 
+    project_root = find_project_root(Path.cwd())
+    module = load_module(project_root) if project_root else None
+    model = build_model(module)
+
     errors: list[str] = []
-    errors += check_naming(root)
+    errors += check_naming(root, model)
     errors += check_single_rule_template(root)
     errors += check_rule_indexing(root)
     errors += check_required_headings(root)
     errors += check_rule_id_shape(root)
-    errors += check_backlog_exists(root)
-    errors += check_roadmaps_index_exists(root)
+    errors += check_module_required_paths(root, model)
+    errors += check_module_indexes(root, model)
     errors += check_workflows_index_exists(root)
     errors += check_users_and_roles_exist(root)
     errors += check_users_have_userid(root)
     errors += check_journal_exists(root)
-    errors += check_definitions_exist(root)
+    errors += check_definitions_exist(root, model)
 
     if errors:
         print(f"catalyst deployment validation FAILED ({len(errors)} issue(s)):")
         for e in errors:
             print(f"  - {e}")
         return 1
-    print(f"catalyst deployment at {root} is valid")
+    scope = f"module {model.module_id}" if model.module_id else "kernel only"
+    print(f"catalyst deployment at {root} is valid ({scope})")
     return 0
 
 

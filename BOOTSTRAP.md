@@ -30,8 +30,9 @@ These are non-negotiable and apply for the entire session. They are restated in
 4. **Never push without explicit assent.** Never push anything in this project
    (or catalyst) without the user's explicit go-ahead.
 5. **The chain invariant.** No work happens without a traceable link down to a
-   documented rule: `REQ`/`BUG`/`HK` → rule → domain, every one carrying a
-   stable, permanent, never-reused ID — extended upward through
+   documented rule: an active-module artifact → the module's grounding type
+   (a kernel rule) → domain, every one carrying a stable, permanent,
+   never-reused ID — extended upward through
    `epic → story → task →` only when an agile project-management plugin
    is active (`work-items/` doesn't exist otherwise).
 6. **Working copy in agent-owned space; one tracked pointer.** The
@@ -78,7 +79,7 @@ consistent.
 | **Parallel sub-agents** (background workers) | Use them for the four-eyes analysis passes and audits. | Run each pass sequentially as separate, context-isolated turns; do not let one pass see the other's output before reconciliation. |
 | **Agent-owned per-project storage** (a data directory this agent already maintains per project, outside the project's own tree — e.g. Claude Code's per-project config space) | Build `.criterion/` there; record its path as `agent-source` in `<app-name>.catalyst` (hard rule 6). | Build `.criterion/` directly inside the target project instead, and add it to that project's own `.gitignore` — never committed. `<app-name>.catalyst`'s `agent-source` then just names the in-project path. |
 | **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved `agent-source`, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `<app-name>.catalyst` (project root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the working copy — `repoed`, `catalyst_repo`, `catalyst_repo_url`, `created_by`, see `Rules-of-Rules.md` §13) are read fresh each session regardless. |
-| **Slash commands** (`/create-bug`, `/create-req`, `/create-feature`, `/roadmap-add`, `/roadmap-remove`, `/roadmap-update`, `/roadmap-merge`, `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/journal`, `/journal-restore`, `/criterion create`, `/criterion get`, `/criterion push`, `/project create`, `/project remove`, `/project export`, `/project import`, `/switch-agent`, `/create-board`, `/create-workflow`, `/commands`, `/meta-tag`, `/status`, `/run-analysis`, `/help`, `/catalyzer`) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
+| **Slash commands** (the kernel's `/check-rules`, `/list`, `/audit`, `/freeze`, `/reconcile`, `/migrate-definition`, `/sync-framework`, `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/journal`, `/journal-restore`, `/criterion create`, `/criterion get`, `/criterion push`, `/project create`, `/project remove`, `/project export`, `/project import`, `/switch-agent`, `/commands`, `/meta-tag`, `/status`, `/run-analysis`, `/help`, `/catalyzer`; those an activated plugin contributes, e.g. `/create-board`, `/create-workflow`; plus the commands the active module adds, from its `code-of-conduct.module.md` §4 — `CODE-OF-CONDUCT.md` §4 of the deployment is the complete list) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
 | **`/dogfood`** — not part of the set above | Only ever exposed when working on catalyst's own repository (`framework/` present), never materialized into a deployed project. See `Rules-of-Rules.md` §13. | Same — this one has no deployed fallback, because it has nothing to run against outside catalyst's own repo. |
 | **Repo file read/write** | — | This is the baseline requirement. If you cannot read and write files in the target repo, stop: catalyst cannot be installed. |
 
@@ -129,7 +130,7 @@ the guide:
    there per the guide: copy the rule / development / work-item templates,
    create the index files, write the per-folder and root `README.md`, seed
    the first rule document(s) with the required `## Contents` and
-   `## Known Bugs — Quick Index` headings. Then write `<app-name>.catalyst`
+   `## Linked Artifacts — Quick Index` headings. Then write `<app-name>.catalyst`
    at the target project's own root, from
    `templates/catalyst-pointer.template.json`, with `agent-source` set
    (hard rule 6) — on the no-owned-space fallback, also add

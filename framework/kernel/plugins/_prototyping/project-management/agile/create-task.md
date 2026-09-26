@@ -17,7 +17,7 @@ Input: $ARGUMENTS
    directory listing of `tasks/`.
 2. A task never gets its own rule target — it inherits its parent story's
    (`rules-of-work-items.md` §2). If it needs a rule the story doesn't
-   cover, fix the story/requirement first.
+   cover, fix the story's development artifact first.
 3. Resolve who is signing this per CODE-OF-CONDUCT.md §2 and fill
    `Signed-off-by`.
 4. Copy the current `TEMPLATE-TASK-vN.md`, fill every field, save as

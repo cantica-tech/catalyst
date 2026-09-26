@@ -4,29 +4,13 @@ This folder contains the reusable document templates that seed the deployed cata
 
 ## What lives here
 
-- Artifact templates such as bugs, requirements, house-keeping, and meta-tags
-  — these are the rule-linked development-artifact types governed by
-  `CODE-OF-CONDUCT.md`.
-- [`features.template.md`](features.template.md) — a related but separate,
-  **non-rule-linked** template for documenting new/future app functionality
-  as an idea or roadmap item. Not measured against a rule; see
-  `Rules-of-Rules.md` §9. Opening actual development work for a feature
-  still means opening a requirement (`requirements.template.md`), not
-  editing the feature entry.
-- [`step.template.md`](step.template.md) — a top-level, **non-rule-linked**
-  template sitting *below* a requirement or a bug rather than above it:
-  one concrete unit of implementation work performed toward a specific
-  `REQ-NNNNNN` or `BUG-NNNNNN` — files touched, commands run, how it was
-  verified. Always names exactly one parent (the `Parent` field); created
-  via `/create-step` as work actually happens, not in advance of it. See
-  `Rules-of-Rules.md` §21.
-- [`test.template.md`](test.template.md) — a top-level,
-  **rule-linked** development-artifact template alongside
-  `bug.template.md`/`requirement.template.md`/`house-keeping.template.md`
-  — a test always carries its own `Targets`/`Domain`, vetted the same
-  way. On top of that it may independently name `(0,n)` requirements and
-  `(0,n)` steps it verifies — both optional. Created via `/create-test`.
-  See `Rules-of-Rules.md` §22.
+- **Development-artifact templates are not here.** The active process
+  module ships the templates for its own entity types (its `templates/`,
+  referenced from its `module.yaml`; `MODULE-SPECIFICATION.md` §2–§3) and
+  they are deployed alongside the kernel's. This folder holds only the
+  kernel's own templates, such as [`meta-tag.template.md`](meta-tag.template.md)
+  — the lightweight annotation governed by `CODE-OF-CONDUCT.md` for every
+  artifact type.
 - **Work-item templates are not here anymore.** They moved to
   `plugins/_prototyping/project-management/agile/templates/` — `work-items/`
   is plugin-territory, not core (`Rules-of-Rules.md` §8, INV-22); see
@@ -57,22 +41,10 @@ This folder contains the reusable document templates that seed the deployed cata
   command in `../rules-of-development.template.md` §4. See `CLAUDE.md`'s
   "Slash commands" entry and `INSTANTIATION-GUIDE.md` §1 step 5 — this is
   required as part of instantiation, not an optional extra.
-- [`backlog.template.md`](backlog.template.md) — copy to
-  `development/BACKLOG.md` on first deploy (`INVARIANTS.md` INV-14). Unlike
-  every other template here, never hand-edited afterward — `/show-backlog`
-  overwrites it in full on every run.
-- [`roadmap.template.md`](roadmap.template.md) — copy to
-  `development/roadmaps/templates/TEMPLATE-ROADMAP-v1.md` on first deploy
-  (`INVARIANTS.md` INV-15, INV-20), then to `development/roadmaps/<name>.md`
-  per named roadmap by `/roadmap-add`. `/roadmap-add`/`-update`/`-merge` add
-  or update a roadmap's `RM-NNNNNN` rows from an external file, `/roadmap-
-  remove` deletes or retires one, and `/show-backlog` refreshes their
-  Status/Linked columns — `Linked` is a list, not a single ID, since a
-  roadmap item of real size is expected to decompose into more than one
-  requirement — see `Rules-of-Rules.md` §10/§21.
 - [`roles.template.json`](roles.template.json) — copy to
   `IAM/roles/roles.json` on first deploy (`INVARIANTS.md` INV-16), filled
-  in with its default agile-role mapping. JSON, not markdown, because it's
+  in with its default agile-role mapping (phrased generically; the active
+  module's own commands can be listed via `/role-modify`). JSON, not markdown, because it's
   managed by `/role-add`/`/role-modify` rather than hand-edited.
 - [`users.template.json`](users.template.json) — copy to
   `IAM/users/users.json` on first deploy (`INVARIANTS.md` INV-16), empty

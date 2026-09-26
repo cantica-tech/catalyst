@@ -4,7 +4,14 @@
   "title": "Catalyst Module Manifest Schema",
   "description": "JSON schema for validating module.yaml files in Catalyst framework modules.",
   "type": "object",
-  "required": ["id", "name", "version", "description", "grounding_type", "entity_types"],
+  "required": [
+    "id",
+    "name",
+    "version",
+    "description",
+    "grounding_type",
+    "entity_types"
+  ],
   "properties": {
     "id": {
       "type": "string",
@@ -32,7 +39,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "schema"],
+        "required": [
+          "id",
+          "schema"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -52,7 +62,11 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "description", "spec_path"],
+        "required": [
+          "name",
+          "description",
+          "spec_path"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -78,7 +92,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "spec_path"],
+        "required": [
+          "name",
+          "spec_path"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -96,7 +113,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["entity_type", "template_path"],
+        "required": [
+          "entity_type",
+          "template_path"
+        ],
         "properties": {
           "entity_type": {
             "type": "string",
@@ -105,6 +125,80 @@
           "template_path": {
             "type": "string",
             "description": "Path to markdown template relative to module root."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "definitions": {
+      "type": "array",
+      "description": "Versioned prose definitions the module contributes (MODULE-SPECIFICATION \u00a76.3).",
+      "items": {
+        "type": "object",
+        "required": [
+          "entity_type",
+          "path"
+        ],
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "description": "Entity type prefix, or another module concept the definition covers."
+          },
+          "path": {
+            "type": "string",
+            "description": "Path to DEFINITION-<TYPE>-vN.md relative to module root."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "contributions": {
+      "type": "object",
+      "description": "Content composed into a deployment (MODULE-SPECIFICATION \u00a76).",
+      "properties": {
+        "rules_of_rules": {
+          "type": "string",
+          "description": "Module meta-rules appended to the deployed Rules-of-Rules.md (\u00a76.1)."
+        },
+        "code_of_conduct": {
+          "type": "string",
+          "description": "Module document types and commands inserted into CODE-OF-CONDUCT \u00a73/\u00a74 (\u00a76.2)."
+        },
+        "invariants": {
+          "type": "string",
+          "description": "Module invariants read with the kernel INVARIANTS.md (\u00a76.4)."
+        },
+        "taskfile": {
+          "type": "string",
+          "description": "Module tasks appended to the deployed Taskfile.common.yml (\u00a76.5)."
+        },
+        "migrations": {
+          "type": "string",
+          "description": "Folder holding the module's migrations and migrations.md index (\u00a76.6)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "required_paths": {
+      "type": "array",
+      "description": "Paths every deployment of this module must carry, checked by check_deployment.py.",
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path relative to the working-copy root."
+          },
+          "invariant": {
+            "type": "string",
+            "description": "Invariant that requires it (e.g. one in the module's INVARIANTS.module.md)."
+          },
+          "seed": {
+            "type": "string",
+            "description": "Module template used to create it when missing."
           }
         },
         "additionalProperties": false

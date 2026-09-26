@@ -15,8 +15,8 @@
 project's own root — inconsistent with INV-6 ("the deployment's real
 working copy... never inside the developed project's own tree"), since
 this file is generated/refreshed framework machinery, not product code,
-the same way `rules/`, `requirements/`, etc. already live in
-`.criterion/` rather than the project tree. (`.claude/commands/*.md`
+the same way `rules/`, the development-artifact folders, etc. already
+live in `.criterion/` rather than the project tree. (`.claude/commands/*.md`
 stays project-root — that's forced by Claude Code's own fixed discovery
 path, an external constraint this file has none of.)
 

@@ -3,9 +3,23 @@
 **catalyst is a portable, model-agnostic development framework that a coding
 agent installs into a project and then works within.** It gives any codebase a
 single, traceable structure for its rules, its development work, its agile
-process, its roadmap, who's accountable for what, and a real history of why
-every change happened — so every change traces down to a documented rule, and
-every rule back up to the work that exercises it.
+process, who's accountable for what, and a real history of why every change
+happened — so every change traces down to a documented rule, and every rule
+back up to the work that exercises it.
+
+## Kernel and modules
+
+The framework is the **kernel** plus one **process module** per deployment.
+The kernel is process-agnostic: it owns rules and domains, reconciliation
+cases (`RECON-`), workflows (`WORKFLOW-`), meta-tags, users and roles, the
+journal, repoed sync, plugins, and entity definitions as a mechanism. The
+active module adds its development-artifact types — their templates,
+definitions, commands, meta-rules, invariants and migrations — and is named
+by the `module` field of the project's `<app-name>.catalyst` pointer. Each
+production module lives in its own repository, listed in
+`framework/modules/catalog.md`; see that repository for what its artifact
+types are and how they relate. The contract between the two is
+`framework/kernel/MODULE-SPECIFICATION.md`.
 
 ## The core chain
 
@@ -14,7 +28,7 @@ At its center is a four-layer chain, each layer subordinate to the one below it:
 ```
 Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer)
                         ▼
-Dev artifacts        REQ- / BUG- / HK- / TAG-          (rule-linked work)
+Dev artifacts   <PREFIX>-NNNNNN (the active module's)  (rule-linked work)
                         ▼
 Rules          (prefix)-(DOMAIN)-(NNNNNN)-(userid)      (documented behavior)
                         ▼
@@ -26,44 +40,29 @@ The work-items layer is optional, plugin-provided content, not core — see
 layer down: dev artifacts trace straight to a rule.
 
 The chain's one invariant: **no work happens without a traceable link down to a
-documented rule**, and every document, domain, and rule carries a stable,
-permanent, never-reused ID. That is what makes both "why does this code do X"
-and "what rule does this ticket satisfy" answerable by following IDs in either
-direction, indefinitely. Rules are never deleted, only retired in place — a
-retired rule keeps its ID, gets marked 🗑 with a reason and date, and stays a
-valid target for the dev-artifact that explains why — so any reference to it,
-in code, tests, or tickets, stays resolvable forever.
+documented rule** — an active-module artifact grounds to the module's
+grounding type (a kernel rule), and that rule to its domain — and every
+document, domain, and rule carries a stable, permanent, never-reused ID. That
+is what makes both "why does this code do X" and "what rule does this ticket
+satisfy" answerable by following IDs in either direction, indefinitely. Rules
+are never deleted, only retired in place — a retired rule keeps its ID, gets
+marked 🗑 with a reason and date, and stays a valid target for the
+dev-artifact that explains why — so any reference to it, in code, tests, or
+tickets, stays resolvable forever.
 
-## Above the chain: roadmap and ideas
+## Development artifacts: the active module
 
-`FEAT-` entries are non-rule-linked roadmap ideas — a place to write down
-future product direction before it's ready to be measured against anything.
-They can themselves be bulk-ingested: `/roadmap-add`/`-update`/`-merge` pull
-an external roadmap (one or many, tracked independently) into `RM-` items
-with their own status, triaged into `FEAT-` entries and, once work actually
-starts, promoted to one or more `REQ-` — never a `BUG-` — the same way any
-other new work enters the chain. A roadmap item of real size is expected to
-decompose into more than one requirement rather than one oversized `REQ-`
-standing in for the whole thing.
-
-## Below the chain: steps
-
-`STEP-` records sit one level under a requirement or a bug: one concrete
-unit of implementation work performed toward it — files touched, commands
-run, how it was verified — created via `/create-step` as work actually
-happens, not in advance of it. A requirement or bug isn't closeable as
-done/fixed until every step opened against it is done or abandoned, so
-its real implementation history stays structured and independently
-referenceable instead of buried in prose.
-
-## Verifying the chain: tests
-
-`TEST-` records are a fourth dev-artifact type alongside `REQ-`/`BUG-`/
-`HK-` — created via `/create-test`, carrying their own targeted rule like
-any other dev artifact, so a test's existence is itself vetted the same
-way a bug or requirement is. On top of that, a test may independently
-name `(0,n)` requirements and `(0,n)` steps it verifies — both optional,
-and a test naming neither is still valid as long as it targets a rule.
+Everything between a work item and a rule belongs to the active module: which
+dev-artifact types exist, how they decompose into smaller units of work, how
+they are verified, which ideas sit above the chain before they are ready to
+be measured against a rule, and which day-to-day views summarize them. The
+kernel only fixes the shape every such type shares — a permanent
+`<PREFIX>-NNNNNN` ID, its own folder and index in the working copy, a
+versioned definition, a `Signed-off-by`, and a grounding link down to a
+rule, direct or through a parent artifact — and the commands that work on any of them (`/status`, `/list`,
+`/meta-tag`, `/audit`). The module's own commands (listed in its
+`code-of-conduct.module.md` §4) are added to the deployment alongside the
+kernel's.
 
 ## Accountability: users, roles, signing
 
@@ -139,9 +138,8 @@ Deployment follows one of two paths, chosen at install time:
   incrementally from what's already there, optionally bootstrapped with a
   four-eyes analysis pass (`/run-analysis`) rather than written up front.
 
-Either way, `development/BACKLOG.md` is the always-current, never-hand-edited
-day-to-day view — `/show-backlog` regenerates it from the real indexes, every
-time.
+Either way, the active module decides what the day-to-day view of open work
+looks like; see its repository.
 
 ## Portable by design
 

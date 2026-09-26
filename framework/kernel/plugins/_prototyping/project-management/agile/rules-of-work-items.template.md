@@ -13,7 +13,7 @@ agnostic" note in the framework [`README.md`](README.md)). Sits above
 EPIC ─▶ STORY ─▶ TASK           (agile layer — this document)
           │
           ▼
-       REQ- / BUG- / HK-        (rule-linked work)
+       <PREFIX>-NNNNNN          (the active module's rule-linked work)
           │
           ▼
        rule IDs                 (documented behavior)
@@ -21,27 +21,28 @@ EPIC ─▶ STORY ─▶ TASK           (agile layer — this document)
 
 ---
 
-## 1. A story is not a substitute for a `REQ-`/`BUG-` doc
+## 1. A story is not a substitute for a development artifact
 
-Every `STORY-NNNNNN` links to exactly one `REQ-NNNNNN` (or `BUG-NNNNNN`). The
-`REQ-`/`BUG-` doc owns rule targets, conflict checks, and new-rule
-proposals. The story is the sized, scheduled slice of that same work.
+Every `STORY-NNNNNN` links to exactly one grounded development artifact of
+the active module (`<PREFIX>-NNNNNN`). That artifact owns rule targets,
+conflict checks, and new-rule proposals. The story is the sized, scheduled
+slice of that same work.
 
-If a story has no `REQ-`/`BUG-` doc yet, create one before pulling the
-story into a sprint/iteration. (A `FEAT-NNNNNN` entry may motivate a story
-too, but it never substitutes for the `REQ-`/`BUG-` doc — features aren't
-rule-linked; see `Rules-of-Rules.md` §9.)
+If a story has no development artifact yet, create one before pulling the
+story into a sprint/iteration. (A non-grounded planning entry of the active
+module may motivate a story too, but it never substitutes for the grounded
+artifact — it isn't rule-linked.)
 
 ## 2. Tasks inherit their parent story's rule target
 
 A `TASK-NNNNNN` never gets its own rule target — it inherits its parent
 story's. If task-level work needs a rule the story doesn't cover, fix the
-story/feature doc first rather than letting scope creep in unreviewed.
+story's development artifact first rather than letting scope creep in unreviewed.
 
 ## 3. Spikes exist to produce rules or estimates, not code
 
 A `SPIKE-NNNNNN` is time-boxed and never itself "implements" anything. Its
-outcome is a new rule proposal (handed to a `REQ-NNNNNN`), an
+outcome is a new rule proposal (handed to a development artifact of the active module), an
 implementation approach, or a go/no-go decision. A spike that ships
 production code has stopped being a spike.
 
@@ -55,7 +56,8 @@ never targets a rule directly. "Done" means all child stories are done.
 Whatever container your methodology uses (`SPRINT-NNN`, `BOARD-NNNNNN`,
 etc.) holds `STORY-`/`TASK-`/`SPIKE-` IDs as-is — it never restates
 acceptance criteria or rule targets. Retro/review action items that imply
-a process change get filed as `HK-NNNNNN`, not left as an untracked note.
+a process change get filed as a development artifact of the active
+module, not left as an untracked note.
 
 ## 6. Boards are Kanban/Scrumban's container, not Scrum's
 

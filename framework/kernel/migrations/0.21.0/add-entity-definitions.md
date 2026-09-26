@@ -17,13 +17,13 @@ version has no `definitions/` folder at all.
 ## Steps
 
 1. Create `.criterion/definitions/` if it doesn't already exist.
-2. For each real entity type (`bug`, `requirement`, `house-keeping`,
-   `rule`, `domain`, `feature`, `roadmap`, `user`, `role`,
-   `reconciliation`, `meta-tag`, `journal`, `backlog`, `ledger`,
-   `slash-command`, `templates-catalog`), if
+2. For each real entity type — the kernel's (`rule`, `domain`, `user`,
+   `role`, `reconciliation`, `meta-tag`, `journal`, `ledger`,
+   `slash-command`, `templates-catalog`) and the active module's
+   (`MODULE-SPECIFICATION.md` §6.3) — if
    `.criterion/definitions/<type>.md` does not already exist, create it
-   from this framework's current *latest* `definitions/<type>/
-   DEFINITION-<TYPE>-vN.md`. This is the exact same "create if missing,
+   from the current *latest* `definitions/<type>/DEFINITION-<TYPE>-vN.md`
+   of this framework or of the active module. This is the exact same "create if missing,
    never overwrite" logic `SYNCHRONIZE.md`'s definitions carve-out already
    describes for ordinary syncs — this migration just runs it once,
    retroactively, for a deployment old enough to have never run it before.

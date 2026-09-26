@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Module Loader & Registry Engine for Catalyst (Python).
 
-Phase 2 implementation of the Catalyst Module Architecture.
-Loads process modules (e.g. software-engineering), ETDs (Entity Type Definitions),
-command registrations, and grounding rules.
+Loads the kernel's own entity types (framework/kernel/entities/) and, for a
+project, its active process module: the module declared by the project's
+*.catalyst pointer, with its ETDs (Entity Type Definitions), command
+registrations, templates and grounding type. Nothing module-specific is
+built in: when no module is declared or found, callers get None and run
+kernel-only.
 
 Exposes query functions:
-- load_module(project_root, module_id) -> ModuleManifest
+- resolve_module_id(project_root) -> str | None
+- load_module(project_root, module_id) -> ModuleManifest | None
+- load_kernel_entities() -> dict[str, ETD]
 - get_active_etds(manifest) -> dict[str, ETD]
 - get_grounding_type(manifest) -> str
 - resolve_command(manifest, name) -> CommandRegistration | None
@@ -52,6 +57,9 @@ class ETD:
     folder: str
     grounding: str  # "required" | "inherited" | "none"
     grounding_field: str | None = None
+    # "id-summary" (files named <id>-<short-summary>.md) or "free-form"
+    # (files keyed by a free-form name, exempt from that naming check).
+    naming: str = "id-summary"
     fields: list[FieldDefinition] = field(default_factory=list)
     workflow: WorkflowDefinition = field(
         default_factory=lambda: WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
@@ -79,6 +87,14 @@ class TemplateRegistration:
 
 
 @dataclass
+class RequiredPath:
+    """A deployment path the module requires to always exist."""
+    path: str
+    invariant: str | None = None
+    seed: str | None = None
+
+
+@dataclass
 class ModuleManifest:
     id: str
     name: str
@@ -89,6 +105,8 @@ class ModuleManifest:
     commands: dict[str, CommandRegistration] = field(default_factory=dict)
     skills: list[SkillRegistration] = field(default_factory=list)
     templates: list[TemplateRegistration] = field(default_factory=list)
+    required_paths: list[RequiredPath] = field(default_factory=list)
+    path: Path | None = None  # the module directory it was loaded from
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
@@ -193,231 +211,65 @@ def _parse_scalar(val: str) -> Any:
     return val
 
 
-def get_default_software_engineering_manifest() -> ModuleManifest:
-    """Built-in default fallback for software-engineering process module."""
-    etds: dict[str, ETD] = {
-        "BUG": ETD(
-            id_prefix="BUG",
-            name="Bug",
-            plural_name="Bugs",
-            folder="bugs",
-            grounding="required",
-            grounding_field="Targets",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Open", "Under Review", "Fixed", "Closed", "WontFix"]),
-                FieldDefinition("Targets", "ref-list", required=True, target_type="rule"),
-                FieldDefinition("Domain", "ref", required=True, target_type="domain"),
-                FieldDefinition("Steps", "ref-list", required=False, target_type="STEP"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Open",
-                states=["Open", "Under Review", "Fixed", "Closed", "WontFix"],
-                closed_states=["Closed", "WontFix"],
-            ),
-        ),
-        "REQ": ETD(
-            id_prefix="REQ",
-            name="Requirement",
-            plural_name="Requirements",
-            folder="requirements",
-            grounding="required",
-            grounding_field="Targets",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Draft", "Proposed", "Vetted", "Active", "Completed", "Abandoned"]),
-                FieldDefinition("Targets", "ref-list", required=True, target_type="rule"),
-                FieldDefinition("Domain", "ref", required=True, target_type="domain"),
-                FieldDefinition("Feature", "ref", required=False, target_type="FEAT", backref="Requirements"),
-                FieldDefinition("Tests", "ref-list", required=False, target_type="TEST", backref="Requirements"),
-                FieldDefinition("Steps", "ref-list", required=False, target_type="STEP"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Draft",
-                states=["Draft", "Proposed", "Vetted", "Active", "Completed", "Abandoned"],
-                closed_states=["Completed", "Abandoned"],
-            ),
-        ),
-        "HK": ETD(
-            id_prefix="HK",
-            name="House-keeping",
-            plural_name="House-keeping Items",
-            folder="house-keeping",
-            grounding="required",
-            grounding_field="Targets",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Open", "Completed"]),
-                FieldDefinition("Targets", "ref-list", required=True, target_type="rule"),
-                FieldDefinition("Domain", "ref", required=True, target_type="domain"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Open",
-                states=["Open", "Completed"],
-                closed_states=["Completed"],
-            ),
-        ),
-        "TEST": ETD(
-            id_prefix="TEST",
-            name="Test",
-            plural_name="Tests",
-            folder="tests",
-            grounding="required",
-            grounding_field="Targets",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Draft", "Active", "Passing", "Failing", "Disabled"]),
-                FieldDefinition("Targets", "ref-list", required=True, target_type="rule"),
-                FieldDefinition("Domain", "ref", required=True, target_type="domain"),
-                FieldDefinition("Requirements", "ref-list", required=False, target_type="REQ", backref="Tests"),
-                FieldDefinition("Steps", "ref-list", required=False, target_type="STEP"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Draft",
-                states=["Draft", "Active", "Passing", "Failing", "Disabled"],
-                closed_states=["Passing"],
-            ),
-        ),
-        "STEP": ETD(
-            id_prefix="STEP",
-            name="Step",
-            plural_name="Steps",
-            folder="steps",
-            grounding="inherited",
-            grounding_field="Parent",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["planned", "in-progress", "done", "abandoned"]),
-                FieldDefinition("Parent", "ref", required=True, target_type="REQ"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="planned",
-                states=["planned", "in-progress", "done", "abandoned"],
-                closed_states=["done", "abandoned"],
-            ),
-        ),
-        "FEAT": ETD(
-            id_prefix="FEAT",
-            name="Feature",
-            plural_name="Features",
-            folder="features",
-            grounding="none",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Draft", "Triaged", "Active", "Completed", "Abandoned"]),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Draft",
-                states=["Draft", "Triaged", "Active", "Completed", "Abandoned"],
-                closed_states=["Completed", "Abandoned"],
-            ),
-        ),
-        "RM": ETD(
-            id_prefix="RM",
-            name="Roadmap",
-            plural_name="Roadmaps",
-            folder="roadmaps",
-            grounding="none",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Not triaged", "Triaged", "In progress", "Done"]),
-                FieldDefinition("Linked", "ref", required=False, target_type="FEAT"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Not triaged",
-                states=["Not triaged", "Triaged", "In progress", "Done"],
-                closed_states=["Done"],
-            ),
-        ),
-        "WORKFLOW": ETD(
-            id_prefix="WORKFLOW",
-            name="Workflow",
-            plural_name="Workflows",
-            folder="workflows",
-            grounding="none",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Draft", "Active", "Deprecated"]),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Draft",
-                states=["Draft", "Active", "Deprecated"],
-                closed_states=["Deprecated"],
-            ),
-        ),
-        "RECON": ETD(
-            id_prefix="RECON",
-            name="Reconciliation",
-            plural_name="Reconciliations",
-            folder="reconciliations",
-            grounding="none",
-            fields=[
-                FieldDefinition("ID", "text", required=True),
-                FieldDefinition("Status", "enum", required=True, allowed_values=["Open", "Under Review", "Resolved-Accepted", "Resolved-Rejected", "Closed"]),
-                FieldDefinition("Entity", "ref", required=True),
-                FieldDefinition("Workflow", "ref", required=False, target_type="WORKFLOW"),
-            ],
-            workflow=WorkflowDefinition(
-                initial="Open",
-                states=["Open", "Under Review", "Resolved-Accepted", "Resolved-Rejected", "Closed"],
-                closed_states=["Resolved-Accepted", "Resolved-Rejected", "Closed"],
-            ),
-        ),
-    }
-
-    commands: dict[str, CommandRegistration] = {
-        "create-req": CommandRegistration("create-req", "Create a new requirement artifact", argument_hint="[<rule-id>]"),
-        "create-bug": CommandRegistration("create-bug", "Create a new bug artifact", argument_hint="[<rule-id>]"),
-        "create-test": CommandRegistration("create-test", "Create a new test artifact", argument_hint="[<rule-id>]"),
-        "create-feature": CommandRegistration("create-feature", "Create a new feature artifact"),
-        "create-step": CommandRegistration("create-step", "Create a new step artifact", argument_hint="<parent-id>"),
-        "check-rules": CommandRegistration("check-rules", "Validate rule link coverage across dev artifacts"),
-        "show-backlog": CommandRegistration("show-backlog", "Display work item and artifact backlog"),
-        "cut-release": CommandRegistration("cut-release", "Cut a release for catalyst or a submodule"),
-    }
-
-    return ModuleManifest(
-        id="software-engineering",
-        name="Software Engineering Process Module",
-        version="1.0.0",
-        description="Standard software engineering process module governing rules, requirements, bugs, tests, steps, features, and reconciliations.",
-        grounding_type="rule",
-        entity_types=etds,
-        commands=commands,
-    )
+POINTER_SUFFIX = ".catalyst"
+DEPLOY_DIRNAME = ".criterion"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+KERNEL_ENTITIES_DIR = REPO_ROOT / "framework" / "kernel" / "entities"
 
 
-def resolve_module_id(project_root: Path | str | None) -> str:
-    """Resolve active module ID from project pointer (*.catalyst or .criterion/config.yaml). Defaults to 'software-engineering'."""
+def _read_pointer(project_root: Path) -> dict[str, Any]:
+    """The first parseable *.catalyst pointer at `project_root`, or {}."""
+    for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
+        try:
+            data = json.loads(pointer.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
+    """The deployment root for `project_root`: the pointer's "agent-source"
+    when it names a real directory (same rule as
+    check_deployment.find_deploy_root), else an in-tree .criterion/."""
     if not project_root:
-        return "software-engineering"
+        return None
+    root = Path(project_root).resolve()
+    source = _read_pointer(root).get("agent-source")
+    if source:
+        candidate = Path(str(source)).expanduser()
+        if candidate.is_dir():
+            return candidate
+    legacy = root / DEPLOY_DIRNAME
+    return legacy if legacy.is_dir() else None
+
+
+def resolve_module_id(project_root: Path | str | None) -> str | None:
+    """The active module id declared for `project_root`: the `module` field
+    of its *.catalyst pointer, then `.criterion/config.yaml` `module:`, then
+    `.criterion/module.yaml` `id:`. None when no module is declared."""
+    if not project_root:
+        return None
     root = Path(project_root).resolve()
 
-    # Search for *.catalyst pointer
-    pointers = list(root.glob("*.catalyst"))
-    if pointers:
-        try:
-            data = json.loads(pointers[0].read_text())
-            if isinstance(data, dict) and data.get("module"):
-                return str(data["module"])
-        except Exception:
-            pass
+    declared = _read_pointer(root).get("module")
+    if declared:
+        return str(declared)
 
-    # Search for .criterion/config.yaml or .criterion/module.yaml
-    cfg_yaml = root / ".criterion" / "config.yaml"
+    cfg_yaml = root / DEPLOY_DIRNAME / "config.yaml"
     if cfg_yaml.is_file():
         parsed = parse_simple_yaml(cfg_yaml.read_text())
         if isinstance(parsed, dict) and parsed.get("module"):
             return str(parsed["module"])
 
-    mod_yaml = root / ".criterion" / "module.yaml"
+    mod_yaml = root / DEPLOY_DIRNAME / "module.yaml"
     if mod_yaml.is_file():
         parsed = parse_simple_yaml(mod_yaml.read_text())
         if isinstance(parsed, dict) and parsed.get("id"):
             return str(parsed["id"])
 
-    return "software-engineering"
-
+    return None
 
 def parse_etd_dict(d: dict[str, Any]) -> ETD:
     id_prefix = d.get("id_prefix", "")
@@ -426,6 +278,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
     folder = d.get("folder", id_prefix.lower())
     grounding = d.get("grounding", "none")
     grounding_field = d.get("grounding_field")
+    naming = str(d.get("naming") or "id-summary")
 
     fields: list[FieldDefinition] = []
     for f in d.get("fields", []):
@@ -458,86 +311,131 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
         folder=folder,
         grounding=grounding,
         grounding_field=grounding_field,
+        naming=naming,
         fields=fields,
         workflow=wf,
     )
 
 
-def load_module(project_root: Path | str | None = None, module_id: str | None = None) -> ModuleManifest:
-    """Load module manifest by ID or project root. Falls back to software-engineering default."""
-    target_id = module_id or resolve_module_id(project_root)
+def load_etd_file(path: Path) -> ETD | None:
+    """Parse one ETD YAML file, or None if it is missing or malformed."""
+    if not path.is_file():
+        return None
+    data = parse_simple_yaml(path.read_text())
+    if not isinstance(data, dict) or not data.get("id_prefix"):
+        return None
+    return parse_etd_dict(data)
 
-    # Search paths for module directory
-    search_dirs: list[Path] = []
+
+def load_kernel_entities(entities_dir: Path | None = None) -> dict[str, ETD]:
+    """The kernel's own entity types (framework/kernel/entities/*.yaml),
+    keyed by id prefix. These are present whatever module is active."""
+    base = entities_dir or KERNEL_ENTITIES_DIR
+    etds: dict[str, ETD] = {}
+    if not base.is_dir():
+        return etds
+    for path in sorted(base.glob("*.yaml")):
+        etd = load_etd_file(path)
+        if etd is not None:
+            etds[etd.id_prefix] = etd
+    return etds
+
+
+def module_search_dirs(project_root: Path | str | None, module_id: str) -> list[Path]:
+    """Candidate directories for module `module_id`, in search order."""
+    dirs: list[Path] = []
     if project_root:
         pr = Path(project_root).resolve()
-        search_dirs.extend([
-            pr / ".criterion" / "modules" / target_id,
-            pr / "modules" / target_id,
-            pr / "framework" / "modules" / target_id,
-            pr.parent / f"catalyst-{target_id}",
+        deploy = resolve_deploy_root(pr)
+        if deploy is not None:
+            dirs.append(deploy / "modules" / module_id)
+        dirs.extend([
+            pr / DEPLOY_DIRNAME / "modules" / module_id,
+            pr / "framework" / "modules" / module_id,
+            # A module's own repository, checked out next to the project.
+            pr.parent / f"catalyst-{module_id}",
         ])
-
-    # Also search relative to this file's repository
-    repo_root = Path(__file__).resolve().parent.parent
-    search_dirs.extend([
-        repo_root / "framework" / "modules" / target_id,
-        repo_root / "modules" / target_id,
-        # A module's own repository, checked out next to catalyst.
-        repo_root.parent / f"catalyst-{target_id}",
+    dirs.extend([
+        REPO_ROOT / "framework" / "modules" / module_id,
+        REPO_ROOT.parent / f"catalyst-{module_id}",
     ])
+    unique: list[Path] = []
+    for d in dirs:
+        if d not in unique:
+            unique.append(d)
+    return unique
 
-    for mdir in search_dirs:
-        mfile = mdir / "module.yaml"
-        if mfile.is_file():
-            data = parse_simple_yaml(mfile.read_text())
-            if isinstance(data, dict):
-                mid = data.get("id", target_id)
-                mname = data.get("name", mid)
-                mver = str(data.get("version", "1.0.0"))
-                mdesc = data.get("description", "")
-                mgnd = data.get("grounding_type", "rule")
 
-                etds: dict[str, ETD] = {}
-                etd_list = data.get("entity_types", [])
-                if isinstance(etd_list, list):
-                    for item in etd_list:
-                        if isinstance(item, dict):
-                            eid = item.get("id")
-                            rel_schema = item.get("schema")
-                            if eid and rel_schema:
-                                schema_path = mdir / rel_schema
-                                if schema_path.is_file():
-                                    etd_dict = parse_simple_yaml(schema_path.read_text())
-                                    if isinstance(etd_dict, dict):
-                                        etds[eid] = parse_etd_dict(etd_dict)
+def find_module_dir(project_root: Path | str | None, module_id: str) -> Path | None:
+    """The first search directory holding a module.yaml, or None."""
+    for mdir in module_search_dirs(project_root, module_id):
+        if (mdir / "module.yaml").is_file():
+            return mdir
+    return None
 
-                cmds: dict[str, CommandRegistration] = {}
-                cmd_list = data.get("commands", [])
-                if isinstance(cmd_list, list):
-                    for c in cmd_list:
-                        if isinstance(c, dict) and c.get("name"):
-                            cname = c["name"]
-                            cmds[cname] = CommandRegistration(
-                                name=cname,
-                                description=c.get("description", ""),
-                                argument_hint=c.get("argument_hint"),
-                                spec_path=c.get("spec_path"),
-                            )
 
-                return ModuleManifest(
-                    id=mid,
-                    name=mname,
-                    version=mver,
-                    description=mdesc,
-                    grounding_type=mgnd,
-                    entity_types=etds or get_default_software_engineering_manifest().entity_types,
-                    commands=cmds or get_default_software_engineering_manifest().commands,
-                )
+def load_module(project_root: Path | str | None = None,
+                module_id: str | None = None) -> ModuleManifest | None:
+    """Load the manifest of module `module_id` (or of the module declared for
+    `project_root`). None when no module is declared or it cannot be found."""
+    target_id = module_id or resolve_module_id(project_root)
+    if not target_id:
+        return None
+    mdir = find_module_dir(project_root, target_id)
+    if mdir is None:
+        return None
+    data = parse_simple_yaml((mdir / "module.yaml").read_text())
+    if not isinstance(data, dict):
+        return None
 
-    # Fall back to default software-engineering manifest if not loaded from file
-    return get_default_software_engineering_manifest()
+    etds: dict[str, ETD] = {}
+    for item in data.get("entity_types") or []:
+        if not isinstance(item, dict):
+            continue
+        eid, rel_schema = item.get("id"), item.get("schema")
+        if eid and rel_schema:
+            etd = load_etd_file(mdir / str(rel_schema))
+            if etd is not None:
+                etds[str(eid)] = etd
 
+    cmds: dict[str, CommandRegistration] = {}
+    for c in data.get("commands") or []:
+        if isinstance(c, dict) and c.get("name"):
+            cname = str(c["name"])
+            cmds[cname] = CommandRegistration(
+                name=cname,
+                description=c.get("description", "") or "",
+                argument_hint=c.get("argument_hint"),
+                spec_path=c.get("spec_path"),
+            )
+
+    templates: list[TemplateRegistration] = []
+    for t in data.get("templates") or []:
+        if isinstance(t, dict) and t.get("entity_type") and t.get("template_path"):
+            templates.append(TemplateRegistration(str(t["entity_type"]), str(t["template_path"])))
+
+    required_paths: list[RequiredPath] = []
+    for r in data.get("required_paths") or []:
+        if isinstance(r, dict) and r.get("path"):
+            required_paths.append(RequiredPath(
+                path=str(r["path"]),
+                invariant=r.get("invariant"),
+                seed=r.get("seed"),
+            ))
+
+    mid = str(data.get("id", target_id))
+    return ModuleManifest(
+        id=mid,
+        name=str(data.get("name", mid)),
+        version=str(data.get("version", "1.0.0")),
+        description=data.get("description", "") or "",
+        grounding_type=data.get("grounding_type", "rule") or "rule",
+        entity_types=etds,
+        commands=cmds,
+        templates=templates,
+        required_paths=required_paths,
+        path=mdir,
+    )
 
 def get_active_etds(manifest: ModuleManifest) -> dict[str, ETD]:
     """Return dictionary of active ETDs keyed by ID prefix."""
@@ -545,7 +443,7 @@ def get_active_etds(manifest: ModuleManifest) -> dict[str, ETD]:
 
 
 def get_grounding_type(manifest: ModuleManifest) -> str:
-    """Return primary grounding artifact type for the module (e.g. 'rule')."""
+    """Return the module's grounding artifact type (a kernel type, e.g. 'rule')."""
     return manifest.grounding_type
 
 

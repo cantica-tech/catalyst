@@ -1,0 +1,26 @@
+id_prefix: WORKFLOW
+name: Workflow
+plural_name: Workflows
+folder: workflows
+grounding: none
+
+fields:
+  - name: ID
+    kind: text
+    required: true
+  - name: Status
+    kind: enum
+    required: true
+    allowed_values:
+      - Draft
+      - Active
+      - Deprecated
+
+workflow:
+  initial: Draft
+  states:
+    - Draft
+    - Active
+    - Deprecated
+  closed_states:
+    - Deprecated

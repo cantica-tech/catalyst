@@ -3,24 +3,18 @@ layout:
   project-root:
     - CODE-OF-CONDUCT.md
     - development:
-        - bugs:
-            - TEMPLATE-BUG.md
-            - bugs.md
-        - house-keeping:
-            - TEMPLATE-HOUSE-KEEPING.md
-            - house-keeping.md
+        - <folder>:   # active-module entity types stored under development/
+            - TEMPLATE-<ENTITY-TYPE>.md
+            - <folder>.md
         - meta-tags:
             - TEMPLATE-META-TAG.md
             - meta-tags.md
     - domains:
         - TEMPLATE-DOMAIN.md
         - domains.md
-    - requirements:
-        - TEMPLATE-REQUIREMENT.md
-        - requirements.md
-    - features:
-        - TEMPLATE-FEATURE.md
-        - features.md
+    - <folder>:   # active-module entity types stored at the root
+        - TEMPLATE-<ENTITY-TYPE>.md
+        - <folder>.md
     - rules:
         - Rules-of-Rules.md
         - rules.md

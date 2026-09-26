@@ -35,8 +35,8 @@ ephemeral sub-agent proposal with nothing durable to show for it.
 
 ## Steps
 
-1. **`reconciliations/`**: create it (top-level, sibling to
-   `requirements/`/`features/`). Add `reconciliations/templates/`
+1. **`reconciliations/`**: create it (top-level, sibling to the active
+   module's root-level artifact folders). Add `reconciliations/templates/`
    (`TEMPLATE-RECONCILIATION-v1.md` from
    `templates/reconciliation.template.md`, `templates-reconciliation.md`
    seeded with a `v1` row — today's date, "initial version" — and its

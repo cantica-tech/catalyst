@@ -1,0 +1,39 @@
+id_prefix: RECON
+name: Reconciliation
+plural_name: Reconciliations
+folder: reconciliations
+grounding: none
+
+fields:
+  - name: ID
+    kind: text
+    required: true
+  - name: Status
+    kind: enum
+    required: true
+    allowed_values:
+      - Open
+      - Under Review
+      - Resolved-Accepted
+      - Resolved-Rejected
+      - Closed
+  - name: Entity
+    kind: ref
+    required: true
+  - name: Workflow
+    kind: ref
+    required: false
+    target_type: WORKFLOW
+
+workflow:
+  initial: Open
+  states:
+    - Open
+    - Under Review
+    - Resolved-Accepted
+    - Resolved-Rejected
+    - Closed
+  closed_states:
+    - Resolved-Accepted
+    - Resolved-Rejected
+    - Closed
