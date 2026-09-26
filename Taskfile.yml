@@ -1,8 +1,8 @@
 # catalyst's own operations. Mirrors .github/workflows/*.yml exactly, so
 # `task check:all` (or `task ci`) is what CI runs, runnable locally.
 #
-# Catalyst-operation dispatch tasks (create-bug, check-rules, sync-framework,
-# ...) come from Taskfile.common.yml, deployed inside .criterion/ (agent-owned
+# Catalyst-operation dispatch tasks (check-rules, sync-framework, and the
+# active module's commands, ...) come from Taskfile.common.yml, deployed inside .criterion/ (agent-owned
 # space, INV-6 — not this repo's own tree) from framework/kernel/
 # templates/Taskfile.common.template.yml, refreshed by /sync-framework, not
 # hand-edited here. See framework/kernel/migrations/0.19.0/
@@ -74,6 +74,11 @@ tasks:
     cmds:
       - python3 scripts/check_plugin_contracts.py
 
+  check:kernel-purity:
+    desc: "Validate that the kernel names no process module or module entity (INV-30, scripts/check_kernel_purity.py)"
+    cmds:
+      - python3 scripts/check_kernel_purity.py
+
   check:all:
     desc: "Run every validation script plus the test suite (what CI runs)"
     cmds:
@@ -81,6 +86,7 @@ tasks:
       - task: check:command-parity
       - task: check:plugins
       - task: check:plugin-contracts
+      - task: check:kernel-purity
       - task: test
 
   release:
@@ -90,6 +96,7 @@ tasks:
       - task: check:command-parity
       - task: check:plugins
       - task: check:plugin-contracts
+      - task: check:kernel-purity
       - task: test
 
   dogfood:

@@ -2,32 +2,32 @@
   "roles": [
     {
       "name": "Product Owner",
-      "actions": ["/create-req", "approve/prioritize requirements", "/create-feature", "/roadmap-add", "/roadmap-update", "/roadmap-merge", "/roadmap-remove"],
+      "actions": ["create the active module's planning and new-work artifacts", "approve/prioritize new work"],
       "reconciliation": "propose"
     },
     {
       "name": "Scrum Master / Delivery Lead",
-      "actions": ["/show-backlog", "/status"],
+      "actions": ["review the active module's open work", "/status"],
       "reconciliation": "propose"
     },
     {
       "name": "Tech Lead / Architect",
-      "actions": ["approve rule changes and new domains", "vet a requirement's rule target(s)"],
+      "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)"],
       "reconciliation": "full"
     },
     {
       "name": "Developer",
-      "actions": ["/create-bug", "/create-req (implementation-driven)", "implement REQ-/BUG-", "/status on tasks/stories"],
+      "actions": ["create the active module's development artifacts (implementation-driven)", "implement the active module's development artifacts", "/status on tasks/stories"],
       "reconciliation": "propose"
     },
     {
       "name": "QA / Tester",
-      "actions": ["/create-bug", "verify a rule's test coverage", "/status on test-plan items"],
+      "actions": ["report defects through the active module's development artifacts", "verify a rule's verification coverage", "/status on verification items"],
       "reconciliation": "propose"
     },
     {
       "name": "Stakeholder",
-      "actions": ["propose FEAT- ideas", "propose roadmap items"],
+      "actions": ["propose ideas and planning items to the active module"],
       "reconciliation": "none"
     },
     {

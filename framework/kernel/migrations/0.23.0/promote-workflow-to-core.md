@@ -28,8 +28,8 @@ this migration is pure addition, never a data-migration case.
    (`README.md`, `templates-workflow.md` seeded with a `v1` row,
    `TEMPLATE-WORKFLOW-v1.md` copied from this framework's
    `templates/workflow.template.md`), the folder's own `README.md`, and
-   an empty `workflows.md` index (empty is fine, same as roadmaps/
-   reconciliations on a fresh deployment).
+   an empty `workflows.md` index (empty is fine, same as reconciliations
+   on a fresh deployment).
 2. Create `definitions/workflow.md` if it doesn't already exist, from
    this framework's current latest `definitions/workflow/
    DEFINITION-WORKFLOW-vN.md` (INV-23's "create if missing" logic,

@@ -21,8 +21,8 @@
   inconsistency gets resolved for an existing project.
 - `development/users.json`/`development/roles.json` move to
   `IAM/users/users.json`/`IAM/roles/roles.json`.
-- `development/bugs/`, `development/house-keeping/`,
-  `development/meta-tags/` are promoted from loose files directly under
+- `development/meta-tags/`, and every active-module artifact type kept
+  under `development/`, are promoted from loose files directly under
   `development/` to full artifact-type folders.
 - `work-items/` gains two optional types — `boards/` (`BOARD-NNNNNN`,
   Kanban/Scrumban's counterpart to `sprints/`) and `workflows/`
@@ -30,8 +30,8 @@
   worked) — plus a `tickets/` slot reserved for plugin population
   (`Rules-of-Rules.md` §8). None of these three are retroactively
   required just because the framework now supports them.
-- Every dev-artifact/feature/roadmap/work-item ID widens from 4-digit
-  `NNNN` to 6-digit `NNNNNN` (`BUG-0001` → `BUG-000001`, etc.). Rule IDs
+- Every active-module artifact ID and work-item ID widens from 4-digit
+  `NNNN` to 6-digit `NNNNNN` (`<PREFIX>-0001` → `<PREFIX>-000001`). Rule IDs
   (`(prefix)-(DOMAIN)-(NNN)`, 3-digit) and `SPRINT-NNN` (3-digit) are
   **unaffected** — this widening only applies to the 4-digit scheme.
 
@@ -56,7 +56,7 @@
    `rules/templates/TEMPLATE-RULE-v1.md`, seed
    `rules/templates/templates-rule.md` (`v1`, today's date, "carried
    over from the pre-INV-20 layout"), write `rules/templates/README.md`.
-3. **Requirements, Features**: same treatment per type — create
+3. **Root-level active-module types**: same treatment per type — create
    `<type>/templates/`, move the existing bare `TEMPLATE-<TYPE>.md` in
    as `TEMPLATE-<TYPE>-v1.md`, seed its catalog and `README.md`.
 4. **IAM**: create `IAM/users/` and `IAM/roles/`. Move
@@ -65,8 +65,8 @@
    unchanged). Each gets its own `README.md` — but **no `templates/`**:
    each is one JSON array, not a one-file-per-instance document type, so
    there's nothing to version.
-5. **development/bugs, house-keeping, meta-tags**: create each as a
-   full artifact-type folder; move the existing `TEMPLATE-<TYPE>.md`,
+5. **development/meta-tags and the active module's `development/` types**:
+   create each as a full artifact-type folder; move the existing `TEMPLATE-<TYPE>.md`,
    `<type>.md` index, and every instance file into it, each gaining the
    nested `templates/` treatment.
 6. **work-items**: for epics/stories/tasks/spikes/sprints, same nested
@@ -75,11 +75,12 @@
    migration does not require adopting either. Add the `tickets/` slot
    (`README.md` + empty `tickets.md`, no `templates/` — no core
    template exists for it).
-7. **Widen IDs to 6 digits**: for every `BUG-`/`REQ-`/`HK-`/`FEAT-`/
-   `RM-`/`EPIC-`/`STORY-`/`TASK-`/`SPIKE-` (and `BOARD-`/`WORKFLOW-` if
-   adopted in step 6) instance: rename its file, and update every index
-   row, cross-reference, `Targets`/`Requirement(s)`/`Roadmap`/`Feature`
-   field, and journal `artifact`/`targets` mention consistently. This is
+7. **Widen IDs to 6 digits**: for every active-module `<PREFIX>-NNNN`
+   instance and every `EPIC-`/`STORY-`/`TASK-`/`SPIKE-` (and
+   `BOARD-`/`WORKFLOW-` if adopted in step 6) instance: rename its file,
+   and update every index row, cross-reference, `Targets` or other
+   link field the entity's template defines, and journal
+   `artifact`/`targets` mention consistently. This is
    the highest-risk step — do it as one atomic pass per ID, verify
    against the relevant `<type>.md` index immediately after each
    rename, and treat any reference this pass can't find and fix as a
@@ -100,7 +101,9 @@
     `files` covering every touched path by content hash) — per
     `Rules-of-Rules.md` §12, this is precisely what the journal exists
     to record.
-12. **Version**: update the deployment's own `version.txt` to `0.12.0`
+12. **Module**: apply the active module's migration for this version, if
+    any (`MODULE-SPECIFICATION.md` §6.6).
+13. **Version**: update the deployment's own `version.txt` to `0.12.0`
     (or later, if synchronizing further than this one migration in the
     same run).
 

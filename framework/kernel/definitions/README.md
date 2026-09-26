@@ -42,9 +42,10 @@ to definitions instead of instance templates.
 ## Entity types covered
 
 `entity` (base entity definition extended by all other entity definitions),
-`bug`, `requirement`, `house-keeping`, `rule`, `domain`, `feature`,
-`roadmap`, `user`, `role`, `reconciliation`, `meta-tag`, `journal`,
-`backlog`, `ledger`, `slash-command`, `templates-catalog`, `workflow`,
-`step`, `test` — every real, deployed catalyst entity type.
+`rule`, `domain`, `user`, `role`, `reconciliation`, `meta-tag`, `journal`,
+`ledger`, `slash-command`, `templates-catalog`, `workflow` — every real,
+deployed kernel entity type. The active process module ships the
+definitions of its own entity types in its `definitions/` folder, with the
+same layout and freeze rule (`MODULE-SPECIFICATION.md` §6.3).
 (`section.template.md` under `templates/` is vestigial and unused — it
 has no definition here.)

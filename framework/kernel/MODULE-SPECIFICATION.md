@@ -1,161 +1,170 @@
 # Catalyst Module & ETD Specification
 
-**Version:** 1.0.0  
-**Status:** Phase 1 Standard  
+**Version:** 2.0.0  
+**Status:** Standard  
 **Scope:** Catalyst kernel (`framework/kernel/`)
 
 ---
 
 ## 1. Overview
 
-This document specifies the architecture, manifest schema, Entity Type Definition (ETD) schema, and directory layout for **Catalyst Modules**.
+This document specifies how a **process module** plugs into the catalyst
+kernel: its repository layout, its manifest, its Entity Type Definitions
+(ETDs), and the content it contributes to a deployment.
 
-A Catalyst Module encapsulates a complete process domain (such as `software-engineering`, `scrum`, `itil`, `legal-compliance`, or `product-management`). Decoupling domain concepts from the Catalyst kernel — the module-independent part of the framework, under `framework/kernel/` — allows the kernel to remain process-agnostic while enabling deployments to load, swap, or extend process models with 100% behavioral parity.
+The catalyst framework is the **kernel** plus its **process modules**. The
+kernel is process-agnostic: it owns rules, domains, reconciliation cases,
+workflows, meta-tags, users and roles, the journal, repoed sync, plugins and
+entity definitions as a mechanism. A module owns a process domain: its
+development-artifact entity types, their templates, definitions, commands,
+meta-rules, invariants and migrations. The kernel never names a specific
+module or any of its entities (`INVARIANTS.md` INV-30); it only speaks of
+"the active module" and `<entity-type>`.
 
----
-
-## 2. Module Directory Layout Specification
-
-Each production module lives in its own git repository (e.g. `software-engineering`) and is published as a versioned release, not vendored into catalyst. Its repository is named `catalyst-<module-id>` and is checked out next to the catalyst repository (e.g. `catalyst-software-engineering`), where the release task and module loader find it. In the catalyst repository itself, `framework/modules/` (a sibling of `framework/kernel/`) holds only in-repo samples such as `sample-process`. In a project deployment, a module is seeded into `.criterion/modules/`. Either way it has this layout:
-
-```
-modules/
-└── <module-id>/
-    ├── module.yaml             # Primary module manifest
-    ├── schemas/                # Entity Type Definitions (ETDs)
-    │   ├── <entity-1>.yaml
-    │   ├── <entity-2>.yaml
-    │   └── ...
-    ├── templates/              # Document templates for human-facing markdown
-    │   ├── template-<entity-1>.md
-    │   └── ...
-    ├── commands/               # Slash command prompt specs (.md)
-    │   ├── create-<entity-1>.md
-    │   └── ...
-    └── skills/                 # Agent skill specifications
-        └── <skill-name>/
-            └── SKILL.md
-```
+A deployment activates exactly one module, named by the `module` field of its
+`<app-name>.catalyst` pointer.
 
 ---
 
-## 3. Module Manifest Schema (`module.yaml`)
+## 2. Module repository layout
 
-The `module.yaml` file defines the identity, grounding rules, entity schemas, command registrations, skills, and templates exported by a module.
+Each production module lives in its own git repository named
+`catalyst-<module-id>`, checked out next to the catalyst repository, and is
+published as a versioned release; it is never vendored into catalyst or added
+as a submodule. Production modules are listed in catalyst's
+`framework/modules/catalog.md`. In the catalyst repository,
+`framework/modules/` (a sibling of `framework/kernel/`) holds only that catalog
+and in-repo samples. In a project deployment, the active module is seeded into
+`.criterion/modules/<module-id>/`.
 
-### 3.1 Field Reference
+```
+catalyst-<module-id>/
+├── module.yaml                 # Module manifest (§3)
+├── version.txt                 # Module version
+├── schemas/                    # One ETD per entity type (§4)
+│   └── <entity>.yaml
+├── templates/                  # Human-facing document templates
+│   └── <entity>.template.md
+├── definitions/                # Versioned prose definition per entity type (§6.3)
+│   └── <entity>/DEFINITION-<PREFIX>-v1.md
+├── commands/                   # Slash-command specs
+│   └── <command>.md
+├── rules-of-rules.module.md    # Module meta-rules (§6.1)
+├── code-of-conduct.module.md   # Module document types and commands (§6.2)
+├── INVARIANTS.module.md        # Module invariants (§6.4)
+├── Taskfile.module.yml         # Module command tasks (§6.5)
+├── migrations/                 # Module migrations + migrations.md index (§6.6)
+└── skills/                     # Optional agent skills
+    └── <skill-name>/SKILL.md
+```
+
+---
+
+## 3. Module manifest (`module.yaml`)
+
+### 3.1 Field reference
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `id` | `string` | Yes | Unique module identifier (e.g. `software-engineering`). Lowercase, hyphen-separated. |
-| `name` | `string` | Yes | Human-readable name of the process module. |
-| `version` | `string` | Yes | SemVer format version string (e.g. `1.0.0`). |
-| `description` | `string` | Yes | Concise description of the module's domain and purpose. |
-| `grounding_type` | `string` | Yes | The primary grounding artifact type for the module (e.g. `rule` for software engineering, `policy` for governance). |
-| `entity_types` | `list[object]` | Yes | List of ETD schema files included in this module. |
-| `commands` | `list[object]` | No | List of slash commands provided by this module. |
-| `skills` | `list[object]` | No | List of agent skills exported by this module. |
-| `templates` | `list[object]` | No | List of document templates for generating human-facing artifacts. |
+| `id` | `string` | Yes | Unique module identifier, lowercase and hyphen-separated. |
+| `name` | `string` | Yes | Human-readable name. |
+| `version` | `string` | Yes | SemVer version. |
+| `description` | `string` | Yes | One-line summary of the process domain. |
+| `grounding_type` | `string` | Yes | The kernel entity the module's artifacts ground to (for example `rule`). |
+| `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
+| `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`, `spec_path`). |
+| `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
+| `definitions` | `list[object]` | No | Entity definitions (`entity_type`, `path`). |
+| `required_paths` | `list[object]` | No | Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`. |
+| `contributions` | `object` | No | Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `taskfile`, `migrations`. |
+| `skills` | `list[object]` | No | Agent skills (`name`, `spec_path`). |
 
-### 3.2 Manifest Example
+### 3.2 Manifest example
+
+A fictional `example-process` module with one entity type:
 
 ```yaml
-id: software-engineering
-name: Software Engineering Process Module
+id: example-process
+name: Example Process Module
 version: 1.0.0
-description: Standard software engineering process module governing rules, requirements, bugs, tests, steps, features, and reconciliations.
+description: Illustrative module with a single rule-grounded entity type.
 grounding_type: rule
 
 entity_types:
-  - id: BUG
-    schema: schemas/bug.yaml
-  - id: REQ
-    schema: schemas/requirement.yaml
-  - id: TEST
-    schema: schemas/test.yaml
-  - id: STEP
-    schema: schemas/step.yaml
-  - id: FEAT
-    schema: schemas/feature.yaml
-  - id: HK
-    schema: schemas/house-keeping.yaml
-  - id: RM
-    schema: schemas/roadmap.yaml
-  - id: WORKFLOW
-    schema: schemas/workflow.yaml
-  - id: RECON
-    schema: schemas/reconciliation.yaml
+  - id: ITEM
+    schema: schemas/item.yaml
 
 commands:
-  - name: create-req
-    description: Create a new rule-linked requirement artifact
+  - name: create-item
+    description: Create a new item
     argument_hint: "[<rule-id>]"
-    spec_path: commands/create-req.md
-  - name: create-bug
-    description: Create a new rule-linked bug artifact
-    argument_hint: "[<rule-id>]"
-    spec_path: commands/create-bug.md
-  - name: check-rules
-    description: Validate chain completeness across all dev artifacts
-    spec_path: commands/check-rules.md
-
-skills:
-  - name: python-fact-grounded-coding
-    spec_path: skills/python-fact-grounded-coding/SKILL.md
+    spec_path: commands/create-item.md
 
 templates:
-  - entity_type: REQ
-    template_path: templates/template-requirement.md
-  - entity_type: BUG
-    template_path: templates/template-bug.md
+  - entity_type: ITEM
+    template_path: templates/item.template.md
+
+definitions:
+  - entity_type: ITEM
+    path: definitions/item/DEFINITION-ITEM-v1.md
+
+contributions:
+  rules_of_rules: rules-of-rules.module.md
+  code_of_conduct: code-of-conduct.module.md
+  invariants: INVARIANTS.module.md
+  taskfile: Taskfile.module.yml
+  migrations: migrations/
 ```
 
 ---
 
-## 4. Entity Type Definition (ETD) Schema (`<type>.yaml`)
+## 4. Entity Type Definition (ETD) schema (`<entity>.yaml`)
 
-An ETD schema specifies an individual artifact type's ID prefix, storage directory, grounding behavior, fields, relationship links, backreferences, and state workflow.
+An ETD specifies one entity type's ID prefix, folder, grounding, fields,
+back-references and workflow. The kernel's own entity types use the same
+format and live in `framework/kernel/entities/`.
 
-### 4.1 Field Reference
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `id_prefix` | `string` | Yes | Uppercase prefix for entity IDs (e.g. `BUG`, `REQ`, `TEST`). |
-| `name` | `string` | Yes | Singular human-readable name (e.g. `Requirement`). |
-| `plural_name` | `string` | Yes | Plural human-readable name (e.g. `Requirements`). |
-| `folder` | `string` | Yes | Directory name relative to working copy root (e.g. `requirements`, `bugs`). |
-| `grounding` | `string` | Yes | Grounding rule requirement: `required` (must link directly to grounding type), `inherited` (inherits from parent entity), or `none` (roadmap/standalone). |
-| `grounding_field` | `string` | Conditional | Name of the field containing the grounding link (e.g. `Targets` or `Parent`). Required when `grounding` is `required` or `inherited`. |
-| `fields` | `list[object]` | Yes | Ordered list of field definitions. |
-| `workflow` | `object` | Yes | Lifecycle states and transition rules. |
-
-### 4.2 Field Definition Structure (`fields[]`)
+### 4.1 Field reference
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | `string` | Yes | Exact header/key name in the artifact file (e.g. `Status`, `Targets`, `Requirements`). |
-| `kind` | `string` | Yes | Data type: `text`, `enum`, `ref`, `ref-list`, `date`, `user`, `user-list`. |
-| `required` | `boolean` | Yes | Whether the field must be present in every artifact instance. |
-| `allowed_values` | `list[string]` | Conditional | Allowed enum values when `kind` is `enum`. |
-| `target_type` | `string` | Conditional | Target entity prefix when `kind` is `ref` or `ref-list` (e.g. `REQ` or `rule`). |
-| `backref` | `string` | Optional | Corresponding back-reference field name on target entity (e.g. `TEST.Requirements` back-populates `REQ.Tests`). |
+| `id_prefix` | `string` | Yes | Uppercase ID prefix. |
+| `name` | `string` | Yes | Singular name. |
+| `plural_name` | `string` | Yes | Plural name. |
+| `folder` | `string` | Yes | Folder relative to the working-copy root. |
+| `naming` | `string` | No | `id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7). |
+| `grounding` | `string` | Yes | `required` (links directly to the grounding type), `inherited` (through a parent entity), or `none`. |
+| `grounding_field` | `string` | Conditional | Field holding the grounding link; required unless `grounding` is `none`. |
+| `fields` | `list[object]` | Yes | Ordered field definitions. |
+| `workflow` | `object` | Yes | Lifecycle states and transitions. |
 
-### 4.3 Workflow Structure (`workflow`)
+### 4.2 Field definitions (`fields[]`)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `initial` | `string` | Yes | Initial status assigned upon entity creation (e.g. `Draft` or `Open`). |
-| `states` | `list[string]` | Yes | Complete set of valid status values. |
-| `closed_states` | `list[string]` | Yes | Status values that signify the entity is done or resolved (e.g. `Closed`, `Resolved-Accepted`). |
-| `transitions` | `list[object]` | No | Optional transition constraints defining allowed `from` $\rightarrow$ `to` state moves. |
+| `name` | `string` | Yes | Exact field name in the artifact file. |
+| `kind` | `string` | Yes | `text`, `enum`, `ref`, `ref-list`, `date`, `user`, `user-list`. |
+| `required` | `boolean` | Yes | Whether every instance must carry it. |
+| `allowed_values` | `list[string]` | Conditional | Values for `enum`. |
+| `target_type` | `string` | Conditional | Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`. |
+| `backref` | `string` | Optional | The field on the target that lists this entity back. |
 
-### 4.4 ETD Schema Example (`schemas/requirement.yaml`)
+### 4.3 Workflow (`workflow`)
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `initial` | `string` | Yes | Status on creation. |
+| `states` | `list[string]` | Yes | All valid statuses. |
+| `closed_states` | `list[string]` | Yes | Statuses meaning done. |
+| `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
+
+### 4.4 ETD example (`schemas/item.yaml`)
 
 ```yaml
-id_prefix: REQ
-name: Requirement
-plural_name: Requirements
-folder: requirements
+id_prefix: ITEM
+name: Item
+plural_name: Items
+folder: items
 grounding: required
 grounding_field: Targets
 
@@ -166,13 +175,7 @@ fields:
   - name: Status
     kind: enum
     required: true
-    allowed_values:
-      - Draft
-      - Proposed
-      - Vetted
-      - Active
-      - Completed
-      - Abandoned
+    allowed_values: [Open, Done]
   - name: Targets
     kind: ref-list
     required: true
@@ -181,50 +184,90 @@ fields:
     kind: ref
     required: true
     target_type: domain
-  - name: Feature
-    kind: ref
-    required: false
-    target_type: FEAT
-    backref: Requirements
-  - name: Tests
-    kind: ref-list
-    required: false
-    target_type: TEST
-    backref: Requirements
-  - name: Steps
-    kind: ref-list
-    required: false
-    target_type: STEP
 
 workflow:
-  initial: Draft
-  states:
-    - Draft
-    - Proposed
-    - Vetted
-    - Active
-    - Completed
-    - Abandoned
-  closed_states:
-    - Completed
-    - Abandoned
+  initial: Open
+  states: [Open, Done]
+  closed_states: [Done]
   transitions:
-    - from: Draft
-      to: Proposed
-    - from: Proposed
-      to: Vetted
-    - from: Vetted
-      to: Active
-    - from: Active
-      to: Completed
-    - from: Active
-      to: Abandoned
+    - from: Open
+      to: Done
 ```
+
+### 4.5 Fixed documents
+
+A file whose name is all uppercase (for example a generated `SUMMARY.md`)
+is a fixed document, not an entity instance, and is exempt from INV-7's
+`<ID>-<short-summary>.md` naming check.
 
 ---
 
-## 5. Grounding Model & Invariant Generalization
+## 5. Grounding model
 
-Under the Catalyst Module architecture:
-1. **Generalized Grounding (INV-5):** The chain invariant is generalized from requiring a hardcoded `rule` link to requiring a link to the active module's `grounding_type` (or inheriting it via `grounding: inherited`). For the `software-engineering` module, `grounding_type` defaults to `rule`.
-2. **Backward Compatibility:** If no module is explicitly declared in a project pointer, the engine defaults to `software-engineering` with `rule` grounding, preserving complete compatibility for existing deployments.
+1. **Generalized grounding (INV-5).** Every module artifact must link to the
+   module's `grounding_type`, directly or through a parent, as its ETD's
+   `grounding` says. Kernel entities (rules, domains) are what modules ground
+   to.
+2. **No default module.** The kernel has no built-in module. A deployment's
+   pointer must name its `module`; tools that find none run kernel-only checks.
+
+---
+
+## 6. Module contributions and composition
+
+A module contributes content that is composed with the kernel's own when a
+deployment is instantiated or synchronized (`INSTANTIATION-GUIDE.md`,
+`SYNCHRONIZE.md`). Composition is additive: module content is appended under a
+`### From module <module-id>` heading and never replaces kernel content.
+
+### 6.1 Meta-rules (`rules-of-rules.module.md`)
+
+Module meta-rule sections (`## N. \`rr-...\` ...`), appended to the deployed
+`rules/Rules-of-Rules.md` after the kernel's sections. Rule IDs stay stable:
+a section that moved from the kernel keeps its original ID. Module text that
+extends a kernel meta-rule, rather than replacing it, goes in an
+``## Addendum to §N (`rr-META-NNN`)`` section that names the kernel rule it
+extends.
+
+### 6.2 Document types and commands (`code-of-conduct.module.md`)
+
+Two sections, `## 3. Standard document types` and
+`## 4. Slash-command entry points`. Each is inserted at the end of the
+matching section of the deployed `CODE-OF-CONDUCT.md`. Every command bullet in
+the module's §4 must match an entry in `module.yaml`'s `commands`; the deployed
+§4 (kernel plus module) is the canonical command list that command files and
+Taskfile tasks are checked against (`scripts/check_command_parity.py`).
+
+### 6.3 Definitions (`definitions/`)
+
+`definitions/<entity>/DEFINITION-<PREFIX>-vN.md`, deployed and frozen exactly
+like the kernel's own definitions (INV-23).
+
+### 6.4 Invariants (`INVARIANTS.module.md`)
+
+Module invariants, read together with the kernel's `INVARIANTS.md`. An
+invariant that moved from the kernel keeps its `INV-N` number; the kernel never
+reuses it.
+
+### 6.5 Taskfile tasks (`Taskfile.module.yml`)
+
+A `tasks:` block with one thin dispatch task per module command, in the same
+shape as the kernel's `templates/Taskfile.common.template.yml`. Its tasks are
+appended to the deployed `Taskfile.common.yml`.
+
+### 6.6 Migrations (`migrations/`)
+
+One-time migrations for the module's entity shapes, indexed in
+`migrations/migrations.md` with the same columns as the kernel index. The
+`From`/`Target` columns name kernel versions. `/sync-framework` applies kernel
+and module migrations together, in version order.
+
+---
+
+## 7. Kernel purity
+
+The kernel, catalyst's own tooling (`scripts/`) and its root documents never
+name a specific module, its entity ID prefixes, folders, commands, templates
+or definitions (INV-30). `scripts/check_kernel_purity.py` derives that list
+from the manifests of the modules in `framework/modules/catalog.md` and fails
+on any match.

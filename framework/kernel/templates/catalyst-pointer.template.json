@@ -1,6 +1,7 @@
 {
   "project_name": "<project-name>",
   "kernel_version": "<catalyst-kernel-version>",
+  "module": "<active-module-id, from framework/modules/catalog.md>",
   "agent": "<current-agent-identity, e.g. claude-code>",
   "agent-source": "<absolute path to the real .criterion/ working copy, in agent-owned space>",
   "repoed": false,

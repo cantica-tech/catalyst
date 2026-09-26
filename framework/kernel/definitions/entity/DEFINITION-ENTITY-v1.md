@@ -8,8 +8,9 @@
 ## Description
 
 The base entity represents the foundational, abstract definition gathering all
-commonalities shared across all catalyst entity types (such as requirements,
-bugs, features, rules, domains, workflows, users, roles, and reconciliations).
+commonalities shared across all catalyst entity types (such as the active
+module's entity types, rules, domains, workflows, users, roles, and
+reconciliations).
 It defines core commonalities including unique identification, versioning, status
 tracking, sign-off provenance, traceability, and a mandatory or canonical **Name** field.
 The **Name** field (`**Name**` in metadata tables or rule headings) provides a concise,

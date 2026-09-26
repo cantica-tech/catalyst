@@ -30,7 +30,7 @@ from pathlib import Path
 
 from module_loader import load_module
 
-from check_deployment import find_deploy_root
+from check_deployment import find_deploy_root, find_project_root
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMANDS_DIR = ROOT / ".claude" / "commands"
@@ -105,26 +105,28 @@ def extract_taskfile_commands(taskfile_text: str) -> set[str] | None:
     return names
 
 
-def check_module_manifest_parity(root: Path, commands_dir: Path) -> list[str]:
-    """Validate that commands declared in an explicitly configured module manifest match available command files."""
-    mod_yaml = root / ".criterion" / "module.yaml"
-    cfg_yaml = root / ".criterion" / "config.yaml"
-    if not (mod_yaml.is_file() or cfg_yaml.is_file() or list(root.glob("*.catalyst"))):
+def check_module_manifest_parity(project_root: Path | None, commands_dir: Path) -> list[str]:
+    """Every command the project's active module registers (module.yaml
+    `commands:`) with a spec_path has a .claude/commands/<name>.md or, failing
+    that, the module's own spec file. No-op when no module is declared or
+    found."""
+    if project_root is None:
         return []
-
-    module = load_module(root)
-    if not module.commands:
+    module = load_module(project_root)
+    if module is None or not module.commands:
         return []
     file_names = find_command_files(commands_dir)
     errors: list[str] = []
-    for cmd_name in sorted(module.commands.keys()):
-        if cmd_name not in file_names and cmd_name != DOGFOOD_EXCEPTION:
-            cmd_reg = module.commands[cmd_name]
-            if cmd_reg.spec_path and not (root / cmd_reg.spec_path).is_file():
-                errors.append(
-                    f"module parity: module '{module.id}' registers /{cmd_name} but "
-                    f"neither .claude/commands/{cmd_name}.md nor {cmd_reg.spec_path} exists"
-                )
+    for cmd_name in sorted(module.commands):
+        if cmd_name in file_names or cmd_name == DOGFOOD_EXCEPTION:
+            continue
+        spec = module.commands[cmd_name].spec_path
+        if not spec or (module.path is not None and (module.path / spec).is_file()):
+            continue
+        errors.append(
+            f"module parity: module '{module.id}' registers /{cmd_name} but "
+            f"neither .claude/commands/{cmd_name}.md nor {spec} exists"
+        )
     return errors
 
 
@@ -186,39 +188,6 @@ def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
     return errors
 
 
-def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
-    if not code_of_conduct.is_file():
-        return [f"taskfile parity: {code_of_conduct} is missing"]
-
-    coc_names = extract_section4_commands(
-        code_of_conduct.read_text(encoding="utf-8", errors="ignore")
-    )
-    if coc_names is None:
-        return [f"taskfile parity: {code_of_conduct} has no '## 4.' section"]
-
-    if not taskfile.is_file():
-        return [f"taskfile parity: {taskfile} is missing"]
-
-    task_names = extract_taskfile_commands(
-        taskfile.read_text(encoding="utf-8", errors="ignore")
-    )
-    if task_names is None:
-        return [f"taskfile parity: {taskfile} has no 'tasks:' block"]
-
-    errors: list[str] = []
-    for name in sorted(coc_names - task_names):
-        errors.append(
-            f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{name} but "
-            f"{taskfile.name} has no matching task"
-        )
-    for name in sorted(task_names - coc_names):
-        errors.append(
-            f"taskfile parity: {taskfile.name} has a '{name}' task but it is "
-            f"not referenced in CODE-OF-CONDUCT.md §4"
-        )
-    return errors
-
-
 def main() -> int:
     root = find_deploy_root(Path.cwd())
     if root is None:
@@ -234,7 +203,7 @@ def main() -> int:
 
     errors = check_command_parity(COMMANDS_DIR, root / "CODE-OF-CONDUCT.md")
     errors += check_taskfile_parity(taskfile_path, root / "CODE-OF-CONDUCT.md")
-    errors += check_module_manifest_parity(root, COMMANDS_DIR)
+    errors += check_module_manifest_parity(find_project_root(Path.cwd()), COMMANDS_DIR)
 
     if errors:
         print(f"command parity validation FAILED ({len(errors)} issue(s)):")
@@ -242,19 +211,6 @@ def main() -> int:
             print(f"  - {e}")
         return 1
     print("command parity validation PASSED")
-    return 0
-
-    if errors:
-        print(f"command parity validation FAILED ({len(errors)} issue(s)):")
-        for e in errors:
-            print(f"  - {e}")
-        return 1
-    task_names = extract_taskfile_commands(
-        taskfile_path.read_text(encoding="utf-8", errors="ignore")
-    )
-    print(f"command parity valid ({len(find_command_files(COMMANDS_DIR))} "
-          f"command(s) checked)")
-    print(f"taskfile parity valid ({len(task_names or set())} task(s) checked)")
     return 0
 
 

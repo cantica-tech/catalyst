@@ -7,7 +7,7 @@ own repositories. The kernel is versioned by the repository's root
 [`version.txt`](../../version.txt) and released as `kernel-v<version>.zip`.
 
 A project-agnostic, portable specification for how any codebase organizes
-its rules, its development work, its agile process, its roadmap, its
+its rules, its development work, its agile process, its planning, its
 accountability, and its own change history — extrapolated from the
 concrete system built in this repo's own [`.criterion/`](../../.criterion/)
 deployment. That folder is **one instantiation** of this framework, for
@@ -24,10 +24,10 @@ repository, not a folder. See §13 of `rules-of-rules.template.md`.)
 A four-layer chain, each layer subordinate to the one below it:
 
 ```
-Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer)
+Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer, plugin)
                         │
                         ▼
-Dev artifacts        REQ- / BUG- / HK- / TAG-         (rule-linked work and lightweight annotations)
+Dev artifacts     <PREFIX>-NNNNNN / TAG-               (the active module's grounded work and lightweight annotations)
                         │
                         ▼
 Rules          (prefix)-(DOMAIN)-(NNNNNN)-(userid)     (documented behavior)
@@ -37,47 +37,25 @@ Rules of rules   the meta-rules governing all of the above
 ```
 
 The chain's invariant, at every layer: **no work happens without a
-traceable link down to a documented rule.** A story targets a requirement or
-bug doc; a requirement doc targets (or proposes) a rule; a rule belongs to a
-domain; a domain belongs to a document; every document, domain, and rule has a
-stable, permanent, never-reused ID. This is what makes "why does this code
-do X" and "what rule does this ticket satisfy" both answerable by
-following IDs, in either direction, indefinitely.
+traceable link down to a documented rule.** A story targets a development
+artifact of the active module; that artifact targets (or proposes) a rule;
+a rule belongs to a domain; a domain belongs to a document; every document,
+domain, and rule has a stable, permanent, never-reused ID. This is what
+makes "why does this code do X" and "what rule does this ticket satisfy"
+both answerable by following IDs, in either direction, indefinitely.
 
-Sitting above all of this, `FEAT-NNNNNN` feature entries (`features/`) are a
-separate, optional, **non-rule-linked** layer — a place to write down new or
-future app functionality as an idea or roadmap item, before it's ready to be
-measured. A feature is never itself implemented and never breaks the chain's
-invariant: when work on one actually starts, that work is tracked as a
-`REQ-NNNNNN` requirement (never a `BUG-NNNNNN`), which is what gets vetted
-against every existing rule document, assigned a domain, and measured for
-completion. See `Rules-of-Rules.md` §9.
+Which development artifacts exist — their entity types, ID prefixes,
+folders, commands, and how they relate to one another — is not defined
+here. It is contributed by the active **process module**
+(`MODULE-SPECIFICATION.md`): each of its Entity Type Definitions declares
+whether the type grounds directly to a rule (`required`), inherits its
+parent's grounding (`inherited`), or sits outside the chain (`none`). The
+module's own README, meta-rules (`rules-of-rules.module.md`), and
+invariants (`INVARIANTS.module.md`) describe its artifacts; the kernel
+only ever refers to them generically (`INVARIANTS.md` INV-30).
 
-`FEAT-` entries can themselves be bulk-populated: named roadmaps
-(`development/roadmaps/<name>.md`, one file per external source ingested
-via `/roadmap-add`/`-update`/`-merge`) hold `RM-NNNNNN` items with their own
-Status, triaged into a `FEAT-` when a human decides one's worth tracking.
-Its row's `Linked` field names every `FEAT-`/`REQ-NNNNNN` currently
-associated with it — a roadmap item of real size is expected to decompose
-into more than one requirement. See `Rules-of-Rules.md` §10.
-
-Sitting *below* a requirement or a bug, `STEP-NNNNNN` records (`steps/`)
-are one concrete unit of implementation work performed toward it — files
-touched, commands run, how it was verified — created via `/create-step`
-as work actually happens. A requirement or bug isn't closeable as
-done/fixed until every step opened against it is done or abandoned. See
-`Rules-of-Rules.md` §21.
-
-`TEST-NNNNNN` records (`tests/`) join `REQ-`/`BUG-`/`HK-` as a fourth
-rule-targeting dev-artifact type — created via `/create-test`, carrying
-its own `Targets`/`Domain` like any other dev artifact, so it is not
-exempt from the chain's invariant. On top of that, a test may
-independently name `(0,n)` requirements and `(0,n)` steps it verifies —
-both optional, and a test naming neither is still valid on its own. See
-`Rules-of-Rules.md` §22.
-
-Every artifact this framework creates — dev-artifact, feature, roadmap
-item, or work item — carries a `Signed-off-by` field, resolved against
+Every artifact the framework creates — active-module artifact or work item
+— carries a `Signed-off-by` field, resolved against
 `IAM/users/users.json` (managed by `/user-add`/`-remove`/`-modify`/
 `-assign-role`) and `IAM/roles/roles.json` (the role → typical-action
 mapping, `/role-add`/`-modify`). A deployment must always have at least
@@ -113,10 +91,10 @@ project carries. See `Rules-of-Rules.md` §13.
 | File | Purpose |
 |---|---|
 | [`rules-of-rules.template.md`](rules-of-rules.template.md) | Generic meta-rules: conflict-checking, done-bar, ID scheme, domain standard, retirement. Copy to `<project>/rules/Rules-of-Rules.md` and fill in placeholders. |
-| [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for bug/requirement/house-keeping/meta-tag artifacts. Copy to `<project>/CODE-OF-CONDUCT.md`. |
+| [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for development artifacts and meta-tags; the active module's document types and commands are inserted from its `code-of-conduct.module.md`. Copy to `<project>/CODE-OF-CONDUCT.md`. |
 | [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) | Standard specification for Catalyst Process Modules, Module Manifests (`module.yaml`), Entity Type Definitions (`.yaml`), and layout. |
 | [`schemas/`](schemas/) | Machine-readable JSON schemas (`module-manifest.schema.json`, `entity-type-definition.schema.json`) for module and ETD validation. |
-| [`templates/`](templates/) | Generic per-item-type document templates (bug, requirement, step, test, feature, reconciliation, house-keeping, meta-tag, domain, workflow, slash-command, backlog, roadmap, roles, users, journal). |
+| [`templates/`](templates/) | Generic kernel document templates (rule, domain, meta-tag, reconciliation, workflow, templates catalog, slash-command, Taskfile, roles, users, journal, pointer). The active module ships its own entity templates. |
 | [`SYNCHRONIZE.md`](SYNCHRONIZE.md) | Rules for synchronizing this framework with deployed projects when versions are missing or outdated. |
 | [`version.txt`](../../version.txt) | Current kernel version (at the catalyst repository root). |
 | [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) | Step-by-step: how to stand this framework up in a new (or existing) project. |

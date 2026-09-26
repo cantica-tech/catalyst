@@ -18,8 +18,17 @@ one way holds more than one file in its directory.
 
 ## Index
 
-See [`migrations.md`](migrations.md) for the full table of migrations,
-their from/target versions, and what each one migrates.
+See [`migrations.md`](migrations.md) for the full table of kernel
+migrations, their from/target versions, and what each one migrates.
+
+## Module migrations
+
+A migration that only reshapes a module's own entity types lives in that
+module's repository, under its `migrations/` with its own
+`migrations.md` index (`MODULE-SPECIFICATION.md` §6.6), never here.
+`/sync-framework` applies the kernel's and the active module's migrations
+together, in version order. Where a kernel migration also touched module
+entities, it defers to the active module's migration for that version.
 
 ## When a migration doesn't apply
 

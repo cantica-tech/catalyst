@@ -36,4 +36,4 @@ Checkable against child stories all being done, not a separate checklist.
 
 ## Related
 
-Other `EPIC-`/`REQ-` IDs, or rule domains, this depends on or overlaps.
+Other `EPIC-` IDs, development artifacts of the active module (`<PREFIX>-NNNNNN`),, or rule domains, this depends on or overlaps.

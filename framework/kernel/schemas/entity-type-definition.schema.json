@@ -4,12 +4,20 @@
   "title": "Catalyst Entity Type Definition (ETD) Schema",
   "description": "JSON schema for validating entity type definition YAML files in Catalyst framework modules.",
   "type": "object",
-  "required": ["id_prefix", "name", "plural_name", "folder", "grounding", "fields", "workflow"],
+  "required": [
+    "id_prefix",
+    "name",
+    "plural_name",
+    "folder",
+    "grounding",
+    "fields",
+    "workflow"
+  ],
   "properties": {
     "id_prefix": {
       "type": "string",
       "pattern": "^[A-Z0-9]+$",
-      "description": "Uppercase prefix used for entity IDs (e.g. BUG, REQ, TEST)."
+      "description": "Uppercase prefix used for entity IDs (e.g. ITEM)."
     },
     "name": {
       "type": "string",
@@ -26,8 +34,12 @@
     },
     "grounding": {
       "type": "string",
-      "enum": ["required", "inherited", "none"],
-      "description": "Grounding rule requirement type."
+      "enum": [
+        "required",
+        "inherited",
+        "none"
+      ],
+      "description": "How the entity grounds to the module's grounding type: directly, via its parent, or not at all."
     },
     "grounding_field": {
       "type": "string",
@@ -37,7 +49,11 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "kind", "required"],
+        "required": [
+          "name",
+          "kind",
+          "required"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -45,7 +61,15 @@
           },
           "kind": {
             "type": "string",
-            "enum": ["text", "enum", "ref", "ref-list", "date", "user", "user-list"],
+            "enum": [
+              "text",
+              "enum",
+              "ref",
+              "ref-list",
+              "date",
+              "user",
+              "user-list"
+            ],
             "description": "Data type for the field."
           },
           "required": {
@@ -74,7 +98,11 @@
     },
     "workflow": {
       "type": "object",
-      "required": ["initial", "states", "closed_states"],
+      "required": [
+        "initial",
+        "states",
+        "closed_states"
+      ],
       "properties": {
         "initial": {
           "type": "string",
@@ -99,7 +127,10 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["from", "to"],
+            "required": [
+              "from",
+              "to"
+            ],
             "properties": {
               "from": {
                 "type": "string"
@@ -113,6 +144,15 @@
         }
       },
       "additionalProperties": false
+    },
+    "naming": {
+      "type": "string",
+      "enum": [
+        "id-summary",
+        "free-form"
+      ],
+      "default": "id-summary",
+      "description": "File naming: `id-summary` (`<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7)."
     }
   },
   "additionalProperties": false

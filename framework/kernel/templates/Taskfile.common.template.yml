@@ -2,7 +2,7 @@
 #
 # Copy this file into the deployment's real working copy, `.criterion/`
 # (agent-owned space per INV-6 — never inside the developed project's own
-# tree, the same way rules/, requirements/, etc. live there), once per
+# tree, the same way rules/, IAM/, etc. live there), once per
 # project (including this framework's own self-deployment), and refresh
 # it from here on `/sync-framework`. See `INSTANTIATION-GUIDE.md` §1 step
 # 5, `INSTANTIATION-CHECKLIST.md`'s Discoverability section, and
@@ -12,15 +12,18 @@
 # unlike this file — that's forced by Claude Code's own fixed discovery
 # path, an external constraint this file has none of).
 #
-# One task per command in the deployed `CODE-OF-CONDUCT.md` §4 (the
+# One task per kernel command in the deployed `CODE-OF-CONDUCT.md` §4; the
+# active module's own tasks (its `Taskfile.module.yml`, one per module
+# command) are appended to the `tasks:` block below on deployment and on
+# `/sync-framework` (`MODULE-SPECIFICATION.md` §6.5). The deployed §4 is the
 # canonical list — `scripts/check_command_parity.py` diffs this file
-# against it, same drift check already applied to `.claude/commands/`).
+# against it, the same drift check already applied to `.claude/commands/`.
 # Each task is a thin, non-interactive dispatch to the actual slash
 # command, so day-to-day catalyst operations are scriptable from a shell
 # or CI job without an interactive session.
 #
 # Usage: task <command-name> -- <arguments>
-#   e.g. task create-bug -- "flaky test in checkout flow"
+#   e.g. task meta-tag -- <artifact-id>
 #        task user-add -- olivier admin
 #
 # Agent-generic dispatch: catalyst doesn't assume Claude Code — the
@@ -35,56 +38,6 @@
 version: "3"
 
 tasks:
-  create-bug:
-    desc: "Create a new bug artifact and register it in bugs/bugs.md"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-bug {{.CLI_ARGS}}"'
-
-  create-req:
-    desc: "Create a new requirement artifact and register it in requirements/requirements.md"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-req {{.CLI_ARGS}}"'
-
-  create-requirement:
-    desc: "Alias of create-req"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-requirement {{.CLI_ARGS}}"'
-
-  create-feature:
-    desc: "Create a new feature entry in features/features.md (not rule-linked)"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-feature {{.CLI_ARGS}}"'
-
-  create-step:
-    desc: "Create a new step against an existing requirement or bug: <REQ-id|BUG-id>"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-step {{.CLI_ARGS}}"'
-
-  create-test:
-    desc: "Create a new test artifact and register it in tests/tests.md"
-    cmds:
-      - '{{.AGENT_CMD}} "/create-test {{.CLI_ARGS}}"'
-
-  roadmap-add:
-    desc: "Ingest a new named roadmap from a local file: <name> <file>"
-    cmds:
-      - '{{.AGENT_CMD}} "/roadmap-add {{.CLI_ARGS}}"'
-
-  roadmap-remove:
-    desc: "Delete or retire a named roadmap: <name>"
-    cmds:
-      - '{{.AGENT_CMD}} "/roadmap-remove {{.CLI_ARGS}}"'
-
-  roadmap-update:
-    desc: "Re-ingest a file as the new full, authoritative roadmap version: <name> <file>"
-    cmds:
-      - '{{.AGENT_CMD}} "/roadmap-update {{.CLI_ARGS}}"'
-
-  roadmap-merge:
-    desc: "Fold a partial delta file into an existing roadmap: <name> <update file>"
-    cmds:
-      - '{{.AGENT_CMD}} "/roadmap-merge {{.CLI_ARGS}}"'
-
   user-add:
     desc: "Register a new user: <name> <role>"
     cmds:
@@ -194,11 +147,6 @@ tasks:
     desc: "List every slash command available in this deployment"
     cmds:
       - '{{.AGENT_CMD}} "/commands {{.CLI_ARGS}}"'
-
-  show-backlog:
-    desc: "Summarize open work/blockers and refresh BACKLOG.md and roadmaps"
-    cmds:
-      - '{{.AGENT_CMD}} "/show-backlog {{.CLI_ARGS}}"'
 
   journal:
     desc: "Read-only filter/report over development/journal.jsonl"

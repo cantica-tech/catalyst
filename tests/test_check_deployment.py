@@ -3,6 +3,63 @@ import shutil
 from pathlib import Path
 
 import check_deployment as cd
+from module_loader import load_module
+
+
+def write_example_module(base: Path) -> Path:
+    """A tiny generic process module (`example-process`) at
+    base/framework/modules/example-process/: an ITEM entity (folder `items`),
+    a free-form-named NOTE entity (folder `notes`, under development/), one
+    required path and one definition directory per entity."""
+    mdir = base / "framework" / "modules" / "example-process"
+    (mdir / "schemas").mkdir(parents=True)
+    (mdir / "module.yaml").write_text(
+        "id: example-process\n"
+        "name: Example Process Module\n"
+        "version: 0.1.0\n"
+        "description: A fictional module for tests.\n"
+        "grounding_type: rule\n"
+        "\n"
+        "entity_types:\n"
+        "  - id: ITEM\n"
+        "    schema: schemas/item.yaml\n"
+        "  - id: NOTE\n"
+        "    schema: schemas/note.yaml\n"
+        "\n"
+        "required_paths:\n"
+        "  - path: development/LEDGER-OF-ITEMS.md\n"
+        "    invariant: INV-EX-1\n"
+        "    seed: templates/ledger.template.md\n"
+    )
+    (mdir / "schemas" / "item.yaml").write_text(
+        "id_prefix: ITEM\nname: Item\nplural_name: Items\nfolder: items\n"
+        "grounding: required\ngrounding_field: Targets\n"
+    )
+    (mdir / "schemas" / "note.yaml").write_text(
+        "id_prefix: NOTE\nname: Note\nplural_name: Notes\nfolder: notes\n"
+        "grounding: none\nnaming: free-form\n"
+    )
+    for d in ("item", "note"):
+        (mdir / "definitions" / d).mkdir(parents=True)
+    return mdir
+
+
+def add_example_module_artifacts(root: Path) -> None:
+    """Make a valid deployment also satisfy the example-process module."""
+    (root / "items").mkdir()
+    (root / "items" / "items.md").write_text("# Items index\n")
+    (root / "development" / "notes").mkdir()
+    (root / "development" / "notes" / "notes.md").write_text("# Notes index\n")
+    (root / "development" / "LEDGER-OF-ITEMS.md").write_text("# Ledger\n")
+    for d in ("item", "note"):
+        (root / "definitions" / f"{d}.md").write_text(f"# `{d}`\n")
+
+
+def example_model(tmp_path: Path) -> cd.DeploymentModel:
+    write_example_module(tmp_path)
+    module = load_module(tmp_path, "example-process")
+    assert module is not None
+    return cd.build_model(module)
 
 
 def make_valid_deployment(tmp_path: Path) -> Path:
@@ -22,16 +79,10 @@ def make_valid_deployment(tmp_path: Path) -> Path:
     (business / "br-AUTH-000001-Ab3xR9pQ-login-flow.md").write_text(
         "## `br-AUTH-000001-Ab3xR9pQ` Login flow\n\n"
         "## Contents\n\n...\n\n"
-        "## Known Bugs — Quick Index\n\n(none)\n"
+        "## Linked Artifacts — Quick Index\n\n(none)\n"
     )
     development = root / "development"
     development.mkdir()
-    (development / "BACKLOG.md").write_text(
-        "# Backlog\n\n**Last refreshed:** 2026-08-23 by `/show-backlog`.\n"
-    )
-    roadmaps = development / "roadmaps"
-    roadmaps.mkdir()
-    (roadmaps / "roadmaps.md").write_text("# Roadmaps index\n\n*(none)*\n")
     workflows = root / "workflows"
     workflows.mkdir()
     (workflows / "workflows.md").write_text("# Workflows index\n\n*(none)*\n")
@@ -47,19 +98,19 @@ def make_valid_deployment(tmp_path: Path) -> Path:
         ]
     }))
     (roles_dir / "roles.json").write_text(json.dumps({
-        "roles": [{"name": "Developer", "actions": ["/create-bug"]}]
+        "roles": [{"name": "Developer", "actions": ["/reconcile"]}]
     }))
     (development / "journal.jsonl").write_text(
         json.dumps({
             "timestamp": "2026-08-23T19:00:00Z",
             "actor": "Ada",
-            "command": "/create-bug",
+            "command": "/reconcile",
             "action": "create",
-            "artifact": "BUG-000001",
+            "artifact": "RECON-000001",
             "targets": ["br-AUTH-000001-Ab3xR9pQ"],
-            "intent": ["fix a real bug"],
+            "intent": ["resolve a real case"],
             "files": [
-                {"path": "development/bugs/BUG-000001-x.md",
+                {"path": "reconciliations/RECON-000001-x.md",
                  "before": None,
                  "after": "a" * 40},
             ],
@@ -67,7 +118,7 @@ def make_valid_deployment(tmp_path: Path) -> Path:
     )
     definitions = root / "definitions"
     definitions.mkdir()
-    for entity_type in cd.ENTITY_TYPES:
+    for entity_type in cd.KERNEL_ENTITY_TYPES:
         (definitions / f"{entity_type}.md").write_text(
             f"# `{entity_type}` — entity definition (v1)\n\n"
             "## Description\n\nA definition.\n"
@@ -134,8 +185,6 @@ def test_valid_deployment_has_no_errors(tmp_path: Path):
     assert cd.check_rule_indexing(root) == []
     assert cd.check_required_headings(root) == []
     assert cd.check_rule_id_shape(root) == []
-    assert cd.check_backlog_exists(root) == []
-    assert cd.check_roadmaps_index_exists(root) == []
     assert cd.check_workflows_index_exists(root) == []
     assert cd.check_users_and_roles_exist(root) == []
     assert cd.check_users_have_userid(root) == []
@@ -158,16 +207,52 @@ def test_check_naming_ignores_index_and_template_files(tmp_path: Path):
     assert cd.check_naming(root) == []
 
 
-def test_check_naming_ignores_named_roadmap_files(tmp_path: Path):
+def test_check_naming_ignores_fixed_uppercase_documents(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    # A named roadmap is keyed by a free-form name (Rules-of-Rules.md §10),
-    # not the sequential <id>-<summary> scheme — a trailing-digits name like
-    # this must not be flagged as a bare ID (INV-7) the way br-AUTH-002.md
-    # would be.
-    (root / "development" / "roadmaps" / "product-2026.md").write_text(
-        "# product-2026\n"
-    )
+    (root / "development" / "SUMMARY.md").write_text("# Summary\n")
     assert cd.check_naming(root) == []
+
+
+def test_check_naming_ignores_free_form_module_entity_files(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    # NOTE declares `naming: free-form`: a trailing-digits name must not be
+    # flagged as a bare ID (INV-7) the way br-AUTH-002.md would be.
+    (root / "development" / "notes" / "product-2026.md").write_text("# n\n")
+    assert cd.check_naming(root, model) == []
+
+
+def test_check_naming_walks_module_entity_folders(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    (root / "items" / "ITEM-000001-ok.md").write_text("# ok\n")
+    assert cd.check_naming(root, model) == []
+    (root / "items" / "ITEM-000002.md").write_text("# bare\n")
+    errors = cd.check_naming(root, model)
+    assert any("ITEM-000002.md" in e for e in errors)
+    # Kernel-only: the module's top-level folder is not walked at all.
+    assert not any("items/" in e for e in cd.check_naming(root))
+
+
+def test_build_model_kernel_only_uses_kernel_entities():
+    model = cd.build_model(None)
+    assert model.module_id is None
+    assert "reconciliations" in model.checked_dirs
+    assert "workflows.md" in model.index_names
+    assert model.entity_types == cd.KERNEL_ENTITY_TYPES
+    assert model.module_folders == ()
+
+
+def test_build_model_adds_active_module_entities(tmp_path: Path):
+    model = example_model(tmp_path)
+    assert model.module_id == "example-process"
+    assert "items" in model.checked_dirs
+    assert "items.md" in model.index_names
+    assert {"item", "note"} <= set(model.entity_types)
+    assert model.free_form_folders == {"notes"}
+    assert model.module_folders == ("items", "notes")
 
 
 def test_check_single_rule_template_missing(tmp_path: Path):
@@ -202,7 +287,7 @@ def test_check_single_rule_template_missing_rules_dir(tmp_path: Path):
 def test_check_rule_indexing_flags_orphan_rule(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     (root / "rules" / "business" / "br-AUTH-002-logout-flow.md").write_text(
-        "# br-AUTH-002-logout-flow\n\n## Contents\n\n## Known Bugs — Quick Index\n"
+        "# br-AUTH-002-logout-flow\n\n## Contents\n\n## Linked Artifacts — Quick Index\n"
     )
     errors = cd.check_rule_indexing(root)
     assert any("br-AUTH-002-logout-flow" in e and "orphan" in e for e in errors)
@@ -216,7 +301,7 @@ def test_check_rule_indexing_ignores_domain_files(tmp_path: Path):
         "# br-AUTH — User authentication\n\n**Document:** ...\n"
     )
     # Domain files are not rule documents (INV-20) — exempt from both the
-    # rules.md orphan check and the ## Contents / Known Bugs heading check.
+    # rules.md orphan check and the ## Contents / Linked Artifacts heading check.
     assert cd.check_rule_indexing(root) == []
     assert cd.check_required_headings(root) == []
 
@@ -273,56 +358,59 @@ def test_check_rule_indexing_missing_global_index(tmp_path: Path):
 def test_check_required_headings_missing_contents(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     rule = root / "rules" / "business" / "br-AUTH-000001-Ab3xR9pQ-login-flow.md"
-    rule.write_text("## `br-AUTH-000001-Ab3xR9pQ` Login flow\n\n## Known Bugs — Quick Index\n")
+    rule.write_text("## `br-AUTH-000001-Ab3xR9pQ` Login flow\n\n## Linked Artifacts — Quick Index\n")
     errors = cd.check_required_headings(root)
     assert any("missing '## Contents'" in e for e in errors)
 
 
-def test_check_required_headings_missing_known_bugs(tmp_path: Path):
+def test_check_required_headings_missing_linked_artifacts(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     rule = root / "rules" / "business" / "br-AUTH-000001-Ab3xR9pQ-login-flow.md"
     rule.write_text("## `br-AUTH-000001-Ab3xR9pQ` Login flow\n\n## Contents\n")
     errors = cd.check_required_headings(root)
-    assert any("missing '## Known Bugs" in e for e in errors)
+    assert any("missing '## Linked Artifacts" in e for e in errors)
 
 
-def test_check_backlog_exists_missing(tmp_path: Path):
+def test_valid_deployment_with_module_has_no_errors(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    (root / "development" / "BACKLOG.md").unlink()
-    errors = cd.check_backlog_exists(root)
-    assert any("INV-14" in e and "development/BACKLOG.md is missing" in e
-               for e in errors)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    assert cd.check_naming(root, model) == []
+    assert cd.check_module_required_paths(root, model) == []
+    assert cd.check_module_indexes(root, model) == []
+    assert cd.check_definitions_exist(root, model) == []
 
 
-def test_check_backlog_exists_missing_development_dir(tmp_path: Path):
+def test_check_module_required_paths_missing(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    shutil.rmtree(root / "development")
-    errors = cd.check_backlog_exists(root)
-    assert any("INV-14" in e for e in errors)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    (root / "development" / "LEDGER-OF-ITEMS.md").unlink()
+    errors = cd.check_module_required_paths(root, model)
+    assert len(errors) == 1
+    assert "INV-EX-1" in errors[0]
+    assert "development/LEDGER-OF-ITEMS.md is missing" in errors[0]
+    assert "templates/ledger.template.md" in errors[0]
 
 
-def test_check_roadmaps_index_exists_missing(tmp_path: Path):
+def test_check_module_required_paths_kernel_only_is_noop(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    (root / "development" / "roadmaps" / "roadmaps.md").unlink()
-    errors = cd.check_roadmaps_index_exists(root)
-    assert any(
-        "INV-15" in e and "development/roadmaps/roadmaps.md is missing" in e
-        for e in errors
-    )
+    assert cd.check_module_required_paths(root, cd.build_model()) == []
 
 
-def test_check_roadmaps_index_exists_missing_roadmaps_dir(tmp_path: Path):
+def test_check_module_indexes_missing(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    shutil.rmtree(root / "development" / "roadmaps")
-    errors = cd.check_roadmaps_index_exists(root)
-    assert any("INV-15" in e for e in errors)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    (root / "development" / "notes" / "notes.md").unlink()
+    errors = cd.check_module_indexes(root, model)
+    assert len(errors) == 1
+    assert "development/notes/notes.md is missing" in errors[0]
 
 
-def test_check_roadmaps_index_exists_missing_development_dir(tmp_path: Path):
+def test_check_module_indexes_absent_folder_is_fine(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
-    shutil.rmtree(root / "development")
-    errors = cd.check_roadmaps_index_exists(root)
-    assert any("INV-15" in e for e in errors)
+    assert cd.check_module_indexes(root, example_model(tmp_path)) == []
 
 
 def test_check_workflows_index_exists_missing(tmp_path: Path):
@@ -437,7 +525,7 @@ def test_check_rule_id_shape_short_digits(tmp_path: Path):
     rule = root / "rules" / "business" / "br-AUTH-000001-Ab3xR9pQ-login-flow.md"
     rule.write_text(
         "## `br-AUTH-001-Ab3xR9pQ` Login flow\n\n"
-        "## Contents\n\n## Known Bugs — Quick Index\n"
+        "## Contents\n\n## Linked Artifacts — Quick Index\n"
     )
     errors = cd.check_rule_id_shape(root)
     assert any("INV-26 width" in e and "3-digit" in e for e in errors)
@@ -448,7 +536,7 @@ def test_check_rule_id_shape_missing_userid_suffix(tmp_path: Path):
     rule = root / "rules" / "business" / "br-AUTH-000001-Ab3xR9pQ-login-flow.md"
     rule.write_text(
         "## `br-AUTH-000001` Login flow\n\n"
-        "## Contents\n\n## Known Bugs — Quick Index\n"
+        "## Contents\n\n## Linked Artifacts — Quick Index\n"
     )
     errors = cd.check_rule_id_shape(root)
     assert any("INV-26 signer" in e and "no valid trailing userid" in e
@@ -460,7 +548,7 @@ def test_check_rule_id_shape_unknown_userid(tmp_path: Path):
     rule = root / "rules" / "business" / "br-AUTH-000001-Ab3xR9pQ-login-flow.md"
     rule.write_text(
         "## `br-AUTH-000001-Zz9kM2wT` Login flow\n\n"
-        "## Contents\n\n## Known Bugs — Quick Index\n"
+        "## Contents\n\n## Linked Artifacts — Quick Index\n"
     )
     errors = cd.check_rule_id_shape(root)
     assert any("INV-26 signer" in e and "does not match any registered user" in e
@@ -593,6 +681,17 @@ def test_check_definitions_exist_missing_one_type(tmp_path: Path):
     assert "definitions/rule.md is missing" in errors[0]
 
 
+def test_check_definitions_exist_missing_module_type(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    add_example_module_artifacts(root)
+    model = example_model(tmp_path)
+    (root / "definitions" / "item.md").unlink()
+    errors = cd.check_definitions_exist(root, model)
+    assert len(errors) == 1
+    assert "definitions/item.md is missing" in errors[0]
+    assert "example-process" in errors[0]
+
+
 def test_main_returns_zero_when_no_deployment(tmp_path: Path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     assert cd.main() == 0
@@ -610,3 +709,19 @@ def test_main_returns_one_for_broken_deployment(tmp_path: Path, monkeypatch):
     (root / "rules" / "templates" / "TEMPLATE-RULE-v1.md").unlink()
     monkeypatch.chdir(tmp_path)
     assert cd.main() == 1
+
+
+def test_main_uses_module_declared_by_pointer(tmp_path: Path, monkeypatch, capsys):
+    project = tmp_path / "app"
+    project.mkdir()
+    deploy = make_valid_deployment(tmp_path / "agent")
+    write_example_module(project)
+    (project / "app.catalyst").write_text(json.dumps(
+        {"module": "example-process", "agent-source": str(deploy)}))
+    monkeypatch.chdir(project)
+    # The module's required path and indexes are missing: main must fail.
+    assert cd.main() == 1
+    add_example_module_artifacts(deploy)
+    capsys.readouterr()
+    assert cd.main() == 0
+    assert "module example-process" in capsys.readouterr().out

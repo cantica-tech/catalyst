@@ -1,6 +1,7 @@
 # Analysis Playbook
 
-A recipe for bootstrapping this framework's rules/domains/bugs against an
+A recipe for bootstrapping this framework's rules, domains and first
+active-module artifacts against an
 **existing** codebase that has no prior rules documentation — the process
 used to build this project's own [`.criterion/rules/`](../../.criterion/rules/)
 directory. Reusable on any project once you've picked your rule
@@ -35,53 +36,54 @@ not from varying the instructions.
 
 ---
 
-## Recipe 1 — Extract a small set of requirement-shaping rules
+## Recipe 1 — Extract a small set of artifact-shaping rules
 
 Run once per **rule document** you are bootstrapping, not per every
 implementation category. For this framework, keep the scope intentionally
 small: create only a limited number of high-level rules that help define
-requirements, especially for:
+the active module's development artifacts, especially for:
 
 - **Rules of Rules:** what counts as a valid rule, how it is named, how it
   is structured, and how conflicts are resolved.
 - **Business Rules:** the domain constraints and workflow expectations that
-  should inform requirements.
+  should inform development artifacts.
 - **UI Rules:** the interaction, validation, presentation, and
-  initialization definitions that shape the user-facing requirements.
+  initialization definitions that shape the user-facing behavior.
 
-These should be treated as definitions and scaffolding for requirements,
-not as a full catalog of implementation behavior. Keep each rule concise,
-high-level, and directly useful when drafting requirements.
+These should be treated as definitions and scaffolding for development
+artifacts, not as a full catalog of implementation behavior. Keep each rule
+concise, high-level, and directly useful when drafting artifacts.
 
 **Prompt template** (send identically to both agents of each pair):
 
 ```
 Audit this codebase for the {{RULE_DOCUMENT}} document and extract only a
-small set of requirement-shaping rules — high-level definitions that help
-create requirements, not detailed implementation policies.
+small set of artifact-shaping rules — high-level definitions that help
+describe expected behavior, not detailed implementation policies.
 
 Do THREE separate passes over the code, in this order, then reconcile
 them into one list before reporting back:
   1. A keyword/pattern sweep (grep-style) across {{relevant source dirs}}
-     for the kinds of rules or definitions that support requirements.
+     for the kinds of rules or definitions that describe expected behavior.
   2. A manual walkthrough of the relevant modules, reading the actual
      logic rather than trusting names/comments.
-  3. A cross-check against the test suite ({{test paths}}) — does a test
-     exist for each rule you found? Note ones that don't.
+  3. A cross-check against the project's automated checks ({{check
+     paths}}) — does a check exist for each rule you found? Note ones that
+     don't.
 
 For every rule found, report:
   - A short bold name for the rule
-  - A one-line description of the rule as a requirement-shaping definition
+  - A one-line description of the rule as an artifact-shaping definition
   - Status: ✅ working as intended / ⚠️ buggy or incomplete / ❌ documented
     intent but not actually implemented
   - Which functional area of the app it belongs to (e.g. "Gateway
     Management", "Recording") — group your final report by this
 
-Only report concise, high-level rules that are useful when drafting
-requirements. Keep them tied to concrete application areas, user flows,
-components, or domain behaviors rather than abstract definitions. These
-rules should support testable requirements and the bugs that will later be
-raised when behavior is wrong. Flag anything you're unsure about explicitly
+Only report concise, high-level rules that are useful when describing
+expected behavior. Keep them tied to concrete application areas, user
+flows, components, or domain behaviors rather than abstract definitions.
+These rules should support verifiable work items and the defects that will
+later be raised when behavior is wrong. Flag anything you're unsure about explicitly
 rather than guessing.
 ```
 
@@ -89,10 +91,10 @@ Launch A and B for each category in one message (background, parallel).
 When both return, run **Recipe 3 (reconciliation)** on the pair before
 moving to the next category.
 
-## Recipe 2 — Extract business-rule definitions for requirements
+## Recipe 2 — Extract business-rule definitions
 
 Use the same shape as Recipe 1, but focus only on the domain constraints
-and workflow expectations that help define requirements. Keep the output
+and workflow expectations that help define expected behavior. Keep the output
 limited to a small set of high-level business-rule definitions, grouped by
 functional area rather than by implementation detail (for example:
 connectivity/security, data/persistence, orchestration/lifecycle). Everything
@@ -159,22 +161,23 @@ order) and create each domain's `rules/domains/<prefix>-<CODE>-<short-descriptio
 file per §6 — this step is deterministic, not another agent pass; a short
 script or careful manual edit is more reliable than delegating it.
 
-## Recipe 5 — Cross-reference known bugs to rule IDs
+## Recipe 5 — Cross-reference known defects to rule IDs
 
-Once rules have IDs, existing "Known Bugs" material (or bugs discovered
-during Recipe 1/2's audits — an ⚠️/❌ rule *is* a bug) gets linked back:
+Once rules have IDs, existing known-issue material (or defects discovered
+during Recipe 1/2's audits — an ⚠️/❌ rule *is* a defect) gets linked back:
 
 ```
-For each bug in this list, find the rule bullet in {{rules doc}} that it
+For each defect in this list, find the rule bullet in {{rules doc}} that it
 violates (its description should match the ⚠️/❌ rule's behavior almost
-exactly, since that's where it came from). Report the bug number and the
+exactly, since that's where it came from). Report the defect number and the
 matching rule ID. If no matching rule bullet exists, say so explicitly —
 that means the rule was never written down and needs to be added first.
 ```
 
-Then open `BUG-NNNNNN` docs per
-[`rules-of-development.template.md`](rules-of-development.template.md),
-citing the matched rule ID in `Targets`.
+Then open the active module's defect-type artifacts for them, per the
+composed `CODE-OF-CONDUCT.md`
+([`rules-of-development.template.md`](rules-of-development.template.md)
+plus the module's §3/§4), citing the matched rule ID in `Targets`.
 
 ## Recipe 6 — Meta-rule / process changes
 

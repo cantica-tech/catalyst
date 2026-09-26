@@ -20,3 +20,15 @@ jobs:
         run: python3 scripts/check_deployment.py
       - name: Validate command parity with CODE-OF-CONDUCT.md §4
         run: python3 scripts/check_command_parity.py
+      - name: Check out catalogued process modules
+        run: |
+          mkdir -p "$RUNNER_TEMP/modules"
+          grep -E '^\| `[a-z0-9-]+` \|' framework/modules/catalog.md | while IFS='|' read -r _ id repo branch _; do
+            id=$(echo "$id" | tr -d ' `'); repo=$(echo "$repo" | tr -d ' `'); branch=$(echo "$branch" | tr -d ' `')
+            url=$(echo "$repo" | sed -E 's#^git@github.com:#https://github.com/#')
+            git clone --depth=1 -b "$branch" "$url" "$RUNNER_TEMP/modules/$id"
+          done
+      - name: Validate the kernel is module-agnostic (INV-30)
+        env:
+          CATALYST_MODULES_DIR: ${{ runner.temp }}/modules
+        run: python3 scripts/check_kernel_purity.py

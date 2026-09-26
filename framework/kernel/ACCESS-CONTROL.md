@@ -39,18 +39,21 @@ of role or identity:
 
 | Role | Read | Write (advisory — proceeds either way, per INV-25) | Reconciliation (`/reconcile`, enforced) |
 |---|---|---|---|
-| Product Owner | everything | `/create-req`, approve/prioritize requirements, `/create-feature`, `/roadmap-add`, `/roadmap-update`, `/roadmap-merge`, `/roadmap-remove` | `propose` |
-| Scrum Master / Delivery Lead | everything | `/show-backlog`, `/status` | `propose` |
-| Tech Lead / Architect | everything | approve rule changes and new domains, vet a requirement's rule target(s) | `full` |
-| Developer | everything | `/create-bug`, `/create-req` (implementation-driven), implement `REQ-`/`BUG-`, `/status` on tasks/stories | `propose` |
-| QA / Tester | everything | `/create-bug`, verify a rule's test coverage, `/status` on test-plan items | `propose` |
-| Stakeholder | everything | propose `FEAT-` ideas, propose roadmap items | `none` |
+| Product Owner | everything | create the active module's planning and new-work artifacts, approve/prioritize new work | `propose` |
+| Scrum Master / Delivery Lead | everything | review the active module's open work, `/status` | `propose` |
+| Tech Lead / Architect | everything | approve rule changes and new domains, vet a development artifact's rule target(s) | `full` |
+| Developer | everything | create the active module's development artifacts (implementation-driven), implement them, `/status` on tasks/stories | `propose` |
+| QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/status` on verification items | `propose` |
+| Stakeholder | everything | propose ideas and planning items to the active module | `none` |
 | Release Manager | everything | `/sync-framework`, `/catalyzer`, cutting releases | `full` |
 | Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/criterion push` (unrestricted), `/reconcile` | `full` |
 
 The "Write" column is each role's *typical* scope (`IAM/roles/roles.json`'s
 `actions` field) — a signal for what to expect and note on mismatch, not an
-enforced boundary. Only the "Reconciliation" column is a real gate.
+enforced boundary. Only the "Reconciliation" column is a real gate. The
+active process module names its own commands for these typical actions in
+its documentation; a deployment may list them in `roles.json` via
+`/role-modify`.
 
 **A third, real (non-advisory, non-refusing) role effect** exists alongside
 these: **signed-object push scoping** (`rr-META-013`, "Signed-object

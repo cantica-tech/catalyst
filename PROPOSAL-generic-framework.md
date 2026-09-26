@@ -3,8 +3,8 @@
 **Status:** draft, for review — not committed, not part of the framework's
 own governed structure yet.
 **Scope:** the `catalyst` framework itself (`framework/`). Does
-not touch `catalyst-ui` directly, though §6 covers what this would mean for
-it as the framework's reference product.
+not touch any downstream host UI directly, though §6 covers what this would
+mean for one built on the framework.
 
 ## 0. The ask, restated
 
@@ -13,9 +13,9 @@ Two threads, tightly coupled:
 1. **Efficiency** — running catalyst (adding an entity type, syncing a
    deployment, dogfooding) burns tokens on repetitive, mechanical work.
 2. **Generality & Modular Prompts** — catalyst should eventually govern *any*
-   process, not just software engineering. The existing software development
+   process, not just the one it grew up around. The existing process-specific
    prompts, slash commands, and workflows need to be treated as a discrete
-   module called **software-development** (or `software-engineering`), allowing
+   **process module**, allowing
    catalyst to seamlessly load and swap other prompt modules for different
    project management types (e.g. Agile Scrum, ITIL service management, legal/compliance,
    product management). The actual artifact types + prompt workflows +
@@ -29,9 +29,9 @@ the second and most of the first goes away for free.
 
 ## 1. Evidence: what adding one entity type actually costs today
 
-This session added two entities (`STEP-`, `TEST-`) and one field-widening
-change (a step's parent: requirement-only → requirement-or-bug). Each
-touched, by hand, every time:
+This session added two entity types (call them `ITEM-` and `SUBITEM-`) and
+one field-widening change (a sub-item's parent: one type only → either of
+two types). Each touched, by hand, every time:
 
 - `rules-of-rules.template.md` — new/amended `rr-META-NNN` section, plus
   edits to the ID-format line, the entity-id-suffix list (§20), the
@@ -47,7 +47,7 @@ touched, by hand, every time:
   migration paragraph.
 - A new `migrations/<version>/*.md` file, plus a `migrations.md` row.
 - `templates/Taskfile.common.template.yml` — a new task.
-- `scripts/check_deployment.py` — an `ENTITY_TYPES` edit.
+- `scripts/check_deployment.py` — an entity-type list edit.
 - `INSTANTIATION-GUIDE.md`, `INSTANTIATION-CHECKLIST.md`,
   `ARTIFACT-LAYOUT.md` — each got its own tree/checklist edit.
 - Three separate top-level READMEs (`README.md`,
@@ -58,7 +58,7 @@ touched, by hand, every time:
 **That's 17+ files, by hand, for one entity type** — and then the *entire
 list repeats* against catalyst's own dogfooded `.criterion`, and again
 against every deployed project's `.criterion`, and again (if there's a
-real product on top, like catalyst-ui) in actual application code.
+real product on top, like a host UI) in actual application code.
 
 The framework has shipped 17 migrations since `0.11.0`. The pattern
 repeats every time. Concretely, in *this session alone*, the repetition
@@ -77,21 +77,21 @@ The framework's actual reusable machinery — the ID+userid scheme
 INV-20), IAM/signing (`rr-META-011`), the append-only journal
 (`rr-META-012`), criterion sync (`rr-META-013`), plugin activation
 (`rr-META-017`) — is **already fully domain-agnostic**. None of it
-mentions "rule" or "bug" or "requirement" by name. This part is fine as
+mentions "rule" or any development-artifact type by name. This part is fine as
 it stands and should not change.
 
 What's *not* generic is layered directly on top, hardcoded into the
 framework's own prose:
 
 - The **chain invariant** itself (INV-5: "no work without a link to a
-  documented rule") is a software-engineering assumption wearing a
+  documented rule") is one process's assumption wearing a
   framework-wide invariant's clothes.
 - Every entity type's **shape** (its fields, which are required, which
   are lists, what they reference) and **workflow** (status enum,
   transition rules, what blocks closing) exist only as scattered prose
   across the ~17 files in §1 — never as one machine-readable source of
   truth a tool could read, generate from, or validate against.
-- Existing **software development prompts and commands** (such as slash
+- Existing **process-specific prompts and commands** (such as slash
   commands defined in `.claude/commands/`, agent skills, and workflow
   prompts) are baked directly into kernel prose rather than being
   isolated into a standalone module.
@@ -122,14 +122,15 @@ small primitive:
   which states count as "closed," what a transition requires).
 - **Relationship** — declared *on* a `ref`/`ref-list` field: target
   type, optional `backref` name (the field the target type gets for
-  free, the way `TEST.Requirements` back-populates `REQ.Tests` today).
+  free, the way a verifying type's `Items` field would back-populate
+  `ITEM.Verified-by`).
 - **Grounding type** — the kernel generalizes INV-5 from "must link to a
   rule" to "may declare a grounding type it must link to." A profile
-  picks its own grounding type (software-engineering's is `rule`; a
+  picks its own grounding type (today's default module's is `rule`; a
   legal profile's might be `policy`, a support-ops profile's might have
   none). A type's ETD says `grounding: required | inherited | none` —
-  `inherited` is what `STEP-` does today (inherits its parent's), `none`
-  is what `FEAT-`/`RM-`/`WORKFLOW-` do today.
+  `inherited` is what a sub-unit-of-work type does (inherits its parent's),
+  `none` is what an idea-capture type or `WORKFLOW-` does.
 
 This is genuinely small: one schema format, one generalized invariant,
 one place relationships/back-references are declared instead of
@@ -139,11 +140,11 @@ re-derived by hand per type.
 
 A **profile** is a named bundle containing Entity Type Definitions (ETDs), a chosen grounding type, seed content, and a dedicated **Prompt Module**:
 
-- **Prompt Module concept:** Existing software development prompts (slash commands such as `/create-req`, `/create-bug`, `/check-rules`, `/cut-release`, skills stored in `.claude/skills/` or `.claude/commands/`, and procedural instructions) are decoupled from the kernel and packaged as a module named `software-development` (or `software-engineering`).
+- **Prompt Module concept:** Existing process-specific prompts (entity-creation slash commands such as `/create-item`, release commands, skills stored in `.claude/skills/` or `.claude/commands/`, and procedural instructions) are decoupled from the kernel and packaged as a module (for example `example-process`), while process-agnostic commands such as `/check-rules` stay in the kernel.
 - **Pluggable project management types:** By encapsulating prompts into modules, Catalyst can support other modules for different project management types (e.g. Agile Scrum, Kanban, ITIL service management, Product Management, Legal/Compliance tracking, or Physical Engineering).
 - **Module structure:** Each project management module bundles its own set of prompt files, slash command definitions (following `.claude/commands/` patterns), agent skills, and ETDs without modifying the Catalyst core kernel.
 
-The framework ships `software-development` as the **default module/profile**,
+The framework ships today's process as the **default module/profile**,
 authored via ETDs and modular prompts like everything else — dogfooding the new mechanism to
 define the old one, rather than keeping two parallel systems.
 An architect/admin creates a new type or adapts a process by writing ETD files or attaching a prompt module in their own deployment. No kernel version bump, no migration, no asking an
@@ -158,7 +159,7 @@ choice, their own way."
 - Validation — orphan/registered/grounding/dangling-reference checks,
   today hand-written per type in `validator.ts`-equivalent logic,
   become one generic pass parameterized by the ETD.
-- Back-reference population — `TEST.Requirements` → `REQ.Tests`
+- Back-reference population — a verifying type's `Items` → `ITEM.Verified-by`
   happens automatically because the relationship says so, not because
   someone remembered to write the "append to the other side" step.
 - Closing/done criteria — read from the workflow block instead of a
@@ -176,8 +177,8 @@ first, regardless of the bigger decision:
    `INSTANTIATION-CHECKLIST.md`, `ARTIFACT-LAYOUT.md`) into one source
    — under the new model, that's literally "the set of ETD files in the
    active profile" — with the rest either linking to it or generated
-   from it. `scripts/check_deployment.py` already validates against one
-   `ENTITY_TYPES` tuple; extend that pattern to *generate* the docs
+   from it. `scripts/check_deployment.py` already validates against the kernel's
+   entity types plus the active module's ETDs; extend that pattern to *generate* the docs
    that currently drift, not just check them after the fact.
 2. **Scope four-eyes verification to the actual diff.** Today, syncing
    or dogfooding a change re-reads the whole corpus for a second,
@@ -189,7 +190,7 @@ first, regardless of the bigger decision:
 3. **Leaner journal entries for mechanical changes.** The journal's
    `intent` field is prose because most past changes needed judgment
    calls explained. A schema-driven ETD add is not one of those — a
-   structured entry (`{op: "add-entity-type", etd: "TEST", version:
+   structured entry (`{op: "add-entity-type", etd: "ITEM", version:
    "0.30.0"}`) is more honest *and* cheaper than three paragraphs of
    narrative reconstructing what a diff already shows.
 4. **Cache what's already been verified.** The journal already tracks
@@ -204,18 +205,19 @@ first, regardless of the bigger decision:
    sequence to confirm nothing heavier than INVARIANTS.md loads by
    default.
 
-## 5. Migration path & Roadmap (this is itself a framework change — same discipline)
+## 5. Migration path & phasing (this is itself a framework change — same discipline)
 
-Backward-compatible, phased, each phase independently shippable (detailed step-by-step roadmap available in [ROADMAP-software-engineering-module.md](ROADMAP-software-engineering-module.md)):
+Backward-compatible, phased, each phase independently shippable (a detailed step-by-step plan for the extraction lives in the default module's own repository, listed in `framework/modules/catalog.md`):
 
 - **Phase 0 (no architecture change, ships immediately):** the quick
   wins in §4 that don't depend on ETDs existing — registry
   consolidation for the 6 duplicated doc lists, journal entry
   leaning-out for mechanical ops, hash-based check caching.
 - **Phase 1 (module spec & kernel generalization):** define the ETD schema format, `module.yaml` manifest structure, and generalize INV-5 into the grounding-type concept. No existing deployment's behavior changes yet — this only adds the *capability*.
-- **Phase 2 (software engineering module extraction):** re-express today's `BUG`/`REQ`/`HK`/
-  `TEST`/`STEP`/`FEAT`/`RM`/`WORKFLOW`/`RECON` as the
-  `software-engineering` module's own ETDs, slash commands (`/create-req`, `/create-bug`, etc.), and templates. A migration (like every
+- **Phase 2 (default module extraction):** re-express today's hardcoded
+  development-artifact types as the default module's own ETDs, slash
+  commands (`/create-<type>`, etc.), and templates, and the process-agnostic
+  ones (`WORKFLOW`, `RECON`) as kernel ETDs. A migration (like every
   past one) converts a deployment's existing hardcoded shape into
   module-backed form, byte-for-byte compatible — existing artifacts don't
   move or get renamed.
@@ -225,24 +227,23 @@ Backward-compatible, phased, each phase independently shippable (detailed step-b
   2–4 actually land in the agent's real day-to-day behavior.
 - **Phase 4 (author tooling & multi-module validation):** a real `/create-entity-type` (or
   equivalent) command so an architect/admin authors a new ETD or module
-  conversationally, without hand-writing YAML, and validation against non-software modules to prove kernel isolation.
+  conversationally, without hand-writing YAML, and validation against modules for other processes to prove kernel isolation.
 
 Each phase gets its own version bump + migration doc, exactly like every
 change so far — this proposal doesn't ask the framework to abandon its
 own discipline, just to stop hand-copying the same information into 17
 places per change.
 
-## 6. What this means for catalyst-ui (not in scope to build now, flagging the shape)
+## 6. What this means for a host UI (not in scope to build now, flagging the shape)
 
-`catalyst-core`'s parser today hardcodes `DevArtifactType =
-"bug"|"requirement"|"house-keeping"|"test"` plus one parser function,
+A host UI's parser typically hardcodes a union of dev-artifact type names
+plus one parser function,
 one validator branch, one tree section, and one icon per type — the
 same repetition pattern as the framework's own docs, just in TypeScript.
-An ETD-driven world implies `catalyst-core` eventually reads a
+An ETD-driven world implies such a host eventually reads a
 deployment's own ETDs and parses/validates/displays *any* declared type
 generically, rather than needing a code change per type. That's a real
-rearchitecture of `catalyst-core`'s parser and `catalyst-host-vscode`'s
-tree-building — flagged here for sequencing, not proposed as part of
+rearchitecture of the host's parser and tree-building — flagged here for sequencing, not proposed as part of
 this framework-side plan.
 
 ## 7. Risks / honest tradeoffs
@@ -255,7 +256,7 @@ this framework-side plan.
 - This is a genuine kernel change (INV-5 generalizes) — needs care that
   every *existing* deployment's behavior is provably unchanged
   post-migration, not just "should be."
-- Scope creep risk: "any process" is a big ambition. `software-engineering`
+- Scope creep risk: "any process" is a big ambition. The default process
   migrating to a real ETD-defined profile (§8) is the proof point — the
   framework should not claim to support a second domain until that
   migration is clean and every existing dogfooded behavior is provably
@@ -269,8 +270,8 @@ this framework-side plan.
 2. **Architecture:** the kernel/profile split (§3) is the direction —
    Entity Type Definitions an architect/admin authors per deployment,
    not framework-hardcoded types.
-3. **Profile & Prompt Module status:** `software-engineering` (or `software-development`) migrates to be a real, ETD-defined profile and prompt module (not a permanently privileged hardcoded default) — Phase 2 in §5 is confirmed scope, not optional. This proves the mechanism against catalyst's own real complexity and avoids the framework permanently carrying two parallel ways of defining a type.
-4. **Modular Prompts:** Existing software development prompts (slash commands, skills, procedural guidance) are packaged as the `software-development` module, establishing the architecture for Catalyst to plug in additional modules for other project management types.
+3. **Profile & Prompt Module status:** today's default process migrates to be a real, ETD-defined profile and prompt module (not a permanently privileged hardcoded default) — Phase 2 in §5 is confirmed scope, not optional. This proves the mechanism against catalyst's own real complexity and avoids the framework permanently carrying two parallel ways of defining a type.
+4. **Modular Prompts:** Existing process-specific prompts (slash commands, skills, procedural guidance) are packaged as that default module, establishing the architecture for Catalyst to plug in additional modules for other project management types.
 
 This plan is now considered final pending explicit go-ahead to begin
 Phase 0. No implementation work has started.

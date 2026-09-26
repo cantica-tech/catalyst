@@ -67,12 +67,19 @@ creates concrete rules for that particular project.
        README.md
        <type>.md
      modules/
-       <module-id>/
+       <module-id>/         # the active module, seeded from its release (step 4)
          module.yaml
+         version.txt
          schemas/
          templates/
+         definitions/
          commands/
+         migrations/
          skills/
+         rules-of-rules.module.md
+         code-of-conduct.module.md
+         INVARIANTS.module.md
+         Taskfile.module.yml
      rules/
        templates/
          README.md
@@ -95,38 +102,14 @@ creates concrete rules for that particular project.
        ui/
          ui-rules.md
          <rule-doc-2>.md
-     requirements/
+     <folder>/              # one per active-module entity type (step 4)
        templates/
          README.md
-         templates-requirement.md
-         TEMPLATE-REQUIREMENT-v1.md
+         templates-<type>.md
+         TEMPLATE-<TYPE>-v1.md
        README.md
-       requirements.md
-       <requirement-doc-1>.md
-       <requirement-doc-2>.md
-     steps/
-       templates/
-         README.md
-         templates-step.md
-         TEMPLATE-STEP-v1.md
-       README.md
-       steps.md
-     tests/
-       templates/
-         README.md
-         templates-test.md
-         TEMPLATE-TEST-v1.md
-       README.md
-       tests.md
-       <TEST-NNNNNN-short-summary>.md
-     features/
-       templates/
-         README.md
-         templates-feature.md
-         TEMPLATE-FEATURE-v1.md
-       README.md
-       features.md
-       <FEAT-NNNNNN-short-summary>.md
+       <folder>.md
+       <PREFIX-NNNNNN-short-summary>.md
      reconciliations/
        templates/
          README.md
@@ -160,27 +143,7 @@ creates concrete rules for that particular project.
        <type>/
          <name>/            # an activated plugin's own install (its own repo)
      development/
-       roadmaps/
-         templates/
-           README.md
-           templates-roadmap.md
-           TEMPLATE-ROADMAP-v1.md
-         README.md
-         roadmaps.md
-       bugs/
-         templates/
-           README.md
-           templates-bug.md
-           TEMPLATE-BUG-v1.md
-         README.md
-         bugs.md
-       house-keeping/
-         templates/
-           README.md
-           templates-house-keeping.md
-           TEMPLATE-HOUSE-KEEPING-v1.md
-         README.md
-         house-keeping.md
+       <folder>/            # active-module entity types the module places here
        meta-tags/
          templates/
            README.md
@@ -188,7 +151,6 @@ creates concrete rules for that particular project.
            TEMPLATE-META-TAG-v1.md
          README.md
          meta-tags.md
-       BACKLOG.md
        README.md
        journal.jsonl
    ```
@@ -231,35 +193,65 @@ creates concrete rules for that particular project.
    already exists in the old, purely in-project shape, and
    `migrations/` (this repository) for migrating an existing deployment
    built under an older layout of this section itself to the current
-   one. The framework only cares that the chain REQ/BUG/HK/TEST→rule
-   stays intact — extended upward through epic→story→task only when an
-   agile project-management plugin is active (INV-5, INV-22) — not the
-   folder names.
+   one. The framework only cares that the chain from every active-module
+   artifact to its grounding type (a kernel rule) to a domain stays intact
+   — extended upward through epic→story→task only when an agile
+   project-management plugin is active (INV-5, INV-22) — not the folder
+   names.
    The `domains/` folder nests under `rules/` (`Rules-of-Rules.md` §7) —
    domains exist only to group rules, so they live where rules live, not
-   as a top-level sibling. The `features/` folder sits at the root,
-   alongside `requirements/`; it holds descriptive, non-rule-linked
-   feature entries (see `Rules-of-Rules.md` §9) and is never a
-   substitute for `requirements/`. The `steps/` folder also sits at the
-   root, alongside `requirements/` — each `STEP-NNNNNN` inside it names
-   exactly one parent, a `REQ-NNNNNN` or a `BUG-NNNNNN`, and records one
-   concrete unit of implementation work performed toward it
-   (`Rules-of-Rules.md` §21). The
-   `tests/` folder also sits at the root, alongside `requirements/`/
-   `steps/` — each `TEST-NNNNNN` inside it is a real development
-   artifact (its own `Targets`/`Domain`, not exempt) that may
-   additionally name `(0,n)` requirements and/or `(0,n)` steps it
-   verifies (`Rules-of-Rules.md` §22). The
-   `reconciliations/` folder also sits at the root, alongside
-   `requirements/`/`features/`/`steps/`/`tests/` — not nested under `work-items/`
+   as a top-level sibling. The `<folder>/` entries above stand for the
+   active module's entity types: each ETD in the module's `schemas/`
+   names its own `folder` (and whether it sits at the root or under
+   `development/`), and the module's own meta-rules
+   (`rules-of-rules.module.md`, composed in step 4) say what each type is
+   for and how its artifacts link to one another and to rules. The kernel
+   never names them (INV-30). The
+   `reconciliations/` folder also sits at the root, alongside the active
+   module's root-level folders — not nested under `work-items/`
    — and holds `RECON-NNNNNN` cases opened by `/criterion push`'s merge
    step or manually (`Rules-of-Rules.md` §16).
    `work-items/` itself is not built at all here — it's plugin-only
    (`Rules-of-Rules.md` §8, INV-22); skip it entirely for a core
    instantiation.)
+4. Seed and compose the active module (`MODULE-SPECIFICATION.md` §6). The
+   `<app-name>.catalyst` pointer MUST name it in its `module` field —
+   there is no default module; if the user has not said which one, list
+   the production modules in `framework/modules/catalog.md` and ask.
+   Then:
+   - **Seed** the module from its catalogued repository, at the release
+     that matches this kernel version (its default branch only if no
+     release exists yet), into `.criterion/modules/<module-id>/` — the
+     whole module tree, never cherry-picked files. Like plugins, a module
+     is never sourced from this framework repository.
+   - **Rules-of-Rules:** append the module's `rules-of-rules.module.md`
+     to the deployed `rules/Rules-of-Rules.md`, after the kernel's
+     sections, under a `### From module <module-id>` heading
+     (§6.1). Module rule IDs keep their numbers; a kernel placeholder
+     line for an `rr-META-NNN` that moved to the module stays in place.
+   - **CODE-OF-CONDUCT:** insert the `## 3.` and `## 4.` sections of the
+     module's `code-of-conduct.module.md` at the end of the deployed
+     `CODE-OF-CONDUCT.md` §3 and §4 respectively, each under a
+     `### From module <module-id>` heading (§6.2). The composed §4
+     (kernel plus module) is the canonical command list step 5 deploys.
+   - **Invariants:** read the module's `INVARIANTS.module.md` together
+     with the kernel's `INVARIANTS.md` (§6.4); both bind the deployment.
+   - **Definitions:** the module's `definitions/` join the kernel's in
+     step 7 (§6.3).
+   - **Taskfile:** append the tasks of the module's `Taskfile.module.yml`
+     to the deployed `Taskfile.common.yml` in step 5 (§6.5).
+   - **Artifact folders:** build one artifact-type folder per module
+     entity type, at the place its ETD names, in step 6, from the
+     module's `templates/`.
+   - **Migrations:** a fresh deployment starts at the current version, so
+     no migration runs now; `/sync-framework` later applies module and
+     kernel migrations together in version order (§6.6,
+     `SYNCHRONIZE.md`).
+   Record the module id and version in `DEPLOYMENT.md`.
 5. Ensure the deployed
    framework exposes **every** documented custom slash command from
-   `rules-of-development.template.md` §4 — the canonical list; don't
+   the composed `CODE-OF-CONDUCT.md` §4 — `rules-of-development.template.md`
+   §4 plus the active module's §4 (step 4) — the canonical list; don't
    re-enumerate a subset of it here or anywhere else, that's exactly how it
    drifts — in the same way the framework defines them, so they are
    available in the deployed environment. Under Claude Code this
@@ -273,8 +265,9 @@ creates concrete rules for that particular project.
    **inside `.criterion/`** (agent-owned space per INV-6 — never the
    target project's own tree, unlike `.claude/commands/` which stays
    project-root only because Claude Code's own fixed discovery path
-   forces it there) — same canonical §4 list, same drift concern, see
-   `CLAUDE.md`'s "Taskfiles" entry. Create the project's own root
+   forces it there), with the active module's `Taskfile.module.yml` tasks
+   appended to it (step 4) — same canonical composed §4 list, same drift
+   concern, see `CLAUDE.md`'s "Taskfiles" entry. Create the project's own root
    `Taskfile.yml` if none exists yet, resolving the deployed agent's CLI
    binary from the `*.catalyst` pointer's `agent` field so every
    dispatched command stays agent-generic, and pointing the include at
@@ -324,36 +317,36 @@ creates concrete rules for that particular project.
    `Taskfile.yml`, alongside — never inside — the included common tasks.
 6. For **every** artifact-type folder (`Rules-of-Rules.md` §15, INV-20):
    create its `templates/` subdirectory, copy the matching
-   `templates/*.template.*` from this framework into it as
+   `templates/*.template.*` — from this framework for a kernel type, from
+   the seeded `.criterion/modules/<module-id>/templates/` for an
+   active-module type — into it as
    `TEMPLATE-<TYPE>-v1.md` (first version — new versions only ever get
    added later, never an in-place edit), write that `templates/`
    folder's own `README.md`, and seed its `templates-<type>.md` catalog
    with one row for `v1` (Version | File | Timestamp | Notes — today's
    date, "initial version"). Then write the artifact-type folder's own
-   `README.md` and its `<type>.md` instance catalog (`bugs.md`,
-   `requirements.md`, `features.md`, `reconciliations.md`,
-   `house-keeping.md`, `meta-tags.md`, `roadmaps.md`, `domains.md`,
-   `workflows.md`).
+   `README.md` and its `<type>.md` instance catalog (the kernel's
+   `reconciliations.md`, `meta-tags.md`, `domains.md`, `workflows.md`,
+   plus one `<folder>.md` per active-module entity type).
    This loop does not include `work-items/` or any of its subtypes
    (`boards.md`/`epics.md`/`stories.md`/`tasks.md`/`spikes.md`/
    `sprints.md`/`tickets.md`) — that folder is
-   plugin-only (step 4's note above) and isn't built during core
+   plugin-only (step 3's note above) and isn't built during core
    instantiation at all. `workflows.md` is core now (`Rules-of-Rules.md`
    §19, INV-24), so it's in the list above, not this exclusion.
 
-   Keep requirements templates in the same `requirements/` directory as
-   the actual requirements documents so the template and the concrete
-   requirement files live together (nested one level deeper now, under
-   `requirements/templates/`, but still co-located), and likewise for
-   every other type. Domain files nest under `rules/domains/`, which
+   Keep each type's templates in the same folder as its actual
+   artifacts so the template and the concrete files live together
+   (nested one level deeper, under `<folder>/templates/`, but still
+   co-located). Domain files nest under `rules/domains/`, which
    gets this same full treatment (its own `templates/`, `README.md`,
    `domains.md`).
 
-   Also copy `templates/backlog.template.md` to `development/BACKLOG.md`
-   — a hard requirement (`INVARIANTS.md` INV-14), not optional like the
-   artifact templates above; unlike those, it is not hand-edited
-   afterward, and it has no `templates/` treatment of its own (it isn't
-   an artifact type, INV-20 doesn't apply to it). Also create
+   Also deploy any non-artifact file the active module's meta-rules and
+   invariants require at instantiation (for example a generated summary
+   document), from the module's own `templates/`, and run whatever
+   command the module names to populate it, so no template's
+   `{{PLACEHOLDER}}` text is left in place. Also create
    `IAM/users/templates/` and `IAM/roles/templates/` the same way as any
    other type in this loop: copy `templates/users.template.json` in as
    `TEMPLATE-USERS-v1.json` and `templates/roles.template.json` in as
@@ -367,10 +360,7 @@ creates concrete rules for that particular project.
    actually complete with an empty `users.json`: a project must have at
    least one active user (INV-16). Ask the user who that first
    registered user should be and what role they hold if it isn't obvious
-   from context. Run `/show-backlog` once immediately after creating
-   `BACKLOG.md` so its sections reflect the real, likely still-empty,
-   indexes from the start, rather than leaving any template's
-   `{{PLACEHOLDER}}` text in place. Also copy
+   from context. Also copy
    `templates/journal.template.jsonl` (empty) to
    `development/journal.jsonl` — a hard requirement (`INVARIANTS.md`
    INV-17). From this point on, every command that creates, modifies,
@@ -378,15 +368,16 @@ creates concrete rules for that particular project.
    or changes a `Status` field, appends one entry to it as its last step
    (`CODE-OF-CONDUCT.md` §9) — including every step of this instantiation
    itself from here onward.
-7. Deploy `framework/kernel/definitions/` (`INVARIANTS.md` INV-23) —
+7. Deploy `framework/kernel/definitions/` and the active module's
+   `definitions/` (`INVARIANTS.md` INV-23, `MODULE-SPECIFICATION.md` §6.3) —
    one short prose file per real entity type explaining what it is and
    what it's for, distinct from the `templates/` files' field-and-shape
    definitions. For each type, copy
    only its *latest* `DEFINITION-<TYPE>-vN.md` content into
    `.criterion/definitions/<type>.md` (flat — one file per type, no nested
    subfolder in the deployed copy; the versioned-history subfolders under
-   `framework/kernel/definitions/` are framework-source structure
-   only). Also copy `framework/kernel/definitions/README.md` to
+   `framework/kernel/definitions/` and the module's `definitions/` are
+   source structure only). Also copy `framework/kernel/definitions/README.md` to
    `.criterion/definitions/README.md` so the freeze/versioning convention
    travels with the deployment. **This step never runs again after first
    deploy for a type that already has a deployed definition** — see
@@ -399,10 +390,9 @@ creates concrete rules for that particular project.
    deployment and synchronization so the deployed framework always has a
    custom, project-specific landing page. In addition, create a `README.md`
    in every major deployed folder (`rules/`, `rules/domains/`,
-   `requirements/`, `steps/`, `tests/`, `features/`, `reconciliations/`, `workflows/`,
-   `IAM/users/`, `IAM/roles/`, `development/`, `development/roadmaps/`,
-   `development/bugs/`, `development/house-keeping/`,
-   `development/meta-tags/`) and in every `templates/` subdirectory
+   `reconciliations/`, `workflows/`, `IAM/users/`, `IAM/roles/`,
+   `development/`, `development/meta-tags/`, `modules/<module-id>/`, and
+   every active-module `<folder>/`) and in every `templates/` subdirectory
    (INV-20) that briefly explains that folder's purpose and link to it
    from the root README so the structure is discoverable and
    self-documenting. Also copy `framework/kernel/ACCESS-CONTROL.md`
@@ -412,16 +402,16 @@ creates concrete rules for that particular project.
    first deploy, refreshed on `/sync-framework` whenever this framework
    version actually changes it, linked from the root README so it's
    discoverable.
-9. Create a starter requirements document in `requirements/` based on the
-   project's rule documents (for example, a description document such as
-   `UI-Rules.md` for UI rules or `business-rules.md` for business rules) and
-   keep it aligned with the rule IDs or source documents that define the
-   expected behavior. Requirements must be concrete and tied to specific
-   application areas, screens, flows, or components, because they are the
-   basis for tests and for the bugs that will later be raised when the
-   behavior is wrong.
-10. Create your first rule document(s) with a `## Contents` heading and a
-   `## Known Bugs — Quick Index` heading (even if empty) — the rest fills
+9. Create whatever starter artifacts the active module's meta-rules call
+   for, based on the project's rule documents (for example, a description
+   document such as `UI-Rules.md` for UI rules or `business-rules.md` for
+   business rules), and keep them aligned with the rule IDs or source
+   documents that define the expected behavior. Starter artifacts must be
+   concrete and tied to specific application areas, screens, flows, or
+   components, because later work is grounded on them.
+10. Create your first rule document(s) with a `## Contents` heading and the
+   `## Linked Artifacts — Quick Index` heading (even if empty;
+   `Rules-of-Rules.md` §6) — the rest fills
    in as domains/rules get added, each per `Rules-of-Rules.md` §6, so the
    framework produces rules that are specific to this project. This is a hard
    requirement: every rule must be stored as its own markdown file under the
@@ -442,7 +432,7 @@ creates concrete rules for that particular project.
    bare `<prefix>-<CODE>.md` — see `Rules-of-Rules.md` §7.
 ## 2. Choosing your agile flavor
 
-`work-items/` is plugin-only (§1 step 4, `Rules-of-Rules.md` §8) — this
+`work-items/` is plugin-only (§1 step 3, `Rules-of-Rules.md` §8) — this
 choice only matters if and when a project-management-type plugin is
 activated. Nothing below the work-items layer changes regardless.
 Above it, once such a plugin is active:
@@ -457,9 +447,9 @@ Above it, once such a plugin is active:
   only §1 of `rules-of-development.md` (no development without a
   targeted rule) — everything above that is replaceable with whatever
   process vocabulary your team actually uses, as long as it still
-  bottoms out in `REQ-`/`BUG-`/`HK-` docs. Without any
+  bottoms out in the active module's development artifacts. Without any
   project-management plugin active, this is the default — the chain
-  simply starts at `REQ-`/`BUG-`/`HK-` (INV-5).
+  simply starts at the active module's artifacts (INV-5).
 
 ## 3. Greenfield path — no existing code or practices
 
@@ -503,12 +493,13 @@ after the fact.
    CI workflow runs green — not a unit test.
 4. Once the dev-environment rule document has its first pass of domains
    and rules, continue with §1 steps 2 onward to deploy the rest of the
-   framework skeleton (requirements, features, reconciliations) around
-   it. That rule document stands in for the starter requirements doc in §1
-   step 8 — there is no product behavior yet to write requirements
-   against.
-5. As soon as real application code starts, that work is a normal `REQ-`
-   (per `CODE-OF-CONDUCT.md` §1) against a business/UI rule document
+   framework skeleton (the active module's artifact folders,
+   reconciliations) around it. That rule document stands in for the
+   starter artifacts in §1 step 9 — there is no product behavior yet to
+   ground them on.
+5. As soon as real application code starts, that work is a normal
+   active-module artifact (per `CODE-OF-CONDUCT.md` §1) against a
+   business/UI rule document
    created the usual way — the greenfield path only front-loads the
    tooling layer, it does not replace the rest of the chain.
 
@@ -535,9 +526,9 @@ after the fact.
    exists in some other form) in document order, per §3 — top-level
    bullets get `NNN`; enumerated sub-cases inside one bullet get
    `-1`/`-2`/... suffixes rather than new top-level IDs.
-5. Once rules exist, retrofit `BUG-`/`REQ-`/`HK-` docs for any
-   already-known issues (a "Known Bugs" index is a good source), citing
-   the rule IDs from step 4.
+5. Once rules exist, retrofit active-module artifacts for any
+   already-known issues and pending work (an existing known-issues index
+   is a good source), citing the rule IDs from step 4.
 6. Add a one-line header to each of your project's rule and process files
    noting which template in this framework they instantiate, e.g.:
    ```
@@ -587,8 +578,8 @@ This makes the association durable across sessions and keeps the project's
 instantiated ruleset available whenever the guide is used again.
 
 At the end of a successful instantiation via the retrofit path (§4), if the
-project currently has no bugs, features, house-keeping items, or other
-tracked work items yet, propose running
+project currently has no active-module artifacts or other tracked work
+items yet, propose running
 [`analysis-playbook.md`](analysis-playbook.md) next to help bootstrap the
 first round of project-specific rules and evidence — it reads an existing
 codebase, so it does not apply after the greenfield path (§3), whose

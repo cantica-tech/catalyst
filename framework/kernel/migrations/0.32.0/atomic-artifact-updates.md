@@ -9,13 +9,14 @@
 ## What changed
 
 New behavioural meta-rule (`Rules-of-Rules.md` rr-META-023,
-`INVARIANTS.md` INV-29): every catalyst artifact — a step's own record,
-a `Status` field, a journal entry — is updated **as the work it
-describes actually happens**, at the smallest atomic unit practical, not
-reconstructed retroactively in one batch after the fact. `STEP-NNNNNN`'s
-own definition already said this narrowly for step-opening (§21); this
-generalizes the same posture to every artifact update, by the agent or
-by a user narrating their own manual work.
+`INVARIANTS.md` INV-29): every catalyst artifact — a development
+artifact's own record, a `Status` field, a journal entry — is updated
+**as the work it describes actually happens**, at the smallest atomic
+unit practical, not reconstructed retroactively in one batch after the
+fact. One active-module entity's own definition already said this
+narrowly for its opening; this generalizes the same posture to every
+artifact update, by the agent or by a user narrating their own manual
+work.
 
 Delayed, batched updating remains permitted, but only when explicitly
 stated **before** the work begins — never a silent default chosen for
@@ -26,17 +27,18 @@ change. Nothing here to retroactively backfill.
 
 | Old | New |
 |---|---|
-| Real-time, atomic updating was only explicitly required for a step's own opening (`Rules-of-Rules.md` §21). | Generalized to every artifact update (steps, `Status` fields, journal entries), with an explicit "must be stated before work starts" exception for delayed/batched updating. |
+| Real-time, atomic updating was only explicitly required for one entity type's own opening. | Generalized to every artifact update (development artifacts, `Status` fields, journal entries), with an explicit "must be stated before work starts" exception for delayed/batched updating. |
 
 ## Steps
 
 1. **Re-sync `CODE-OF-CONDUCT.md`/`Rules-of-Rules.md`** (the ordinary
-   template-refresh path) so the deployed copies carry the new
-   rr-META-023 section and the Steps paragraph's INV-29 cross-reference.
+   template-refresh path, composed with the active module's
+   contributions) so the deployed copies carry the new rr-META-023
+   section and its INV-29 cross-references.
 2. **No retroactive changes to any existing artifact.** This is a
    behavioural rule governing how future updates happen, not a schema
-   or field change — no existing step, requirement, bug, or test file
-   needs editing because of this migration.
+   or field change — no existing artifact file needs editing because of
+   this migration.
 3. Journal the migration (`action: "create"`, `intent` describing the
    new behavioural invariant, `files` covering every path actually
    touched by content hash) — never rewrite the journal itself

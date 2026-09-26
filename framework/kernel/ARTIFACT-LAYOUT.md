@@ -14,8 +14,7 @@ the surrounding deploy-procedure text.
   existing version.
 - `[...]` — this directory accepts **files and folders, at any depth** —
   the artifact type's own choice of sub-organization for its actual
-  instances (e.g. rule documents nested by domain, one file per named
-  roadmap).
+  instances (e.g. rule documents nested by domain).
 
 ## The tree
 
@@ -45,41 +44,14 @@ the surrounding deploy-procedure text.
         Rules-of-Rules.md
         rules.md                         # rules catalog
         [...]                            # actual rule documents, typically nested by domain
-    requirements/
+    <folder>/                            # one per active-module entity type (its ETD's storage folder)
         templates/
             README.md
-            templates-requirement.md
-            TEMPLATE-REQUIREMENT-v1.md
+            templates-<entity-type>.md
+            TEMPLATE-<ENTITY-TYPE>-v1.md
             ...
         README.md
-        requirements.md
-        [...]
-    steps/
-        templates/
-            README.md
-            templates-step.md
-            TEMPLATE-STEP-v1.md
-            ...
-        README.md
-        steps.md                      # steps catalog
-        [...]
-    tests/
-        templates/
-            README.md
-            templates-test.md
-            TEMPLATE-TEST-v1.md
-            ...
-        README.md
-        tests.md                      # tests catalog
-        [...]
-    features/
-        templates/
-            README.md
-            templates-feature.md
-            TEMPLATE-FEATURE-v1.md
-            ...
-        README.md
-        features.md
+        <folder>.md                      # <entity-type> catalog
         [...]
     reconciliations/
         templates/
@@ -127,32 +99,10 @@ the surrounding deploy-procedure text.
         <type>/
             [...]
     development/
-        roadmaps/
-            templates/
-                README.md
-                templates-roadmap.md
-                TEMPLATE-ROADMAP-v1.md
-                ...
+        <folder>/                        # active-module entity types whose ETD stores them under development/
+            templates/ ...               # same shape as a top-level <folder>/
             README.md
-            roadmaps.md                  # roadmaps catalog
-            [...]
-        bugs/
-            templates/
-                README.md
-                templates-bug.md
-                TEMPLATE-BUG-v1.md
-                ...
-            README.md
-            bugs.md                      # bugs catalog
-            [...]
-        house-keeping/
-            templates/
-                README.md
-                templates-house-keeping.md
-                TEMPLATE-HOUSE-KEEPING-v1.md
-                ...
-            README.md
-            house-keeping.md             # house-keeping items catalog
+            <folder>.md
             [...]
         meta-tags/
             templates/
@@ -163,10 +113,15 @@ the surrounding deploy-procedure text.
             README.md
             meta-tags.md                 # meta-tags catalog
             [...]
-        BACKLOG.md                       # not an artifact type (INV-14) — no templates/ of its own
         README.md
         journal.jsonl                    # not an artifact type (INV-17) — no templates/ of its own
 ```
+
+Which `<folder>/` directories exist, and whether each sits at the top
+level or under `development/`, is decided by the active process module's
+Entity Type Definitions (`MODULE-SPECIFICATION.md` §4); every one of them
+follows the same INV-20 shape. A module may also deploy generated,
+non-artifact files of its own (see its `INVARIANTS.module.md`).
 
 `work-items/` is **not** part of this core tree — see "Optional,
 plugin-provided: `work-items/`" below.
@@ -177,9 +132,9 @@ A handful of files are deliberately **not** artifact types and so carry
 no `templates/` of their own, even though they sit inside a directory
 that has one:
 
-- `development/BACKLOG.md` (INV-14) — machine-regenerated in full by
-  `/show-backlog` on every run, never hand-edited, never versioned as a
-  template.
+- Any generated summary file the active module deploys (its
+  `INVARIANTS.module.md` names them) — machine-regenerated, never
+  hand-edited, never versioned as a template.
 - `development/journal.jsonl` (INV-17) — an append-only log, not a
   document type with versions.
 - `rules/Rules-of-Rules.md` — the document that *governs* an artifact

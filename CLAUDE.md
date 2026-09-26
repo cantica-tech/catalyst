@@ -11,12 +11,13 @@ Capabilities you have (use them per `BOOTSTRAP.md §1`):
 - **Persistent memory:** record the deployment target note there.
 - **Slash commands:** create one native command file per entry in
   `CODE-OF-CONDUCT.md` §4 (the deployed copy of
-  `framework/kernel/rules-of-development.template.md` §4 — that's the
+  `framework/kernel/rules-of-development.template.md` §4, with the active
+  module's `code-of-conduct.module.md` §4 inserted at its end — that's the
   canonical, complete list; never hand-maintain a shortlist elsewhere, it
   drifts out of sync with the real command set). For each command:
   - Path: `.claude/commands/<name>.md`, in the **target project's** root
-    — not this framework repository. `/create-req`'s alias
-    `/create-requirement` gets its own file too.
+    — not this framework repository. Every alias a command declares gets
+    its own file too.
   - Shape: follow
     `framework/kernel/templates/slash-command.template.md` — minimal
     frontmatter (`description`, `argument-hint` only; don't reach for
