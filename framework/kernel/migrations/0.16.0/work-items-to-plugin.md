@@ -21,8 +21,8 @@ that materializes artifact-type folders and/or slash commands into the
 deployed project on activation, and removes exactly that content on
 deactivation, never touching artifact instances the project already
 created. The chain invariant (INV-5) is revised to match: without an
-agile project-management plugin active, `REQ-`/`BUG-`/`HK-` chains
-directly to `rule → domain`; with one active, the full
+agile project-management plugin active, every rule-targeting
+development artifact chains directly to `rule → domain`; with one active, the full
 `epic → story → task →` prefix is required, same as before this
 migration. **No concrete plugin exists yet** — this migration removes
 `work-items/` from core; it does not hand you a replacement plugin to

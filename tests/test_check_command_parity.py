@@ -32,18 +32,18 @@ def make_taskfile(tmp_path: Path, names: list[str], *, filename="Taskfile.common
 def test_extract_section4_commands_parses_simple_bullets():
     text = (
         "## 4. Slash-command entry points\n\n"
-        "- `/create-bug` — create a new bug artifact.\n"
+        "- `/create-item` — create a new item.\n"
         "- `/list <type>` — list artifacts.\n"
     )
-    assert ccp.extract_section4_commands(text) == {"create-bug", "list"}
+    assert ccp.extract_section4_commands(text) == {"create-item", "list"}
 
 
 def test_extract_section4_commands_handles_alias_bullet():
     text = (
         "## 4. Slash-command entry points\n\n"
-        "- `/create-req` or `/create-requirement` — create a requirement.\n"
+        "- `/create-item` or `/create-new-item` — create an item.\n"
     )
-    assert ccp.extract_section4_commands(text) == {"create-req", "create-requirement"}
+    assert ccp.extract_section4_commands(text) == {"create-item", "create-new-item"}
 
 
 def test_extract_section4_commands_collapses_repeated_subcommand_bullets():
@@ -80,11 +80,11 @@ def test_extract_section4_commands_ignores_bold_prose_naming_commands():
 def test_extract_section4_commands_stops_at_next_top_level_section():
     text = (
         "## 4. Slash-command entry points\n\n"
-        "- `/create-bug` — create a new bug artifact.\n"
+        "- `/create-item` — create a new item.\n"
         "## 5. Something else\n\n"
         "- `/not-a-real-command` — should not be picked up.\n"
     )
-    assert ccp.extract_section4_commands(text) == {"create-bug"}
+    assert ccp.extract_section4_commands(text) == {"create-item"}
 
 
 def test_extract_section4_commands_returns_none_when_section_missing():
@@ -93,8 +93,8 @@ def test_extract_section4_commands_returns_none_when_section_missing():
 
 
 def test_find_command_files_excludes_dogfood(tmp_path: Path):
-    commands_dir = make_commands(tmp_path, ["create-bug", "dogfood"])
-    assert ccp.find_command_files(commands_dir) == {"create-bug"}
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
+    assert ccp.find_command_files(commands_dir) == {"create-item"}
 
 
 def test_find_command_files_missing_dir_returns_empty(tmp_path: Path):
@@ -104,46 +104,46 @@ def test_find_command_files_missing_dir_returns_empty(tmp_path: Path):
 def test_check_command_parity_clean_baseline_has_no_errors(tmp_path: Path):
     coc = make_coc(
         tmp_path,
-        "- `/create-bug` — create a bug.\n"
+        "- `/create-item` — create an item.\n"
         "- `/list <type>` — list artifacts.\n",
     )
-    commands_dir = make_commands(tmp_path, ["create-bug", "list", "dogfood"])
+    commands_dir = make_commands(tmp_path, ["create-item", "list", "dogfood"])
     assert ccp.check_command_parity(commands_dir, coc) == []
 
 
 def test_check_command_parity_flags_documented_command_missing_file(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
     commands_dir = make_commands(tmp_path, [])
     errors = ccp.check_command_parity(commands_dir, coc)
-    assert any("references /create-bug but" in e for e in errors)
+    assert any("references /create-item but" in e for e in errors)
 
 
 def test_check_command_parity_flags_undocumented_command_file(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug", "mystery-command"])
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "mystery-command"])
     errors = ccp.check_command_parity(commands_dir, coc)
     assert any("mystery-command.md exists but is not referenced" in e for e in errors)
 
 
 def test_check_command_parity_does_not_flag_dogfood_as_undocumented(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug", "dogfood"])
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
     assert ccp.check_command_parity(commands_dir, coc) == []
 
 
 def test_check_command_parity_alias_bullet_requires_both_files(tmp_path: Path):
     coc = make_coc(
         tmp_path,
-        "- `/create-req` or `/create-requirement` — create a requirement.\n",
+        "- `/create-item` or `/create-new-item` — create an item.\n",
     )
-    commands_dir = make_commands(tmp_path, ["create-req"])
+    commands_dir = make_commands(tmp_path, ["create-item"])
     errors = ccp.check_command_parity(commands_dir, coc)
     assert len(errors) == 1
-    assert "create-requirement" in errors[0]
+    assert "create-new-item" in errors[0]
 
 
 def test_check_command_parity_missing_code_of_conduct_file(tmp_path: Path):
-    commands_dir = make_commands(tmp_path, ["create-bug"])
+    commands_dir = make_commands(tmp_path, ["create-item"])
     errors = ccp.check_command_parity(commands_dir, tmp_path / "CODE-OF-CONDUCT.md")
     assert any("is missing" in e for e in errors)
 
@@ -151,7 +151,7 @@ def test_check_command_parity_missing_code_of_conduct_file(tmp_path: Path):
 def test_check_command_parity_missing_section4(tmp_path: Path):
     coc = tmp_path / "CODE-OF-CONDUCT.md"
     coc.write_text("## 1. Something else\n\nNo section 4 here.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug"])
+    commands_dir = make_commands(tmp_path, ["create-item"])
     errors = ccp.check_command_parity(commands_dir, coc)
     assert any("has no '## 4.' section" in e for e in errors)
 
@@ -160,25 +160,25 @@ def test_extract_taskfile_commands_parses_top_level_tasks():
     text = (
         'version: "3"\n\n'
         "tasks:\n"
-        "  create-bug:\n"
+        "  create-item:\n"
         '    desc: "..."\n'
         "    cmds:\n"
         '      - "true"\n'
         "  list:\n"
         '    desc: "..."\n'
     )
-    assert ccp.extract_taskfile_commands(text) == {"create-bug", "list"}
+    assert ccp.extract_taskfile_commands(text) == {"create-item", "list"}
 
 
 def test_extract_taskfile_commands_stops_at_dedent():
     text = (
         "tasks:\n"
-        "  create-bug:\n"
+        "  create-item:\n"
         '    desc: "..."\n'
         "vars:\n"
         "  should-not-count: true\n"
     )
-    assert ccp.extract_taskfile_commands(text) == {"create-bug"}
+    assert ccp.extract_taskfile_commands(text) == {"create-item"}
 
 
 def test_extract_taskfile_commands_returns_none_when_no_tasks_block():
@@ -188,29 +188,29 @@ def test_extract_taskfile_commands_returns_none_when_no_tasks_block():
 def test_check_taskfile_parity_clean_baseline_has_no_errors(tmp_path: Path):
     coc = make_coc(
         tmp_path,
-        "- `/create-bug` — create a bug.\n"
+        "- `/create-item` — create an item.\n"
         "- `/list <type>` — list artifacts.\n",
     )
-    taskfile = make_taskfile(tmp_path, ["create-bug", "list"])
+    taskfile = make_taskfile(tmp_path, ["create-item", "list"])
     assert ccp.check_taskfile_parity(taskfile, coc) == []
 
 
 def test_check_taskfile_parity_flags_documented_command_missing_task(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
     taskfile = make_taskfile(tmp_path, [])
     errors = ccp.check_taskfile_parity(taskfile, coc)
-    assert any("references /create-bug but" in e for e in errors)
+    assert any("references /create-item but" in e for e in errors)
 
 
 def test_check_taskfile_parity_flags_undocumented_task(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
-    taskfile = make_taskfile(tmp_path, ["create-bug", "mystery-task"])
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
+    taskfile = make_taskfile(tmp_path, ["create-item", "mystery-task"])
     errors = ccp.check_taskfile_parity(taskfile, coc)
     assert any("'mystery-task' task but it is not referenced" in e for e in errors)
 
 
 def test_check_taskfile_parity_missing_taskfile(tmp_path: Path):
-    coc = make_coc(tmp_path, "- `/create-bug` — create a bug.\n")
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
     errors = ccp.check_taskfile_parity(tmp_path / "Taskfile.common.yml", coc)
     assert any("is missing" in e for e in errors)
 
@@ -223,9 +223,9 @@ def test_main_returns_zero_when_no_deployment(tmp_path: Path, monkeypatch):
 def test_main_returns_zero_for_valid_parity(tmp_path: Path, monkeypatch):
     deploy_root = tmp_path / ".criterion"
     deploy_root.mkdir()
-    make_coc(deploy_root, "- `/create-bug` — create a bug.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug", "dogfood"])
-    make_taskfile(deploy_root, ["create-bug"])
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
+    make_taskfile(deploy_root, ["create-item"])
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
     assert ccp.main() == 0
@@ -234,9 +234,9 @@ def test_main_returns_zero_for_valid_parity(tmp_path: Path, monkeypatch):
 def test_main_returns_one_for_mismatched_parity(tmp_path: Path, monkeypatch):
     deploy_root = tmp_path / ".criterion"
     deploy_root.mkdir()
-    make_coc(deploy_root, "- `/create-bug` — create a bug.\n")
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
     commands_dir = make_commands(tmp_path, ["dogfood"])
-    make_taskfile(deploy_root, ["create-bug"])
+    make_taskfile(deploy_root, ["create-item"])
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
     assert ccp.main() == 1
@@ -245,8 +245,8 @@ def test_main_returns_one_for_mismatched_parity(tmp_path: Path, monkeypatch):
 def test_main_returns_one_for_missing_taskfile(tmp_path: Path, monkeypatch):
     deploy_root = tmp_path / ".criterion"
     deploy_root.mkdir()
-    make_coc(deploy_root, "- `/create-bug` — create a bug.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug", "dogfood"])
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
     assert ccp.main() == 1
@@ -261,9 +261,47 @@ def test_main_ignores_a_taskfile_at_the_project_root_not_in_criterion(
     check; only one inside .criterion/ counts."""
     deploy_root = tmp_path / ".criterion"
     deploy_root.mkdir()
-    make_coc(deploy_root, "- `/create-bug` — create a bug.\n")
-    commands_dir = make_commands(tmp_path, ["create-bug", "dogfood"])
-    make_taskfile(tmp_path, ["create-bug"])  # wrong location: project root
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
+    make_taskfile(tmp_path, ["create-item"])  # wrong location: project root
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
     assert ccp.main() == 1
+
+
+def write_example_module(project: Path, *, with_spec: bool) -> None:
+    mdir = project / "framework" / "modules" / "example-process"
+    mdir.mkdir(parents=True)
+    (mdir / "module.yaml").write_text(
+        "id: example-process\n"
+        "commands:\n"
+        "  - name: create-item\n"
+        "    description: Create a new item\n"
+        "    spec_path: commands/create-item.md\n"
+    )
+    if with_spec:
+        (mdir / "commands").mkdir()
+        (mdir / "commands" / "create-item.md").write_text("# /create-item\n")
+    (project / "app.catalyst").write_text('{"module": "example-process"}')
+
+
+def test_check_module_manifest_parity_noop_without_module(tmp_path: Path):
+    commands_dir = make_commands(tmp_path, [])
+    assert ccp.check_module_manifest_parity(tmp_path, commands_dir) == []
+    assert ccp.check_module_manifest_parity(None, commands_dir) == []
+
+
+def test_check_module_manifest_parity_flags_unbacked_command(tmp_path: Path):
+    write_example_module(tmp_path, with_spec=False)
+    commands_dir = make_commands(tmp_path, [])
+    errors = ccp.check_module_manifest_parity(tmp_path, commands_dir)
+    assert len(errors) == 1
+    assert "example-process" in errors[0] and "/create-item" in errors[0]
+
+
+def test_check_module_manifest_parity_accepts_command_file_or_spec(tmp_path: Path):
+    write_example_module(tmp_path, with_spec=True)
+    assert ccp.check_module_manifest_parity(tmp_path, make_commands(tmp_path, [])) == []
+    other = tmp_path / "other"
+    write_example_module(other, with_spec=False)
+    assert ccp.check_module_manifest_parity(other, make_commands(other, ["create-item"])) == []

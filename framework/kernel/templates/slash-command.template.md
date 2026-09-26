@@ -1,9 +1,9 @@
 # Slash-command file template
 
 > Copy this file to `.claude/commands/{{command-name}}.md` in the target
-> project, once per command listed in the deployed `CODE-OF-CONDUCT.md` §4,
-> and resolve every `{{PLACEHOLDER}}`. See `INSTANTIATION-GUIDE.md` §1
-> step 5 and `CLAUDE.md`'s "Slash commands" entry — this template exists
+> project, once per command listed in the deployed `CODE-OF-CONDUCT.md` §4
+> (kernel and active-module entries alike), and resolve every
+> `{{PLACEHOLDER}}`. See `INSTANTIATION-GUIDE.md` §1 step 5 and `CLAUDE.md`'s "Slash commands" entry — this template exists
 > because that entry requires it, not as an optional convenience.
 
 This file becomes the literal prompt Claude Code runs when the user types
@@ -11,7 +11,7 @@ This file becomes the literal prompt Claude Code runs when the user types
 `CODE-OF-CONDUCT.md` §4** — the canonical behavior spec — rather than
 duplicating that spec's prose here. That's what keeps the command correct
 across a `/sync-framework` without needing its own edit: if the framework
-changes what `/create-bug` does, the deployed `CODE-OF-CONDUCT.md` gets
+changes what `/meta-tag` does, the deployed `CODE-OF-CONDUCT.md` gets
 synced and this file's instructions ("follow §4") are still accurate
 unchanged.
 
@@ -36,8 +36,8 @@ Input: $ARGUMENTS
    sequential ID from the relevant index file + a directory listing of
    existing files — never guess or reuse a number.}}
 2. {{Name any field this artifact type can never leave empty (e.g. a
-   bug's Targets, per CODE-OF-CONDUCT.md §1) and what to do if the user's
-   input doesn't supply it — ask, don't invent a value.}}
+   rule-linked artifact's Targets, per CODE-OF-CONDUCT.md §1) and what to
+   do if the user's input doesn't supply it — ask, don't invent a value.}}
 3. {{Copy the relevant TEMPLATE-*.md, fill every field, and use a
    descriptive `<id>-<short-summary>.md` filename — never a bare ID
    (rr-META-003 / INV-7).}}
@@ -50,7 +50,7 @@ Adapt the numbered steps to what the command actually does — don't force
 every command through this artifact-creation shape:
 
 - **Query/inspect commands** (`/list`, `/audit`, `/check-rules`,
-  `/show-backlog`, `/help`) don't create anything — steps 1–4 become
+  `/help`, and any the active module contributes) don't create anything — steps 1–4 become
   "resolve what's being asked for, read the relevant index/rule files,
   report findings" instead.
 - **`/sync-framework` and `/run-analysis`** additionally need this

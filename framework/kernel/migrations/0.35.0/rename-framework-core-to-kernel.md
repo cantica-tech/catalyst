@@ -18,17 +18,17 @@ kernel**. The framework is the kernel plus its process modules
    `<app-name>.catalyst` pointer field `framework_version` is renamed
    `kernel_version`.
 3. **`/sync-kernel`.** `/sync-framework` is renamed `/sync-kernel`.
-   `/sync-framework` stays as an alias, the same way `/create-requirement`
-   aliases `/create-req`.
+   `/sync-framework` stays as an alias, the same way any command alias in
+   `CODE-OF-CONDUCT.md` §4 works.
 4. **Module manifests.** A module release's `manifest.json` declares its
    compatible kernel as `kernelVersion` (was `frameworkVersion`). Readers
    accept both names.
 5. **Kernel release.** The kernel ships as
    `catalyst/kernel/v<version>/kernel-v<version>.zip` (manifest id
    `catalyst-kernel`) instead of `catalyst/framework/v<version>/framework-v<version>.zip`.
-6. **Modules are full repositories.** `software-engineering` is no longer a
-   catalyst submodule. It lives in its own repository, checked out next to
-   catalyst as `catalyst-software-engineering/`, which the release task
+6. **Modules are full repositories.** A production module is no longer a
+   catalyst submodule. Each lives in its own repository, checked out next
+   to catalyst as `catalyst-<module-id>/`, which the release task
    (`scripts/package_release.py`) and module loader read from.
 
 ## Steps for deployed projects

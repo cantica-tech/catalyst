@@ -2,7 +2,7 @@
 
 > A process-definition document, not a unit of work: never itself "done"
 > (`Rules-of-Rules.md` §19). Documents how a category of work or a
-> procedure (e.g. a bug's triage-to-resolution path, or how to resolve a
+> procedure (e.g. an item's triage-to-resolution path, or how to resolve a
 > particular recurring kind of reconciliation) moves through its steps.
 > Other core entities may optionally reference one by ID to guide their
 > own process — `RECON-` reconciliation cases are the first to do so

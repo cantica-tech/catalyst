@@ -12,8 +12,8 @@
   case-sensitive alphanumeric, containing at least one uppercase
   letter, generated once and never changed (`Rules-of-Rules.md` §11,
   INV-26).
-- Every rule, `BUG-`/`REQ-`/`HK-`, `FEAT-`, `RM-`, `WORKFLOW-`, and
-  `RECON-` ID now carries its creator/signer's `userid` as a trailing
+- Every rule, active-module `<PREFIX>-NNNNNN`, `WORKFLOW-`, and `RECON-`
+  ID now carries its creator/signer's `userid` as a trailing
   `-XXXXXXXX` segment, assigned once at creation, immutable after
   (`Rules-of-Rules.md` §20).
 - A rule ID's sequence number widens from 3-digit `NNN` to 6-digit
@@ -57,15 +57,17 @@
    self-governing/exempt from that index — check
    `rules-of-rules.template.md` §1 for which ones are), then search the
    **entire deployment tree** for the bare old-id string and update
-   every real citation found — structured fields (`Targets`, `Feature`,
-   `Roadmap`, `Requirement(s)`, `Linked`, `Entity`, `Workflow`) and
+   every real citation found — structured fields (`Targets`, `Entity`,
+   `Workflow`, and every link field the active module's templates
+   define) and
    free-text `## Related`/`## Notes`/prose citations alike, since there
    is no dedicated cross-reference-checking script to catch a missed
-   one. Two carve-outs, never touched:
+   one. Carve-outs, never touched:
    - `development/journal.jsonl` — **never edit** (INV-17). Historical
      entries correctly keep citing the pre-rename form forever.
-   - `development/BACKLOG.md` — **never hand-edit** (INV-14).
-     Regenerate via `/show-backlog` after every rename lands instead.
+   - any generated file the active module declares never hand-edited —
+     regenerate it with the command the module names after every
+     rename lands instead.
    A completed `.ledger/*.todo.md` checklist line narrating a past
    action is historical record, same posture as the journal — leave it.
    A domain's own filename/code that merely shares a rule's
@@ -73,14 +75,15 @@
    have no numeric ID; don't touch it.
 
    Re-search for that same old form immediately after each rename —
-   zero remaining hits outside the two carve-outs before moving to the
+   zero remaining hits outside the carve-outs before moving to the
    next id. An unresolved hit is a blocker, not something to skip.
 5. **Re-sync governing docs**: refresh this deployment's own
    `rules/Rules-of-Rules.md` (§3/§11/§20) and `CODE-OF-CONDUCT.md`
    (§2/§6) against their now-updated source templates, the same way any
    other `/sync-framework` pass would.
-6. **Refresh `development/BACKLOG.md`** via `/show-backlog` if any
-   renamed id appeared there.
+6. **Module**: regenerate any active-module generated file a renamed id
+   appeared in, and apply the active module's migration for this
+   version, if any (`MODULE-SPECIFICATION.md` §6.6).
 7. **Journal**: two entries — one for the user migration (step 1-2),
    one for the rule-id migration (steps 3-4) — each with real
    `git hash-object` before/after hashes for every file it touched.
@@ -91,8 +94,8 @@
    new `check_users_have_userid`/`check_rule_id_shape` checks this same
    version introduces, before considering the migration done.
 
-Note: `BUG-`/`REQ-`/`HK-`/`FEAT-`/`RM-`/`WORKFLOW-`/`RECON-` commonly
-have zero existing instances in a fresh or lightly-used deployment —
+Note: active-module artifacts, `WORKFLOW-` and `RECON-` commonly have
+zero existing instances in a fresh or lightly-used deployment —
 there is nothing to rename there in that case, but `Rules-of-Rules.md`
 §20 governs every future instance of every one of these types from now
 on regardless.

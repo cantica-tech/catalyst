@@ -75,13 +75,17 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
    `<prefix>-<PARENT>.<SUB>-<short-summary>.md`), using the domain's own
    `Scope` field as the source for the summary, then every reference to the
    old filename updated accordingly.
-10. Check `## Version-specific one-time migrations` below for any entry
-    whose "From" version is at or above the project's own `version.txt`
-    value *before* this synchronization run started. Run each such entry
-    exactly once, as part of this same run, reporting flagged items to the
-    user per that entry's own steps rather than applying them silently. Do
-    not re-run an entry on a project whose pre-sync `version.txt` already
-    reflected a version past that entry's "From" version.
+10. Check `## Version-specific one-time migrations` below — and the
+    active module's own `migrations/migrations.md`
+    (`MODULE-SPECIFICATION.md` §6.6) — for any entry whose "From" version
+    is at or above the project's own `version.txt` value *before* this
+    synchronization run started. Run each such entry exactly once, as part
+    of this same run, kernel and module entries merged into one sequence in
+    version order (a kernel and a module entry with the same target run
+    kernel first), reporting flagged items to the user per that entry's
+    own steps rather than applying them silently. Do not re-run an entry on
+    a project whose pre-sync `version.txt` already reflected a version past
+    that entry's "From" version.
 11. Never deactivate an already-active plugin as a side effect of applying a
     new kernel version. A plugin stays active across the sync unless its
     entry in the relevant `plugins/<type>/catalog.md` explicitly excludes
@@ -122,7 +126,7 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
    sourced from this repository; every plugin must have its own repository.
    A deployed project's own `plugins/<type>/catalog.md` and installed plugin
    directories are project-owned state, not framework template content —
-   merge into them (see item 12 of the slash-command behavior below), never
+   merge into them (see item 12 of the slash-command behavior above), never
    overwrite or delete them wholesale.
 5. Ensure the deployed project contains a custom root-level `README.md` that
    describes the deployed framework's structure and the project's artifact
@@ -131,43 +135,47 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
    customization, unlike the README) — create it if missing, and refresh
    it if this kernel version actually changed its content, same
    treatment as `CODE-OF-CONDUCT.md`/`Rules-of-Rules.md`.
-6. Ensure the deployed project contains the required artifacts:
-   - `requirements/requirements.md`
-   - `requirements/` individual requirement files
-   - `steps/steps.md` (create the folder and index even when empty — see
-     the "Version-specific one-time migrations" section below for the
-     one-time `Steps` field this introduces on every existing requirement,
-     and separately for the one-time `Steps` field it introduces on every
-     existing bug once a step's `Parent` widens to accept either)
-   - `steps/` individual step files, if any
-   - `tests/tests.md` (create the folder and index even when empty)
-   - `tests/` individual test files, if any
-   - `features/features.md`
-   - `features/` individual feature files, if any (create the folder and
-     index even when empty — see the "Version-specific one-time
-     migrations" section below for the one-time `BUG-`→`REQ-`
-     reclassification audit that runs alongside this on eligible projects)
-   - `bugs/bugs.md`
-   - `bugs/` individual bug files
-   - `house-keeping/house-keeping.md`
+6. Refresh and recompose the active module (`MODULE-SPECIFICATION.md`
+   §6). The `<app-name>.catalyst` pointer must name it in its `module`
+   field — there is no default module; if the field is missing, stop and
+   ask the user which catalogued module (`framework/modules/catalog.md`)
+   the deployment uses before going further. Then:
+   - refresh `.criterion/modules/<module-id>/` from the module's
+     catalogued repository, at the release matching the target kernel
+     version (whole tree, never cherry-picked files), creating it if
+     missing;
+   - recompose the deployed `rules/Rules-of-Rules.md` from
+     `rules-of-rules.template.md` plus the module's
+     `rules-of-rules.module.md`, appended after the kernel's sections
+     under `### From module <module-id>` (§6.1);
+   - recompose the deployed `CODE-OF-CONDUCT.md` §3 and §4 from
+     `rules-of-development.template.md` plus the `## 3.`/`## 4.`
+     sections of the module's `code-of-conduct.module.md`, each inserted
+     at the end of the matching kernel section under
+     `### From module <module-id>` (§6.2);
+   - read the module's `INVARIANTS.module.md` together with the kernel's
+     `INVARIANTS.md` (§6.4);
+   - recompose `Taskfile.common.yml` from
+     `templates/Taskfile.common.template.yml` plus the module's
+     `Taskfile.module.yml` tasks (§6.5);
+   - apply the module's migrations with the kernel's, in version order
+     (item 10 of the slash-command behavior above, §6.6).
+   Composition is additive: module content never replaces kernel content,
+   and project-local adjustments outside the composed blocks are
+   preserved like any other synced file. Record the module id and
+   version in `DEPLOYMENT.md`.
+7. Ensure the deployed project contains the required artifacts:
+   - one artifact-type folder per active-module entity type, at the
+     place its ETD names, with its `templates/` (from the seeded module's
+     `templates/`), its `<folder>.md` index (created even when empty) and
+     its individual artifact files, if any. A type the module added since
+     the project's last sync gets its folder and index created, not
+     silently skipped; synchronization never overwrites or deletes an
+     existing artifact file.
+   - any non-artifact file the active module's meta-rules or invariants
+     require (created from the module's `templates/` if missing, and
+     refreshed only by the command the module names for it)
    - `meta-tags/meta-tags.md`
-   - `development/BACKLOG.md` (from `templates/backlog.template.md` on
-     first deploy; refreshed in full by `/show-backlog`, never
-     hand-edited — see `INVARIANTS.md` INV-14). If a deployed project
-     predates this requirement and has no `development/BACKLOG.md`,
-     synchronizing to a version that includes it creates it from the
-     template rather than skipping it as "already deployed."
-   - `development/roadmaps/templates/TEMPLATE-ROADMAP-v1.md` and an empty
-     `development/roadmaps/roadmaps.md` index (from
-     `templates/roadmap.template.md` on first deploy — see
-     `INVARIANTS.md` INV-15). Individual `development/roadmaps/<name>.md`
-     files are added/updated/retired by `/roadmap-add`/`-update`/`-merge`/
-     `-remove`, with Status/Linked columns refreshed by `/show-backlog`;
-     synchronization must never overwrite or delete an existing named
-     roadmap file, the same non-destructive treatment as an installed
-     plugin directory. A deployed project that predates this requirement
-     gets the folder/index created from the template on its next sync,
-     not silently skipped.
    - `IAM/roles/roles.json` (from `templates/roles.template.json` on
      first deploy; entries added/changed by `/role-add`/`/role-modify` —
      never overwritten by synchronization once it exists, same
@@ -188,12 +196,14 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
      this requirement gets it created empty on its next sync — synchronizing
      does not retroactively fabricate entries for history that predates
      the journal's own existence.
-   - `definitions/<type>.md` for every real entity type (from
-     `framework/kernel/definitions/<type>/DEFINITION-<TYPE>-vN.md`,
-     latest version only — see `definitions/README.md` and
+   - `definitions/<type>.md` for every real entity type, kernel and
+     active module (from `framework/kernel/definitions/<type>/
+     DEFINITION-<TYPE>-vN.md` or the module's `definitions/<type>/
+     DEFINITION-<TYPE>-vN.md`, `MODULE-SPECIFICATION.md` §6.3; latest
+     version only — see `definitions/README.md` and
      `INVARIANTS.md` INV-23). **Frozen once deployed**: a sync creates `.criterion/definitions/<type>.md` only for
      a type that doesn't already have one there (e.g. a type this framework
-     version introduced since the project's last sync) — it never
+     version or the active module introduced since the project's last sync) — it never
      overwrites or touches an existing `definitions/<type>.md`, no matter
      how much newer the framework's own copy has become. This is stronger
      than every other "don't overwrite" item above: those still get
@@ -202,32 +212,34 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
      of what an entity type *is* must not shift silently underneath it).
      The only sanctioned way to move a deployed definition forward is the
      explicit `/migrate-definition <entity-type> <version>` command, and
-     only to a version that actually exists in this framework's
-     `definitions/<entity-type>/` folder — see `rules-of-development.
-     template.md` §4. A deployed project that predates this feature
+     only to a version that actually exists in this framework's (or the
+     active module's) `definitions/<entity-type>/` folder — see
+     `rules-of-development.template.md` §4. A deployed project that predates this mechanism
      entirely gets every type's `definitions/<type>.md` created (at
      whatever version is current in this framework) the first time it
      syncs past the version that introduced it — see "Version-specific
      one-time migrations" below.
    - `version.txt`
-   - every documented slash command from `rules-of-development.template.md`
-     §4 — the canonical list; this file must never re-enumerate a subset of
-     it — must be available in the deployed environment after
+   - every documented slash command from the composed `CODE-OF-CONDUCT.md`
+     §4 — `rules-of-development.template.md` §4 plus the active module's
+     §4 (item 6), the canonical list; this file must never re-enumerate a
+     subset of it — must be available in the deployed environment after
      synchronization. Under Claude Code: create any
      `.claude/commands/<name>.md` missing relative to that list (following
      `templates/slash-command.template.md`), and refresh an existing one
-     only if this kernel version actually changed that command's spec
-     in `rules-of-development.template.md` §4 — an unchanged command's file
+     only if this kernel or module version actually changed that
+     command's spec in the composed §4 — an unchanged command's file
      is project-owned content like any other synced file, not something to
      overwrite wholesale on every sync. Same treatment for
      `Taskfile.common.yml` (deployed inside `.criterion/`, not the project
-     tree — INV-6) against `templates/Taskfile.common.template.yml`: add
-     any task missing relative to §4, refresh a task's `desc`/dispatched
-     command only if this kernel version changed that command's §4 spec.
+     tree — INV-6) against `templates/Taskfile.common.template.yml` plus
+     the module's `Taskfile.module.yml`: add any task missing relative to
+     §4, refresh a task's `desc`/dispatched command only if this kernel or
+     module version changed that command's §4 spec.
      The project's own root `Taskfile.yml` (its `includes:` plus its
      project-specific tasks) is project-owned content, never overwritten by
      a sync.
-7. Update the deployed framework's `version.txt` to the latest released
+8. Update the deployed framework's `version.txt` to the latest released
    version once synchronization is complete.
 
 ## Version-specific one-time migrations
@@ -237,33 +249,19 @@ step for content a project deployed *before* that version, distinct from
 the ordinary template/rule copying above. Each entry below runs **exactly
 once** — the first time a deployed project's `version.txt` is advanced past
 the entry's "From" version — never again on later syncs, even if the
-project re-syncs to a still-later version afterward.
+project re-syncs to a still-later version afterward. The kernel's entries
+are listed below and indexed in `migrations/migrations.md` (this
+repository); the active module's entries live in its own
+`migrations/migrations.md` and run interleaved with these, in version
+order (`MODULE-SPECIFICATION.md` §6.6). Where a kernel version also
+changed the active module's entity shapes, its entry below says so and
+defers to the module's migration for that version.
 
-### From `0.3.1`: audit `BUG-` items that were actually feature requests
+### From `0.3.1`: module-owned audit
 
-This kernel version introduces `features/` (`Rules-of-Rules.md` §9) and
-makes explicit that new feature work belongs in a `REQ-NNNNNN` requirement,
-never a `BUG-NNNNNN` bug (`rules-of-development.md` §3). A project synchronized
-from a kernel version at or below `0.3.1` may already contain `BUG-`
-items that were filed for what was actually new/desired behavior rather
-than an existing rule failing to hold.
-
-When synchronizing such a project up to a version that includes this
-section, perform this audit once, as part of that same synchronization run:
-
-1. Read every file in `bugs/` (or the project's equivalent bugs directory).
-2. For each one, judge whether its `Description`/`Root cause` describes
-   behavior that used to work and regressed (a real bug) versus behavior
-   that was never specified or built at all (a feature gap misfiled as a
-   bug). A strong signal: a `Targets` rule whose status marker is ❌ "not
-   implemented" rather than a regression from a previously ✅ rule.
-3. Report every flagged item to the user rather than silently
-   reclassifying it. For each one the user confirms, convert it to a
-   `REQ-NNNNNN` using `templates/requirements.template.md`, preserving its
-   original content and `Opened` date, then retire the `BUG-NNNNNN` in place
-   per `Rules-of-Rules.md` §4 with a note pointing at the new `REQ-NNNNNN`.
-4. Do not repeat this audit on later syncs once the deployed project's
-   `version.txt` already reflects a version that includes this section.
+An entity-only migration for this version moved to the active module's
+`migrations/` (`MODULE-SPECIFICATION.md` §6.6). Apply the active module's
+migration for this version, if any; the kernel has nothing to do here.
 
 ### From `0.10.1`: agent-owned working copy + `<app-name>.catalyst` pointer
 
@@ -331,23 +329,18 @@ hardcoded `claude -p`) — only a deployment that ran `/sync-framework` or
 was first instantiated while on exactly `0.18.0` needs this; anything
 older simply gets the new shape fresh, no migration involved.
 
-### From `0.19.0`: roadmap items gain a `Description` column
+### From `0.19.0`: module-owned shape change
 
-Target version `0.20.0`. Full procedure:
-`migrations/0.20.0/roadmap-description-column.md` (this repository) — not
-duplicated here. Every existing `RM-NNNNNN` row in every
-`development/roadmaps/<name>.md` gains a `Description` column (between
-`Title` and `Status`) — a one-line summary per row must be backfilled,
-not left blank, so this is not a purely mechanical sync. A deployment
-with no named roadmaps yet (an empty `roadmaps.md`) has nothing to
-migrate.
+Target version `0.20.0`. No kernel change. Apply the active module's
+migration for this version, if any (`MODULE-SPECIFICATION.md` §6.6).
 
 ### From `0.20.0`: entity definitions
 
 Target version `0.21.0`. Full procedure:
 `migrations/0.21.0/add-entity-definitions.md` (this repository) — not
 duplicated here. A deployment with no `definitions/` folder yet gets one
-created, with every real entity type's current latest `definitions/<type>/
+created, with every real entity type's (kernel and active module) current
+latest `definitions/<type>/
 DEFINITION-<TYPE>-vN.md` copied in as `.criterion/definitions/<type>.md` —
 the same "create if missing" logic ordinary synchronization now applies
 to this folder going forward (INV-23), just run once, retroactively.
@@ -385,44 +378,23 @@ it yet, and links it from the root README.
 
 Target version `0.26.0`. Full procedure:
 `migrations/0.26.0/userid-and-entity-id-suffix.md` (this repository) — not
-duplicated here. Every registered user gains a `userid`; every entity ID
-gains a creator/signer `userid` suffix; rule sequence IDs widen to 6 digits.
+duplicated here. Every registered user gains a `userid`; every entity ID —
+kernel and active module — gains a creator/signer `userid` suffix; rule
+sequence IDs widen to 6 digits.
 
 ### From `0.26.0`: add `Name` field to development entities
 
 Target version `0.27.0`. Full procedure:
 `migrations/0.27.0/add-entity-name-field.md` (this repository) — not
 duplicated here. Base `entity` definition introduced and `Name` field
-added across all development entities and templates (`definitions/entity/`,
-`Rules-of-Rules.md` §3).
+added across every entity type and template, kernel and active module
+(`definitions/entity/`, `Rules-of-Rules.md` §3).
 
-### From `0.28.0`: `STEP-` entity + roadmap multi-link
+### From `0.28.0`, `0.29.0` and `0.30.0`: module-owned shape changes
 
-Target version `0.29.0`. Full procedure:
-`migrations/0.29.0/add-step-entity-and-roadmap-multilink.md` (this
-repository) — not duplicated here. Adds the core `STEP-NNNNNN` entity
-(`steps/`, `/create-step`) recording a requirement's actual implementation
-work, a `Steps` field on every requirement, and generalizes a roadmap
-row's `Linked` field from an implicit single ID to an explicit list.
-
-### From `0.29.0`: `TEST-` entity
-
-Target version `0.30.0`. Full procedure:
-`migrations/0.30.0/add-test-entity.md` (this repository) — not
-duplicated here. Adds `TEST-NNNNNN` as a fourth core development-artifact
-type (own `Targets`/`Domain`, subject to hard rule 1) alongside
-`BUG-`/`REQ-`/`HK-`, with two additional independent `(0,n)` link fields
-(`Requirements`, `Steps`) — pure addition, no existing artifact requires
-retroactive changes.
-
-### From `0.30.0`: a step's parent widens to requirement or bug
-
-Target version `0.31.0`. Full procedure:
-`migrations/0.31.0/step-parent-bug-or-requirement.md` (this repository) —
-not duplicated here. A step's single required parent field (renamed
-`Requirement` → `Parent`) now accepts a `BUG-NNNNNN` as well as a
-`REQ-NNNNNN`; the bug template gains its own `Steps` field, mirroring
-the requirement's.
+Target versions `0.29.0`, `0.30.0` and `0.31.0`. No kernel change. Apply
+the active module's migration for each of these versions, if any, in
+version order (`MODULE-SPECIFICATION.md` §6.6).
 
 ### From `0.31.0`: atomic, real-time artifact updates
 
@@ -432,6 +404,38 @@ duplicated here. New behavioural meta-rule: every catalyst artifact is
 updated as the work it describes actually happens, not batched
 retroactively, unless delayed updating is explicitly stated before work
 begins. Purely behavioural — no schema change, nothing to backfill.
+
+### From `0.32.1`: process modules and ETDs
+
+Target version `0.33.0`. Full procedure:
+`migrations/0.33.0/process-modules-and-etds.md` (this repository) — not
+duplicated here. Introduces process modules and Entity Type Definitions;
+the active module is seeded into `.criterion/modules/<module-id>/` and
+named in the pointer's `module` field.
+
+### From `0.34.0`: the kernel
+
+Target version `0.35.0`. Full procedure:
+`migrations/0.35.0/rename-framework-core-to-kernel.md` (this repository) —
+not duplicated here. The module-independent part of the framework is
+named the kernel; the pointer's `framework_version` becomes
+`kernel_version`.
+
+### From `0.35.0`: keep `/sync-framework`
+
+Target version `0.35.1`. Full procedure:
+`migrations/0.35.1/keep-sync-framework.md` (this repository) — not
+duplicated here. Withdraws `/sync-kernel`; `/sync-framework` keeps its
+name.
+
+### From `0.35.2`: module-agnostic kernel
+
+Target version `0.36.0`. Full procedure:
+`migrations/0.36.0/module-agnostic-kernel.md` (this repository) — not
+duplicated here. The kernel no longer carries any module entity; every
+module template, definition, meta-rule, invariant, command, task and
+migration comes from the active module and is composed per
+`MODULE-SPECIFICATION.md` §6. The pointer must name its module.
 
 ## Expected outcome
 

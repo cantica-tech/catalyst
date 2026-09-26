@@ -10,6 +10,11 @@ Keep this file short. Anything that needs explanation, examples, or rationale
 belongs in the guide it came from — not here. A bloated invariants file decays
 faster and is the first thing a summarizer mangles.
 
+The active process module adds its own invariants in its
+`INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4), read together with
+this file. An invariant that moved to a module keeps its number here as a
+one-line placeholder; numbers are never reused.
+
 ## Behavioural
 
 - **INV-1 — Repo-scoped references.** Never mention a local drive, folder, or
@@ -36,7 +41,7 @@ faster and is the first thing a summarizer mangles.
   any of those; it only removes confirmation pauses that were advisory in
   the first place (e.g. `rr-META-011`'s role-mismatch check).
 - **INV-29 — Atomic, real-time artifact updates.** Catalyst's own
-  artifacts (a step's own record, a `Status` field, a journal entry) are
+  artifacts (an artifact's own record, a `Status` field, a journal entry) are
   updated as the work they describe actually happens, at the smallest
   atomic unit practical — never reconstructed retroactively in one batch
   once work is already underway or done. Delayed, batched updating is
@@ -49,18 +54,18 @@ faster and is the first thing a summarizer mangles.
 ## Structural
 
 - **INV-5 — Chain invariant.** No work without a traceable link down to a
-  documented grounding artifact (e.g., `rule` for software engineering,
-  `policy` for governance modules): `REQ`/`BUG`/`HK` → rule → domain.
-  Generalized across Catalyst Modules (`MODULE-SPECIFICATION.md`): an active
-  module declares its `grounding_type` and each ETD specifies `grounding`
-  as `required` (linking directly to grounding type), `inherited` (inheriting
-  parent link), or `none`. Every document, domain, and rule has a stable,
-  permanent, never-reused ID. Extended upward through `epic → story → task →`
-  when an agile project-management plugin is active (INV-22) — `work-items/`
-  doesn't exist otherwise, so the chain can't reach through it; without one
-  active, `REQ`/`BUG`/`HK` chains directly to rule → domain, the same
-  way house-keeping's "no rule applies" is already a legitimate,
-  explicit answer.
+  documented grounding artifact: an active-module artifact grounds to the
+  module's grounding type (a kernel rule) → domain. The active module
+  declares its `grounding_type` (`MODULE-SPECIFICATION.md` §5) and each of
+  its ETDs specifies `grounding` as `required` (linking directly to the
+  grounding type), `inherited` (inheriting its parent's link), or `none`.
+  Every document, domain, and rule has a stable, permanent, never-reused
+  ID. Extended upward through `epic → story → task →` when an agile
+  project-management plugin is active (INV-22) — `work-items/` doesn't
+  exist otherwise, so the chain can't reach through it; without one
+  active, the module's grounded artifacts chain directly to their
+  grounding → domain. The module's own chain specifics live in its
+  `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4).
 - **INV-6 — Working copy in agent-owned space; one tracked pointer.** The
   deployment's real working copy is a directory named `.criterion/`,
   living in **agent-owned space** resolved per the running agent
@@ -92,25 +97,17 @@ faster and is the first thing a summarizer mangles.
   its local type index, and appears in the global `rules.md`. Exactly one
   *current* `TEMPLATE-RULE-vN.md` (the highest `N`), in `rules/templates/`
   (INV-20) — never at the `rules/` root directly.
-- **INV-9 — Requirements, not bugs, for new work.** `FEAT-` entries are
-  non-rule-linked roadmap. When work on one starts it becomes a `REQ-` (never a
-  `BUG-`), which is vetted against every rule, assigned a domain, and measured.
-- **INV-14 — Persisted backlog.** `development/BACKLOG.md` always exists,
-  seeded from `templates/backlog.template.md`. It is never hand-edited —
-  `/show-backlog` overwrites it in full every run, so it can't drift from
-  the real indexes.
-- **INV-15 — Machine-maintained roadmap tracking.** `development/roadmaps/`
-  and its `roadmaps.md` index always exist (empty is fine); individual named
-  roadmaps are created only via `/roadmap-add`. In every
-  `development/roadmaps/<name>.md`, the Status/Linked columns are set only
-  by the `/roadmap-*` commands and `/show-backlog` — never hand-edited.
-  `/roadmap-remove` never deletes a roadmap with linked items; it retires
-  it in place.
+- **INV-9** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
+  never reused.
+- **INV-14** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
+  never reused.
+- **INV-15** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
+  never reused.
 - **INV-16 — At least one active user; advisory role signing.**
   `IAM/users/users.json` and `IAM/roles/roles.json` always exist, and
   `users.json` must contain **at least one user with `"active": true`** —
-  a hard requirement, not optional-if-empty like `roadmaps.md`. Every
-  dev-artifact, feature, roadmap item, and work item carries a
+  a hard requirement, not optional-if-empty like an artifact index. Every
+  active-module artifact, rule-linked artifact, and work item carries a
   `Signed-off-by` field. Role checks against `roles.json` are advisory — a
   mismatch proceeds anyway, noted rather than paused for (INV-25), never
   a hard block, since catalyst cannot verify who is actually typing.
@@ -231,7 +228,7 @@ faster and is the first thing a summarizer mangles.
   field; its chain runs sideways via an `Entity` field naming the
   disputed artifact. Never file-versioned per round — each round of
   back-and-forth is a new row in the same file's `Revisions` section,
-  edited in place and journaled like `BUG-`/`REQ-` (INV-17). Resolved via
+  edited in place and journaled like any other artifact (INV-17). Resolved via
   `/reconcile <id> accept|accept-with-edits|reject|propose <text>`,
   moving `Status` through `Open`/`Under Review`/`Resolved-*`/`Closed` —
   who can resolve one is genuinely gated by the actor's role
@@ -285,9 +282,10 @@ faster and is the first thing a summarizer mangles.
   letter, drawn cryptographically at `/user-add` time and regenerated
   on collision against every existing `userid` in the registry
   (`Rules-of-Rules.md` rr-META-011). From that point on, every rule,
-  `BUG-`/`REQ-`/`HK-`/`TEST-`, `FEAT-`, `RM-`, `STEP-`, `WORKFLOW-`, and
-  `RECON-` ID carries its creator/signer's `userid` as a trailing `-XXXXXXXX`
-  suffix, assigned once at creation and never changed thereafter
+  `WORKFLOW-`, and `RECON-` ID, and every ID of an active-module entity
+  type (`<PREFIX>-NNNNNN`), carries its creator/signer's `userid` as a
+  trailing `-XXXXXXXX` suffix, assigned once at creation and never changed
+  thereafter
   (`Rules-of-Rules.md` rr-META-020). A rule ID's sequence number is
   6-digit, not 3 (`Rules-of-Rules.md` rr-META-003) — zero-padded
   before the suffix is appended, never after. Rules and domains carry
@@ -297,39 +295,19 @@ faster and is the first thing a summarizer mangles.
   and are out of scope for this suffix entirely. A user must have a
   `userid` before any entity it signs can be assigned its suffix —
   this ordering is not optional.
-- **INV-27 — Steps record a requirement's or bug's actual implementation
-  work.** `STEP-NNNNNN` (`templates/step.template.md`) names exactly one
-  parent — a `REQ-NNNNNN` or a `BUG-NNNNNN`, the `Parent` field — and
-  records one concrete unit of implementation work performed toward it —
-  files touched, commands run, how it was verified. Its own top-level
-  `steps/` folder, sibling of `requirements/`, full INV-20 treatment.
-  Exempt from the chain invariant's rule-targeting requirement (INV-5)
-  the same way `FEAT-`/`RM-` are — it inherits its parent's
-  already-vetted rule target rather than asserting one of its own. Both
-  the requirement and bug templates carry a `Steps` field listing every
-  step opened against that instance; neither is closeable as `done`/
-  `fixed` until every one of its steps is `done` or `abandoned`
-  (`Rules-of-Rules.md` rr-META-021). A roadmap row's `Linked` field is a
-  list, not a single ID: a roadmap item of real size
-  is expected to decompose into more than one requirement, each
-  accumulating its own steps.
-- **INV-28 — Tests are development artifacts with optional (0,n) links.**
-  `TEST-NNNNNN` (`templates/test.template.md`) joined the
-  `(BUG|REQ|HK|TEST)` development-artifact format at framework `0.30.0`
-  — unlike `STEP-`/`FEAT-`/`RM-`, it is **not** exempt from the chain
-  invariant (INV-5): a test always carries its own `Targets`/`Domain`
-  and is subject to `rules-of-development.md` §1. Its own top-level
-  `tests/` folder, sibling of `requirements/`/`steps/`, full INV-20
-  treatment. Two additional, independent `(0,n)` fields — `Requirements`
-  (zero or more `REQ-NNNNNN`) and `Steps` (zero or more `STEP-NNNNNN`)
-  it verifies — both optional; a test naming neither is valid as long as
-  it still carries `Targets`/`Domain`. Many-to-many: one requirement or
-  step may be verified by several tests, and one test may verify several
-  requirements and/or steps at once. Back-referenced on the other side:
-  a requirement and a step each gain their own `Tests` field, listing
-  every `TEST-NNNNNN` that names them — populated automatically by
-  `/create-test` in the same action, never hand-edited
-  (`Rules-of-Rules.md` rr-META-022).
+- **INV-27** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
+  never reused.
+- **INV-28** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
+  never reused.
+- **INV-30 — The kernel is module-agnostic.** The kernel
+  (`framework/kernel/`), catalyst's tooling (`scripts/`) and root documents
+  never name a specific process module or any of its entity ID prefixes,
+  folders, commands, templates or definitions; only generic references
+  ("the active module", `<entity-type>`). Module content lives in the
+  module's own repository and is composed into deployments
+  (`MODULE-SPECIFICATION.md` §6). Enforced by
+  `scripts/check_kernel_purity.py`, which derives its denylist from the
+  modules in `framework/modules/catalog.md`.
 
 ## Plugins
 

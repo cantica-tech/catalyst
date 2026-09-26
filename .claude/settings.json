@@ -28,6 +28,10 @@
           {
             "type": "command",
             "command": "python3 scripts/check_command_parity.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 scripts/check_kernel_purity.py"
           }
         ]
       }

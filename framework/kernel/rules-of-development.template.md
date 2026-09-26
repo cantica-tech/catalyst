@@ -3,8 +3,8 @@
 > Copy to `CODE-OF-CONDUCT.md` in the project root and resolve every
 > `{{PLACEHOLDER}}`. See [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md).
 
-Standards for how development work — bugs, requirements, house-keeping, and
-meta-tags — gets proposed, tracked, and closed. Subordinate to
+Standards for how development work — the active module's development
+artifacts and meta-tags — gets proposed, tracked, and closed. Subordinate to
 [`{{RULES_DIR}}/Rules-of-Rules.md`]({{RULES_DIR}}/Rules-of-Rules.md):
 that file governs the rules themselves; this file governs the work items
 that reference those rules.
@@ -13,8 +13,9 @@ that reference those rules.
 
 ## 1. No development without a targeted rule
 
-**No bug, requirement, house-keeping work, or meta-tag may start without
-citing one or more existing rule IDs in its `Targets` field when the tag is
+**No rule-linked development artifact of the active module, and no
+meta-tag, may start without citing one or more existing rule IDs in its
+`Targets` field when the tag is
 used to annotate a rule-linked artifact.** If no rule currently covers the
 behavior in question:
 
@@ -22,11 +23,11 @@ behavior in question:
 document.
 2. That definition must satisfy `Rules-of-Rules.md` §1 (conflict check)
 and follow the ID scheme in §3.
-3. Only then open the `BUG-`/`REQ-`/`HK-` item, citing the new ID(s).
+3. Only then open the `<PREFIX>-NNNNNN` item, citing the new ID(s).
 
-House-keeping is the one category where "no rule applies" is a legitimate
-answer (pure repo hygiene with no bearing on any documented behavior or
-process) — but it must be stated explicitly, not left blank.
+The active module may declare an entity type for which "no rule applies"
+is a legitimate answer (pure repo hygiene with no bearing on any documented
+behavior or process) — but it must be stated explicitly, not left blank.
 
 ## 2. Users, roles, and signing
 
@@ -46,8 +47,8 @@ mapping each role to the actions/commands it's expected to perform.
 
 **This is JSON, not hand-edited markdown, precisely because it's managed
 exclusively by commands** — the same reasoning that keeps
-`development/BACKLOG.md` machine-only, just with structured data instead
-of a regenerated document.
+regenerated summary documents machine-only, just with structured data
+instead of a regenerated document.
 
 **Hard requirement: `IAM/users/users.json` must always have at least
 one entry with `"active": true`.** A project with nobody registered has
@@ -80,100 +81,39 @@ role mismatch is noted, never a block or a confirmation prompt:
    registered before INV-26 existed), register them and assign one
    first; an entity is never assigned a suffixed id ahead of its signer.
 
-Every dev-artifact, feature entry, roadmap item, and work item carries a
-`Signed-off-by` field for this reason (see each type's template). It
-records who actually signed the artifact, which may differ from who typed
-the command on their behalf.
+Every development artifact of the active module and every work item
+carries a `Signed-off-by` field for this reason (see each type's
+template). It records who actually signed the artifact, which may differ
+from who typed the command on their behalf.
 
 ## 3. Standard document types
 
+The kernel defines one document type of its own; the active module's
+document types are appended at the end of this section
+(`MODULE-SPECIFICATION.md` §6.2).
+
 | Type | Folder | Template | ID prefix |
 |---|---|---|---|
-| Bug | `bugs/` | `templates/bug.template.md` | `BUG-NNNNNN` |
-| Requirement | `requirements/` | `templates/requirements.template.md` | `REQ-NNNNNN` |
-| House-keeping | `house-keeping/` | `templates/house-keeping.template.md` | `HK-NNNNNN` |
-| Test | `tests/` | `templates/test.template.md` | `TEST-NNNNNN` |
 | Meta-tag | `meta-tags/` | `templates/meta-tag.template.md` | `TAG-<KEY>-<ARTEFACT-ID>` |
 
-Feature entries (`FEAT-NNNNNN`, folder `features/`, template
-`templates/features.template.md` → `TEMPLATE-FEATURE.md`) are a related
-but **separate, non-rule-linked** scheme — see `Rules-of-Rules.md` §9.
-They document possible future work, are not one of the four
-development-artifact types above, and are exempt from this document's
-rules (no `Targets`, no `Domain`, never "done" against a rule). When a
-new feature actually needs to be developed, open a `REQ-NNNNNN`
-requirement — never a `BUG-NNNNNN` — to track it.
-
-Roadmap items (`RM-NNNNNN`, table rows inside `development/roadmaps/<name>.md`
-files — one file per named roadmap, template `templates/roadmap.template.md`,
-index `development/roadmaps/roadmaps.md`) sit one level above feature
-entries — see `Rules-of-Rules.md` §10. They are populated by
-`/roadmap-add`/`/roadmap-update`/`/roadmap-merge` from an external source
-file rather than created one at a time, and are exempt from this document's
-rules the same way feature entries are (no `Targets`, no `Domain`, never
-"done" against a rule). Formalizing a roadmap item means opening a
-`FEAT-NNNNNN` for it via `/create-feature`, citing the `RM-NNNNNN` ID in the
-feature's `Roadmap` field. A roadmap item of real size is expected to
-decompose into **more than one** requirement rather than one oversized
-`REQ-NNNNNN` standing in for the whole item — its row's `Linked` field
-names every `FEAT-`/`REQ-NNNNNN` currently associated with it, not just one.
-
-Steps (`STEP-NNNNNN`, folder `steps/`, template `templates/step.template.md`)
-sit one level *below* a requirement or a bug — see `Rules-of-Rules.md`
-§21. Each names exactly one parent — a `REQ-NNNNNN` or a `BUG-NNNNNN`
-(the `Parent` field) — and records one concrete unit of implementation
-work performed toward it (files touched, commands run, how it was
-verified). Like feature entries and roadmap items, a step is exempt from
-this document's rules (no `Targets`, no `Domain` of its own — it
-inherits its parent's), but unlike them it's created *during* active
-implementation, not before it: a requirement or bug worth calling
-`in-progress` is expected to have at least one step opened against it,
-and isn't closeable as `done`/`fixed` until every one of its steps is
-`done` or `abandoned`. Opened and closed as the work itself happens, not
-batched afterward, per `INVARIANTS.md` INV-29.
-
-Tests (`TEST-NNNNNN`, folder `tests/`, template `templates/test.template.md`)
-join this document's four development-artifact types as of framework
-`0.30.0` — see `Rules-of-Rules.md` §22. Unlike features, roadmap items,
-and steps, a test is **not** exempt from this document's rules: it always
-carries its own `Targets`/`Domain`, vetted the same way a bug or
-requirement is. On top of that, a test may independently name `(0,n)`
-`REQ-NNNNNN` and `(0,n)` `STEP-NNNNNN` it verifies — both optional, and
-neither implies the other. Named requirements/steps get the new test's
-ID appended to their own `Tests` field in the same action — the mirror
-image of a requirement's `Steps` field.
+The active module states, for each of its entity types, whether it is
+rule-linked (bound by this document's rules — `Targets`, `Domain`, closed
+against a rule) or exempt from them, and how its entity types relate to
+one another.
 
 ### Hard rule: individual files and indexes
 
-- **This is a hard requirement.** Bugs, requirements, house-keeping items,
-  tests, and meta-tags must each be stored as their own individual markdown
-  file in the corresponding folder, not only as free-form notes or grouped
-  content.
+- **This is a hard requirement.** Every rule-linked development artifact
+  of the active module, and every meta-tag, must be stored as its own
+  individual markdown file in the corresponding folder, not only as
+  free-form notes or grouped content.
 - **This is also a hard requirement.** Every item must be listed in the
   corresponding type index file so the repository has an authoritative catalog
   of the concrete documents that exist.
-- Each item directory must also contain an index file named after the item type:
-  - `bugs/bugs.md` for the bug index.
-  - `requirements/requirements.md` for the requirements index.
-  - `house-keeping/house-keeping.md` for the house-keeping index.
-  - `tests/tests.md` for the test index.
-  - `meta-tags/meta-tags.md` for the meta-tag index.
+- Each item directory must also contain an index file named after the item
+  type — `<folder>/<folder>.md` for each of the active module's entity
+  types, and `meta-tags/meta-tags.md` for the meta-tag index.
 - These index files are the canonical indexes for their directory and must be kept up to date.
-- **This is a hard requirement.** `development/BACKLOG.md` always
-  exists — seeded from `templates/backlog.template.md` on first deploy —
-  as the go-to document for developers to review work to be done and
-  current status. It is not hand-maintained: `/show-backlog` regenerates
-  it in full every time it runs, so it never drifts from the real
-  indexes — including every `development/roadmaps/<name>.md`. See
-  `INVARIANTS.md` INV-14.
-- **This is also a hard requirement.** `development/roadmaps/` and its
-  `roadmaps.md` index always exist (empty is fine — individual named
-  roadmaps are created only via `/roadmap-add`). Within any
-  `development/roadmaps/<name>.md` that does exist, only the
-  `/roadmap-add`/`-update`/`-merge`/`-remove` commands and `/show-backlog`
-  (Status/Linked refresh) ever change it; hand-editing anything but a
-  row's Notes column is pointless, the same way hand-editing `BACKLOG.md`
-  is. See `INVARIANTS.md` INV-15.
 - **This is a hard requirement, stricter than the others above.**
   `IAM/users/users.json` and `IAM/roles/roles.json` always exist, and
   `users.json` must contain **at least one entry with `"active": true`** —
@@ -186,72 +126,17 @@ image of a requirement's `Steps` field.
   rule above, since even the commands that write to it only ever append.
   See `INVARIANTS.md` INV-17 and §9.
 
-- **Bug**: an existing ✅ rule doesn't actually hold in the running system,
-  or formalizes an already-known ⚠️/❌ rule into trackable, closeable work.
-  Never introduces a new rule by itself.
-- **Requirement**: an explicit, tracked requirement that captures
-  user/business behavior that must be implemented and tested — this is the
-  artifact to open when a new feature needs to be developed, never a bug.
-  It must be vetted against every existing rule document (`Rules-of-Rules.md`
-  §1 conflict check) before it's opened, it always carries a `Domain`, and it
-  always answers — targets and/or proposes — one or more rules (and, if
-  needed, a new domain — see `Rules-of-Rules.md` §6/§7) inline in the
-  requirement doc so rule and requirement are reviewed together. None of
-  those three are optional.
-- **House-keeping**: dev-support tooling/process, not product behavior.
-  Still targets a rule where one exists — most commonly a `rr-META-*`
-  process rule.
-- **Test**: verifies that a targeted rule actually holds, the same
-  `Targets`/`Domain` requirement as a bug or requirement. Optionally
-  names `(0,n)` requirements and/or `(0,n)` steps it verifies, on top of
-  its own rule target — see `Rules-of-Rules.md` §22.
 - **Meta-tag**: a lightweight annotation attached to an existing artifact.
   It stores one key/value pair whose key is one of `comment`, `version`, or
   `link-to`, and it is saved under the name `tag-<key>-<artefact-id>`.
 
 ## 4. Slash-command entry points
 
-The framework exposes the following custom slash commands:
+The framework exposes the following kernel slash commands. The active
+module's commands are appended at the end of this section
+(`MODULE-SPECIFICATION.md` §6.2); kernel and module entries together are
+this deployment's canonical command list.
 
-- `/create-bug` — create a new bug artifact immediately, register it in
-  `bugs/bugs.md`, and track it in the same workflow as any other bug.
-- `/create-req` or `/create-requirement` — create a new requirement artifact
-  immediately, register it in `requirements/requirements.md`, and track it in
-  the same workflow.
-- `/create-test` — create a new test artifact immediately, register it in
-  `tests/tests.md`, and track it in the same workflow as any other
-  development artifact. Prompts for a rule target and domain like
-  `/create-bug`/`/create-req` — a test is not exempt from
-  `rules-of-development.md` §1. Optionally accepts `(0,n)` requirements
-  and/or `(0,n)` steps it verifies (`Rules-of-Rules.md` §22); neither is
-  required. Named requirements/steps get the new test's ID appended to
-  their own `Tests` field in the same action.
-- `/create-feature` — create a new feature entry immediately and register it
-  in `features/features.md`. Unlike `/create-bug`/`/create-req`, this never
-  prompts for a rule target or domain — features are not rule-linked (see
-  `Rules-of-Rules.md` §9).
-- `/create-step <REQ-id|BUG-id>` — create a new step immediately against
-  an existing requirement or bug, register it in `steps/steps.md`, and
-  append its ID to that parent's own `Steps` field. Like `/create-feature`,
-  never prompts for a rule target or domain — a step inherits its
-  parent's (see `Rules-of-Rules.md` §21). Refuses if `<REQ-id|BUG-id>`
-  doesn't resolve to an existing requirement or bug.
-- `/roadmap-add <name> <file>` — ingest a new named roadmap from a local
-  file, creating `development/roadmaps/<name>.md` from
-  `templates/roadmap.template.md` and registering it in
-  `development/roadmaps/roadmaps.md` (see `Rules-of-Rules.md` §10).
-  Refuses if `<name>` already exists — use `/roadmap-update` or
-  `/roadmap-merge` instead.
-- `/roadmap-remove <name>` — delete `development/roadmaps/<name>.md` and
-  its `roadmaps.md` entry if no row is linked to a `FEAT-`/`REQ-`;
-  otherwise retire it in place (never hard-deletes a linked roadmap).
-- `/roadmap-update <name> <file>` — re-ingest `<file>` as the new full,
-  authoritative version of an existing named roadmap: add new rows,
-  update matched rows, flag (never delete) rows missing from the new
-  file.
-- `/roadmap-merge <name> <update file>` — fold a partial delta file into
-  an existing named roadmap: add/update only the rows the delta
-  mentions, without flagging anything as missing.
 - `/user-add <name> <role>` — register a new user in
   `IAM/users/users.json` with an initial role from
   `IAM/roles/roles.json`. Refuses if `<name>` is already registered —
@@ -438,12 +323,8 @@ the seven currently exist anywhere.
   consistent and do not conflict.
 - `/commands list [--filter ...]` — list every slash command available in
   this deployment (name, one-line purpose), sourced from this document's
-  §4. `/help` with no argument delegates here for its command listing
+  §4 — kernel and active-module entries alike. `/help` with no argument delegates here for its command listing
   rather than re-describing it.
-- `/show-backlog` — summarize open work, blockers, and missing links,
-  refresh `development/BACKLOG.md` with the result, and refresh every
-  active `development/roadmaps/<name>.md`'s Status/Linked columns from
-  the `FEAT-`/`REQ-` each row is linked to.
 - `/journal [--since <date>] [--artifact <id>] [--actor <name>] [--rule
   <id>]` — read-only: filter and report `development/journal.jsonl`
   entries. Never writes to the journal (see §9).
@@ -453,101 +334,6 @@ the seven currently exist anywhere.
   live working tree.
 - `/help` — return help documentation for the framework or for a specific
   command when provided.
-
-When the user enters `/create-bug: ...`, create a new bug artifact immediately,
-register it in `bugs/bugs.md`, and track it in the same workflow as any other
-bug. If the domain cannot be inferred from context, prompt for the domain and
-rule before creating the artifact.
-
-When the user enters `/create-req:` or `/create-requirement: ...`, create a
-new requirement artifact immediately, register it in
-`requirements/requirements.md`, and track it in the same workflow. If the
-domain or target rule cannot be inferred, prompt for both before creating the
-artifact.
-
-When the user enters `/create-test: ...`, create a new test artifact
-immediately using `templates/test.template.md`, register it in
-`tests/tests.md`, and track it in the same workflow as any other
-development artifact. If the domain or target rule cannot be inferred,
-prompt for both before creating the artifact — a test is not exempt
-from §1 ("no development without a targeted rule"). If the user names
-one or more `REQ-NNNNNN`/`STEP-NNNNNN` this test verifies, populate the
-`Requirements`/`Steps` fields accordingly, and append the new test's own
-ID to each named requirement's/step's own `Tests` field (creating that
-field if this is its first test); if `<REQ-id>`/`<STEP-id>` doesn't
-resolve to an existing artifact, refuse with a clear message rather than
-citing a dangling id. Both fields are optional — a test naming neither
-is valid as long as `Targets`/`Domain` are still set.
-
-When the user enters `/create-feature: ...`, create a new feature entry
-immediately using `templates/features.template.md`, register it in
-`features/features.md`, and track it as idea/roadmap content, not
-rule-linked development work. Do not prompt for a domain or rule target —
-neither field exists on this artifact type. If this feature formalizes an
-existing roadmap row (in any `development/roadmaps/<name>.md`), cite that
-row's `RM-NNNNNN` ID in the new feature's `Roadmap` field and set the row's
-`Status` to `Triaged` and `Linked` to the new `FEAT-NNNNNN` (the row's first
-linked entry). If the user later asks to start building a registered
-feature, create a `REQ-NNNNNN` requirement instead (prompting for
-domain/target rule as usual), link it back to the `FEAT-NNNNNN` entry's
-`Requirement(s)` field, and **append** (never replace) that `REQ-NNNNNN` to
-the roadmap row's `Linked` list — a feature may reasonably decompose into
-more than one requirement, each added to `Linked` as it's opened, per
-`Rules-of-Rules.md` §21.
-
-When the user enters `/create-step <REQ-id|BUG-id>: ...`, refuse with a
-clear message if `<REQ-id|BUG-id>` doesn't resolve to an existing file
-under `requirements/` or `development/bugs/`. Otherwise create a new
-step immediately using `templates/step.template.md`, register it in
-`steps/steps.md`, set its `Parent` field to `<REQ-id|BUG-id>`, and
-append its own `STEP-NNNNNN` ID to that parent's `Steps` field (creating
-the field if this is its first step). Do not prompt for a domain or rule
-target — neither field exists on this artifact type; it inherits
-`<REQ-id|BUG-id>`'s own `Targets`/`Domain`. New steps start `Status:
-planned` unless the user says
-work is already underway, in which case `in-progress`.
-
-When the user enters `/roadmap-add <name> <file>: ...`, refuse with a clear
-message if `development/roadmaps/<name>.md` already exists (point to
-`/roadmap-update`/`/roadmap-merge`). Otherwise read `<file>` from the
-local filesystem, identify its distinct items, and create
-`development/roadmaps/<name>.md` from `templates/roadmap.template.md` with
-one `RM-NNNNNN` row per item (`Description`: a sentence or two summarizing
-the item, drawn from `<file>` — not a restatement of `Title`; `Status: Not
-triaged`, `Linked: *(none)*`), IDs continuing the global sequence across
-every existing named roadmap — never reused, never guessed. Register the
-new roadmap in `development/roadmaps/roadmaps.md`, then report the
-roadmap name and the IDs assigned.
-
-When the user enters `/roadmap-remove <name>`, refuse with a clear message
-if `development/roadmaps/<name>.md` does not exist. If every row's `Linked`
-field is empty, delete the file and its `roadmaps.md` entry outright and
-report that. If any row has a non-empty `Linked` field, do **not** delete
-anything — instead add a `Retired` field (today's date) to the file, mark
-its `roadmaps.md` entry `retired`, leave every row and `RM-NNNNNN` ID exactly
-as they are, and tell the user it was retired rather than removed because
-removing it would break a live `FEAT-`/`REQ-` cross-reference.
-
-When the user enters `/roadmap-update <name> <file>: ...`, refuse with a
-clear message if `development/roadmaps/<name>.md` does not exist (point to
-`/roadmap-add`). Otherwise treat `<file>` as the new full, authoritative
-version of this roadmap: add a new `RM-NNNNNN` row for each item not already
-present (with its own `Description`, same rule as `/roadmap-add`), update
-the `Title`/`Description`/`Notes` of any row that matches an item in
-`<file>` by title/description similarity (ask the user rather than
-guessing when a match is ambiguous), and flag — in `Notes`, never by
-deleting — any existing row whose item no longer appears in `<file>`.
-Update the file's `Source` and `Last updated` fields, then report a short
-summary of what was added/updated/flagged.
-
-When the user enters `/roadmap-merge <name> <update file>: ...`, refuse
-with a clear message if `development/roadmaps/<name>.md` does not exist
-(point to `/roadmap-add`). Otherwise treat `<update file>` as a partial
-delta, not the full roadmap: apply the same add/update matching rule as
-`/roadmap-update` for only the items `<update file>` actually contains,
-but do not compare against or flag any row it doesn't mention, and do not
-change the `Source` field — only `Last updated`. Report a short summary of
-what was added/updated.
 
 When the user enters `/user-add <name> <role>: ...`, refuse with a clear
 message if `<name>` already has an entry in `IAM/users/users.json`
@@ -758,8 +544,9 @@ check the actor's `roles` array in `IAM/users/users.json` against
 `IAM/roles/roles.json`; if it includes the `Admin` role, skip scoping
 and push everything. Otherwise leave out any artifact file signed by
 someone else, and report which files (if any) were excluded and why.
-Shared registries/indexes (`rules.md`, `requirements.md`,
-`roadmaps.md`, `BACKLOG.md`, `IAM/users/users.json`,
+Shared registries/indexes (`rules.md`, every entity type's own index
+file, any regenerated summary document the active module defines,
+`IAM/users/users.json`,
 `IAM/roles/roles.json`) and the journal aren't signed by one person and
 are never filtered by this rule. This scopes what gets pushed; it never
 refuses the command outright. If `--force` is given: refuse unless the
@@ -924,24 +711,6 @@ catalyst-development-only commands that exist there but aren't part of
 this deployed set — `/dogfood` (see that repo's own `.claude/commands/`)
 is the current example.
 
-When the user enters `/show-backlog`, inspect the current artifact indexes
-(open bugs by severity, in-progress/proposed requirements, work items with no
-linked `REQ-`/`BUG-` doc, rules with no open work targeting them, feature
-ideas with no requirement yet, and every `development/roadmaps/<name>.md`
-not marked `Retired`, rows grouped by roadmap name then Status),
-**overwrite `development/BACKLOG.md` in full** with the result (from
-`templates/backlog.template.md`'s structure, with a refreshed timestamp),
-**also refresh every active `development/roadmaps/<name>.md`** in place —
-for each `RM-NNNNNN` row, resolve every `FEAT-`/`REQ-` its `Linked` field
-names (if any — it's a list, not a single id) and set `Status` to
-`Not triaged` (nothing linked) / `Triaged` (only a `FEAT-` linked) /
-`In progress` (at least one linked `REQ-` isn't yet `done`) / `Done`
-(every linked `REQ-` is `done`) accordingly, leaving `Title`/`Notes`/`Source`
-untouched — and also report the same summary to the user in this turn. No
-file write is optional — a stale `BACKLOG.md`, or any roadmap file that
-doesn't match the last `/show-backlog` run, is itself a bug in the
-deployment.
-
 When the user enters `/journal [--since <date>] [--artifact <id>]
 [--actor <name>] [--rule <id>]`, read `development/journal.jsonl` (one
 JSON object per line) and apply whichever filters were given — `--since`
@@ -975,14 +744,15 @@ it is unsupported and suggest the available commands.
 ## 5. Domain field
 
 Every item's `Domain` field is the `DOMAIN` code of the rule(s) it targets,
-from `{{RULES_DIR}}/domains/` — not free text. (Feature entries under
-`features/` are not development artifacts under this document and carry no
-`Domain` field — see `Rules-of-Rules.md` §9.)
+from `{{RULES_DIR}}/domains/` — not free text. (An entity type the active
+module declares exempt from this document's rules is not a development
+artifact under this document and carries no `Domain` field.)
 
 ## 6. Development-artifact IDs
 
-Per `Rules-of-Rules.md` §5: `(BUG|REQ|HK|TEST)-(NNNNNN)-(userid)`, global per
-type, sequential, zero-padded 6 digits, never reused, plus the signer's
+Per `Rules-of-Rules.md` §5: `<PREFIX>-(NNNNNN)-(userid)`, where `<PREFIX>`
+is one of the active module's rule-linked entity-type ID prefixes — global
+per type, sequential, zero-padded 6 digits, never reused, plus the signer's
 `userid` as a trailing suffix from the moment they're signed
 (`Rules-of-Rules.md` §20, INV-26). Meta-tags use a file-name pattern of
 `tag-<key>-<artefact-id>` rather than a sequential numeric ID. This is a
@@ -991,37 +761,26 @@ must be more than the bare ID and must follow the format
 **`<artifact-id>-<short-summary>`**. The corresponding markdown filename must
 also follow the same descriptive pattern as
 **`<artifact-id>-<short-summary>.md`**, not simply `<artifact-id>.md`.
-Example: `BUG-000001-Ab3xR9pQ-login-form-validation` or
-`BUG-000001-Ab3xR9pQ-login-form-validation.md`, and
-`REQ-000002-Ab3xR9pQ-password-reset-flow` or
-`REQ-000002-Ab3xR9pQ-password-reset-flow.md`. The same rule must be applied
-retroactively during framework deployment or synchronization to existing
+Example, for the `example-process` module's `ITEM` entity type
+(`MODULE-SPECIFICATION.md`): `ITEM-000001-Ab3xR9pQ-login-form-validation`
+or `ITEM-000001-Ab3xR9pQ-login-form-validation.md`. The same rule must be
+applied retroactively during framework deployment or synchronization to existing
 deployed items whose names or filenames are still only the bare ID.
 
 ## 7. Closing an item
 
-Before closing a bug or requirement, ensure the corresponding entry exists in
-its individual file and is reflected in the relevant index file.
-
-- **Bug**: not closeable as "fixed" without its test-plan item landing,
-  **and** every `STEP-NNNNNN` in its `Steps` field is `done` or
-  `abandoned` (`Rules-of-Rules.md` §21).
-- **Requirement**: not closeable as "done" until the acceptance criteria and
-  rule targets are reflected in the implementation and tests, **and** every
-  `STEP-NNNNNN` in its `Steps` field is `done` or `abandoned`
-  (`Rules-of-Rules.md` §21).
-- **Step**: not closeable as "done" without its own Verification section
-  filled in; `abandoned` requires a reason there instead.
-- **House-keeping**: closeable once its stated verification passes.
-- **Test**: not closeable as "passing" without its own Actual outcome
-  section reflecting a real run; `failing`/`blocked` require the same
-  section explaining why.
+Before closing a development artifact, ensure the corresponding entry
+exists in its individual file and is reflected in the relevant index file.
+What each of the active module's entity types requires before it may be
+closed — and with which terminal `Status` values — is defined by the
+module, in its own §3 entries and entity definitions.
 
 ## 8. Retired rules and development work
 
 Retiring a *rule* is `Rules-of-Rules.md` §4's process — status marker to
 🗑, reason plus date appended, ID never reused. Closing a *dev-artifact*
-(`BUG-`/`REQ-`/`HK-`) as `wontfix`/`rejected`/`abandoned` is independent
+(any rule-linked development artifact of the active module) as a terminal
+negative status such as `wontfix`/`rejected`/`abandoned` is independent
 of that: closing an artifact never retires the rule(s) it targeted, and
 retiring a rule never auto-closes the artifacts that cite it. Each is
 closed on its own, citing the other's ID and the reason, so the history
