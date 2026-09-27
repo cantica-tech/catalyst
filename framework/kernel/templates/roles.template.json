@@ -37,7 +37,7 @@
     },
     {
       "name": "Admin",
-      "actions": ["/user-add", "/user-remove", "/user-modify", "/user-assign-role", "/user-list", "/role-add", "/role-modify", "/freeze", "/criterion push (unrestricted — not scoped to own Signed-off-by objects)", "/reconcile"],
+      "actions": ["/user-add", "/user-remove", "/user-modify", "/user-assign-role", "/user-list", "/role-add", "/role-modify", "/freeze", "/criterion create", "/reconcile"],
       "reconciliation": "full"
     }
   ]

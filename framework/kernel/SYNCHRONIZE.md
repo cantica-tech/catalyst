@@ -464,6 +464,17 @@ project-root-relative, CLI-written entries carry `writer`, and journaled
 blobs are pinned under `refs/catalyst/journal`. Old journal entries are
 never rewritten.
 
+### From `0.38.0`: shared deployments on git
+
+Target version `0.39.0`. Full procedure:
+`migrations/0.39.0/criterion-on-git.md` (this repository) — not
+duplicated here. A shared ("repoed") deployment's working copy becomes a
+git submodule of the product repository at `.criterion`, and
+contributors land changes through pull requests (`catalyst criterion`,
+`CLI.md`); the per-user `<name>.criterion` branches, AI-assisted merging
+and the identity migration are withdrawn. A local-only deployment only
+bumps its version.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current

@@ -123,8 +123,8 @@ def locate(dep: Deployment, path: str) -> tuple[Path, str] | None:
     """(repository, path inside it) for a canonical journal path."""
     if path.startswith(WC):
         return dep.root, path[len(WC):]
-    if ":" in path.split("/", 1)[0] or path.startswith("/"):
-        return None
+    if dep.standalone or ":" in path.split("/", 1)[0] or path.startswith("/"):
+        return None           # a bare working copy has no project files to check
     return dep.project_root, path
 
 
@@ -299,6 +299,22 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
     return entry
 
 
+def unjournaled(dep: Deployment) -> list[str]:
+    """Journal paths whose current content differs from their last entry."""
+    last = last_after(dep)
+    by_repo: dict[Path, dict[str, str]] = {}
+    for path in last:
+        where = locate(dep, path)
+        if where is not None:
+            by_repo.setdefault(where[0], {})[where[1]] = path
+    changed = []
+    for repo, rels in by_repo.items():
+        for rel, current in current_hashes(repo, list(rels)).items():
+            if current != last[rels[rel]]:
+                changed.append(rels[rel])
+    return sorted(changed)
+
+
 # --- verify --------------------------------------------------------------
 @dataclass
 class Issue:
@@ -316,6 +332,7 @@ class Issue:
 def verify(dep: Deployment) -> list[Issue]:
     issues: list[Issue] = []
     last: dict[str, tuple[str | None, int, bool]] = {}     # path -> (after, line, cli-written)
+    seen: dict[str, set] = {}                               # path -> every after recorded
     prev_t: datetime.datetime | None = None
     pins: dict[Path, set[str]] = {}
 
@@ -341,7 +358,8 @@ def verify(dep: Deployment) -> list[Issue]:
             issues.append(Issue(level(cli), "schema", n,
                                 f"timestamp '{entry.get('timestamp')}' is not ISO 8601", not cli))
         elif prev_t is not None and t < prev_t:
-            issues.append(Issue(level(cli), "time-order", n,
+            # expected after a merge: each side's entries keep their own order
+            issues.append(Issue("warning", "time-order", n,
                                 f"{entry.get('timestamp')} is earlier than a previous entry", not cli))
         if t is not None and (prev_t is None or t > prev_t):
             prev_t = t
@@ -355,9 +373,16 @@ def verify(dep: Deployment) -> list[Issue]:
             before, after = f.get("before"), f.get("after")
             path = entry_path(dep, entry, f)
             if path in last and last[path][0] != before:
-                issues.append(Issue(level(cli), "chain", n,
-                                    f"{path}: before {str(before)[:10]} != after {str(last[path][0])[:10]} "
-                                    f"at line {last[path][1]}", not cli))
+                if before is not None and before in seen[path]:
+                    # both sides of a merge edited this file from the same
+                    # earlier state: a fork, resolved by a later entry
+                    issues.append(Issue("warning", "concurrent-edit", n,
+                                        f"{path}: edited from an earlier state than line {last[path][1]} "
+                                        "(merged work)", not cli))
+                else:
+                    issues.append(Issue(level(cli), "chain", n,
+                                        f"{path}: before {str(before)[:10]} != after {str(last[path][0])[:10]} "
+                                        f"at line {last[path][1]}", not cli))
             where = locate(dep, path)
             if where is not None:
                 repo = where[0]
@@ -372,6 +397,7 @@ def verify(dep: Deployment) -> list[Issue]:
                         issues.append(Issue("warning", "unpinned", n,
                                             f"{path}: blob {after[:10]} is not pinned — `catalyst journal pin`"))
             last[path] = (after, n, cli)
+            seen.setdefault(path, {None}).update({before, after})
 
     by_repo: dict[Path, list[str]] = {}
     for path in last:

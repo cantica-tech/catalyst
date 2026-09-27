@@ -97,27 +97,29 @@ judgment parts in prose; agents with an end-of-turn hook run
 
 ## Multi-user sync: criterion
 
-A deployment stays local by default, but can opt into being **repoed**:
-`.criterion/` mirrored through a dedicated repository so multiple
-people working on the same project converge instead of silently diverging.
-`/criterion create`/`get` bootstrap or join it, and run an **identity
-migration** on first contact: once a contributor's real git identity is
-resolved, every existing `Signed-off-by` that named their old, unresolved
-identity gets rewritten to match it going forward. The journal itself is
-never rewritten — immutability is the harder invariant, so the migration
-is recorded as a new journal entry instead, not a silent edit to old ones.
-Every contributor pushes to their own branch via `/criterion push`,
-which vets the incoming change against the framework's own rules and
-merges it — using AI-assisted resolution only where a plain merge can't —
-into the shared canonical branch, then syncs the result back down locally.
+A deployment stays local by default, but can opt into being **shared**
+on plain git. `/criterion create` (`catalyst criterion create <url>`)
+publishes the working copy to a dedicated criterion repository and makes
+`.criterion` a submodule of the product repository, so every product
+commit pins the rules in force. Contributors check it out with
+`/criterion get`, and land changes through pull requests against the
+shared branch with `/criterion push`: it rebases (the journal and the
+generated indexes merge by union), runs `catalyst check` and an integrity
+check that nothing recorded was lost, and opens the pull request; the
+criterion repository's CI runs the same checks, and
+`catalyst criterion protect` makes them required. The AI never applies a
+merge: a real conflict stops the push, and a proposed resolution waits as
+a reconciliation case for a human. IDs stay unique across contributors
+through their userid suffix, so nobody renumbers. Identity is still
+self-declared; branch protection and review are the real controls. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
 
 ## Dogfooding
 
-The same vetting procedure — `/check-rules` plus an independent four-eyes
+A vetting procedure — `/check-rules` plus an independent four-eyes
 sub-agent pass checking whether the actual state still matches what the
-rules claim — backs both `/criterion push`'s incoming-change check and a
-standalone command, `/dogfood`, that runs it on demand against catalyst's
-own repository. `/dogfood` is deliberately **not** part of what gets
+rules claim — runs as a standalone command, `/dogfood`, on demand against
+catalyst's own repository. `/dogfood` is deliberately **not** part of what gets
 deployed into other projects: it only ever exists in catalyst's own repo,
 for verifying catalyst's own rules against catalyst's own actual state,
 never as something an ordinary deployment carries around.
@@ -172,9 +174,10 @@ clone; `/project create`/`remove`/`export`/`import` manage that
 lifecycle. An agent with no owned-space concept (or a platform without
 symlinks) falls back to building `.criterion/` directly in the project,
 gitignored there instead. Either way, `/criterion` is the opt-in mechanism for a team
-that wants the working copy to persist and sync across contributors,
-through a dedicated repository rather than a commit into the product's
-own history.
+that wants the working copy shared across contributors: it moves to a
+dedicated criterion repository, mounted as the product's `.criterion`
+submodule, so the product commits only a gitlink — never the working
+copy's content.
 
 `BOOTSTRAP.md` is the single source of truth. Everything else here either points
 at it or extends it.

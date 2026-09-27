@@ -6,6 +6,31 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.39.0 — unreleased
+
+Beta-readiness Phase 2: shared deployments on git (`catalyst criterion`,
+INV-6/INV-18 revised, migration `0.39.0/criterion-on-git.md`).
+
+- A shared deployment's working copy is a git submodule of the product
+  repository at `.criterion`, so every product commit pins the rules in
+  force; a local-only deployment keeps the agent-owned working copy.
+- Contributors land changes through pull requests: `catalyst criterion
+  push` commits, rebases on the shared branch (the journal and regenerated
+  indexes merge by union, the merged state is journaled), runs `catalyst
+  check` and an integrity check, pushes a topic branch with a lease and
+  opens a pull request. The criterion repository's CI runs the same checks
+  (`catalyst --working-copy .`); `catalyst criterion protect` makes them
+  required on GitHub.
+- A real conflict stops the push with nothing pushed; the agent never
+  applies a merge — it may propose a resolution as a RECON case.
+- `catalyst criterion integrity` fails any merge that loses an ID, an index
+  row or a journal line; `catalyst criterion sync` refuses while local work
+  is uncommitted or unpushed.
+- ID numbers are unique per entity type and signer: two contributors may
+  hold the same number under different userids; nothing is renumbered.
+- `journal verify` treats merge forks as concurrent edits (warnings).
+- The feature freeze recorded in `CONTRIBUTING.md` is lifted.
+
 ## 0.38.0 — unreleased
 
 Beta-readiness Phase 1: the `catalyst` CLI (`framework/kernel/CLI.md`).

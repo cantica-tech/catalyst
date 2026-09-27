@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -12,13 +13,21 @@ from catalyst import __version__
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
+from catalyst.criterion import CriterionError
+
+
+def open_deployment(args):
+    if getattr(args, "working_copy", None):
+        from catalyst.deployment import load_working_copy
+        return load_working_copy(args.working_copy)
+    return load(args.project)
 
 
 def cmd_validate(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.validate import ERROR, validate
 
-    dep = load(args.project)
+    dep = open_deployment(args)
     findings = validate(dep, load_corpus(dep))
     errors = [f for f in findings if f.level == ERROR]
     failing = findings if args.strict else errors
@@ -40,7 +49,7 @@ def cmd_id(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.ids import next_entity_id, next_rule_id, resolve_signer
 
-    dep = load(args.project)
+    dep = open_deployment(args)
     corpus = load_corpus(dep)
     signer = resolve_signer(dep, corpus, args.as_user)
     if args.id_command == "next":
@@ -54,7 +63,7 @@ def cmd_userid(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.ids import generate_userid
 
-    dep = load(args.project)
+    dep = open_deployment(args)
     existing = {str(u["userid"]) for u in load_corpus(dep).users if u.get("userid")}
     print(generate_userid(existing))
     return 0
@@ -63,7 +72,7 @@ def cmd_userid(args) -> int:
 def cmd_journal(args) -> int:
     from catalyst import journal as j
 
-    dep = load(args.project)
+    dep = open_deployment(args)
     if args.journal_command == "append":
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
@@ -113,7 +122,7 @@ def cmd_index(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.indexes import regenerate
 
-    dep = load(args.project)
+    dep = open_deployment(args)
     changes = regenerate(dep, load_corpus(dep), write=not args.check)
     for c in changes:
         rel = f".criterion/{c.path.relative_to(dep.root)}"
@@ -133,7 +142,7 @@ def cmd_check(args) -> int:
     from catalyst.check import run
 
     try:
-        dep = load(args.project)
+        dep = open_deployment(args)
     except WorkingCopyMissing as exc:
         print(f"catalyst check FAILED: {exc}")
         return 1
@@ -158,7 +167,7 @@ def cmd_hook(args) -> int:
     from catalyst.check import hook_stop
 
     try:
-        dep = load(args.project)
+        dep = open_deployment(args)
     except WorkingCopyMissing as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 2
@@ -167,11 +176,66 @@ def cmd_hook(args) -> int:
     return hook_stop(dep, strict=args.strict)
 
 
+def cmd_criterion(args) -> int:
+    from catalyst import criterion as cr
+
+    sub = args.criterion_command
+    if sub == "join":
+        start = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+        project = next((d for d in (start, *start.parents) if any(d.glob("*.catalyst"))), None)
+        if project is None:
+            raise DeploymentNotFound(f"no *.catalyst pointer at or above {start}")
+        print(f"joined: .criterion at {cr.join(project)}")
+        return 0
+    dep = open_deployment(args)
+    if sub == "status":
+        st = cr.status(dep, fetch=args.fetch)
+        print(f"mode:     {st.mode}\nremote:   {st.remote or '(none)'}\nshared:   {st.branch}\n"
+              f"branch:   {st.current or '(detached)'}\nchanges:  {len(st.dirty)} uncommitted")
+        if st.ahead is not None:
+            print(f"vs shared: {st.ahead} ahead, {st.behind} behind")
+        return 0
+    if sub == "create":
+        for step in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE):
+            print(f"- {step}")
+        print("Commit the product repository's staged changes when ready.")
+        return 0
+    if sub == "push":
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import resolve_signer
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        res = cr.push(dep, signer, args.message, open_pr=not args.no_pr)
+        if res.commits == 0:
+            print("nothing to push: the working copy matches the shared branch")
+            return 0
+        print(f"pushed {res.commits} commit(s) to {res.branch}"
+              + (f" (regenerated {', '.join(res.regenerated)})" if res.regenerated else ""))
+        print(f"pull request: {res.pr}" if res.pr else
+              f"open a pull request from {res.branch} into {cr.shared_branch(dep)}")
+        return 0
+    if sub == "sync":
+        print(f"working copy at {cr.sync(dep)} (shared branch {cr.shared_branch(dep)})")
+        if not dep.standalone and cr.is_submodule(dep.project_root):
+            print("the product repository's .criterion pointer moved: commit it to pin these rules")
+        return 0
+    if sub == "integrity":
+        problems = cr.integrity(dep.root, args.head, args.parent or None)
+        for p in problems:
+            print(f"ERROR   {p}")
+        print(f"catalyst criterion integrity {'FAILED' if problems else 'passed'}: "
+              f"{len(problems)} missing")
+        return 1 if problems else 0
+    print(cr.protect(dep, apply=args.yes))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"catalyst {__version__}")
     parser.add_argument("--project", type=Path, default=None,
                         help="a directory inside the project (default: current directory)")
+    parser.add_argument("--working-copy", type=Path, default=None,
+                        help="check a bare working copy (e.g. the criterion repository in CI)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("validate", help="validate the traceability chain against the ETDs")
@@ -234,6 +298,33 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--diff", action="store_true", help="with --check, show what would change")
     q.set_defaults(func=cmd_index)
 
+    p = sub.add_parser("criterion", help="shared deployments on git: submodule, pull requests")
+    cs = p.add_subparsers(dest="criterion_command", required=True)
+    q = cs.add_parser("status", help="the working copy against the shared branch")
+    q.add_argument("--fetch", action="store_true")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("create", help="publish a local-only working copy as the .criterion submodule")
+    q.add_argument("url", help="the criterion repository (empty, or already holding this history)")
+    q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("join", help="check out a shared deployment in a clone of the product")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("push", help="commit, rebase, check, push a topic branch, open a pull request")
+    q.add_argument("-m", "--message", required=True, help="commit message / pull request title")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--no-pr", action="store_true", help="push the branch without opening a pull request")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("sync", help="fast-forward to the shared branch (refuses with local work)")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("integrity", help="fail if a merge lost any ID, index row or journal line")
+    q.add_argument("--head", default="HEAD")
+    q.add_argument("--parent", action="append", help="compare against this revision (repeatable; "
+                   "default: the head's own parents)")
+    q.set_defaults(func=cmd_criterion)
+    q = cs.add_parser("protect", help="branch protection for the shared branch (GitHub)")
+    q.add_argument("--yes", action="store_true", help="apply it (without: show what would be set)")
+    q.set_defaults(func=cmd_criterion)
+
     p = sub.add_parser("userid", help="userid operations")
     uid = p.add_subparsers(dest="userid_command", required=True)
     q = uid.add_parser("gen", help="draw a new unique userid (INV-26)")
@@ -245,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (IdError, JournalError) as exc:
+    except (IdError, JournalError, CriterionError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     except DeploymentNotFound as exc:

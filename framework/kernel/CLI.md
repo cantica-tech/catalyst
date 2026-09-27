@@ -36,13 +36,22 @@ working copy reached through `<project root>/.criterion` (INV-6).
 `--project <dir>` starts the search elsewhere. `catalyst --version`
 prints the CLI's version, which is the kernel version it shipped with.
 
+`--working-copy <dir>` (before the subcommand) opens a bare working copy
+instead: a directory holding `version.txt` and `rules/`, with no project
+or pointer around it — the criterion repository checked out on its own,
+as in its CI. The module is the single one under `<dir>/modules/`
+(kernel-only if there is none or several), project files are out of
+scope, and journal paths outside the working copy are not checked.
+`check`, `validate`, `index`, `journal verify` and `criterion integrity`
+work this way.
+
 ### Exit codes
 
 | Code | Meaning |
 |---|---|
 | `0` | Success. |
 | `1` | Failure: a check found errors (or warnings under `--strict`), an argument was rejected, or a git operation failed. The reason is printed. |
-| `2` | No deployment found at or above the current directory. |
+| `2` | No deployment found at or above the current directory (or `--working-copy` names no working copy). |
 
 The deployment is found by walking up from the current directory as the
 shell sees it, through the `.criterion` symlink, so any directory inside
@@ -127,10 +136,16 @@ prefix fails and lists the known ones.
 The command allocates nothing: two calls before the file is written
 print the same ID. Create the file, then allocate the next one.
 
+The number is unique per type and signer, not across contributors: two
+contributors of a shared deployment allocating concurrently can draw the
+same number, each under their own userid. Both IDs are valid and neither
+is renumbered (`Rules-of-Rules.md` §6, §13).
+
 ### `catalyst id next-rule <doc-prefix> <DOMAIN> [--as <user>]`
 
 Prints the next rule ID, `<doc-prefix>-<DOMAIN>-NNNNNN-<userid>`, with
-`NNNNNN` unique within the domain (`Rules-of-Rules.md` §3). The domain
+`NNNNNN` one above the highest number the domain has seen, unique within
+the domain and signer (`Rules-of-Rules.md` §3). The domain
 must be registered in `rules/domains/domains.md` (`META` is always
 accepted).
 
@@ -209,6 +224,156 @@ Free-form types whose items are rows of a hand-edited table (the ETD's
 `naming: free-form`) have no generated index; their rows stay prose-edited
 per the owning command.
 
+### `catalyst criterion <subcommand>`
+
+Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). A shared
+deployment's working copy is a git submodule of the product repository
+at `.criterion`, checked out from a dedicated criterion repository on
+its **shared branch** (the pointer's `criterion_branch`, default
+`criterion`). Contributors land changes through pull requests against
+that branch.
+
+Every subcommand fails with exit `1` and a reason on stderr when git
+fails or a precondition does not hold; nothing is half-applied in the
+product repository.
+
+#### `catalyst criterion create <url> [--branch <name>]`
+
+Turns a local-only deployment into a shared one. `<url>` is the
+criterion repository: empty, or already holding this working copy's
+history on `<name>` (default `criterion`). In order:
+
+1. Refuses if `.criterion` is already a submodule, or is not a symlink
+   to an agent-owned working copy (move an in-project fallback directory
+   out and symlink it first).
+2. Initialises the working copy as a git repository if it is not one.
+3. Writes the working copy's `.gitattributes` (below) and, if absent,
+   the CI workflow `.github/workflows/catalyst.yml` (below); commits any
+   uncommitted change.
+4. Sets `origin` to `<url>`. If `<url>` already has the branch, it must
+   be contained in the working copy's history (fetch or merge it
+   first), otherwise `create` refuses. Pushes the working copy to the
+   branch.
+5. Replaces the `.criterion` symlink with a submodule on that branch,
+   drops `/.criterion` from the product's `.gitignore`, and records
+   `repoed: true`, `catalyst_repo_url` and `criterion_branch` in
+   `<app-name>.catalyst`.
+6. Stages `.gitmodules`, the gitlink, the pointer and `.gitignore` in the
+   product repository. It commits nothing: commit them when ready.
+
+The old agent-owned copy is left in place, unused; remove it once
+satisfied. Creating the remote repository itself happens on the hosting
+service, beforehand.
+
+#### `catalyst criterion join`
+
+In a fresh clone of the product repository: initialises the `.criterion`
+submodule and checks out the shared branch, so the working copy is on a
+branch rather than a detached gitlink. Fails if the project has no
+`.criterion` submodule. Prints the checked-out commit.
+
+#### `catalyst criterion status [--fetch]`
+
+Prints the mode (`submodule` or `local`), the remote, the shared branch,
+the current branch, the count of uncommitted changes and, when the
+remote has the shared branch, how far the working copy is ahead of and
+behind it. `--fetch` fetches first. Always exits `0`.
+
+#### `catalyst criterion push -m <message> [--as <user>] [--no-pr]`
+
+Lands the working copy's changes as a pull request against the shared
+branch. `<message>` is the commit message and pull request title; the
+signer is resolved as in [Signer](#signer), and its `git_username` (else
+`name`) is the commit author name and the topic branch's prefix. In
+order:
+
+1. Refuses if the working copy has no remote (`create` first). Fetches.
+2. Switches to a topic branch, `<user>/<UTC timestamp>`, unless one is
+   already checked out (any branch other than the shared one) whose pull
+   request is still open — a topic whose branch was merged or deleted is
+   replaced by a new one. If the remote topic branch holds commits this
+   working copy lacks (a reviewer's suggestion), it refuses: pull them
+   first. Rewrites `.gitattributes`; commits every change with
+   `<message>`.
+3. Rebases onto the shared branch. A conflict aborts the rebase and
+   fails with the conflicting files: nothing is pushed. Resolve by hand,
+   or record a proposed resolution as a `RECON-` case for a human to
+   accept (`/reconcile`); never apply one automatically.
+4. Regenerates the indexes (`index regen`) and, when the union merge or
+   the regeneration changed an index, appends one journal entry
+   (`command: "catalyst criterion push"`, `action: "update"`) recording
+   their merged state, and commits it.
+5. Runs `catalyst check`, then `integrity` against the shared branch
+   (nothing it records may be missing). Either failing pushes nothing.
+6. With no commit ahead of the shared branch, prints `nothing to push`
+   and exits `0`.
+7. Pushes the topic branch with an explicit lease (the remote branch must
+   still be what the push built on), shares the journal pins, and, unless
+   `--no-pr`, opens a pull request with `gh` (or reports the one
+   already open for the branch). Without `gh`, it prints the branch to
+   open a pull request from.
+
+Once the pull request is merged, `sync` brings the result back.
+
+#### `catalyst criterion sync`
+
+Fast-forwards the working copy to the shared branch. Refuses while the
+working copy has uncommitted changes, or commits that no remote branch
+contains — at HEAD or on the local shared branch, even with HEAD
+detached (`push` them first) — so it never loses local work. `join`
+applies the same guard. It then
+checks out the shared branch at `origin/<shared branch>`. In a product
+repository, the `.criterion` gitlink has moved: commit it to pin these
+rules for the product.
+
+#### `catalyst criterion integrity [--head <rev>] [--parent <rev> ...]`
+
+Fails (exit `1`) if a merge lost anything: every journal line, every
+defined entity ID and rule ID, and every index row that a parent
+recorded must still be recorded at `<rev>` (default `HEAD`). Parents
+default to `<rev>`'s own parents, which fits a pull request's merge
+commit in CI; `--parent` (repeatable) compares against given revisions
+instead. It reads revisions straight from git, so it needs no checkout
+of them.
+
+#### `catalyst criterion protect [--yes]`
+
+Branch protection for the shared branch on GitHub: pull requests
+required (with no minimum number of approving reviews — raise it on the
+host to require review), the `catalyst` status check required (strict:
+up to date with the branch), no force-push, no deletion. Repository
+administrators keep their override. Without `--yes`, prints the API call it
+would make and changes nothing; with `--yes`, applies it with `gh api`.
+Fails for a non-GitHub remote: on another host, set the equivalent by
+hand. Protection is what makes the gates real — without it, anyone with
+write access can push to the shared branch directly.
+
+#### Merge-safe storage: `.gitattributes`
+
+`create` and `push` keep one block in the working copy's `.gitattributes`,
+headed by a `# catalyst:` comment, marking `merge=union` for the files
+that are append-only or regenerated: `development/journal.jsonl` and
+every per-file entity type's `<folder>/<folder>.md` index
+(`rules/rules.md` is hand-maintained, so concurrent edits to it conflict
+instead). A union merge keeps both sides' lines; `push` then regenerates
+the indexes in ID order and journals every file the rebase merged. The
+team's own lines in the file are kept. Everything else merges normally, and a
+conflict there stops the push.
+
+#### The CI workflow
+
+`create` writes `.github/workflows/catalyst.yml` into the criterion
+repository (never overwriting an existing one). On every pull request
+against, and every push to, the shared branch it checks out the full
+history and runs, from the working copy's own vendored CLI:
+
+```
+python3 bin/catalyst.pyz --working-copy . check
+python3 bin/catalyst.pyz --working-copy . criterion integrity   # pull requests only
+```
+
+The job is named `catalyst`, the status check `protect` requires.
+
 ## Journal conventions
 
 These apply to every entry the CLI writes (`Rules-of-Rules.md` §12).
@@ -247,3 +412,5 @@ at the end of every artifact-changing command instead
 - [`rules-of-development.template.md`](rules-of-development.template.md) §4 — the commands that call the CLI.
 - [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) — vendoring the CLI and registering the hook at install.
 - [`migrations/0.38.0/catalyst-cli.md`](migrations/0.38.0/catalyst-cli.md) — bringing an existing deployment onto the CLI.
+- [`rules-of-rules.template.md`](rules-of-rules.template.md) §13 — shared deployments, what `catalyst criterion` guarantees.
+- [`migrations/0.39.0/criterion-on-git.md`](migrations/0.39.0/criterion-on-git.md) — moving a repoed deployment onto the submodule model.

@@ -396,13 +396,19 @@ def find_module_dir(project_root: Path | str | None, module_id: str) -> Path | N
 
 
 def load_module(project_root: Path | str | None = None,
-                module_id: str | None = None) -> ModuleManifest | None:
+                module_id: str | None = None,
+                module_dir: Path | None = None) -> ModuleManifest | None:
     """Load the manifest of module `module_id` (or of the module declared for
-    `project_root`). None when no module is declared or it cannot be found."""
-    target_id = module_id or resolve_module_id(project_root)
-    if not target_id:
-        return None
-    mdir = find_module_dir(project_root, target_id)
+    `project_root`, or the one at `module_dir`). None when no module is
+    declared or it cannot be found."""
+    if module_dir is not None:
+        mdir = module_dir if (module_dir / "module.yaml").is_file() else None
+        target_id = module_dir.name
+    else:
+        target_id = module_id or resolve_module_id(project_root)
+        if not target_id:
+            return None
+        mdir = find_module_dir(project_root, target_id)
     if mdir is None:
         return None
     data = parse_simple_yaml((mdir / "module.yaml").read_text())

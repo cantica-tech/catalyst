@@ -35,24 +35,25 @@ These are non-negotiable and apply for the entire session. They are restated in
    never-reused ID — extended upward through
    `epic → story → task →` only when an agile project-management plugin
    is active (`work-items/` doesn't exist otherwise).
-6. **Working copy in agent-owned space; one tracked pointer.** The
-   working-copy directory is always named `.criterion/`, but it
-   builds in **agent-owned space** you compute from your own conventions
-   (§1), not inside the target project's own tree, and its location is
-   never written into a tracked file. The project reaches it through
-   `<project root>/.criterion`, a gitignored symlink you create or repair
-   (§1.1); the target project tracks exactly one file for it,
-   `<app-name>.catalyst` at its root, which holds no path. No agent
-   owned-space concept (or no symlinks on this platform) → fall back to
-   building `.criterion/` directly inside the target project instead,
-   gitignored there, never committed. On starting catalyst, always check
-   the symlink and whether the agent has changed: if so, mirror
-   `.criterion/` into your own owned location, repoint the symlink,
-   update `agent` and `updated` in `<app-name>.catalyst`, and refresh
-   memory. Pre-0.37.0 pointers may still carry `agent-source`; tools
-   honor it until migrated. `/criterion`, not a commit into the
-   product's own repo, is how a team persists or shares the working copy
-   across contributors.
+6. **Working copy outside the product tree; one tracked pointer.** The
+   working-copy directory is always named `.criterion/`, reached through
+   `<project root>/.criterion`. **Local-only** (the default), it builds
+   in **agent-owned space** you compute from your own conventions (§1),
+   never written into a tracked file, and `.criterion` is a gitignored
+   symlink you create or repair (§1.1). **Shared** (opt-in,
+   `/criterion`, INV-18), `.criterion` is a git submodule of the product
+   repository pointing at the criterion repository: the product tracks
+   only `.gitmodules` and the gitlink, and contributors land changes
+   through pull requests — never a merge applied by the agent. Either
+   way the project tracks `<app-name>.catalyst` at its root, which holds
+   no path. No agent owned-space concept (or no symlinks on this
+   platform) → build `.criterion/` directly inside the target project
+   instead, gitignored there, never committed. On starting catalyst,
+   always check `.criterion` and whether the agent has changed: if so,
+   mirror a local-only `.criterion/` into your own owned location,
+   repoint the symlink, update `agent` and `updated` in
+   `<app-name>.catalyst`, and refresh memory. Pre-0.37.0 pointers may
+   still carry `agent-source`; tools honor it until migrated.
 7. **Descriptive naming.** Every rule, dev artifact, and domain file is named
    `<id>-<short-summary>.md`. Bare-ID filenames are not acceptable.
 8. **Plugins are gated.** A plugin is never loaded unless explicitly activated
@@ -83,8 +84,8 @@ consistent.
 |---|---|---|
 | **Parallel sub-agents** (background workers) | Use them for the four-eyes analysis passes and audits. | Run each pass sequentially as separate, context-isolated turns; do not let one pass see the other's output before reconciliation. |
 | **Agent-owned per-project storage** (a data directory this agent already maintains per project, outside the project's own tree — e.g. Claude Code's per-project config space) | Build `.criterion/` there — the location is computed per machine from this agent's own conventions (its shim, e.g. `CLAUDE.md`, says how), never recorded in `<app-name>.catalyst` — and link it into the project as a `.criterion` symlink at the project root, with `/.criterion` in the project's `.gitignore` (hard rule 6). | Build `.criterion/` directly inside the target project instead (also the fallback on a platform without symlinks), and add `/.criterion` to that project's own `.gitignore` — never committed. |
-| **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved working-copy location, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `<app-name>.catalyst` (project root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the working copy — `repoed`, `catalyst_repo`, `catalyst_repo_url`, `created_by`, see `Rules-of-Rules.md` §13) are read fresh each session regardless. |
-| **Slash commands** (the kernel's `/check-rules`, `/list`, `/audit`, `/freeze`, `/reconcile`, `/migrate-definition`, `/sync-framework`, `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/journal`, `/journal-restore`, `/criterion create`, `/criterion get`, `/criterion push`, `/project create`, `/project remove`, `/project export`, `/project import`, `/switch-agent`, `/commands`, `/meta-tag`, `/status`, `/run-analysis`, `/help`, `/catalyzer`; those an activated plugin contributes, e.g. `/create-board`, `/create-workflow`; plus the commands the active module adds, from its `code-of-conduct.module.md` §4 — `CODE-OF-CONDUCT.md` §4 of the deployment is the complete list) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
+| **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved working-copy location, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `<app-name>.catalyst` (project root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the working copy) are read fresh each session regardless; sharing is recorded in the pointer (`repoed`, `catalyst_repo_url`, `criterion_branch`) and `.gitmodules` (`Rules-of-Rules.md` §13). |
+| **Slash commands** (the kernel's `/check-rules`, `/list`, `/audit`, `/freeze`, `/reconcile`, `/migrate-definition`, `/sync-framework`, `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/journal`, `/journal-restore`, `/criterion create`, `/criterion get`, `/criterion push`, `/criterion sync`, `/criterion status`, `/project create`, `/project remove`, `/project export`, `/project import`, `/switch-agent`, `/commands`, `/meta-tag`, `/status`, `/run-analysis`, `/help`, `/catalyzer`; those an activated plugin contributes, e.g. `/create-board`, `/create-workflow`; plus the commands the active module adds, from its `code-of-conduct.module.md` §4 — `CODE-OF-CONDUCT.md` §4 of the deployment is the complete list) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
 | **`/dogfood`** — not part of the set above | Only ever exposed when working on catalyst's own repository (`framework/` present), never materialized into a deployed project. See `Rules-of-Rules.md` §13. | Same — this one has no deployed fallback, because it has nothing to run against outside catalyst's own repo. |
 | **Repo file read/write** | — | This is the baseline requirement. If you cannot read and write files in the target repo, stop: catalyst cannot be installed. |
 
@@ -97,7 +98,7 @@ When an agent starts a session or assumes governance of a project previously man
 1. Read `<app-name>.catalyst` at the project root.
 2. Compare the running agent's identifier (`agent`, e.g. `copilot`, `claude-code`, etc.) against `<app-name>.catalyst`'s `agent` field.
 3. If they differ:
-   - If a `.criterion/` working copy exists at the old location (the
+   - If a local-only `.criterion/` working copy exists at the old location (the
      current symlink's target, or a legacy pointer's `agent-source`), mirror
      it into the running agent's own owned location (§1): the new location
      must end up an exact copy of the old one — nothing added, nothing left
@@ -107,7 +108,8 @@ When an agent starts a session or assumes governance of a project previously man
 4. Either way, check `<project root>/.criterion`: if it is missing, or is a
    symlink pointing anywhere but the running agent's own owned location,
    (re)create it there. A real `.criterion/` directory is the in-project
-   fallback — leave it. Make sure `/.criterion` is in the project's
+   fallback, and a submodule is a shared deployment (hard rule 6) —
+   leave either. Make sure `/.criterion` is in the project's
    `.gitignore`. A pointer that still carries `agent-source` predates
    0.37.0: honor it as the old location above, and offer the 0.37.0
    migration (`/sync-framework`).

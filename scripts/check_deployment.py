@@ -579,10 +579,13 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     return errors
 
 
-def structural_errors(root: Path, project_root: Path | None) -> tuple[list[str], str]:
+def structural_errors(root: Path, project_root: Path | None,
+                      module: ModuleManifest | None = None) -> tuple[list[str], str]:
     """Every structural check against the working copy at `root`, and the
-    scope they ran with ("module <id>" or "kernel only")."""
-    module = load_module(project_root) if project_root else None
+    scope they ran with ("module <id>" or "kernel only"). `module` overrides
+    the one the project declares (a bare working copy has no pointer)."""
+    if module is None and project_root:
+        module = load_module(project_root)
     model = build_model(module)
 
     errors: list[str] = []

@@ -15,9 +15,9 @@ this project, built via the retrofit path (§4 below); this folder is the
 generic template for standing the same system up in any project so it
 can create rules that fit that project's reality.
 
-(`criterion` is a different thing entirely as of INV-18 — the
-canonical branch name in a *repoed* deployment's dedicated sync
-repository, not a folder. See §13 of `rules-of-rules.template.md`.)
+(`criterion` is also the default shared branch of a *shared*
+deployment's criterion repository — INV-18, §13 of
+`rules-of-rules.template.md`.)
 
 ## What this framework is
 
@@ -77,15 +77,15 @@ any point into a side directory — real reconstruction, not narrative.
 Entries are written by `catalyst journal append` ([`CLI.md`](CLI.md)),
 never by hand. See `Rules-of-Rules.md` §12.
 
-A deployment can additionally opt into being **repoed**: `.criterion/`
-mirrored through a dedicated repository so multiple contributors converge
-on one agreed-upon state instead of silently diverging.
-`/criterion create`/`get`/`push` manage it; every push is vetted against
-the framework's own rules (`/check-rules` plus a four-eyes drift check)
-before an AI-assisted merge lands it on the canonical `criterion`
-branch. `/dogfood` runs that same vetting procedure standalone, but only
-against catalyst's own repository — it's never part of what a deployed
-project carries. See `Rules-of-Rules.md` §13.
+A deployment can additionally opt into being **shared**: its working copy
+moves to a dedicated criterion repository, mounted as the product's
+`.criterion` submodule, and contributors land changes through pull
+requests that CI checks with `catalyst check` and
+`catalyst criterion integrity`. A conflict stops the push; the agent
+never applies a merge. `/criterion create`/`get`/`push`/`sync`/`status`
+manage it (`CLI.md`, `Rules-of-Rules.md` §13). `/dogfood` (a
+`/check-rules` plus four-eyes drift check) runs only against catalyst's
+own repository — it's never part of what a deployed project carries.
 
 ## Files in this folder
 

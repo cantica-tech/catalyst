@@ -3,14 +3,14 @@
 Thanks for your interest. catalyst is pre-1.0 and changes quickly; please open
 an issue to discuss anything larger than a fix before sending a pull request.
 
-## Current focus: beta readiness (feature freeze)
+## Current focus: beta readiness
 
-catalyst is working towards a public beta. Until the "rebuild criterion on
-git" phase of that roadmap lands, the kernel takes **no new invariants
-(`INV-`), meta-rules (`rr-META-`) or entity types**. Changes that make
-existing behaviour executable, verifiable or simpler are welcome; changes
-that add more rules for an agent to follow are not, for now. A proposal
-that seems to need an exception should start as an issue.
+catalyst is working towards a public beta. The feature freeze held while
+the mechanics moved into code (the `catalyst` CLI, kernel 0.38.0) and
+criterion was rebuilt on git (kernel 0.39.0); it is lifted. The bar stays:
+prefer changes that make behaviour executable, verifiable or simpler over
+new rules for an agent to follow, and propose a new invariant, meta-rule
+or entity type as an issue first.
 
 ## Prerequisites
 

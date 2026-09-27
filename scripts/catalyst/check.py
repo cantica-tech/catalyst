@@ -33,7 +33,8 @@ class Report:
 
 def run(dep: Deployment) -> Report:
     report = Report()
-    structure, report.scope = structural_errors(dep.root, dep.project_root)
+    structure, report.scope = structural_errors(
+        dep.root, None if dep.standalone else dep.project_root, dep.module)
     report.errors += [f"structure: {e}" for e in structure]
     corpus = load_corpus(dep)
     for f in validate(dep, corpus):

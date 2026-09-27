@@ -32,12 +32,13 @@ behavior or process) — but it must be stated explicitly, not left blank.
 ## 2. Users, roles, and signing
 
 `IAM/users/users.json` is a JSON array of registered users
-(`{name, roles, registered, active, notes, userid}`, plus `git_username`
-once a repoed deployment resolves it — `Rules-of-Rules.md` §13), managed
-only by
+(`{name, roles, registered, active, notes, userid}`, plus an optional
+`git_username`, the name `catalyst criterion push` commits under —
+`Rules-of-Rules.md` §13), managed only by
 `/user-add`/`/user-remove`/`/user-modify`/`/user-assign-role`/`/user-list`
-— see §4. Once a user has a `git_username`, every `Signed-off-by`/journal
-`actor` written for them uses that, never `name`. Each user has one or
+— see §4. A `Signed-off-by` value resolves a user by `name`,
+`git_username` or `userid`; one already written is never rewritten.
+Each user has one or
 more roles drawn from
 `IAM/roles/roles.json`, a JSON array of `{name, actions}` objects
 mapping each role to the actions/commands it's expected to perform.
@@ -242,50 +243,31 @@ the seven currently exist anywhere.
   behavior. Each plugin must live in its own repository, with no exceptions,
   and during framework deployment or synchronization plugins must be pulled
   directly from that plugin repository rather than from this repository.
-- `/criterion create <name> <git-info>` — bootstrap a repoed deployment
-  (`Rules-of-Rules.md` §13, `INVARIANTS.md` INV-18): register or create
-  the dedicated repo (confirm explicitly first if `<git-info>` already
-  has *unrelated* content — a different deployment's own state, not a
-  rejoin of this one), then ask which branch this actor will push to and
-  record it as `criterion_branch` in `<app-name>.catalyst`, then push
-  local `.criterion/` as the first commit on its `criterion`
-  branch. Also resolves the current actor's `git_username` and migrates
-  their prior `Signed-off-by` occurrences to it (never the journal — see
-  §9/§13). Called again against the same repo with a different `<name>`,
-  branches instead of refusing: a new branch off `criterion`, named
-  `<name>` in its branch-safe form.
-- `/criterion get <repo> <username>` — join an already-repoed
-  deployment: download `<repo>`'s `criterion` branch and check out
-  `<username>.criterion` (branch-safe form) from it as this user's
-  local `.criterion/` (in the running agent's owned location, linked by
-  the gitignored `.criterion` symlink — INV-6). `<username>` is this user's `git_username`,
-  same identity-migration treatment as `create`. Also asks which branch
-  to push to and records `criterion_branch`, same as `create`.
-- `/criterion push [--force]` — refuses if not yet repoed (point to
-  `/criterion create`), or asks for and records `criterion_branch`
-  first if this deployment predates that field. If `criterion_branch`
-  is a real contributor branch (the default —
-  `<git_username>.criterion`, or the branch-safe form of `name`):
-  vet the pushed state against `criterion` (`/check-rules` + a
-  four-eyes sub-agent pass), AI-merge where a plain merge can't resolve
-  it, update both branches, and refresh the local `.criterion/` to
-  match; `--force` skips vetting for this one push and overwrites
-  `criterion` directly anyway — refused for anyone but the repo's
-  `created_by` user. If `criterion_branch` **is** `criterion`
-  itself (single-maintainer mode, e.g. catalyst's own self-dogfooding):
-  every push overwrites `criterion` directly, no vetting, no merge —
-  the normal behavior in this mode, not a `--force`-only shortcut —
-  still refused for anyone but `created_by`. After a `/dogfood` run that
-  ends clean or ends with fixes applied and reverified, offer this
-  command (`create` if not yet repoed, `push` otherwise) as the natural
-  next step — never run it automatically.
+- `/criterion create <url> | get | push <message> | sync | status` —
+  share this deployment's working copy through a criterion repository
+  (`Rules-of-Rules.md` §13, `INVARIANTS.md` INV-18). Each subcommand is
+  the matching `catalyst criterion` command (`CLI.md`); the agent adds
+  only the judgment around it.
+  - `create <url>` — turn a local-only deployment into a shared one: the
+    working copy is pushed to `<url>` and `.criterion` becomes a
+    submodule of the product repository.
+  - `get` — in a fresh clone of the product repository, check out the
+    shared working copy (`catalyst criterion join`).
+  - `push <message>` — land the working copy's changes as a pull request
+    against the shared branch. A conflict stops it with nothing pushed.
+  - `sync` — fast-forward to the shared branch; refuses while local work
+    is uncommitted or unpushed.
+  - `status` — where the working copy stands against the shared branch.
+  After a `/dogfood` run that ends clean or ends with fixes applied and
+  reverified, offer this command (`create` if not yet shared, `push`
+  otherwise) as the natural next step — never run it automatically.
 - `/reconcile <RECON-id> accept|accept-with-edits|reject|propose <text>`
   — resolve, or move toward resolving, an open reconciliation case
   (`Rules-of-Rules.md` §16, `INVARIANTS.md` INV-21): `accept` merges its
   `Proposed` content into the `Entity` it names as-is, `accept-with-edits`
   appends a new `Revisions` row first and merges that instead, `reject`
-  leaves `criterion` unchanged and flags the proposer's local copy for
-  reverting — each sets `Status` to the matching `Resolved-*` value,
+  leaves the shared branch's version unchanged and the proposer drops or
+  reworks their change — each sets `Status` to the matching `Resolved-*` value,
   fills `Resolved`/`Resolver`, and regenerates
   `reconciliations/reconciliations.md` (`catalyst index regen`). `propose <text>` instead appends
   `<text>` as a new `Revisions` row and moves `Status` to `Under Review`
@@ -504,119 +486,47 @@ framework startup, the framework must scan the installed plugins and activate
 each one whose `active` metadata flag is true the same way `/catalyzer
 activate` loads a plugin into memory (see above). This is a hard rule.
 
-When the user enters `/criterion create <name> <git-info>: ...`: if
-`.criterion/DEPLOYMENT.md` doesn't yet show `repoed: true`, this is the first-call
-bootstrap — check whether `<git-info>` already exists: if it does,
-inspect its content before registering it as-is — if it's genuinely this
-same deployment's own prior state (a real rejoin), proceed; if it holds
-*unrelated* content (a different project's own `.criterion/`
-deployment), that's not a rejoin, stop and confirm explicitly with the
-user before doing anything, the same tier of confirmation as creating a
-new repo; if `<git-info>` doesn't exist yet, create it there under
-`<name>` — this is an externally-visible, hard-to-reverse action, so
-confirm with the user before creating it, distinct from the general
-push-assent already implied by invoking this command. Write `repoed:
-true`, `catalyst_repo: <name>`, `catalyst_repo_url: <git-info>`,
-`created_by: <the current Signed-off-by actor>` to
-`.criterion/DEPLOYMENT.md`, **ask which branch this actor will push
-to** — the actor's own `<branch-safe-name>.criterion` is the
-suggested default, but `criterion` itself is a valid choice too (see
-`/criterion push` below for what that changes) — and write the answer
-as `criterion_branch` in both `.criterion/DEPLOYMENT.md` and
-`<app-name>.catalyst`. Then push the current local `.criterion/`
-state as the first commit on a `criterion` branch there. Nothing is
-vetted on this first push. If `.criterion/DEPLOYMENT.md` **already**
-shows `repoed: true`: don't refuse — if `<git-info>` matches the
-registered `catalyst_repo_url`, create a new branch off `criterion`'s
-current state named `<name>` in its branch-safe form (§13) and stop
-there (no repo mutation, no `.criterion/DEPLOYMENT.md` change); if `<git-info>`
-names a different repo, confirm explicitly with the user before doing
-anything, since that's an unusual second-repo scenario rather than
-ordinary branching. On the first-call path only, also run the identity
-migration below, then report the result.
+When the user enters `/criterion create <url>`: confirm the user wants
+this deployment shared, and that the criterion repository at `<url>`
+exists (empty, or holding this working copy's own history) — creating it
+on a hosting service is externally visible, so ask before doing it. Run
+`catalyst criterion create <url>` (`--branch <name>` only if the user
+wants a shared branch other than `criterion`). If it refuses because the
+remote branch holds history the working copy lacks, report it: that is
+someone else's work or another deployment, never something to overwrite.
+Report the steps it printed, then offer to commit the product
+repository's staged changes (`.gitmodules`, the `.criterion` gitlink,
+the pointer, `.gitignore`) — never commit without assent (INV-4) — and
+offer `catalyst criterion protect` (show its output, then `--yes` on
+assent).
 
-When the user enters `/criterion get <repo> <username>: ...`, validate
-`<username>` against the branch-safe-name rule (§13) — refuse with a
-suggested alternative if it doesn't survive sanitization uniquely against
-already-registered users. Download `<repo>`'s `criterion` branch content
-and check out `<username>.criterion` (branch-safe form) from it as
-this user's local `.criterion/` — in the running agent's owned location
-(`BOOTSTRAP.md` §1), then create or repair the `.criterion` symlink at
-the project root and make sure `/.criterion` is gitignored (INV-6) —
-creating a `IAM/users/users.json`
-entry for them first if one doesn't already exist. **Ask which branch
-this actor will push to**, same as `create` above (the just-created
-`<username>.criterion` is the default), and record
-`criterion_branch`. Then run the identity migration below for this
-user, and report the result.
+When the user enters `/criterion get`: in a clone of the product
+repository whose `.criterion` is a submodule, run
+`catalyst criterion join`. If the joining person is not yet in
+`IAM/users/users.json`, they register with `/user-add` (which draws their
+`userid`) before signing anything, and land that registration with
+`/criterion push` like any other change.
 
-**Identity migration** (part of both `/criterion create`'s first call
-and `/criterion get`): set `git_username` on the current user's
-`IAM/users/users.json` entry to their resolved git identity (`git
-config user.name`, branch-safe form, for `create`; the given `<username>`
-for `get`). Rewrite every existing artifact's `Signed-off-by` field that
-currently names this user's old `name` to their new `git_username` —
-from this point on, every `Signed-off-by`/journal `actor` written for
-them uses `git_username`, never `name`. **Never rewrite the journal
-itself** (`Rules-of-Rules.md` §12, INV-17 — entries are immutable, no
-exception for this either); instead append one new entry with
-`catalyst journal append --action update` (`intent` describing the
-migration) covering every artifact file actually rewritten.
+When the user enters `/criterion push <message>`: resolve the signer
+(§2) and run `catalyst criterion push -m "<message>" --as <signer>`.
+Report the pull request (or the branch to open one from). If the push
+stops on a conflict, report the conflicting files and stop: nothing was
+pushed. Never resolve the conflict by applying an edit of your own. You
+may propose a resolution: open a `RECON-` case (`catalyst id next RECON
+--as <signer>`, `Trigger: merge-conflict`, `Baseline` the shared
+branch's version, `Proposed` your resolution — `Rules-of-Rules.md` §16),
+then `catalyst index regen` and `catalyst journal append`, and leave it
+for a human to decide with `/reconcile`. If `catalyst check` or the
+integrity check fails, report the errors and fix them as ordinary work
+before pushing again.
 
-When the user enters `/criterion push [--force]`, refuse with a clear
-message if `.criterion/DEPLOYMENT.md` doesn't show `repoed: true` (point to
-`/criterion create`). If no `criterion_branch` is recorded yet (a
-deployment from before this field existed), ask now — same question as
-`/criterion create`'s — and record the answer before continuing.
+When the user enters `/criterion sync`: run `catalyst criterion sync`.
+If it refuses, report why (uncommitted or unpushed work) and offer
+`/criterion push`. Afterwards, offer to commit the moved `.criterion`
+gitlink in the product repository, which pins the synced rules.
 
-**If `criterion_branch` names a real contributor branch**
-(`<git_username>.criterion` if the actor has one, otherwise the
-branch-safe form of `name`): push local `.criterion/` there in the
-repoed repository (creating that branch on their first push), **scoped
-to artifact files whose `Signed-off-by` names the current actor** —
-check the actor's `roles` array in `IAM/users/users.json` against
-`IAM/roles/roles.json`; if it includes the `Admin` role, skip scoping
-and push everything. Otherwise leave out any artifact file signed by
-someone else, and report which files (if any) were excluded and why.
-Shared registries/indexes (`rules.md`, every entity type's own index
-file, any regenerated summary document the active module defines,
-`IAM/users/users.json`,
-`IAM/roles/roles.json`) and the journal aren't signed by one person and
-are never filtered by this rule. This scopes what gets pushed; it never
-refuses the command outright. If `--force` is given: refuse unless the
-current actor matches
-`.criterion/DEPLOYMENT.md`'s `created_by`; otherwise confirm with the user, then
-overwrite `criterion` directly from local state and skip everything
-below. Otherwise: (1) vet the incoming branch against `criterion` —
-`/check-rules` plus an independent four-eyes sub-agent pass checking
-whether the incoming state still matches what its own rules claim;
-disagreement between the two sub-agents, or a flagged violation, stops
-here rather than proceeding silently; (2) merge —
-attempt a normal merge first, and only where that leaves a conflict
-(git-level, vetting-flagged, or a rights-mismatch against the actor's
-role in `IAM/roles/roles.json`), have a sub-agent propose a resolution
-guided by `Rules-of-Rules.md` §1's conflict-check principle. Where
-that's itself contested, or genuinely irreconcilable, open a
-`RECON-NNNNNN` (ID from `catalyst id next RECON`) instead of guessing
-which side wins (`Rules-of-Rules.md` §16, resolved later via
-`/reconcile`) — that one entity stays unmerged,
-everything else in the push proceeds; (3) update both `criterion` (the
-merge commit) and the
-contributor's own branch (fast-forwarded to match); (4) pull the updated
-`criterion` down and overwrite the local `.criterion/` directory
-and this session's in-memory record of it.
-
-**If `criterion_branch` *is* `criterion` itself** (single-maintainer
-mode): push local `.criterion/` state directly onto `criterion`,
-overwriting it — every time, no vetting, no merge, not gated behind
-`--force`. Still refuse unless the current actor matches
-`.criterion/DEPLOYMENT.md`'s `created_by`. This is the expected mode
-for catalyst's own self-dogfooding, offered as the natural follow-up
-after a `/dogfood` run ends clean or ends with fixes applied and
-reverified — `/dogfood`'s own four-eyes audit is what already vetted the
-state, so repeating that check on push would be redundant.
-
-Report the result either way.
+When the user enters `/criterion status`: run
+`catalyst criterion status --fetch` and report it.
 
 When the user enters `/project create <project name>: ...`, refuse if a
 `<app-name>.catalyst` pointer or an in-project `.criterion/` already
@@ -665,7 +575,7 @@ machine (never the exporting machine's), materialize every bundled file
 there, create the `.criterion` symlink at the project root pointing at
 it and gitignore `/.criterion`, then write `<app-name>.catalyst`
 carrying the bundle's pointer fields over as-is (`repoed`,
-`catalyst_repo`, `catalyst_repo_url`, `created_by`), with no path. Journal
+`catalyst_repo`, `catalyst_repo_url`, `created_by`, `criterion_branch`), with no path. Journal
 the import with `catalyst journal append --command /project --action sync`
 covering the pointer and `.gitignore`, then report the result.
 
@@ -807,10 +717,12 @@ artifact under this document and carries no `Domain` field.)
 ## 6. Development-artifact IDs
 
 Per `Rules-of-Rules.md` §5: `<PREFIX>-(NNNNNN)-(userid)`, where `<PREFIX>`
-is one of the active module's rule-linked entity-type ID prefixes — global
-per type, sequential, zero-padded 6 digits, never reused, plus the signer's
-`userid` as a trailing suffix from the moment they're signed
-(`Rules-of-Rules.md` §20, INV-26). The next ID comes from
+is one of the active module's rule-linked entity-type ID prefixes —
+sequential per type, zero-padded 6 digits, never reused, never renumbered,
+plus the signer's `userid` as a trailing suffix from the moment they're
+signed (`Rules-of-Rules.md` §20, INV-26). The number is unique per type and
+signer: in a shared deployment two contributors may hold the same number
+under different userids (`Rules-of-Rules.md` §6, §13). The next ID comes from
 `catalyst id next <PREFIX> --as <signer>`, never from reading the index by
 hand. Meta-tags use a file-name pattern of
 `tag-<key>-<artefact-id>` rather than a sequential numeric ID. This is a

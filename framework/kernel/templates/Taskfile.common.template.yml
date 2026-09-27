@@ -99,7 +99,7 @@ tasks:
       - '{{.AGENT_CMD}} "/catalyzer {{.CLI_ARGS}}"'
 
   criterion:
-    desc: "Bootstrap/join/sync a repoed .criterion/ deployment: <create|get|push> ..."
+    desc: "Share the working copy through a criterion repository: <create <url>|get|push <message>|sync|status>"
     cmds:
       - '{{.AGENT_CMD}} "/criterion {{.CLI_ARGS}}"'
 

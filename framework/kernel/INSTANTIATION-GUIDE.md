@@ -190,10 +190,10 @@ creates concrete rules for that particular project.
    building `.criterion/` directly inside the target project as a real
    directory, gitignored the same way — still not committed, but no
    relocation possible without agent support. Either way, `/criterion` (§13,
-   opt-in) remains the durable, shareable persistence layer for teams
-   that want the working copy to survive and sync across contributors,
-   via a dedicated repository, never by committing it into the product's
-   own repo. See `Rules-of-Rules.md` §14 for migrating a deployment that
+   opt-in) is how a team shares the working copy: it moves to a
+   dedicated criterion repository, mounted as the product's `.criterion`
+   submodule — the product commits only the gitlink, never the working
+   copy's content. See `Rules-of-Rules.md` §14 for migrating a deployment that
    already exists in the old, purely in-project shape, and
    `migrations/` (this repository) for migrating an existing deployment
    built under an older layout of this section itself to the current
@@ -213,8 +213,8 @@ creates concrete rules for that particular project.
    never names them (INV-30). The
    `reconciliations/` folder also sits at the root, alongside the active
    module's root-level folders — not nested under `work-items/`
-   — and holds `RECON-NNNNNN` cases opened by `/criterion push`'s merge
-   step or manually (`Rules-of-Rules.md` §16).
+   — and holds `RECON-NNNNNN` cases opened for a conflict that stopped
+   `/criterion push`, or manually (`Rules-of-Rules.md` §16).
    `work-items/` itself is not built at all here — it's plugin-only
    (`Rules-of-Rules.md` §8, INV-22); skip it entirely for a core
    instantiation.)

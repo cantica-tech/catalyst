@@ -41,6 +41,7 @@ class Deployment:
     pointer: dict
     module: ModuleManifest | None
     etds: dict[str, ETD] = field(default_factory=dict)   # by id prefix
+    standalone: bool = False        # a bare working copy, with no project around it
 
     def folder(self, etd: ETD) -> Path | None:
         """The ETD's folder in the working copy: at the root, or nested one
@@ -48,7 +49,8 @@ class Deployment:
         direct = self.root / etd.folder
         if direct.is_dir():
             return direct
-        for sub in sorted(p for p in self.root.iterdir() if p.is_dir()):
+        # never hidden directories: .github/workflows is not the workflows type
+        for sub in sorted(p for p in self.root.iterdir() if p.is_dir() and not p.name.startswith(".")):
             nested = sub / etd.folder
             if nested.is_dir():
                 return nested
@@ -91,3 +93,20 @@ def load(start: Path | None = None) -> Deployment:
         for etd in module.entity_types.values():
             etds[etd.id_prefix] = etd
     return Deployment(project_root, root, read_pointer(project_root), module, etds)
+
+
+def load_working_copy(path: Path) -> Deployment:
+    """A bare working copy — e.g. the criterion repository checked out on its
+    own in CI. Its module is the one under modules/; project files are out
+    of scope."""
+    root = Path(os.path.abspath(path))
+    if not (root / "version.txt").is_file() or not (root / "rules").is_dir():
+        raise DeploymentNotFound(f"{root} is not a catalyst working copy")
+    mods = sorted(d for d in (root / "modules").glob("*") if (d / "module.yaml").is_file()) \
+        if (root / "modules").is_dir() else []
+    module = load_module(module_dir=mods[0]) if len(mods) == 1 else None
+    etds = dict(load_kernel_entities())
+    if module is not None:
+        for etd in module.entity_types.values():
+            etds[etd.id_prefix] = etd
+    return Deployment(root, root, {}, module, etds, standalone=True)
