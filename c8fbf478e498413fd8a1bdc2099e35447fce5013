@@ -1,0 +1,411 @@
+"""`catalyst init`: install catalyst into a project, deterministically
+(INSTANTIATION-GUIDE.md, INSTANTIATION-CHECKLIST.md).
+
+Everything mechanical in the checklist happens here: the working copy's
+skeleton (every entity folder with its index, templates catalog and
+README), the governing documents composed from kernel + module, definitions,
+the first user with a userid, an empty journal, the vendored CLI, the
+pointer, the `.criterion` access path and its .gitignore entry. The agent
+keeps the judgment: the project's name, its rule documents, its first rules.
+
+Installing is always an explicit request (INV-2): nothing here runs on load.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from module_loader import ETD, load_kernel_entities, load_module
+
+from catalyst import compose
+from catalyst.ids import generate_userid
+
+SHIPPED_EXCLUDE = {".git", "catalyst", "node_modules", "dist", "__pycache__"}
+KERNEL_TYPES = {  # kernel entity folders, their template source and index
+    "rules": ("RULE", "rule.template.md"),
+    "rules/domains": ("DOMAIN", "domain.template.md"),
+    "reconciliations": ("RECONCILIATION", "reconciliation.template.md"),
+    "workflows": ("WORKFLOW", "workflow.template.md"),
+    "development/meta-tags": ("META-TAG", "meta-tag.template.md"),
+}
+
+
+class InitError(Exception):
+    pass
+
+
+@dataclass
+class InitRequest:
+    project: Path
+    name: str
+    module_id: str
+    user: str
+    kernel: Path                       # framework/kernel of a catalyst checkout or release
+    module: Path | None = None         # the module's directory (found if None)
+    git_username: str | None = None
+    rule_docs: list[tuple[str, str]] = field(default_factory=list)   # (file name, prefix)
+    test_locations: str | None = None
+    at: Path | None = None             # agent-owned location; None = in-project fallback
+    agent: str = "unknown"
+    commands_dir: Path | None = None   # write command files here (e.g. .claude/commands)
+    userid: str | None = None          # fixed first userid (reproducible examples); else drawn
+
+
+def today() -> str:
+    return datetime.date.today().isoformat()
+
+
+def _write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
+
+
+def _latest_definition(type_dir: Path) -> Path | None:
+    versioned = [(int(m.group(1)), p) for p in type_dir.glob("DEFINITION-*.md")
+                 if (m := re.search(r"-v(\d+)\.md$", p.name))]
+    return max(versioned)[1] if versioned else None
+
+
+def _seed_template(src: Path, dest: Path, params: "compose.Params | None") -> None:
+    """Copy a template, dropping its "copy this file to ..." notice and
+    resolving the instantiation placeholders, so the deployed copy reads as
+    this project's own."""
+    if src.suffix != ".md" or params is None:
+        shutil.copyfile(src, dest)
+        return
+    text = compose.resolve(compose.strip_notice(src.read_text(encoding="utf-8")), params)
+    dest.write_text(compose.sign_meta_ids(text, params.userid), encoding="utf-8")
+
+
+PARAMS: "compose.Params | None" = None       # set by _install for _type_folder
+
+
+def _type_folder(root: Path, rel: str, type_name: str, template_src: Path | None,
+                 index_text: str, readme: str, stamp: str) -> None:
+    folder = root / rel
+    templates = folder / "templates"
+    templates.mkdir(parents=True, exist_ok=True)
+    if template_src is not None and template_src.is_file():
+        suffix = template_src.suffix if template_src.suffix != ".md" else ".md"
+        _seed_template(template_src, templates / f"TEMPLATE-{type_name}-v1{suffix}", PARAMS)
+        catalog_file = f"TEMPLATE-{type_name}-v1{suffix}"
+    else:
+        catalog_file = None
+    lower = type_name.lower()
+    _write(templates / f"templates-{lower}.md",
+           f"# `{type_name}` templates — catalog\n\n| Version | File | Timestamp | Notes |\n|---|---|---|---|\n"
+           + (f"| v1 | `{catalog_file}` | {stamp} | Initial version. |\n" if catalog_file else ""))
+    _write(templates / "README.md",
+           f"# `{type_name}` templates\n\nVersioned templates for this folder's entities, catalogued in "
+           f"`templates-{lower}.md` (INV-20). A new version is a new file and a new catalog row.\n")
+    if index_text:
+        index = folder / f"{folder.name}.md"
+        if not index.exists():
+            _write(index, index_text)
+    _write(folder / "README.md", readme)
+
+
+def _module_dir(req: InitRequest) -> Path:
+    if req.module is not None:
+        return req.module
+    from module_loader import find_module_dir
+    found = find_module_dir(req.project, req.module_id)
+    if found is None:
+        raise InitError(f"module '{req.module_id}' not found — pass --module-dir")
+    return found
+
+
+def _vendor_cli(dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    running = Path(sys.argv[0])
+    if running.suffix == ".pyz" and running.is_file():
+        shutil.copyfile(running, dest)
+        return
+    try:                                   # from catalyst's own checkout
+        import package_release
+        package_release.build_cli(Path(package_release.ROOT), dest)
+    except Exception as exc:  # noqa: BLE001 — report, don't half-install
+        raise InitError(f"cannot vendor the CLI ({exc}); run init from catalyst.pyz") from exc
+
+
+NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def init(req: InitRequest) -> list[str]:
+    """Install, all or nothing: on any failure every path this created is
+    removed and .gitignore restored, so the install can simply be re-run."""
+    created: list[Path] = []
+    gitignore = req.project.resolve() / ".gitignore"
+    old_gitignore = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else None
+    try:
+        return _install(req, created)
+    except BaseException as exc:
+        for path in reversed(created):
+            if path.is_symlink() or path.is_file():
+                path.unlink(missing_ok=True)
+            elif path.is_dir():
+                shutil.rmtree(path, ignore_errors=True)
+        if old_gitignore is None:
+            gitignore.unlink(missing_ok=True) if gitignore in created else None
+        else:
+            gitignore.write_text(old_gitignore, encoding="utf-8")
+        if isinstance(exc, InitError):
+            raise
+        raise InitError(f"install failed and was rolled back: {exc}") from exc
+
+
+def _install(req: InitRequest, created: list[Path]) -> list[str]:
+    if not NAME_RE.match(req.name):
+        raise InitError(f"--name '{req.name}' must be letters, digits, '.', '_' or '-' (no path)")
+    project = req.project.resolve()
+    if any(project.glob("*.catalyst")):
+        raise InitError(f"{project} already has a *.catalyst pointer — catalyst is installed")
+    if (project / ".criterion").exists() or (project / ".criterion").is_symlink():
+        raise InitError(f"{project}/.criterion already exists")
+    kernel = req.kernel.resolve()
+    if not (kernel / "rules-of-rules.template.md").is_file():
+        raise InitError(f"{kernel} is not a catalyst kernel (no rules-of-rules.template.md)")
+    module_src = _module_dir(req).resolve()
+    manifest = load_module(module_dir=module_src)
+    if manifest is None:
+        raise InitError(f"{module_src} has no readable module.yaml")
+    if (kernel / "manifest.json").is_file():                      # a kernel release
+        version = json.loads((kernel / "manifest.json").read_text())["version"]
+    elif (kernel.parent.parent / "version.txt").is_file():       # catalyst's checkout
+        version = (kernel.parent.parent / "version.txt").read_text().strip()
+    else:
+        raise InitError(f"cannot tell the kernel version of {kernel}")
+    stamp = today()
+    if req.at:
+        root = req.at.expanduser().resolve()
+        if root == project or project in root.parents:
+            raise InitError("--at must be outside the project (it is the agent-owned location); "
+                            "omit it for an in-project working copy")
+    else:
+        root = project / ".criterion"
+    if root.exists() and any(root.iterdir()):
+        raise InitError(f"{root} exists and is not empty")
+    if not root.exists():
+        created.append(root)
+    steps: list[str] = []
+
+    # --- the first user and the composed documents ------------------------
+    userid = req.userid or generate_userid(set())
+    if not re.fullmatch(r"[A-Za-z0-9]{8}", userid) or not any(c.isupper() for c in userid):
+        raise InitError(f"userid '{userid}' is not 8 letters/digits with an uppercase letter")
+    rule_docs = req.rule_docs or [(f"{re.sub(r'[^a-z0-9]+', '-', req.name.lower()).strip('-')}-rules.md", "br")]
+    params = compose.Params(manifest.id, userid, [d for d, _ in rule_docs],
+                            req.test_locations or compose.Params.test_locations)
+    _write(root / "CODE-OF-CONDUCT.md", compose.code_of_conduct(kernel, module_src, params))
+    _write(root / "rules" / "Rules-of-Rules.md", compose.rules_of_rules(kernel, module_src, params))
+    _write(root / "ACCESS-CONTROL.md", compose.access_control(kernel, params))
+    _write(root / "Taskfile.common.yml", compose.taskfile(kernel, module_src, params))
+    _write(root / compose.PARAMS_FILE, json.dumps(params.as_dict(), indent=2))
+    global PARAMS
+    PARAMS = params
+    steps.append("composed CODE-OF-CONDUCT.md, rules/Rules-of-Rules.md, ACCESS-CONTROL.md, Taskfile.common.yml")
+
+    # --- the module, seeded whole -----------------------------------------
+    mod_dest = root / "modules" / manifest.id
+    shutil.copytree(module_src, mod_dest, ignore=lambda d, names: [n for n in names if n in SHIPPED_EXCLUDE])
+    steps.append(f"seeded module {manifest.id} {manifest.version}")
+
+    # --- kernel entity folders --------------------------------------------
+    kt = kernel / "templates"
+    _type_folder(root, "rules", "RULE", kt / "rule.template.md",
+                 "", "# Rules\n\nRule documents, one per project seam, each with `## Contents` and "
+                 "`## Linked Artifacts — Quick Index`; `rules.md` indexes every rule ID (INV-8).\n", stamp)
+    _write(root / "rules" / "rules.md", "# Rules index\n\n## Documents\n\n| Prefix | Document | Domains |\n"
+           "|---|---|---|\n" + "".join(f"| `{p}` | [`{d}`]({d}) | |\n" for d, p in rule_docs) +
+           "\n## Rule IDs\n\n*(none yet)*\n")
+    for doc, prefix in rule_docs:
+        _write(root / "rules" / doc, f"# {doc[:-3].replace('-', ' ').title()}\n\nPrefix: `{prefix}`. "
+               "Rules are added with the rule template (`rules/templates/`), numbered with "
+               f"`catalyst id next-rule {prefix} <DOMAIN>`.\n\n## Contents\n\n*(no rules yet)*\n\n"
+               "## Linked Artifacts — Quick Index\n\n*(none yet)*\n")
+    _type_folder(root, "rules/domains", "DOMAIN", kt / "domain.template.md",
+                 "# Domains index\n\n| Code | Document | Defined |\n|---|---|---|\n",
+                 "# Domains\n\nOne file per DOMAIN code, registered in `domains.md`.\n", stamp)
+    for rel, (tname, src) in KERNEL_TYPES.items():
+        if rel.startswith("rules"):
+            continue
+        folder_name = rel.rsplit("/", 1)[-1]
+        _type_folder(root, rel, tname, kt / src,
+                     f"# {folder_name.replace('-', ' ').title()} index\n\n| ID | Title | Status |\n|---|---|---|\n",
+                     f"# {folder_name.replace('-', ' ').title()}\n\nSee `CODE-OF-CONDUCT.md`.\n", stamp)
+
+    # --- module entity folders --------------------------------------------
+    templates = {t.entity_type: [] for t in manifest.templates}
+    for t in manifest.templates:
+        templates[t.entity_type].append(module_src / t.template_path)
+    for prefix, etd in sorted(((e.id_prefix, e) for e in manifest.entity_types.values())):
+        rel = f"{etd.location}/{etd.folder}" if etd.location else etd.folder
+        srcs = templates.get(prefix, [])
+        # with two templates, the index one is named after the folder
+        # (requirements.template.md); a single template is always the item's
+        index_src = next((t for t in srcs if len(srcs) > 1 and t.name.split(".")[0] == etd.folder), None)
+        item = next((t for t in srcs if t is not index_src), None)
+        index_text = "" if etd.naming == "free-form" else (
+            index_src.read_text(encoding="utf-8") if index_src and index_src.is_file() else
+            f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n")
+        type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
+        _type_folder(root, rel, type_name, item, index_text,
+                     f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see "
+                     "`CODE-OF-CONDUCT.md` §3/§4.\n", stamp)
+    for rp in manifest.required_paths:
+        target = root / rp.path
+        if not target.exists():
+            seed = module_src / rp.seed if rp.seed else None
+            # a seed is used only when it is that file's own template
+            # (x.template.md for x.md); otherwise the path gets an empty index
+            own = seed is not None and seed.is_file() and \
+                seed.name.split(".")[0].lower() == target.stem.lower()
+            _write(target, seed.read_text(encoding="utf-8") if own else
+                   f"# {target.stem.title()}\n\n*(none yet)*\n")
+    steps.append(f"created every entity folder ({len(manifest.entity_types)} module, 5 kernel) "
+                 "with index, templates catalog and README")
+
+    # --- definitions ------------------------------------------------------
+    defs = root / "definitions"
+    defs.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(kernel / "definitions" / "README.md", defs / "README.md")
+    for source in (kernel / "definitions", module_src / "definitions"):
+        for type_dir in sorted(d for d in source.iterdir() if d.is_dir()) if source.is_dir() else []:
+            latest = _latest_definition(type_dir)
+            if latest is not None:
+                shutil.copyfile(latest, defs / f"{type_dir.name}.md")
+    steps.append("froze the latest definition of every kernel and module type (INV-23)")
+
+    # --- IAM --------------------------------------------------------------
+    for kind, template in (("users", "users.template.json"), ("roles", "roles.template.json")):
+        tdir = root / "IAM" / kind / "templates"
+        tdir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(kt / template, tdir / f"TEMPLATE-{kind.upper()}-v1.json")
+        _write(tdir / f"templates-{kind[:-1]}.md",
+               f"# `{kind.upper()}` templates — catalog\n\n| Version | File | Timestamp | Notes |\n"
+               f"|---|---|---|---|\n| v1 | `TEMPLATE-{kind.upper()}-v1.json` | {stamp} | Initial version. |\n")
+        _write(tdir / "README.md", f"# `{kind}` templates\n\nSeed shape for `{kind}.json` (INV-20).\n")
+        _write(root / "IAM" / kind / "README.md", f"# {kind.title()}\n\nManaged by the `/user-*` and "
+               "`/role-*` commands only (CODE-OF-CONDUCT.md §2).\n")
+    user = {"name": req.user, "roles": ["Admin"], "registered": stamp, "active": True,
+            "notes": "", "userid": userid}
+    if req.git_username:
+        user["git_username"] = req.git_username
+    _write(root / "IAM" / "users" / "users.json", json.dumps({"users": [user]}, indent=2))
+    shutil.copyfile(kt / "roles.template.json", root / "IAM" / "roles" / "roles.json")
+    steps.append(f"registered {req.user} (userid {userid}) as the first, Admin user (INV-16)")
+
+    # --- journal, version, docs, CLI --------------------------------------
+    (root / "development").mkdir(parents=True, exist_ok=True)
+    (root / "development" / "journal.jsonl").write_text("", encoding="utf-8")   # truly empty
+    _write(root / "version.txt", version)
+    _write(root / "DEPLOYMENT.md", f"# Deployment\n\n- Project: `{req.name}`\n- Kernel: {version}\n"
+           f"- Active module: `{manifest.id}` v{manifest.version}\n- Installed: {stamp} by {req.user} "
+           f"with `catalyst init`\n- Shared: no (local-only; `catalyst criterion create <url>` shares it)\n")
+    _write(root / "README.md", f"# `{req.name}` — catalyst working copy\n\nGoverned by `CODE-OF-CONDUCT.md` "
+           "and `rules/Rules-of-Rules.md`; run `python3 .criterion/bin/catalyst.pyz check` from the "
+           "project root. Folders: `rules/`, `definitions/`, `IAM/`, `development/` (journal), and one "
+           "folder per entity type (see each folder's README).\n")
+    _vendor_cli(root / "bin" / "catalyst.pyz")
+    steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md; vendored bin/catalyst.pyz")
+
+    # --- the project side ---------------------------------------------------
+    pointer = {"project_name": req.name, "kernel_version": version, "module": manifest.id,
+               "agent": req.agent, "repoed": False, "catalyst_repo": None, "catalyst_repo_url": None,
+               "created_by": req.user, "criterion_branch": None, "created": stamp, "updated": stamp}
+    pointer_path = project / f"{req.name}.catalyst"
+    created.append(pointer_path)
+    _write(pointer_path, json.dumps(pointer, indent=2))
+    if req.at:
+        created.append(project / ".criterion")
+        (project / ".criterion").symlink_to(root)
+    gitignore = project / ".gitignore"
+    if not gitignore.exists():
+        created.append(gitignore)
+    lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.is_file() else []
+    if "/.criterion" not in lines:
+        _write(gitignore, "\n".join(lines + ["/.criterion"]))
+    steps.append(f"wrote {pointer_path.name}; .criterion {'links to ' + str(root) if req.at else 'is in-project'}"
+                 "; /.criterion gitignored")
+    if req.commands_dir is not None:
+        steps.append(_write_commands(req, module_src, root, created))
+
+    # --- the working copy's own history, and the first journal entry ------
+    _git(root, "init", "-q")
+    _git(root, "add", "-A")
+    _git(root, "-c", f"user.name={req.git_username or req.user}", "-c",
+         f"user.email={(req.git_username or 'catalyst')}@catalyst.invalid", "commit", "-q", "-m",
+         f"catalyst init: {req.name} (kernel {version}, module {manifest.id} {manifest.version})")
+    from catalyst import journal
+    from catalyst.deployment import load
+    dep = load(project)
+    journal.append(dep, journal.AppendRequest(
+        command="catalyst init", action="create", artifact=f"deployment of {req.name}", targets=[],
+        intent=[f"Install catalyst (kernel {version}, module {manifest.id} {manifest.version}) into "
+                f"{req.name}, on the user's explicit request (INV-2)."],
+        files=([str(pointer_path), str(project / ".gitignore")] +
+               ([str(p) for p in sorted((req.project / req.commands_dir).glob("*.md"))]
+                if req.commands_dir is not None else [])
+               if _is_repo(project) else []) +
+              [str(root / "CODE-OF-CONDUCT.md"), str(root / "rules" / "Rules-of-Rules.md"),
+               str(root / "IAM" / "users" / "users.json")],
+        actor=req.git_username or req.user, allow_unchanged=True))
+    steps.append("initialised the working copy's git history and journaled the install")
+    return steps
+
+
+def _write_commands(req: InitRequest, module_src: Path, root: Path, created: list[Path]) -> str:
+    """One command file per command in the composed CODE-OF-CONDUCT §4
+    (aliases included): the module's own files, the kernel's from a catalyst
+    checkout when present, else a thin file pointing at `catalyst spec`."""
+    from catalyst.spec import parse
+    dest = req.commands_dir if req.commands_dir.is_absolute() else req.project / req.commands_dir
+    missing = dest
+    while not missing.parent.exists():          # track the highest folder this creates
+        missing = missing.parent
+    if not dest.exists():
+        created.append(missing)
+    dest.mkdir(parents=True, exist_ok=True)
+    s = parse((root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8"))
+    names = sorted(set(s.bullets) | set(s.aliases))
+    module_cmds = {p.stem: p for p in (module_src / "commands").glob("*.md")}
+    kernel_cmds_dir = req.kernel.parent.parent / ".claude" / "commands"
+    kernel_cmds = {p.stem: p for p in kernel_cmds_dir.glob("*.md")} if kernel_cmds_dir.is_dir() else {}
+    copied = generated = 0
+    for name in names:
+        target = dest / f"{name}.md"
+        if target.exists():
+            continue
+        created.append(target)
+        src = module_cmds.get(name) or kernel_cmds.get(name)
+        if src is not None:
+            shutil.copyfile(src, target)
+            copied += 1
+            continue
+        primary = s.aliases.get(name, name)
+        bullet = (s.bullets.get(primary) or [""])[0]
+        summary = bullet.split("—", 1)[1].strip().split(".")[0].replace("\n", " ") if "—" in bullet else primary
+        summary = re.sub(r"\s+", " ", summary).replace('"', "'")
+        target.write_text(f'---\ndescription: "{summary}"\n---\n\nFirst run `catalyst spec {name}` and follow '
+                          "it. Sources: `.criterion/CODE-OF-CONDUCT.md` §4 (canonical).\n\nInput: $ARGUMENTS\n",
+                          encoding="utf-8")
+        generated += 1
+    return f"wrote {copied + generated} command files into {dest} ({generated} generated from §4)"
+
+
+def _is_repo(path: Path) -> bool:
+    return subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"],
+                          capture_output=True).returncode == 0
+
+
+def _git(repo: Path, *args: str) -> None:
+    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    if res.returncode != 0:
+        raise InitError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
