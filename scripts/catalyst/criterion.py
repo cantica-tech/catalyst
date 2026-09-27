@@ -26,6 +26,7 @@ import datetime
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -355,7 +356,17 @@ class PushResult:
 
 def _topic(user: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-") or "contributor"
-    return f"{slug}/{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    return f"{slug}/{stamp}-{secrets.token_hex(2)}"      # unique even within one second
+
+
+def _ident(wc: Path, user: str) -> list[str]:
+    """Commit identity: the signer as author name, and an email only when
+    git has none configured (a fresh CI runner, a new machine)."""
+    args = ["-c", f"user.name={user}"]
+    if not run(wc, "config", "user.email", check=False).stdout.strip():
+        args += ["-c", f"user.email={re.sub(r'[^A-Za-z0-9._-]+', '-', user)}@catalyst.invalid"]
+    return args
 
 
 def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
@@ -401,11 +412,11 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
             files=[str(wc / ".gitattributes")], actor=user, allow_unchanged=True))
     if dirty(wc):
         run(wc, "add", "-A")
-        run(wc, "-c", f"user.name={user}", "commit", "-q", "-m", message)
+        run(wc, *_ident(wc, user), "commit", "-q", "-m", message)
     pre_rebase = out(wc, "rev-parse", "HEAD") if run(wc, "rev-parse", "-q", "--verify", "HEAD",
                                                       check=False).returncode == 0 else None
     if has_base:
-        res = run(wc, "-c", f"user.name={user}", "rebase", "-q", base, check=False)
+        res = run(wc, *_ident(wc, user), "rebase", "-q", base, check=False)
         if res.returncode != 0:
             files = out(wc, "diff", "--name-only", "--diff-filter=U").splitlines()
             run(wc, "rebase", "--abort", check=False)
@@ -431,7 +442,7 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
                     "catalyst index regen); this records their merged state."],
             files=[str(wc / p) for p in touched], actor=user, allow_unchanged=True))
         run(wc, "add", "-A")
-        run(wc, "-c", f"user.name={user}", "commit", "-q", "-m", "Regenerate indexes after rebase")
+        run(wc, *_ident(wc, user), "commit", "-q", "-m", "Regenerate indexes after rebase")
     report = (checker or _check)(fresh)
     if report:
         raise CriterionError("catalyst check fails on the rebased work — nothing was pushed:\n" + report)

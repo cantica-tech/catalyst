@@ -66,8 +66,9 @@ def world(tmp_path, monkeypatch):
         git(r, "config", "user.name", "Bob")
         git(r, "config", "user.email", "bob@example.com")
     cr.join(bob)
-    git(bob / ".criterion", "config", "user.email", "bob@example.com")
-    git(project / ".criterion", "config", "user.email", "ada@example.com")
+    for wc, name in ((bob / ".criterion", "Bob"), (project / ".criterion", "Ada Lovelace")):
+        git(wc, "config", "user.name", name)
+        git(wc, "config", "user.email", f"{name.split()[0].lower()}@example.com")
     return {"remote": remote, "ada": project, "bob": bob, "steps": steps, "tmp": tmp_path}
 
 
