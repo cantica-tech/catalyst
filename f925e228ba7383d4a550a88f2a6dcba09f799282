@@ -1,0 +1,96 @@
+"""`catalyst spec <command>`: only the part of the deployed CODE-OF-CONDUCT.md
+§4 a command needs — its bullet and its "When the user enters `/<command>`"
+procedure — instead of the whole document. Keeps each command's reading
+load within a budget (the canonical text is still §4; this only selects).
+"""
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from catalyst.deployment import Deployment
+
+PROC_START = re.compile(r"^When the user enters `/([a-z][a-z0-9-]*)")
+BULLET_START = re.compile(r"^- `/([a-z][a-z0-9-]*)")
+PREAMBLE = ("Signer, roles and IDs: CODE-OF-CONDUCT.md §2 (`catalyst id next`, never by hand). "
+            "Every artifact-changing command ends with `catalyst index regen`, then "
+            "`catalyst journal append` (and `catalyst check` if no end-of-turn hook runs it).")
+
+
+class SpecError(Exception):
+    pass
+
+
+def section4(dep: Deployment) -> list[str]:
+    text = (dep.root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
+    m = re.search(r"^## 4\.[^\n]*\n", text, re.M)
+    if not m:
+        raise SpecError("CODE-OF-CONDUCT.md has no '## 4.' section")
+    end = re.search(r"^## 5\.", text[m.end():], re.M)
+    return text[m.end():m.end() + end.start() if end else len(text)].splitlines()
+
+
+def primary(lines: list[str], name: str) -> str:
+    """The command a name stands for: itself, or the first command of the
+    bullet that declares it as an alias (`/a` or `/b` — ...)."""
+    for line in lines:
+        b = BULLET_START.match(line)
+        if b and f"`/{name}" in line.split("—")[0]:
+            return b.group(1)
+    return name
+
+
+def spec(dep: Deployment, command: str) -> str:
+    lines = section4(dep)
+    asked = command.lstrip("/")
+    name = primary(lines, asked)
+    bullets, procedure = [], []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        b = BULLET_START.match(line)
+        if b and (b.group(1) == name or f"/{name}`" in line.split("—")[0]):
+            block = [line]
+            i += 1
+            while i < len(lines) and lines[i].startswith("  ") and not BULLET_START.match(lines[i]):
+                block.append(lines[i])
+                i += 1
+            bullets.append("\n".join(block))
+            continue
+        p = PROC_START.match(line)
+        if p and p.group(1) == name:
+            block = [line]
+            i += 1
+            while i < len(lines):
+                nxt = lines[i]
+                if PROC_START.match(nxt) and PROC_START.match(nxt).group(1) != name:
+                    break
+                if nxt.startswith("#") or BULLET_START.match(nxt):
+                    break
+                if block[-1].strip() == "" and nxt.strip():
+                    # a new paragraph belongs to this procedure only if it says so
+                    para = [nxt]
+                    j = i + 1
+                    while j < len(lines) and lines[j].strip():
+                        para.append(lines[j])
+                        j += 1
+                    text = "\n".join(para)
+                    if not (f"/{name}" in text or nxt.startswith(("  ", "```", "1.", "- ", "* "))):
+                        break
+                block.append(nxt)
+                i += 1
+            procedure.append("\n".join(block).rstrip())
+            continue
+        i += 1
+    if not bullets and not procedure:
+        raise SpecError(f"/{name} is not in CODE-OF-CONDUCT.md §4")
+    title = f"/{asked}" + (f" (alias of /{name})" if asked != name else "")
+    out = [f"# {title} — from CODE-OF-CONDUCT.md §4", "", *bullets]
+    if procedure:
+        out += ["", *procedure]
+    out += ["", PREAMBLE]
+    return "\n".join(out).rstrip() + "\n"
+
+
+def commands(dep: Deployment) -> list[str]:
+    return sorted({BULLET_START.match(l).group(1) for l in section4(dep) if BULLET_START.match(l)})

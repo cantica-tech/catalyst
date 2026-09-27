@@ -1,0 +1,57 @@
+from __future__ import annotations
+
+from catalyst.__main__ import main
+from catalyst.deployment import load
+from catalyst.spec import commands, spec
+from catalyst_fixtures import make_project, write
+
+COC = """# Rules of Development
+
+## 3. Types
+
+## 4. Slash-command entry points
+
+- `/alpha <x>` — do alpha.
+  More about alpha.
+- `/beta` or `/b` — do beta.
+
+When the user enters `/alpha <x>`, do the alpha thing.
+
+Then finish alpha: see `/alpha`'s ending.
+
+A paragraph about plugins that belongs to no command.
+
+When the user enters `/beta`, do beta.
+
+## 5. Next
+"""
+
+
+def project(tmp_path):
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", COC)
+    return p
+
+
+def test_spec_selects_only_the_command(tmp_path):
+    dep = load(project(tmp_path))
+    text = spec(dep, "/alpha")
+    assert "do alpha" in text and "More about alpha" in text and "alpha thing" in text
+    assert "finish alpha" in text
+    assert "plugins" not in text and "do beta" not in text
+    assert commands(dep) == ["alpha", "beta"]
+
+
+def test_spec_cli_and_budget(tmp_path, capsys):
+    p = project(tmp_path)
+    assert main(["--project", str(p), "spec", "beta"]) == 0
+    assert "do beta" in capsys.readouterr().out
+    assert main(["--project", str(p), "spec", "gamma"]) == 1
+    assert main(["--project", str(p), "spec", "--budget", "1000"]) == 0
+    assert main(["--project", str(p), "spec", "--budget", "5"]) == 1
+
+
+def test_alias_reads_its_primary_commands_spec(tmp_path):
+    dep = load(project(tmp_path))
+    text = spec(dep, "b")
+    assert "alias of /beta" in text and "When the user enters `/beta`" in text
