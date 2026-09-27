@@ -341,13 +341,11 @@ with a default agile-role mapping and then extended via `/role-add`
 `IAM/users/` and `IAM/roles/` each follow the same uniform shape as every
 other artifact type (§15) — their own `templates/` and `README.md`.
 
-**`userid` generation (`/user-add`, INV-26).** Draw 8 characters, each
+**`userid` generation (`/user-add`, INV-26).** `catalyst userid gen`
+(`CLI.md`) implements this; it is specified here so the rule stays
+checkable. Draw 8 characters, each
 independently and uniformly from the 62-character alphabet
-`[A-Za-z0-9]`, using whatever cryptographically-secure random source
-the running agent's environment provides (e.g. Python's
-`secrets.choice`) — this is an agent-followed procedure, not a
-specific library dependency, since catalyst itself has no fixed
-runtime. Redraw if the result contains no uppercase letter (this
+`[A-Za-z0-9]`, using a cryptographically-secure random source. Redraw if the result contains no uppercase letter (this
 closes a real parsing ambiguity in host UIs that derive an id from a
 filename: an 8-letter, all-lowercase summary word like `database` must
 never be mistakable for a `userid` suffix — see rr-META-020). Check
@@ -391,7 +389,8 @@ value reflects who signed it under the mapping in effect at the time.
 append-only. A "changelog" narrates what happened; this journal is
 precise enough to **replay**: every entry carries exact content pointers,
 not just prose, so a point in time is mechanically reconstructable, not
-just describable.
+just describable. Entries are written with `catalyst journal append`
+(`CLI.md`), never by hand.
 
 ### Entry schema
 
@@ -409,9 +408,10 @@ command, entity and files.
   "targets": ["fw-STRUCTURE-003"],
   "intent": ["one or more sentences — the goal driving this change, not a label"],
   "files": [
-    {"path": "items/ITEM-000001-foo.md", "before": null, "after": "a1b2c3...(40 hex)"},
-    {"path": "items/items.md", "before": "d4e5f6...", "after": "g7h8i9..."}
-  ]
+    {"path": ".criterion/items/ITEM-000001-foo.md", "before": null, "after": "a1b2c3...(40 hex)"},
+    {"path": ".criterion/items/items.md", "before": "d4e5f6...", "after": "g7h8i9..."}
+  ],
+  "writer": "catalyst/<version>"
 }
 ```
 
@@ -426,34 +426,43 @@ command, entity and files.
   because one atomic change sometimes serves more than one goal (e.g.
   "close a gap found while retrofitting a different rule" *and* "satisfy
   the rule being retrofitted").
-- **`files[].before`/`files[].after`** — the `git hash-object` SHA-1 of
-  that file's content immediately before and immediately after this
-  change, computed **and written to the git object store** with
-  `git hash-object -w <path>` (not just computed) so the blob is
-  retrievable via `git cat-file -p <hash>` independent of whether
-  anything was ever committed or staged — this command never commits or
-  stages on its own (`INVARIANTS.md` INV-4). `null` means the file didn't
-  exist before (create) or doesn't exist after (delete).
+- **`files[].path`** — relative to the project root. A working-copy file
+  is written `.criterion/<path>` and hashed into the working copy's own
+  git repository; any other path is hashed into the project's. Never
+  absolute (INV-1, INV-6). Older entries with bare (working-copy
+  relative), `<repo>:path` or absolute paths are normalised on read and
+  never rewritten.
+- **`files[].before`/`files[].after`** — the git blob SHA-1 of that
+  file's content immediately before and after this change, written to
+  the object store so it is retrievable independent of whether anything
+  was ever committed or staged (nothing is committed or staged,
+  `INVARIANTS.md` INV-4). `null` means the file didn't exist before
+  (create) or doesn't exist after (delete).
+- **`writer`** — `catalyst/<version>` on every CLI-written entry;
+  `catalyst journal verify` holds those to errors and only warns on
+  entries without it.
+- **Pinning** — every journaled blob is kept reachable under
+  `refs/catalyst/journal` (a commit chain whose tree holds each blob) so
+  `git gc` can never prune it; `catalyst journal pin` backfills older
+  entries.
 
 ### Point-in-time restore
 
-To reconstruct the tree as of timestamp `T`: for every file path that
-appears in any entry with `timestamp <= T`, take that file's `after` hash
-from its **latest** such entry (or treat it as absent if that latest
-`after` is `null`), then materialize each into a side directory via
-`git cat-file -p <hash> > <side-dir>/<path>` — **never overwrite the live
-working tree directly**; that's the user's call once they've reviewed the
-reconstruction. `/journal-restore <timestamp>` performs exactly this.
+`catalyst journal restore <T> <side-dir>` (behind `/journal-restore`)
+takes, for every path in any entry with `timestamp <= T`, the `after`
+hash of its latest such entry (absent if `null`) and materialises it
+into the side directory — **never the live working tree**; replacing it
+is the user's call once they have reviewed the reconstruction.
 
 ### What must append an entry
 
 Every command that creates, modifies, closes, or retires a rule-linked
 artifact, rule, domain, or work item, or changes a `Status` field
-(`CODE-OF-CONDUCT.md` §9) — resolve every touched file's `before` hash
-*before* editing it, make the edit, then compute+write its `after` hash,
-append one entry covering every file the command touched, then report the
-result. This is the last step of the command, after everything else it
-already does — it does not replace any of a command's existing steps.
+(`CODE-OF-CONDUCT.md` §9): make the edit, then run
+`catalyst journal append` covering every file the command touched, then
+report the result. This is the last step of the command, after
+everything else it already does — it does not replace any of a command's
+existing steps.
 
 ### Complements, does not duplicate, `catalyst-git`
 
@@ -781,7 +790,7 @@ courtesy as `/criterion create`:
 4. Make sure `/.criterion` is in that project's `.gitignore` — the
    symlink (or the fallback directory) is never committed.
 5. Append one journal entry, in the working copy's new location, for the
-   migration itself (`action: "migrate"`, `intent` describing the move,
+   migration itself (`action: "sync"`, `intent` describing the move,
    `files` covering the old and new `DEPLOYMENT.md`/pointer locations by
    content hash) — this is exactly what the journal (§12) exists to
    record, and its immutability means the pre-migration history stays

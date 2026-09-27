@@ -130,6 +130,13 @@ from drifting. The guide holds the rationale; this holds the checks.
       and no machine-specific path
       (see `INSTANTIATION-GUIDE.md` §1 step 5 for the full snippet) plus
       this project's own operational tasks
+- [ ] catalyst CLI vendored at `.criterion/bin/catalyst.pyz` — the kernel
+      release's `bin/catalyst.pyz`, or `task build:cli` from catalyst's own
+      checkout (`CLI.md`) — and the deployed `Taskfile.common.yml` carries
+      the `catalyst` pass-through task
+- [ ] If the agent supports end-of-turn hooks: `catalyst hook stop`
+      registered per its shim (Claude Code: `agents/claude-code/settings.template.json`
+      merged into the project's `.claude/settings.json`)
 
 ## Finalize
 - [ ] `dev-instructions.yaml` deleted after successful deploy
@@ -152,6 +159,7 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Every item above `[x]` in the ledger; no silent skips
 - [ ] `scripts/check_deployment.py` passes (resolves the working copy
       through the project-root `.criterion`)
+- [ ] `catalyst check` reports no errors (warnings reported to the user)
 - [ ] Deployed tree presented to user; **no commit/push yet** (INV-4)
 - [ ] On the retrofit path, if no work items exist yet, offered to run
       `ANALYSIS-PLAYBOOK.md` (not applicable on the greenfield path — it reads

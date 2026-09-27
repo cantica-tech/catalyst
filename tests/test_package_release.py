@@ -104,7 +104,9 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
         assert "README.md" in namelist
         assert "INVARIANTS.md" in namelist
         assert "LICENSE" in namelist
+        assert "bin/catalyst.pyz" in namelist
         assert not any(n.startswith("modules/") for n in namelist)
+    assert (kernel_release_dir / "catalyst.pyz").is_file()
 
     # 3. Verify publishing into a distribution repository checkout
     publish_dir = tmp_path / "dist-repo"

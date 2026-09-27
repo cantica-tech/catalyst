@@ -85,6 +85,16 @@ as it stood at any point into a side directory for inspection — a real
 point-in-time reconstruction, never a guess, and never applied to the live
 tree automatically. `/journal` is the read-only query side.
 
+## The catalyst CLI
+
+The mechanical steps — allocating IDs, drawing userids, hashing files into
+the journal, regenerating indexes, validating the traceability chain — are
+code, not prose: the `catalyst` command line, vendored into every deployment
+as `.criterion/bin/catalyst.pyz`. Procedures call it and keep only the
+judgment parts in prose; agents with an end-of-turn hook run
+`catalyst hook stop` so every turn ends on a passing `catalyst check`. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
+
 ## Multi-user sync: criterion
 
 A deployment stays local by default, but can opt into being **repoed**:

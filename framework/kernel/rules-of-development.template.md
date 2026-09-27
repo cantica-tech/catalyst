@@ -75,11 +75,14 @@ role mismatch is noted, never a block or a confirmation prompt:
 4. Fill the artifact's `Signed-off-by` field with the user's name
    (carrying forward any unregistered-signer or role-mismatch note from
    steps 2-3) and proceed.
-5. Append that same signer's `userid` as this entity's own id suffix
+5. Allocate the entity's ID with `catalyst id next <PREFIX> --as <signer>`
+   (`CLI.md`), which carries that signer's `userid` as its suffix
    (`Rules-of-Rules.md` §20, INV-26) — the same moment, never a separate
-   step done later. If the signer has no `userid` yet (unregistered, or
-   registered before INV-26 existed), register them and assign one
-   first; an entity is never assigned a suffixed id ahead of its signer.
+   step done later. Always pass the signer confirmed in step 1 as `--as`;
+   the CLI's own fallback to the git identity is not a confirmation. If
+   the signer has no `userid` yet (unregistered, or registered before
+   INV-26 existed), register them first (`/user-add`); the CLI refuses to
+   allocate a suffixed ID ahead of its signer.
 
 Every development artifact of the active module and every work item
 carries a `Signed-off-by` field for this reason (see each type's
@@ -113,7 +116,10 @@ one another.
 - Each item directory must also contain an index file named after the item
   type — `<folder>/<folder>.md` for each of the active module's entity
   types, and `meta-tags/meta-tags.md` for the meta-tag index.
-- These index files are the canonical indexes for their directory and must be kept up to date.
+- These index files are the canonical indexes for their directory. Each
+  entity type's index is regenerated from the artifact files with
+  `catalyst index regen`, never edited by hand or merged; `meta-tags/meta-tags.md`,
+  which is not an entity type's index, is kept by `/meta-tag`.
 - **This is a hard requirement, stricter than the others above.**
   `IAM/users/users.json` and `IAM/roles/roles.json` always exist, and
   `users.json` must contain **at least one entry with `"active": true`** —
@@ -136,6 +142,19 @@ The framework exposes the following kernel slash commands. The active
 module's commands are appended at the end of this section
 (`MODULE-SPECIFICATION.md` §6.2); kernel and module entries together are
 this deployment's canonical command list.
+
+Mechanical steps are calls to the catalyst CLI (`CLI.md`), never
+re-derived by hand. **`catalyst <args>`** is shorthand for
+`python3 .criterion/bin/catalyst.pyz <args>` (or `task catalyst -- <args>`).
+Every command that creates or changes an artifact, rule, domain or
+`Status` ends the same way, after its own steps below:
+
+1. `catalyst index regen` — rebuild every entity index from the files.
+2. `catalyst journal append --command /<name> --action <action>
+   --artifact <id> [--target <rule-id> ...] --intent "<goal>"
+   --file <path> ...` — one entry covering every touched file (§9).
+3. `catalyst check` — unless the agent's end-of-turn hook already runs
+   `catalyst hook stop`; resolve every error before reporting.
 
 - `/user-add <name> <role>` — register a new user in
   `IAM/users/users.json` with an initial role from
@@ -267,8 +286,8 @@ the seven currently exist anywhere.
   appends a new `Revisions` row first and merges that instead, `reject`
   leaves `criterion` unchanged and flags the proposer's local copy for
   reverting — each sets `Status` to the matching `Resolved-*` value,
-  fills `Resolved`/`Resolver`, and registers the outcome in
-  `reconciliations/reconciliations.md`. `propose <text>` instead appends
+  fills `Resolved`/`Resolver`, and regenerates
+  `reconciliations/reconciliations.md` (`catalyst index regen`). `propose <text>` instead appends
   `<text>` as a new `Revisions` row and moves `Status` to `Under Review`
   without resolving anything. **Genuinely role-gated, not advisory**: the
   actor's `reconciliation` field in `IAM/roles/roles.json` must be `full`
@@ -311,7 +330,8 @@ the seven currently exist anywhere.
   `updated`) unconditionally, and refreshes persistent framework memory.
   No `Taskfile.yml` edit: it reaches the working copy through the
   symlink.
-- `/status` — update an artifact or work item's `Status` field.
+- `/status` — update an artifact or work item's `Status` field, then
+  regenerate indexes and journal the change.
 - `/audit <file-name>` — analyze the change-impact of the specified file by
   checking the current repository state, the file's role in the framework,
   and the rules or artifacts that depend on it, then return a concise impact
@@ -324,7 +344,8 @@ the seven currently exist anywhere.
   newest kernel version available from the framework source. If no argument
   is provided, synchronize against the currently installed local version.
 - `/check-rules` — verify that rules, domains, and artifact links remain
-  consistent and do not conflict.
+  consistent and do not conflict: `catalyst check` for the mechanical
+  checks, then the judgment ones.
 - `/commands list [--filter ...]` — list every slash command available in
   this deployment (name, one-line purpose), sourced from this document's
   §4 — kernel and active-module entries alike. `/help` with no argument delegates here for its command listing
@@ -333,9 +354,9 @@ the seven currently exist anywhere.
   <id>]` — read-only: filter and report `development/journal.jsonl`
   entries. Never writes to the journal (see §9).
 - `/journal-restore <timestamp>` — read-only: reconstruct the tree as it
-  stood at `<timestamp>` into a side directory, from the journal's
-  before/after file hashes (`Rules-of-Rules.md` §12). Never overwrites the
-  live working tree.
+  stood at `<timestamp>` into a side directory with
+  `catalyst journal restore` (`Rules-of-Rules.md` §12). Never overwrites
+  the live working tree.
 - `/help` — return help documentation for the framework or for a specific
   command when provided.
 
@@ -347,8 +368,10 @@ deployment's own current `IAM/users/templates/TEMPLATE-USERS-vN.json`
 and `IAM/roles/templates/TEMPLATE-ROLES-vN.json` (the highest `N`
 present). If `<role>` isn't one of the roles listed in
 `IAM/roles/roles.json`, ask whether to use an existing role or run
-`/role-add` for `<role>` first. Otherwise append a new entry (`registered`:
-today, `active: true`, `roles: [<role>]`) and report it. If this is the
+`/role-add` for `<role>` first. Otherwise draw the new user's `userid`
+with `catalyst userid gen` (never by hand — `Rules-of-Rules.md` §11,
+INV-26), append a new entry (`registered`: today, `active: true`,
+`roles: [<role>]`, `userid`) and report it. If this is the
 project's first registered user, note that the hard "at least one active
 user" requirement (§2) is now satisfied.
 
@@ -405,7 +428,11 @@ project-management-type plugin's own `working-contract.md` is active.
 When the user enters `/meta-tag <artefact-id>`, create a new meta-tag artifact
 immediately, save it as `tag-<key>-<artefact-id>`, register it in
 `meta-tags/meta-tags.md`, and link it to the specified artifact. If the key
-is not supplied explicitly, prompt for it.
+is not supplied explicitly, prompt for it. A meta-tag is named by its key
+and target, not numbered, so no ID is allocated; `meta-tags/meta-tags.md`
+is not an entity index, so its row is added here rather than by
+`catalyst index regen`. Then journal the change with
+`catalyst journal append --command /meta-tag --action create ...`.
 
 When the user enters `/list <type> [--filter ...]`, inspect the relevant
 catalogs and return the matching items. If `type` is `all`, inspect every
@@ -532,9 +559,9 @@ currently names this user's old `name` to their new `git_username` —
 from this point on, every `Signed-off-by`/journal `actor` written for
 them uses `git_username`, never `name`. **Never rewrite the journal
 itself** (`Rules-of-Rules.md` §12, INV-17 — entries are immutable, no
-exception for this either); instead append one new entry (`action:
-"update"`, `intent` describing the migration) covering every artifact
-file actually rewritten.
+exception for this either); instead append one new entry with
+`catalyst journal append --action update` (`intent` describing the
+migration) covering every artifact file actually rewritten.
 
 When the user enters `/criterion push [--force]`, refuse with a clear
 message if `.criterion/DEPLOYMENT.md` doesn't show `repoed: true` (point to
@@ -570,8 +597,9 @@ attempt a normal merge first, and only where that leaves a conflict
 role in `IAM/roles/roles.json`), have a sub-agent propose a resolution
 guided by `Rules-of-Rules.md` §1's conflict-check principle. Where
 that's itself contested, or genuinely irreconcilable, open a
-`RECON-NNNNNN` instead of guessing which side wins (`Rules-of-Rules.md`
-§16, resolved later via `/reconcile`) — that one entity stays unmerged,
+`RECON-NNNNNN` (ID from `catalyst id next RECON`) instead of guessing
+which side wins (`Rules-of-Rules.md` §16, resolved later via
+`/reconcile`) — that one entity stays unmerged,
 everything else in the push proceeds; (3) update both `criterion` (the
 merge commit) and the
 contributor's own branch (fast-forwarded to match); (4) pull the updated
@@ -637,9 +665,9 @@ machine (never the exporting machine's), materialize every bundled file
 there, create the `.criterion` symlink at the project root pointing at
 it and gitignore `/.criterion`, then write `<app-name>.catalyst`
 carrying the bundle's pointer fields over as-is (`repoed`,
-`catalyst_repo`, `catalyst_repo_url`, `created_by`), with no path. Append one
-journal entry for the import (`action: "import"`), then report the
-result.
+`catalyst_repo`, `catalyst_repo_url`, `created_by`), with no path. Journal
+the import with `catalyst journal append --command /project --action sync`
+covering the pointer and `.gitignore`, then report the result.
 
 When the user enters `/status <artefact-id> <status> [force]`, update the
 artifact's `Status` field. If the supplied status is one of the valid statuses
@@ -648,6 +676,12 @@ command includes the word `force`, change it to that invalid value anyway. If
 the status is invalid and `force` is not supplied, respond that the status
 change is impossible and do not modify the artifact. If the artifact ID does
 not resolve to an existing artifact, state that the artifact cannot be found.
+The valid statuses are the `Status` values the type's entity type
+definition allows (a forced value outside them is reported by
+`catalyst validate` as an `enum-value` warning). After the edit, run
+`catalyst index regen` and
+`catalyst journal append --command /status --action status-change ...`
+(§4's common ending).
 
 Each plugin must be defined by the following minimum metadata fields: `name`,
 `description`, `uuid`, `version`, `active`, and `type`. The plugin definition
@@ -662,7 +696,8 @@ When the user enters `/audit <file-name>`, inspect the repository and the
 current framework state to determine the impact of changes against the named
 file. The command must identify whether the file is a rule, template,
 artifact, plugin contract, or other framework asset; inspect related indexes,
-references, and dependent artifacts; and return a concise summary of likely
+references, and dependent artifacts (`catalyst validate --json` resolves
+every reference mechanically); and return a concise summary of likely
 impact, affected areas, and any blocking concerns. If the file cannot be
 resolved, report that it was not found and do not invent a result.
 
@@ -701,7 +736,11 @@ columns of a row that already exists — and must never delete an existing
 row, blank the file, or delete or replace an installed plugin's directory
 contents. A missing row or directory is something the user resolves
 afterward via `/catalyzer activate` or `/catalyzer download`, never
-something `/sync-framework` performs or silently corrects on its own. After
+something `/sync-framework` performs or silently corrects on its own. The
+refresh always replaces `.criterion/bin/catalyst.pyz` with the release's
+`bin/catalyst.pyz`, then journals the sync with
+`catalyst journal append --command /sync-framework --action sync` and
+runs `catalyst check`. After
 the refresh completes, perform a four-eyes
 verification pass: one sub-agent verifies the newly deployed framework against
 `INSTANTIATION-GUIDE.md` and the framework rules, and a second independent
@@ -709,9 +748,15 @@ sub-agent repeats the verification from a separate pass. The sync is not
 complete until both sub-agents approve the deployment; any disagreement or
 failed validation becomes a blocking issue.
 
-When the user enters `/check-rules`, inspect the deployed framework for
-missing rule targets, conflicting domains, missing indexes, and broken links,
-then report the result.
+When the user enters `/check-rules`, start with `catalyst check`: it
+reports the mechanical findings — deployment structure, missing rule
+targets and broken links (the chain), journal integrity, and stale or
+missing index rows (`CLI.md` lists every code). Then do what only
+judgment can: look for rules that conflict with one another
+(`Rules-of-Rules.md` §1), domains that overlap or are misassigned, and
+artifacts whose content no longer matches the rule they cite. Report
+both parts; never hand-edit an index to clear a finding —
+`catalyst index regen` does that.
 
 When the user enters `/commands list [--filter ...]`, list every slash
 command available in this deployment — name, one-line purpose — sourced
@@ -729,20 +774,19 @@ JSON object per line) and apply whichever filters were given — `--since`
 on `timestamp`, `--artifact` on `artifact`, `--actor` on `actor`,
 `--rule` on membership in `targets`. Report the matching entries in
 timestamp order: what changed, who, which command, which rule(s), and
-each entry's `intent`. If the journal doesn't exist or is empty, say so
-rather than inventing history. This command never appends to the journal
-itself.
+each entry's `intent`. Paths in older entries may be bare
+(working-copy relative), `<repo>:path` or absolute; read them as their
+project-root-relative form (`Rules-of-Rules.md` §12). To report the
+journal's integrity as well, run `catalyst journal verify`. If the journal
+doesn't exist or is empty, say so rather than inventing history. This
+command never appends to the journal itself.
 
-When the user enters `/journal-restore <timestamp>`, read
-`development/journal.jsonl` and, for every file path that appears in any
-entry with `timestamp <= <timestamp>`, take that path's `after` hash from
-its latest such entry (skip the path entirely if that latest `after` is
-`null` — the file didn't exist at that point). Materialize each into a
-new side directory (e.g. `.criterion/.journal-restore/<timestamp>/`)
-via `git cat-file -p <hash>` — **never write into the live working
-tree**. Report the side directory's path and which files it contains. If
-a referenced hash isn't retrievable from the git object store (was never
-written with `-w`, or the repository was pruned), report that file as
+When the user enters `/journal-restore <timestamp>`, run
+`catalyst journal restore <timestamp> <side-dir>` with a new, empty side
+directory (e.g. `.criterion/.journal-restore/<timestamp>/`) — it
+materialises every journaled file as of that time and **never writes
+into the live working tree**. Report the side directory's path and which
+files it contains. Report every path the CLI lists as a missing blob as
 unrecoverable rather than silently omitting it.
 
 When the user enters `/help` without any additional entry, run `/commands
@@ -766,7 +810,9 @@ Per `Rules-of-Rules.md` §5: `<PREFIX>-(NNNNNN)-(userid)`, where `<PREFIX>`
 is one of the active module's rule-linked entity-type ID prefixes — global
 per type, sequential, zero-padded 6 digits, never reused, plus the signer's
 `userid` as a trailing suffix from the moment they're signed
-(`Rules-of-Rules.md` §20, INV-26). Meta-tags use a file-name pattern of
+(`Rules-of-Rules.md` §20, INV-26). The next ID comes from
+`catalyst id next <PREFIX> --as <signer>`, never from reading the index by
+hand. Meta-tags use a file-name pattern of
 `tag-<key>-<artefact-id>` rather than a sequential numeric ID. This is a
 hard requirement for all new artifacts and work items: every item name
 must be more than the bare ID and must follow the format
@@ -782,7 +828,8 @@ deployed items whose names or filenames are still only the bare ID.
 ## 7. Closing an item
 
 Before closing a development artifact, ensure the corresponding entry
-exists in its individual file and is reflected in the relevant index file.
+exists in its individual file and is reflected in the relevant index file
+(`catalyst index regen`).
 What each of the active module's entity types requires before it may be
 closed — and with which terminal `Status` values — is defined by the
 module, in its own §3 entries and entity definitions.
@@ -803,19 +850,21 @@ other.
 
 `development/journal.jsonl` is an append-only, transaction-log-grade
 record — see `Rules-of-Rules.md` §12 for the full entry schema (exact
-before/after `git hash-object -w` content pointers per file, one or more
-`intent` statements, the `targets` rule IDs) and the point-in-time
-restore mechanism (`/journal-restore`, materializes a reconstructed tree
-into a side directory — never overwrites the live tree).
+before/after git blob pointers per file, project-root-relative paths, one
+or more `intent` statements, the `targets` rule IDs, the `writer`) and the
+point-in-time restore mechanism (`/journal-restore`, materializes a
+reconstructed tree into a side directory — never overwrites the live
+tree).
 
 **Every command in §4 that creates, modifies, closes, or retires a
 rule-linked artifact, rule, domain, or work item, or changes a `Status`
 field, appends exactly one journal entry as its last step** — after
 everything that command's own section above already specifies, not
-instead of any of it. Concretely: resolve each touched file's `before`
-hash before editing it, make the edit(s), compute and write each file's
-`after` hash, then append one entry covering every file the command
-touched. Entries are immutable — never edited, deleted, or reordered
+instead of any of it. Concretely: make the edit(s), then run
+`catalyst journal append` once, with a `--file` for every file the
+command touched; it records each file's real `before`/`after` hashes and
+pins the blobs. Entries are written only this way, never by hand, and the
+agent's judgment goes into `--intent` and `--target`. Entries are immutable — never edited, deleted, or reordered
 afterward, the same "never delete, retire in place" principle as a
 retired rule (`Rules-of-Rules.md` §4) applies here in its strictest
 form: nothing about a written entry ever changes, period.
@@ -824,7 +873,9 @@ Two read-only commands operate on the journal without writing to it
 themselves: `/journal [--since <date>] [--artifact <id>] [--actor <name>]
 [--rule <id>]` reconstructs/filters the history for review, and
 `/journal-restore <timestamp>` materializes the tree as it stood at that
-point into a side directory for inspection.
+point into a side directory for inspection (`catalyst journal restore`).
+`catalyst journal verify` checks the hash chains, blobs and pins, and
+flags any journaled file edited without an entry.
 
 This is kernel infrastructure, distinct from the `catalyst-git`
 plugin's continuous rule-compliance auditing of a *deployed* project

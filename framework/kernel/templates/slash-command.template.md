@@ -32,18 +32,25 @@ argument-hint: {{expected arguments, e.g. "<short description> [--flag value]"}}
 `.criterion/CODE-OF-CONDUCT.md` §4{{, template: .criterion/<dir>/TEMPLATE-<TYPE>.md — only if this command creates an artifact}}.
 Input: $ARGUMENTS
 
-1. {{If this command creates a numbered artifact: resolve the next
-   sequential ID from the relevant index file + a directory listing of
-   existing files — never guess or reuse a number.}}
+1. {{If this command creates a numbered artifact: resolve the signer
+   (CODE-OF-CONDUCT.md §2), then allocate the ID with
+   `catalyst id next <PREFIX> --as <signer>` — never guess, compute by
+   hand, or reuse a number.}}
 2. {{Name any field this artifact type can never leave empty (e.g. a
    rule-linked artifact's Targets, per CODE-OF-CONDUCT.md §1) and what to
    do if the user's input doesn't supply it — ask, don't invent a value.}}
 3. {{Copy the relevant TEMPLATE-*.md, fill every field, and use a
    descriptive `<id>-<short-summary>.md` filename — never a bare ID
    (rr-META-003 / INV-7).}}
-4. {{Register it in its index file.}}
+4. {{Register it with `catalyst index regen`, then journal it with
+   `catalyst journal append --command /{{command-name}} --action <action>
+   --artifact <id> [--target <rule-id> ...] --intent "<goal>" --file <each touched file>`
+   (CODE-OF-CONDUCT.md §4's common ending).}}
 5. Report the result. Do not commit or push — leave changes unstaged
    unless the user asks otherwise (`Rules-of-Rules.md` INV-4).
+
+`catalyst <args>` is `python3 .criterion/bin/catalyst.pyz <args>`
+(`CODE-OF-CONDUCT.md` §4).
 ```
 
 Adapt the numbered steps to what the command actually does — don't force
@@ -52,7 +59,7 @@ every command through this artifact-creation shape:
 - **Query/inspect commands** (`/list`, `/audit`, `/check-rules`,
   `/help`, and any the active module contributes) don't create anything — steps 1–4 become
   "resolve what's being asked for, read the relevant index/rule files,
-  report findings" instead.
+  report findings" instead (`/check-rules` starts from `catalyst check`).
 - **`/sync-framework` and `/run-analysis`** additionally need this
   framework's own repository content (`SYNCHRONIZE.md`,
   `ANALYSIS-PLAYBOOK.md`) that isn't part of the deployed project — fetch

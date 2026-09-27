@@ -63,10 +63,16 @@ Capabilities you have (use them per `BOOTSTRAP.md §1`):
   (install/lint/test/build/...). Same instantiation-procedure status as
   slash commands above — part of `INSTANTIATION-GUIDE.md` §1 step 5 and
   `INSTANTIATION-CHECKLIST.md`'s Discoverability section, not optional.
-- **Hooks:** if `.claude/settings.json` is present, its `SessionStart` hook
-  re-injects `INVARIANTS.md` and its `Stop` hook runs `scripts/stop_hook.py`,
-  which runs every checker and blocks the stop (exit 2, failures on stderr)
-  until they pass — the enforcement layer of the anti-drift architecture. You
-  do not need to simulate these; the harness runs them.
+- **Hooks:** in a deployed project, merge
+  `agents/claude-code/settings.template.json` into the project's
+  `.claude/settings.json` — it registers
+  `python3 .criterion/bin/catalyst.pyz hook stop` as the `Stop` hook, which
+  runs `catalyst check` and blocks the stop (exit 2, failures on stderr)
+  while any error remains (`framework/kernel/CLI.md`). In catalyst's own
+  repository, `.claude/settings.json`'s `SessionStart` hook re-injects
+  `INVARIANTS.md` and its `Stop` hook runs `scripts/stop_hook.py` (the
+  repository checkers plus `catalyst check`) — the enforcement layer of the
+  anti-drift architecture. You do not need to simulate these; the harness
+  runs them.
 
 Everything else: `BOOTSTRAP.md`.

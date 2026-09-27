@@ -74,7 +74,8 @@ record: exact git content hashes before/after per touched file, the
 rule(s) it served, and the actual intent behind it. Precise enough that
 `/journal-restore <timestamp>` can materialize the tree as it stood at
 any point into a side directory — real reconstruction, not narrative.
-See `Rules-of-Rules.md` §12.
+Entries are written by `catalyst journal append` ([`CLI.md`](CLI.md)),
+never by hand. See `Rules-of-Rules.md` §12.
 
 A deployment can additionally opt into being **repoed**: `.criterion/`
 mirrored through a dedicated repository so multiple contributors converge
@@ -92,6 +93,7 @@ project carries. See `Rules-of-Rules.md` §13.
 |---|---|
 | [`rules-of-rules.template.md`](rules-of-rules.template.md) | Generic meta-rules: conflict-checking, done-bar, ID scheme, domain standard, retirement. Copy to `<project>/rules/Rules-of-Rules.md` and fill in placeholders. |
 | [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for development artifacts and meta-tags; the active module's document types and commands are inserted from its `code-of-conduct.module.md`. Copy to `<project>/CODE-OF-CONDUCT.md`. |
+| [`CLI.md`](CLI.md) | Reference for the `catalyst` command line: the mechanical steps (IDs, userids, journal, indexes, chain validation, the end-of-turn hook) that procedures call instead of describing. |
 | [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) | Standard specification for Catalyst Process Modules, Module Manifests (`module.yaml`), Entity Type Definitions (`.yaml`), and layout. |
 | [`schemas/`](schemas/) | Machine-readable JSON schemas (`module-manifest.schema.json`, `entity-type-definition.schema.json`) for module and ETD validation. |
 | [`templates/`](templates/) | Generic kernel document templates (rule, domain, meta-tag, reconciliation, workflow, templates catalog, slash-command, Taskfile, roles, users, journal, pointer). The active module ships its own entity templates. |

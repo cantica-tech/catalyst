@@ -336,10 +336,28 @@ def load_kernel_entities(entities_dir: Path | None = None) -> dict[str, ETD]:
     base = entities_dir or KERNEL_ENTITIES_DIR
     etds: dict[str, ETD] = {}
     if not base.is_dir():
+        if entities_dir is None:
+            return _embedded_kernel_entities()
         return etds
     for path in sorted(base.glob("*.yaml")):
         etd = load_etd_file(path)
         if etd is not None:
+            etds[etd.id_prefix] = etd
+    return etds
+
+
+def _embedded_kernel_entities() -> dict[str, ETD]:
+    """The kernel's entity types as embedded in the `catalyst.pyz` zipapp by
+    scripts/package_release.py (no repository to read them from there)."""
+    try:
+        from kernel_entities_embedded import ENTITIES  # type: ignore
+    except ImportError:
+        return {}
+    etds: dict[str, ETD] = {}
+    for text in ENTITIES.values():
+        data = parse_simple_yaml(text)
+        if isinstance(data, dict) and data.get("id_prefix"):
+            etd = parse_etd_dict(data)
             etds[etd.id_prefix] = etd
     return etds
 

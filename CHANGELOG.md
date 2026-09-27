@@ -6,6 +6,34 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.38.0 — unreleased
+
+Beta-readiness Phase 1: the `catalyst` CLI (`framework/kernel/CLI.md`).
+Python, stdlib only, shipped as the single-file zipapp `catalyst.pyz`
+(kernel release `bin/catalyst.pyz`), vendored into `.criterion/bin/`.
+
+- `catalyst validate`: the traceability chain checked against the entity
+  type definitions — structural breaks are errors, shape mismatches
+  warnings (`--strict` promotes).
+- `catalyst id next` / `id next-rule` / `userid gen`: ID and userid
+  allocation, never reused, never guessed.
+- `catalyst journal append|verify|restore|pin`: real hashes and time,
+  hash-chain and unjournaled-edit detection, point-in-time restore, and
+  blobs pinned under `refs/catalyst/journal` so `git gc` keeps them.
+  Journal paths are now relative to the project root (`.criterion/...` for
+  the working copy); older entries are read as written.
+- `catalyst index regen [--check]`: indexes rebuilt from the artifacts;
+  rows whose file is gone and hand-written cells are kept, so no ID is
+  ever freed for reuse.
+- `catalyst check` / `catalyst hook stop`: every check in one pass, and
+  the same pass as an end-of-turn hook (Claude Code template in
+  `agents/claude-code/`). catalyst's own Stop hook now runs it, so an
+  unjournaled edit blocks the end of a turn.
+- Command procedures (the kernel's, and the reference process module's
+  from its 2.1.0) call the CLI instead of describing its mechanics; the signer is never
+  guessed from git config.
+- Migration `0.38.0/catalyst-cli.md`.
+
 ## 0.37.0 — unreleased
 
 Beta-readiness Phase 0.

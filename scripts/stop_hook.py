@@ -16,6 +16,7 @@ Exit 0 = all checks passed (or second consecutive block), exit 2 = block.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -32,13 +33,17 @@ CHECKS = [
 
 
 def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
-    """(checker, output) for every checker that exits non-zero."""
+    """(checker, output) for every checker that exits non-zero — the
+    repository's own checkers, then `catalyst check` on its deployment
+    (chain, journal incl. unjournaled edits, index freshness)."""
     failures = []
-    for check in CHECKS:
-        res = subprocess.run([sys.executable, str(root / "scripts" / check)],
-                             cwd=root, capture_output=True, text=True)
+    commands = [(check, [sys.executable, str(root / "scripts" / check)]) for check in CHECKS]
+    commands.append(("catalyst check", [sys.executable, "-m", "catalyst", "check"]))
+    env = {**os.environ, "PYTHONPATH": str(root / "scripts")}
+    for name, cmd in commands:
+        res = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True)
         if res.returncode != 0:
-            failures.append((check, (res.stdout + res.stderr).strip()))
+            failures.append((name, (res.stdout + res.stderr).strip()))
     return failures
 
 

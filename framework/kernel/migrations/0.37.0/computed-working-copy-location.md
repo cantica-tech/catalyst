@@ -76,7 +76,7 @@ there, and personal paths leaked into the project's history. From
    location.
 8. **Verify.** Run `scripts/check_deployment.py` and resolve every reported
    issue.
-9. **Journal.** Append one entry (`action: "migrate"`, `intent`
+9. **Journal.** Append one entry (`action: "sync"`, `intent`
    describing the move to a computed location, `files` covering the
    pointer, `.gitignore` and `Taskfile.yml` by content hash) — never
    rewrite the journal itself (INV-17).

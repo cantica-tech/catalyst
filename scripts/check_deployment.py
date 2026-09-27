@@ -579,17 +579,9 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     return errors
 
 
-def main() -> int:
-    root = find_deploy_root(Path.cwd())
-    if root is None:
-        # No deployment in this repo — nothing to validate, not a failure.
-        print(
-            f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; "
-            "skipping deployment validation"
-        )
-        return 0
-
-    project_root = find_project_root(Path.cwd())
+def structural_errors(root: Path, project_root: Path | None) -> tuple[list[str], str]:
+    """Every structural check against the working copy at `root`, and the
+    scope they ran with ("module <id>" or "kernel only")."""
     module = load_module(project_root) if project_root else None
     model = build_model(module)
 
@@ -607,13 +599,26 @@ def main() -> int:
     errors += check_journal_exists(root)
     errors += check_definitions_exist(root, model)
     errors += check_version_drift(root, project_root)
+    scope = f"module {model.module_id}" if model.module_id else "kernel only"
+    return errors, scope
 
+
+def main() -> int:
+    root = find_deploy_root(Path.cwd())
+    if root is None:
+        # No deployment in this repo — nothing to validate, not a failure.
+        print(
+            f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; "
+            "skipping deployment validation"
+        )
+        return 0
+
+    errors, scope = structural_errors(root, find_project_root(Path.cwd()))
     if errors:
         print(f"catalyst deployment validation FAILED ({len(errors)} issue(s)):")
         for e in errors:
             print(f"  - {e}")
         return 1
-    scope = f"module {model.module_id}" if model.module_id else "kernel only"
     print(f"catalyst deployment at {root} is valid ({scope})")
     return 0
 

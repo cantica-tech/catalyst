@@ -310,6 +310,19 @@ creates concrete rules for that particular project.
    ```
    Add that project's own operational tasks in this same root
    `Taskfile.yml`, alongside — never inside — the included common tasks.
+
+   **Vendor the catalyst CLI** (`CLI.md`). Copy `bin/catalyst.pyz` from
+   the kernel release into `.criterion/bin/catalyst.pyz` (from catalyst's
+   own checkout instead: `task build:cli`, then copy
+   `dist/catalyst.pyz`). The deployed `Taskfile.common.yml` carries the
+   template's `catalyst` pass-through task (`task catalyst -- <args>`),
+   the one task that is not a slash command. From here on,
+   `catalyst <args>` means `python3 .criterion/bin/catalyst.pyz <args>`,
+   and every later step uses it for IDs, userids, indexes and the
+   journal. If the running agent supports an end-of-turn hook, register
+   `catalyst hook stop` as that hook the way its shim says (under Claude
+   Code: merge `agents/claude-code/settings.template.json` from this
+   repository into the project's `.claude/settings.json`).
 6. For **every** artifact-type folder (`Rules-of-Rules.md` §15, INV-20):
    create its `templates/` subdirectory, copy the matching
    `templates/*.template.*` — from this framework for a kernel type, from
@@ -361,8 +374,10 @@ creates concrete rules for that particular project.
    INV-17). From this point on, every command that creates, modifies,
    closes, or retires a rule-linked artifact, rule, domain, or work item,
    or changes a `Status` field, appends one entry to it as its last step
-   (`CODE-OF-CONDUCT.md` §9) — including every step of this instantiation
-   itself from here onward.
+   with `catalyst journal append` (`CODE-OF-CONDUCT.md` §9) — including
+   every step of this instantiation itself from here onward. Once the
+   artifact folders exist, `catalyst index regen` writes every entity
+   index's rows.
 7. Deploy `framework/kernel/definitions/` and the active module's
    `definitions/` (`INVARIANTS.md` INV-23, `MODULE-SPECIFICATION.md` §6.3) —
    one short prose file per real entity type explaining what it is and
@@ -424,7 +439,11 @@ creates concrete rules for that particular project.
    files: every file under `rules/domains/` must be named
    `<prefix>-<CODE>-<short-summary>.md` (or
    `<prefix>-<PARENT>.<SUB>-<short-summary>.md` for a sub-domain), never the
-   bare `<prefix>-<CODE>.md` — see `Rules-of-Rules.md` §7.
+   bare `<prefix>-<CODE>.md` — see `Rules-of-Rules.md` §7. Allocate each
+   rule ID with `catalyst id next-rule <doc-prefix> <DOMAIN> --as <signer>`.
+11. Finish with `catalyst check`. Resolve every error before calling the
+   deployment done; warnings may remain, and are reported to the user.
+
 ## 2. Choosing your agile flavor
 
 `work-items/` is plugin-only (§1 step 3, `Rules-of-Rules.md` §8) — this

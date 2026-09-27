@@ -34,6 +34,8 @@ includes:
     taskfile: .criterion/Taskfile.common.yml
     optional: true
     flatten: true
+    # this repository runs the CLI from source (the `catalyst` task below)
+    excludes: [catalyst]
     vars:
       AGENT_CMD: '{{.AGENT_CMD}}'
 
@@ -82,6 +84,18 @@ tasks:
       - task: check:plugin-contracts
       - task: check:kernel-purity
       - task: test
+
+  build:cli:
+    desc: "Build the single-file catalyst CLI into dist/catalyst.pyz"
+    cmds:
+      - python3 -c 'import sys; sys.path.insert(0, "scripts"); from pathlib import Path; import package_release as p; print(p.build_cli(Path("."), Path("dist/catalyst.pyz")))'
+
+  catalyst:
+    desc: "Run the catalyst CLI from source: task catalyst -- <args>"
+    env:
+      PYTHONPATH: scripts
+    cmds:
+      - python3 -m catalyst {{.CLI_ARGS}}
 
   release:
     desc: "Package the kernel and modules into versioned zipped archives with manifests (no commit, no push)"
