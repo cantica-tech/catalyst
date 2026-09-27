@@ -1,0 +1,90 @@
+# Migration 0.38.0: the catalyst CLI
+
+> Apply this migration when synchronizing a deployment whose `version.txt`
+> is being advanced past `0.37.0` to `0.38.0` or later. See `SYNCHRONIZE.md`
+> for the full synchronization procedure. Never re-run on a later sync once
+> applied.
+
+Until `0.37.0`, every mechanical step of the framework was prose the
+agent followed by hand: reading an index for the next ID, drawing a
+userid, running `git hash-object -w` for each journaled file, editing
+index rows, checking links. Each re-derivation was a chance to drift. From
+`0.38.0` those steps are the `catalyst` command line (`CLI.md`), and the
+procedures in `CODE-OF-CONDUCT.md` call it; only the judgment stays prose.
+
+## What changed
+
+1. **The CLI.** The kernel release ships `bin/catalyst.pyz`, a
+   single-file zipapp needing only Python 3 and `git`. A deployment
+   vendors it at `.criterion/bin/catalyst.pyz`; `catalyst <args>` is
+   shorthand for `python3 .criterion/bin/catalyst.pyz <args>`.
+2. **Taskfile.** `Taskfile.common.yml` gains a `catalyst` pass-through
+   task (`task catalyst -- <args>`), the one task that is not a slash
+   command.
+3. **Procedures.** `CODE-OF-CONDUCT.md` §4 and §9 (kernel and module
+   parts) allocate IDs with `catalyst id next`, userids with
+   `catalyst userid gen`, rebuild indexes with `catalyst index regen`,
+   journal with `catalyst journal append`, restore with
+   `catalyst journal restore`, and check with `catalyst check`. Every
+   artifact-changing command ends with regen, append, and check.
+4. **Journal paths.** Paths are relative to the project root: a
+   working-copy file is written `.criterion/<path>` and hashed into the
+   working copy's own git repository, any other path into the project's
+   (`Rules-of-Rules.md` §12). Older bare (working-copy relative),
+   `<repo>:path` and absolute paths are normalised on read.
+5. **Writer and pinning.** CLI-written entries carry
+   `"writer": "catalyst/<version>"`, and every journaled blob is pinned
+   under `refs/catalyst/journal` (a commit chain whose tree holds each
+   blob) so `git gc` cannot prune it. `catalyst journal verify` holds
+   CLI-written entries to errors and only warns on older ones.
+6. **Journal action.** The action enum is unchanged
+   (`create|update|close|retire|status-change|sync`). A migration is
+   journaled as `sync`; the CLI rejects anything else, including the
+   `"migrate"` earlier migration docs named.
+7. **Hook.** An agent that supports an end-of-turn hook registers
+   `catalyst hook stop`, which blocks the end of a turn while
+   `catalyst check` reports errors (`CLI.md` "Hooks").
+
+Old journal entries are never rewritten (INV-17). They keep their paths
+and lack `writer`; the CLI reads them as they are.
+
+## Steps for deployed projects
+
+1. **Vendor the CLI.** Copy `bin/catalyst.pyz` from the `0.38.0` kernel
+   release into `.criterion/bin/catalyst.pyz` (from catalyst's own
+   checkout: `task build:cli`, then copy `dist/catalyst.pyz`). Check it
+   runs: `python3 .criterion/bin/catalyst.pyz --version`.
+2. **Taskfile.** Add the template's `catalyst` task to
+   `.criterion/Taskfile.common.yml`
+   (`templates/Taskfile.common.template.yml`). Leave the project's root
+   `Taskfile.yml` untouched.
+3. **Hook.** If the running agent supports an end-of-turn hook, register
+   `catalyst hook stop` as its shim says (under Claude Code: merge
+   `agents/claude-code/settings.template.json` from this repository into
+   the project's `.claude/settings.json`, keeping any hooks already
+   there). An agent without hook support skips this step.
+4. **Command files.** Refresh the agent's command files (or their
+   fallback, `BOOTSTRAP.md` §1) from the recomposed `CODE-OF-CONDUCT.md`
+   §4, whose procedures changed in this version.
+5. **Pin.** Run `catalyst journal pin` once, to pin every blob the
+   existing journal references.
+6. **Check.** Run `catalyst check`. Resolve every error, or record for
+   the user each error that cannot be resolved now (for example a
+   missing blob from before pinning existed). Warnings are allowed;
+   `catalyst index regen` clears `index-drift`, and legacy journal
+   warnings need no action.
+7. **Version.** Set `.criterion/version.txt` and the pointer's
+   `kernel_version` to `0.38.0`.
+8. **Journal.** Append one entry with
+   `catalyst journal append --command /sync-framework --action sync
+   --artifact "kernel 0.38.0" --intent "<adopt the catalyst CLI>"
+   --file <each touched file>` — the first CLI-written entry. Never
+   rewrite the journal itself (INV-17).
+
+## Rollback
+
+Nothing in the working copy is renamed or deleted, and no journal line
+changes. Removing `.criterion/bin/catalyst.pyz`, the `catalyst` task and
+the hook, and restoring `version.txt` and the pointer, reverts the
+migration. The `refs/catalyst/journal` ref can stay: it only keeps blobs
+reachable.
