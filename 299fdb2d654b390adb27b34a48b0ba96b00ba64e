@@ -1,0 +1,13 @@
+{
+  "project_name": "catalyst",
+  "framework_version": "0.13.0",
+  "agent": "claude-code",
+  "agent-source": "/Users/oliviersteck/.claude/projects/-Users-oliviersteck-sources-catalyst/.catalyst-proj",
+  "repoed": true,
+  "catalyst_repo": "catalyst-proj",
+  "catalyst_repo_url": "git@github.com:oliben67/catalyst-proj.git",
+  "created_by": "Olivier Steck",
+  "thingamabob_branch": "thingamabob",
+  "created": "2026-08-23",
+  "updated": "2026-08-27"
+}

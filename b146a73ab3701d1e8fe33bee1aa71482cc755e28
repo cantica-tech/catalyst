@@ -1,0 +1,112 @@
+# catalyst's own operations. Mirrors .github/workflows/*.yml exactly, so
+# `task check:all` (or `task ci`) is what CI runs, runnable locally.
+#
+# Catalyst-operation dispatch tasks (check-rules, sync-framework, and the
+# active module's commands, ...) come from Taskfile.common.yml, deployed inside .criterion/ (agent-owned
+# space, INV-6 — not this repo's own tree) from framework/kernel/
+# templates/Taskfile.common.template.yml, refreshed by /sync-framework, not
+# hand-edited here. See framework/kernel/migrations/0.19.0/
+# taskfile-into-criterion.md for why it moved out of this repo's own root.
+
+version: "3"
+
+vars:
+  # This deployment's *.catalyst pointer's own agent-source field (INV-6),
+  # copied here as a literal — NOT `sh:`-computed. Task resolves an
+  # `includes.taskfile` path before dynamic (`sh:`) vars are evaluated, so
+  # a dynamic value here silently produces an empty path and "no Taskfile
+  # found" (confirmed by hand: a plain `cmds:` var with the identical `sh:`
+  # script resolves fine, only the `includes:` use fails). Update by hand
+  # (or via /sync-framework) if agent-source ever changes — the same
+  # "set once, rarely revisited" tradeoff the pointer's own field already
+  # has. Falls back to a bare `.criterion` for an agent with no owned-space
+  # concept (INV-6's documented fallback).
+  CRITERION_DIR: "/Users/oliviersteck/.claude/projects/-Users-oliviersteck-sources-catalyst/.criterion"
+  # Resolves the deployed agent's CLI binary from the pointer's "agent"
+  # field. "claude-code" is the one known id whose CLI binary name differs
+  # from the id itself; any other agent id is assumed to already be its
+  # own binary name. Falls back to "claude" — today's only known agent —
+  # when no pointer/field is found.
+  AGENT_ID:
+    sh: |
+      f=$(ls *.catalyst 2>/dev/null | head -1)
+      [ -n "$f" ] && grep -oE '"agent"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | sed -E 's/.*"([^"]*)"$/\1/'
+  AGENT_BIN: '{{if eq .AGENT_ID "claude-code"}}claude{{else if .AGENT_ID}}{{.AGENT_ID}}{{else}}claude{{end}}'
+  # Full override escape hatch for an agent needing different flags than
+  # `<bin> -p "<prompt>"` entirely (e.g. a non-Claude CLI).
+  AGENT_CMD: '{{.AGENT_CMD_OVERRIDE | default (printf "%s -p" .AGENT_BIN)}}'
+
+includes:
+  common:
+    taskfile: '{{.CRITERION_DIR}}/Taskfile.common.yml'
+    flatten: true
+    vars:
+      AGENT_CMD: '{{.AGENT_CMD}}'
+
+tasks:
+  install:
+    desc: "Install Python test dependencies into the active environment"
+    cmds:
+      - pip install -r requirements-dev.txt
+
+  test:
+    desc: "Run the pytest suite"
+    cmds:
+      - pytest
+
+  check:deployment:
+    desc: "Validate catalyst deployment structure (scripts/check_deployment.py)"
+    cmds:
+      - python3 scripts/check_deployment.py
+
+  check:command-parity:
+    desc: "Validate .claude/commands/ and Taskfile.common.yml against CODE-OF-CONDUCT.md §4"
+    cmds:
+      - python3 scripts/check_command_parity.py
+
+  check:plugins:
+    desc: "Validate plugin rules (scripts/check_plugins.py)"
+    cmds:
+      - python3 scripts/check_plugins.py
+
+  check:plugin-contracts:
+    desc: "Validate plugin contracts (scripts/check_plugin_contracts.py)"
+    cmds:
+      - python3 scripts/check_plugin_contracts.py
+
+  check:kernel-purity:
+    desc: "Validate that the kernel names no process module or module entity (INV-30, scripts/check_kernel_purity.py)"
+    cmds:
+      - python3 scripts/check_kernel_purity.py
+
+  check:all:
+    desc: "Run every validation script plus the test suite (what CI runs)"
+    cmds:
+      - task: check:deployment
+      - task: check:command-parity
+      - task: check:plugins
+      - task: check:plugin-contracts
+      - task: check:kernel-purity
+      - task: test
+
+  release:
+    desc: "Package the kernel and modules into versioned zipped archives with manifests (no commit, no push)"
+    cmds:
+      - python3 scripts/package_release.py
+      - task: check:command-parity
+      - task: check:plugins
+      - task: check:plugin-contracts
+      - task: check:kernel-purity
+      - task: test
+
+  release:publish:
+    desc: "Package, copy releases into PUBLISH_DIR (a distribution repository checkout), then commit and push the module repositories and PUBLISH_DIR"
+    requires:
+      vars: [PUBLISH_DIR]
+    cmds:
+      - python3 scripts/package_release.py --publish-dir "{{.PUBLISH_DIR}}" --push
+
+  dogfood:
+    desc: "Vet this repository against its own rules (catalyst-development-only)"
+    cmds:
+      - '{{.AGENT_CMD}} "/dogfood {{.CLI_ARGS}}"'

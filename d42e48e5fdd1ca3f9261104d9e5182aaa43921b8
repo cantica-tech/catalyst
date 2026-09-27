@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat framework/kernel/INVARIANTS.md"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/stop_hook.py"
+          }
+        ]
+      }
+    ]
+  }
+}

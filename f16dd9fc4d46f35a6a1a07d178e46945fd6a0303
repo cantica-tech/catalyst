@@ -1,0 +1,14 @@
+# Changelog
+
+catalyst is pre-1.0: minor versions may change the deployed layout. Every
+such change ships a migration (`framework/kernel/migrations/migrations.md`)
+that `/sync-framework` applies to an existing deployment. Versions before
+0.37.0 are described by that migrations index and by the tagged commit
+messages.
+
+## 0.37.0 — unreleased
+
+Beta-readiness Phase 0.
+
+- Licensed under Apache-2.0; added `CONTRIBUTING.md`, `SECURITY.md` and this
+  changelog.

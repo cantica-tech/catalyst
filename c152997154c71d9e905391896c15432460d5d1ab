@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from catalyst.__main__ import main
+from catalyst.corpus import load_corpus, norm_field, ref_values
+from catalyst.deployment import DeploymentNotFound, load
+from catalyst.validate import ERROR, WARNING, validate
+from catalyst_fixtures import USERID, artifact, make_project, write
+
+
+def findings(project: Path):
+    dep = load(project)
+    return validate(dep, load_corpus(dep))
+
+
+def codes(project: Path, level: str | None = None) -> list[str]:
+    return [f.code for f in findings(project) if level is None or f.level == level]
+
+
+def item_file(project: Path) -> Path:
+    return project / ".criterion" / "items" / "ITEM-000001-first-item.md"
+
+
+def edit(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    assert old in text
+    path.write_text(text.replace(old, new))
+
+
+def test_valid_fixture_is_clean(tmp_path):
+    assert findings(make_project(tmp_path)) == []
+
+
+def test_load_finds_module_and_kernel_etds(tmp_path):
+    dep = load(make_project(tmp_path) / ".criterion" / "items")
+    assert {"ITEM", "SUB", "RECON", "WORKFLOW"} <= set(dep.etds)
+    assert dep.module.id == "example-process"
+
+
+def test_load_without_deployment(tmp_path):
+    with pytest.raises(DeploymentNotFound):
+        load(tmp_path)
+
+
+def test_field_name_matching_and_ref_parsing():
+    assert norm_field("Requirement(s)") == norm_field("Requirements")
+    assert ref_values("`A-1`, `B-2`") == ["A-1", "B-2"]
+    assert ref_values("*(none yet)*") == []
+    assert ref_values("X-1, Y-2") == ["X-1", "Y-2"]
+
+
+def test_dangling_reference_is_an_error(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), f"`br-AUTH-000001-{USERID}`", f"`br-AUTH-000009-{USERID}`")
+    assert "dangling-ref" in codes(project, ERROR)
+    assert "ungrounded" in codes(project, ERROR)
+
+
+def test_missing_required_field(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), "| **Domain** | `AUTH` |\n", "")
+    assert codes(project, ERROR) == ["required-field"]
+
+
+def test_inherited_grounding_needs_a_resolvable_parent(tmp_path):
+    project = make_project(tmp_path)
+    sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
+    edit(sub, "| **Item** |", "| **Requirement** |")    # legacy field name
+    assert sorted(codes(project, ERROR)) == ["required-field", "ungrounded"]
+
+
+def test_unregistered_signer(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), "| **Signed-off-by** | Ada Lovelace |", "| **Signed-off-by** | Mallory |")
+    assert codes(project, ERROR) == ["signer"]
+
+
+def test_signer_may_be_git_username(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), "| **Signed-off-by** | Ada Lovelace |", "| **Signed-off-by** | ada |")
+    assert findings(project) == []
+
+
+def test_enum_outside_allowed_values_is_a_warning(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), "| **Status** | Open |", "| **Status** | shipped |")
+    assert codes(project) == ["enum-value"]
+    assert codes(project, WARNING) == ["enum-value"]
+
+
+def test_one_sided_backref_is_a_warning(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
+    assert codes(project) == ["backref"]
+
+
+def test_reference_to_wrong_type_is_a_warning(tmp_path):
+    project = make_project(tmp_path)
+    sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
+    edit(sub, f"| **Item** | `ITEM-000001-{USERID}` |", f"| **Item** | `br-AUTH-000001-{USERID}` |")
+    assert "ref-type" in codes(project, WARNING)
+    assert codes(project, ERROR) == []
+
+
+def test_duplicate_artifact_id(tmp_path):
+    project = make_project(tmp_path)
+    write(project / ".criterion" / "items" / "ITEM-000001-copy.md", item_file(project).read_text())
+    assert "duplicate-id" in codes(project, ERROR)
+
+
+def test_id_shape_and_filename(tmp_path):
+    project = make_project(tmp_path)
+    edit(item_file(project), f"`ITEM-000001-{USERID}`", "`ITEM-000001-Zz9zZz9z`")
+    assert "id-shape" in codes(project, ERROR)
+
+
+def test_rule_missing_from_index(tmp_path):
+    project = make_project(tmp_path)
+    doc = project / ".criterion" / "rules" / "business" / "br-business-rules.md"
+    edit(doc, "## Linked Artifacts", f"### `br-AUTH-000002-{USERID}` Logout\n\n## Linked Artifacts")
+    assert codes(project, ERROR) == ["rule-unindexed"]
+
+
+def test_module_placeholder_heading_is_not_a_definition(tmp_path):
+    project = make_project(tmp_path)
+    write(project / ".criterion" / "rules" / "Rules-of-Rules.md",
+          f"## 9. `rr-META-000009-{USERID}` — owned by the active module\n\n"
+          f"### From module example-process\n\n## 9. `rr-META-000009-{USERID}` Items\n")
+    assert findings(project) == []
+
+
+def test_index_drift_and_orphans(tmp_path):
+    project = make_project(tmp_path)
+    write(project / ".criterion" / "items" / "ITEM-000002-second.md",
+          artifact(f"ITEM-000002-{USERID}", "Second", {
+              "ID": f"`ITEM-000002-{USERID}`", "Status": "Open", "Targets": f"`br-AUTH-000001-{USERID}`",
+              "Domain": "`AUTH`", "Signed-off-by": "Ada Lovelace"}))
+    assert codes(project) == ["index-drift"]
+    edit(project / ".criterion" / "items" / "items.md", "| First item |", "| First item |\n"
+         f"| [ITEM-000003-{USERID}](ITEM-000003-gone.md) | Gone | Open |")
+    assert "index-orphan" in codes(project, ERROR)
+
+
+def test_cli_exit_codes_and_json(tmp_path, capsys):
+    project = make_project(tmp_path)
+    assert main(["--project", str(project), "validate"]) == 0
+    edit(item_file(project), "| **Status** | Open |", "| **Status** | shipped |")
+    assert main(["--project", str(project), "validate"]) == 0
+    assert main(["--project", str(project), "validate", "--strict"]) == 1
+    capsys.readouterr()
+    assert main(["--project", str(project), "validate", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is True and out["findings"][0]["code"] == "enum-value"
+
+
+def test_cli_without_deployment(tmp_path, capsys):
+    assert main(["--project", str(tmp_path), "validate"]) == 2
+    assert "no catalyst deployment" in capsys.readouterr().err

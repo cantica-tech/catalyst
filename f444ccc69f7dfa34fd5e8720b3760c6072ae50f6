@@ -1,0 +1,13 @@
+{
+  "project_name": "catalyst",
+  "kernel_version": "0.35.1",
+  "module": "software-engineering",
+  "agent": "claude-code",
+  "repoed": true,
+  "catalyst_repo": "criterion",
+  "catalyst_repo_url": "git@github.com:oliben67/criterion.git",
+  "created_by": "Olivier Steck",
+  "criterion_branch": "criterion",
+  "created": "2026-08-23",
+  "updated": "2026-09-27"
+}

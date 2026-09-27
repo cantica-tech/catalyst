@@ -1,0 +1,11 @@
+This zip contains the full catalyst tree with the anti-drift architecture applied
+and version bumped to 0.5.0.
+
+plugins/repository/catalyst-git/ appears here as regular files (checked out at
+e4095f4, catalyst-git v0.3.0). In a real git clone this is a submodule linked via
+.gitmodules. If you turn this zip back into a working git repo, re-establish the
+submodule rather than committing these files directly:
+
+    git submodule update --init --recursive
+
+(You can delete this note file.)

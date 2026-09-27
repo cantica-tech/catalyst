@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+"""Claude Code Stop hook: run catalyst's checkers and block the stop on failure.
+
+Claude Code only acts on a Stop hook that exits 2, and only shows the model
+what the hook wrote to stderr. The checkers themselves exit 1 and print to
+stdout (right for CI and the terminal), so this wrapper runs each one,
+collects the output of those that fail, writes it to stderr and exits 2:
+the agent sees the failures and keeps working instead of stopping.
+
+When the hook input says a Stop hook already blocked this stop
+(`stop_hook_active`), the failures are still reported but the stop is let
+through (exit 0), so an unfixable failure can't loop the session forever.
+
+Exit 0 = all checks passed (or second consecutive block), exit 2 = block.
+"""
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
+CHECKS = [
+    "check_deployment.py",
+    "check_plugins.py",
+    "check_plugin_contracts.py",
+    "check_command_parity.py",
+    "check_kernel_purity.py",
+]
+
+
+def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
+    """(checker, output) for every checker that exits non-zero."""
+    failures = []
+    for check in CHECKS:
+        res = subprocess.run([sys.executable, str(root / "scripts" / check)],
+                             cwd=root, capture_output=True, text=True)
+        if res.returncode != 0:
+            failures.append((check, (res.stdout + res.stderr).strip()))
+    return failures
+
+
+def read_hook_input(stream=None) -> dict:
+    try:
+        data = json.loads((stream or sys.stdin).read() or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def main() -> int:
+    hook_input = read_hook_input()
+    failures = run_checks()
+    if not failures:
+        return 0
+    report = "\n\n".join(f"{check} FAILED:\n{output}" for check, output in failures)
+    if hook_input.get("stop_hook_active"):
+        print(f"catalyst checks still failing (not blocking again):\n\n{report}",
+              file=sys.stderr)
+        return 0
+    print(f"catalyst checks failed — fix these before stopping:\n\n{report}",
+          file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

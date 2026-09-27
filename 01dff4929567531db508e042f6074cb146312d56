@@ -1,0 +1,12 @@
+{
+  "project_name": "catalyst",
+  "framework_version": "0.10.1",
+  "agent": "claude-code",
+  "agent-source": "/Users/oliviersteck/.claude/projects/-Users-oliviersteck-sources-catalyst/.catalyst-proj",
+  "repoed": false,
+  "catalyst_repo": null,
+  "catalyst_repo_url": null,
+  "created_by": null,
+  "created": "2026-08-23",
+  "updated": "2026-08-24"
+}

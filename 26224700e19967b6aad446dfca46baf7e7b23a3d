@@ -1,0 +1,5 @@
+.vscode/catalyst.code-workspace
+/catalyst/
+__pycache__/
+*.pyc
+
