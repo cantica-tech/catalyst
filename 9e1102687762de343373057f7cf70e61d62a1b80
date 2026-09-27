@@ -1,0 +1,246 @@
+"""Two contributors sharing one deployment through a criterion remote, on real
+git: publish (create), join, concurrent work through topic branches and
+merges, union-merged journal, regenerated indexes, integrity, conflicts,
+and a sync that never loses local work."""
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+from pathlib import Path
+
+import pytest
+
+from catalyst import criterion as cr
+from catalyst import journal as j
+from catalyst.corpus import load_corpus
+from catalyst.deployment import load
+from catalyst.ids import next_entity_id
+from catalyst.indexes import regenerate
+from catalyst_fixtures import USERID, artifact, git_init, make_project, write
+
+BOB_ID = "Bb4xR9pQ"
+NO_CHECK = lambda dep: ""       # structural checks are covered elsewhere
+
+
+def git(repo: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(repo), *args], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture(autouse=True)
+def allow_file_submodules(monkeypatch):
+    # git refuses file:// submodules by default since 2.38.1
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "protocol.file.allow")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "always")
+
+
+@pytest.fixture
+def world(tmp_path, monkeypatch):
+    """Ada's project published as a submodule; Bob's clone joined."""
+    remote = tmp_path / "criterion.git"
+    product = tmp_path / "product.git"
+    for bare in (remote, product):
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    project = make_project(tmp_path / "ada")
+    users = project / ".criterion" / "IAM" / "users" / "users.json"
+    data = json.loads(users.read_text())
+    data["users"].append({"name": "Bob", "git_username": "bob", "roles": ["Admin"],
+                          "active": True, "userid": BOB_ID})
+    users.write_text(json.dumps(data))
+    agent = tmp_path / "ada-agent" / ".criterion"
+    agent.parent.mkdir()
+    shutil.move(str(project / ".criterion"), str(agent))
+    (project / ".criterion").symlink_to(agent)
+    git_init(agent)
+    git_init(project)
+    monkeypatch.chdir(project)
+    steps = cr.create(load(project), str(remote), "criterion", cr.CI_TEMPLATE)
+    git(project, "commit", "-q", "-m", "share the deployment")
+    git(project, "remote", "add", "origin", str(product))
+    git(project, "push", "-q", "origin", "HEAD:refs/heads/main")
+    bob = tmp_path / "bob" / "app"
+    subprocess.run(["git", "clone", "-q", "-b", "main", str(product), str(bob)], check=True)
+    for r in (bob,):
+        git(r, "config", "user.name", "Bob")
+        git(r, "config", "user.email", "bob@example.com")
+    cr.join(bob)
+    git(bob / ".criterion", "config", "user.email", "bob@example.com")
+    git(project / ".criterion", "config", "user.email", "ada@example.com")
+    return {"remote": remote, "ada": project, "bob": bob, "steps": steps, "tmp": tmp_path}
+
+
+def add_item(project: Path, as_user: str, title: str) -> str:
+    dep = load(project)
+    corpus = load_corpus(dep)
+    signer = corpus.user(as_user)
+    art_id = next_entity_id(dep, corpus, "ITEM", signer)
+    name = f"{art_id.rsplit('-', 1)[0]}-{title.lower().replace(' ', '-')}.md"
+    write(dep.root / "items" / name, artifact(art_id, title, {
+        "ID": f"`{art_id}`", "Status": "Open", "Targets": f"`br-AUTH-000001-{USERID}`",
+        "Domain": "`AUTH`", "Signed-off-by": signer["name"]}))
+    regenerate(dep, load_corpus(dep))
+    j.append(dep, j.AppendRequest(command="/create-item", action="create", artifact=art_id,
+                                  targets=[f"br-AUTH-000001-{USERID}"], intent=[f"add {title}"],
+                                  files=[str(dep.root / "items" / name), str(dep.root / "items" / "items.md")],
+                                  actor=signer["git_username"]))
+    return art_id
+
+
+def merge_topic(world, topic: str) -> str:
+    """What GitHub does when a pull request is merged."""
+    merger = world["tmp"] / f"merger-{topic.replace('/', '-')}"
+    subprocess.run(["git", "clone", "-q", "-b", "criterion", str(world["remote"]), str(merger)], check=True)
+    git(merger, "config", "user.name", "GitHub")
+    git(merger, "config", "user.email", "gh@example.com")
+    git(merger, "merge", "-q", "--no-ff", f"origin/{topic}", "-m", f"Merge {topic}")
+    git(merger, "push", "-q", "origin", "criterion")
+    return git(merger, "rev-parse", "HEAD")
+
+
+def push(world, who: str, message: str, **kw):
+    project = world[who]
+    dep = load(project)
+    signer = load_corpus(dep).user(who)
+    return cr.push(dep, signer, message, open_pr=False, checker=kw.get("checker", NO_CHECK))
+
+
+def test_create_publishes_and_makes_a_submodule(world):
+    ada = world["ada"]
+    assert cr.is_submodule(ada)
+    assert (ada / ".criterion").is_dir() and not (ada / ".criterion").is_symlink()
+    pointer = json.loads((ada / "app.catalyst").read_text())
+    assert pointer["repoed"] is True and pointer["criterion_branch"] == "criterion"
+    attrs = (ada / ".criterion" / ".gitattributes").read_text()
+    assert "development/journal.jsonl merge=union" in attrs and "items/items.md merge=union" in attrs
+    assert (ada / ".criterion" / cr.CI_WORKFLOW).is_file()
+    last = json.loads((ada / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()[-1])
+    assert last["command"] == "catalyst criterion create"
+    assert {f["path"] for f in last["files"]} == {".criterion/.gitattributes", f".criterion/{cr.CI_WORKFLOW}"}
+    assert "/.criterion" not in (ada / ".gitignore").read_text()
+    # the product commit pins the rules version
+    assert git(ada, "ls-tree", "HEAD", ".criterion").split()[1] == "commit"
+
+
+def test_join_checks_out_the_shared_branch(world):
+    bob = world["bob"] / ".criterion"
+    assert (bob / "items" / "items.md").is_file()
+    assert git(bob, "symbolic-ref", "--short", "HEAD") == "criterion"
+
+
+def test_concurrent_work_merges_without_losing_anything(world):
+    a_item = add_item(world["ada"], "ada", "Ada thing")
+    b_item = add_item(world["bob"], "bob", "Bob thing")
+    assert a_item == f"ITEM-000002-{USERID}" and b_item == f"ITEM-000002-{BOB_ID}"  # same number, different signer
+    a = push(world, "ada", "Ada adds an item")
+    merge_topic(world, a.branch)
+    b = push(world, "bob", "Bob adds an item")     # rebases onto Ada's merged work
+    assert b.commits >= 1
+    merged = merge_topic(world, b.branch)
+    wc = world["bob"] / ".criterion"
+    git(wc, "fetch", "-q", "origin")
+    assert cr.integrity(wc, "origin/criterion") == []
+    shared = cr.facts_at(wc, "origin/criterion")
+    assert {a_item, b_item} <= shared.ids and {a_item, b_item} <= shared.rows
+    entries = [json.loads(line) for line in shared.journal]
+    assert sorted(e["actor"] for e in entries if e["command"] == "/create-item") == ["ada", "bob"]
+    merge = [e for e in entries if e["command"] == "catalyst criterion push"]
+    assert len(merge) == 1 and merge[0]["files"][0]["path"] == ".criterion/items/items.md"
+    # Bob's rebased index lists both, in ID order
+    index = subprocess.run(["git", "-C", str(wc), "show", "origin/criterion:items/items.md"],
+                           capture_output=True, text=True).stdout
+    assert index.index("ITEM-000001") < index.index(a_item) and b_item in index
+    assert merged
+    # after syncing, the union-merged journal verifies: forks are warnings, not errors
+    cr.sync(load(world["bob"]))
+    issues = [i for i in j.verify(load(world["bob"])) if i.level == "error"]
+    assert issues == []
+
+
+def test_sync_refuses_local_work_then_fast_forwards(world):
+    add_item(world["ada"], "ada", "Ada thing")
+    a = push(world, "ada", "Ada adds an item")
+    merge_topic(world, a.branch)
+    bob = world["bob"]
+    write(bob / ".criterion" / "scratch.md", "unsaved\n")
+    with pytest.raises(cr.CriterionError, match="uncommitted"):
+        cr.sync(load(bob))
+    (bob / ".criterion" / "scratch.md").unlink()
+    git(bob / ".criterion", "commit", "-q", "--allow-empty", "-m", "local only")
+    with pytest.raises(cr.CriterionError, match="not on the remote"):
+        cr.sync(load(bob))
+    git(bob / ".criterion", "reset", "-q", "--hard", "HEAD~1")
+    cr.sync(load(bob))
+    assert f"ITEM-000002-{USERID}" in (bob / ".criterion" / "items" / "items.md").read_text()
+
+
+def test_a_real_conflict_stops_the_push(world):
+    for who in ("ada", "bob"):
+        f = world[who] / ".criterion" / "items" / "ITEM-000001-first-item.md"
+        f.write_text(f.read_text().replace("| Open |", f"| Done by {who} |"))
+    a = push(world, "ada", "Ada closes it")
+    merge_topic(world, a.branch)
+    wc = world["bob"] / ".criterion"
+    with pytest.raises(cr.CriterionConflict) as exc:
+        push(world, "bob", "Bob closes it too")
+    assert "items/ITEM-000001-first-item.md" in exc.value.files
+    assert "RECON" in str(exc.value)
+    # nothing half-done: no rebase in progress, Bob's commit intact, nothing pushed
+    assert not (Path(git(wc, "rev-parse", "--git-dir")) / "rebase-merge").exists()
+    assert "Done by bob" in git(wc, "show", "HEAD:items/ITEM-000001-first-item.md")
+    assert git(wc, "ls-remote", "--heads", "origin", "bob/*") == ""
+
+
+def test_failing_check_blocks_the_push(world):
+    add_item(world["ada"], "ada", "Ada thing")
+    with pytest.raises(cr.CriterionError, match="nothing was pushed"):
+        push(world, "ada", "broken", checker=lambda dep: "ERROR chain dangling-ref")
+    assert git(world["ada"] / ".criterion", "ls-remote", "--heads", "origin", "ada/*") == ""
+
+
+def test_integrity_catches_a_merge_that_drops_a_journal_line(world):
+    add_item(world["ada"], "ada", "Ada thing")
+    a = push(world, "ada", "Ada adds an item")
+    wc = world["ada"] / ".criterion"
+    git(wc, "checkout", "-q", "criterion")
+    git(wc, "merge", "-q", "--no-ff", "--no-commit", a.branch)
+    (wc / "development" / "journal.jsonl").write_text("")       # a bad merge resolution
+    git(wc, "add", "-A")
+    git(wc, "commit", "-q", "-m", "bad merge")
+    problems = cr.integrity(wc)
+    assert any("journal line" in p for p in problems)
+
+
+def test_nothing_to_push(world):
+    assert push(world, "bob", "no-op").commits == 0
+
+
+def test_status_and_protection_payload(world):
+    st = cr.status(load(world["bob"]), fetch=True)
+    assert st.mode == "submodule" and st.branch == "criterion" and st.ahead == 0
+    assert cr.github_repo("git@github.com:o/criterion.git") == "o/criterion"
+    assert cr.protection_payload()["required_status_checks"]["contexts"] == ["catalyst"]
+    with pytest.raises(cr.CriterionError, match="GitHub remotes only"):
+        cr.protect(load(world["bob"]), apply=False)
+
+
+def test_journal_blobs_travel_with_the_repository(world):
+    """A fresh clone must hold every blob the journal references: pins are
+    shared on create/push and fetched on join/sync, merged by union."""
+    add_item(world["ada"], "ada", "Ada thing")
+    a = push(world, "ada", "Ada adds an item")
+    merge_topic(world, a.branch)
+    add_item(world["bob"], "bob", "Bob thing")       # Bob pins in parallel
+    b = push(world, "bob", "Bob adds an item")
+    merge_topic(world, b.branch)
+    fresh = world["tmp"] / "carol"
+    subprocess.run(["git", "clone", "-q", "-b", "criterion", str(world["remote"]), str(fresh)], check=True)
+    cr.share_pins(fresh, publish=False)
+    for line in (fresh / "development" / "journal.jsonl").read_text().splitlines():
+        for f in json.loads(line)["files"]:
+            if f["after"] and f["path"].startswith(".criterion/"):
+                assert j.blob_exists(fresh, f["after"]), f["path"]
+    remote_pins = subprocess.run(["git", "-C", str(world["remote"]), "rev-list", "--parents", "-n", "1",
+                                  "refs/catalyst/journal"], capture_output=True, text=True).stdout.split()
+    assert len(remote_pins) >= 2
