@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://catalyst.framework/schemas/entity-type-definition.schema.json",
+  "title": "Catalyst Entity Type Definition (ETD) Schema",
+  "description": "JSON schema for validating entity type definition YAML files in Catalyst framework modules.",
+  "type": "object",
+  "required": [
+    "id_prefix",
+    "name",
+    "plural_name",
+    "folder",
+    "grounding",
+    "fields",
+    "workflow"
+  ],
+  "properties": {
+    "id_prefix": {
+      "type": "string",
+      "pattern": "^[A-Z0-9]+$",
+      "description": "Uppercase prefix used for entity IDs (e.g. ITEM)."
+    },
+    "name": {
+      "type": "string",
+      "description": "Singular human-readable name of entity."
+    },
+    "plural_name": {
+      "type": "string",
+      "description": "Plural human-readable name of entity."
+    },
+    "folder": {
+      "type": "string",
+      "pattern": "^[a-z0-9_-]+$",
+      "description": "Storage folder relative to project root."
+    },
+    "grounding": {
+      "type": "string",
+      "enum": [
+        "required",
+        "inherited",
+        "none"
+      ],
+      "description": "How the entity grounds to the module's grounding type: directly, via its parent, or not at all."
+    },
+    "grounding_field": {
+      "type": "string",
+      "description": "Name of field containing the grounding link."
+    },
+    "fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "required"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field header name in artifact file."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "text",
+              "enum",
+              "ref",
+              "ref-list",
+              "date",
+              "user",
+              "user-list"
+            ],
+            "description": "Data type for the field."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "True if field must be present."
+          },
+          "allowed_values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Allowed string options when kind is enum."
+          },
+          "target_type": {
+            "type": "string",
+            "description": "Target entity prefix when kind is ref or ref-list."
+          },
+          "backref": {
+            "type": "string",
+            "description": "Corresponding field on target entity to back-populate."
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "initial",
+        "states",
+        "closed_states"
+      ],
+      "properties": {
+        "initial": {
+          "type": "string",
+          "description": "Initial status string upon creation."
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "All valid status strings."
+        },
+        "closed_states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Status strings indicating entity is closed/done."
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "naming": {
+      "type": "string",
+      "enum": [
+        "id-summary",
+        "free-form"
+      ],
+      "default": "id-summary",
+      "description": "File naming: `id-summary` (`<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7)."
+    }
+  },
+  "additionalProperties": false
+}
