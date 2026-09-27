@@ -1,0 +1,356 @@
+"""The journal (`development/journal.jsonl`, Rules-of-Rules.md §12,
+INV-17): append, verify, restore, pin.
+
+Paths are relative to the project root; working-copy files start with
+`.criterion/` and are hashed into the working copy's own git repository,
+every other path into the project's. Legacy entries (bare working-copy
+paths, `<repo>:path` prefixes, absolute paths) are normalised on read.
+
+Every blob a CLI-written entry references is pinned under
+`refs/catalyst/journal` in its repository — a commit chain whose tree holds
+each blob under its own hash — so `git gc` can never prune it and
+point-in-time restore keeps working.
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from catalyst import __version__
+from catalyst.deployment import Deployment
+
+JOURNAL = "development/journal.jsonl"
+PIN_REF = "refs/catalyst/journal"
+WC = ".criterion/"
+ACTIONS = ("create", "update", "close", "retire", "status-change", "sync")
+REQUIRED = ("timestamp", "actor", "command", "action", "artifact", "targets", "intent", "files")
+
+
+class JournalError(Exception):
+    pass
+
+
+def git(repo: Path, *args: str, input: str | None = None, check: bool = True) -> str:
+    res = subprocess.run(["git", "-C", str(repo), *args], input=input,
+                         capture_output=True, text=True)
+    if check and res.returncode != 0:
+        raise JournalError(f"git {' '.join(args)} failed in {repo}: {res.stderr.strip()}")
+    return res.stdout.strip() if res.returncode == 0 else ""
+
+
+def now() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --- paths ---------------------------------------------------------------
+def canonical(dep: Deployment, path: str) -> str:
+    """A journal path for a user-supplied path (absolute, or relative to the
+    current directory)."""
+    p = Path(path)
+    absolute = p if p.is_absolute() else Path(os.getcwd()) / p
+    absolute = Path(os.path.normpath(absolute))
+    for base, prefix in ((dep.root, WC), (dep.root.resolve(), WC),
+                         (dep.project_root, ""), (dep.project_root.resolve(), "")):
+        try:
+            rel = absolute.relative_to(base)
+        except ValueError:
+            continue
+        rel_s = rel.as_posix()
+        if prefix == "" and rel_s.startswith(WC.rstrip("/")):
+            return rel_s        # already through the .criterion symlink
+        return prefix + rel_s
+    real = Path(os.path.realpath(absolute))
+    for base, prefix in ((dep.root.resolve(), WC), (dep.project_root.resolve(), "")):
+        try:
+            return prefix + real.relative_to(base).as_posix()
+        except ValueError:
+            continue
+    raise JournalError(f"{path} is outside the project and its working copy")
+
+
+def normalise(dep: Deployment, recorded: str, shas: tuple = ()) -> str:
+    """Read a (possibly legacy) journal path as a canonical one. `shas`
+    (the entry's before/after) settle a bare path that exists in neither
+    tree any more: it belongs to whichever repository holds its blobs."""
+    path = recorded
+    if ":" in path and not path.startswith("/") and "/" not in path.split(":", 1)[0]:
+        repo, rest = path.split(":", 1)
+        if repo == "criterion":
+            return WC + rest
+        if repo == dep.project_root.name:
+            return rest
+        return path          # another repository: kept as recorded, not verifiable here
+    if path.startswith("/"):
+        try:
+            return canonical(dep, path)
+        except JournalError:
+            return path
+    if path.startswith(WC):
+        return path
+    in_wc, in_project = (dep.root / path).exists(), (dep.project_root / path).exists()
+    if in_project and not in_wc:
+        return path
+    if not in_wc and not in_project:
+        for sha in shas:
+            if sha and blob_exists(dep.project_root, sha) and not blob_exists(dep.root, sha):
+                return path
+    return WC + path          # the pre-0.38 schema's paths were working-copy relative
+
+
+def locate(dep: Deployment, path: str) -> tuple[Path, str] | None:
+    """(repository, path inside it) for a canonical journal path."""
+    if path.startswith(WC):
+        return dep.root, path[len(WC):]
+    if ":" in path.split("/", 1)[0] or path.startswith("/"):
+        return None
+    return dep.project_root, path
+
+
+# --- reading -------------------------------------------------------------
+def journal_path(dep: Deployment) -> Path:
+    return dep.root / JOURNAL
+
+
+def read(dep: Deployment) -> list[tuple[int, dict | None, str]]:
+    """(line number, entry or None if malformed, raw line)."""
+    path = journal_path(dep)
+    if not path.is_file():
+        return []
+    out = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+            out.append((n, entry if isinstance(entry, dict) else None, line))
+        except json.JSONDecodeError:
+            out.append((n, None, line))
+    return out
+
+
+def entry_path(dep: Deployment, entry: dict, f: dict) -> str:
+    """A file's canonical path: as written when the entry is CLI-written
+    (already canonical), else normalised from its legacy form."""
+    if str(entry.get("writer", "")).startswith("catalyst/"):
+        return str(f["path"])
+    return normalise(dep, str(f["path"]), (f.get("before"), f.get("after")))
+
+
+def last_after(dep: Deployment) -> dict[str, str | None]:
+    last: dict[str, str | None] = {}
+    for _, entry, _ in read(dep):
+        for f in (entry or {}).get("files", []) or []:
+            if isinstance(f, dict) and "path" in f:
+                last[entry_path(dep, entry, f)] = f.get("after")
+    return last
+
+
+# --- pinning -------------------------------------------------------------
+def pinned(repo: Path) -> set[str]:
+    if not git(repo, "rev-parse", "--verify", "-q", PIN_REF, check=False):
+        return set()
+    listing = git(repo, "ls-tree", PIN_REF)
+    return {line.split("\t", 1)[1] for line in listing.splitlines() if "\t" in line}
+
+
+def blob_exists(repo: Path, sha: str) -> bool:
+    res = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}^{{blob}}"],
+                         capture_output=True)
+    return res.returncode == 0
+
+
+def pin(repo: Path, shas: set[str]) -> int:
+    """Add blobs to refs/catalyst/journal; returns how many were new."""
+    have = pinned(repo)
+    new = {s for s in shas if s and s not in have and blob_exists(repo, s)}
+    if not new:
+        return 0
+    tree_in = "".join(f"100644 blob {s}\t{s}\n" for s in sorted(have | new))
+    tree = git(repo, "mktree", input=tree_in)
+    parent = git(repo, "rev-parse", "--verify", "-q", PIN_REF, check=False)
+    cmd = ["-c", "user.name=catalyst", "-c", "user.email=catalyst@localhost",
+           "commit-tree", tree]
+    if parent:
+        cmd += ["-p", parent]
+    commit = git(repo, *cmd, "-m", f"catalyst journal: pin {len(new)} blob(s)")
+    git(repo, "update-ref", PIN_REF, commit)
+    return len(new)
+
+
+# --- append --------------------------------------------------------------
+@dataclass
+class AppendRequest:
+    command: str
+    action: str
+    artifact: str
+    targets: list[str]
+    intent: list[str]
+    files: list[str]
+    actor: str
+    allow_unchanged: bool = False
+    timestamp: str = field(default_factory=now)
+
+
+def head_blob(repo: Path, rel: str) -> str | None:
+    return git(repo, "rev-parse", "-q", "--verify", f"HEAD:{rel}", check=False) or None
+
+
+def append(dep: Deployment, req: AppendRequest) -> dict:
+    if req.action not in ACTIONS:
+        raise JournalError(f"action '{req.action}' is not one of {', '.join(ACTIONS)}")
+    if not req.intent or not all(i.strip() for i in req.intent):
+        raise JournalError("at least one non-empty --intent is required: the goal, not a label")
+    if not req.files:
+        raise JournalError("at least one --file is required")
+    previous = last_after(dep)
+    files, to_pin = [], {}
+    for raw in req.files:
+        path = canonical(dep, raw)
+        where = locate(dep, path)
+        if where is None:
+            raise JournalError(f"{raw} cannot be journaled from this deployment")
+        repo, rel = where
+        before = previous[path] if path in previous else head_blob(repo, rel)
+        after = git(repo, "hash-object", "-w", "--", rel) if (repo / rel).is_file() else None
+        if before == after and not req.allow_unchanged:
+            raise JournalError(f"{path} is unchanged since its last journaled state "
+                               "(pass --allow-unchanged if that is intended)")
+        files.append({"path": path, "before": before, "after": after})
+        if after:
+            to_pin.setdefault(repo, set()).add(after)
+    entry = {"timestamp": req.timestamp, "actor": req.actor, "command": req.command,
+             "action": req.action, "artifact": req.artifact, "targets": req.targets,
+             "intent": req.intent, "files": files, "writer": f"catalyst/{__version__}"}
+    path = journal_path(dep)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    for repo, shas in to_pin.items():
+        pin(repo, shas)
+    return entry
+
+
+# --- verify --------------------------------------------------------------
+@dataclass
+class Issue:
+    level: str
+    code: str
+    line: int
+    message: str
+    legacy: bool = False    # about an entry not written by the catalyst CLI
+
+    def __str__(self) -> str:
+        where = f"journal.jsonl:{self.line}" if self.line else "journal.jsonl"
+        return f"{self.level.upper():7} {self.code:18} {where}: {self.message}"
+
+
+def verify(dep: Deployment) -> list[Issue]:
+    issues: list[Issue] = []
+    last: dict[str, tuple[str | None, int, bool]] = {}     # path -> (after, line, cli-written)
+    prev_ts = ""
+    pins: dict[Path, set[str]] = {}
+
+    def level(strict: bool) -> str:
+        return "error" if strict else "warning"
+
+    for n, entry, _ in read(dep):
+        if entry is None:
+            issues.append(Issue("error", "malformed", n, "not a JSON object"))
+            continue
+        cli = str(entry.get("writer", "")).startswith("catalyst/")
+        missing = [k for k in REQUIRED if k not in entry]
+        if missing:
+            issues.append(Issue(level(cli), "schema", n, f"missing {', '.join(missing)}", not cli))
+        ts = str(entry.get("timestamp", ""))
+        if ts and prev_ts and ts < prev_ts:
+            issues.append(Issue(level(cli), "time-order", n, f"{ts} is earlier than {prev_ts}", not cli))
+        prev_ts = max(prev_ts, ts)
+        for f in entry.get("files", []) or []:
+            if not isinstance(f, dict) or "path" not in f:
+                continue
+            recorded = str(f["path"])
+            if recorded.startswith("/"):
+                issues.append(Issue("warning", "absolute-path", n,
+                                    f"{recorded} is machine-specific (INV-1, INV-6)", not cli))
+            before, after = f.get("before"), f.get("after")
+            path = entry_path(dep, entry, f)
+            if path in last and last[path][0] != before:
+                issues.append(Issue(level(cli), "chain", n,
+                                    f"{path}: before {str(before)[:10]} != after {str(last[path][0])[:10]} "
+                                    f"at line {last[path][1]}", not cli))
+            where = locate(dep, path)
+            if where is not None:
+                repo = where[0]
+                for sha in (before, after):
+                    if sha and not blob_exists(repo, sha):
+                        issues.append(Issue(level(cli), "missing-blob", n,
+                                            f"{path}: blob {sha[:10]} is not in {repo.name}'s object store", not cli))
+                if cli and after:
+                    if repo not in pins:
+                        pins[repo] = pinned(repo)
+                    if after not in pins[repo]:
+                        issues.append(Issue("warning", "unpinned", n,
+                                            f"{path}: blob {after[:10]} is not pinned — `catalyst journal pin`"))
+            last[path] = (after, n, cli)
+
+    for path, (after, n, cli) in sorted(last.items()):
+        where = locate(dep, path)
+        if where is None:
+            continue
+        repo, rel = where
+        current = git(repo, "hash-object", "--", rel, check=False) if (repo / rel).is_file() else None
+        if current != after:
+            state = "deleted" if current is None else "changed"
+            issues.append(Issue(level(cli), "unjournaled", n,
+                                f"{path} {state} since its last journal entry", not cli))
+    return issues
+
+
+# --- restore -------------------------------------------------------------
+def restore(dep: Deployment, timestamp: str, out: Path) -> tuple[list[str], list[str]]:
+    """Materialise every journaled path as of `timestamp` into `out`.
+    Returns (restored paths, paths whose blob is missing)."""
+    if out.exists() and any(out.iterdir()):
+        raise JournalError(f"{out} exists and is not empty — restore never overwrites")
+    state: dict[str, str | None] = {}
+    for _, entry, _ in read(dep):
+        if entry is None or str(entry.get("timestamp", "")) > timestamp:
+            continue
+        for f in entry.get("files", []) or []:
+            if isinstance(f, dict) and "path" in f:
+                state[entry_path(dep, entry, f)] = f.get("after")
+    restored, missing = [], []
+    for path, sha in sorted(state.items()):
+        where = locate(dep, path)
+        if sha is None or where is None:
+            continue
+        repo = where[0]
+        res = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", sha], capture_output=True)
+        if res.returncode != 0:
+            missing.append(path)
+            continue
+        target = out / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(res.stdout)
+        restored.append(path)
+    return restored, missing
+
+
+def pin_all(dep: Deployment) -> dict[str, int]:
+    """Pin every blob any entry references (backfill)."""
+    wanted: dict[Path, set[str]] = {}
+    for _, entry, _ in read(dep):
+        for f in (entry or {}).get("files", []) or []:
+            if not isinstance(f, dict) or "path" not in f:
+                continue
+            where = locate(dep, entry_path(dep, entry, f))
+            if where is None:
+                continue
+            for sha in (f.get("before"), f.get("after")):
+                if sha:
+                    wanted.setdefault(where[0], set()).add(sha)
+    return {repo.name: pin(repo, shas) for repo, shas in wanted.items()}
