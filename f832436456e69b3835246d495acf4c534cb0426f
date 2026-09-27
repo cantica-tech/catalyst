@@ -1,0 +1,94 @@
+# Migration 0.40.0: explicit install, ceremony tiers, command specs
+
+> Apply this migration when synchronizing a deployment whose `version.txt`
+> is being advanced past `0.39.0` to `0.40.0` or later. See `SYNCHRONIZE.md`
+> for the full synchronization procedure. Never re-run on a later sync once
+> applied.
+
+Until `0.39.0`, catalyst installed itself the first time it was loaded into
+a project, every change carried the same ceremony whatever its size, and
+each command file sent the agent to read the whole `CODE-OF-CONDUCT.md`.
+From `0.40.0` installing is an explicit request carried out by
+`catalyst init`, changes are tiered, and a command reads only its own spec.
+
+## What changed
+
+1. **Explicit install (INV-2 revised).** Loading or reading catalyst never
+   installs it; it is installed only when the user asks. The mechanical
+   install is one command, `catalyst init` (`CLI.md`,
+   `INSTANTIATION-GUIDE.md` §1); `/project create` runs it. Nothing changes
+   in an existing deployment's shape.
+2. **Ceremony tiers.** `catalyst journal append --tier chore|fix|feature`
+   records a change's tier in the entry's new optional `tier` field. A
+   **chore** changes no rule's behaviour: no artifact, one entry with no
+   targets. A **fix** restores a documented rule's behaviour; a **feature**
+   adds or changes behaviour. The agent states the tier before starting and
+   escalates if the change grows (`CODE-OF-CONDUCT.md` §1, §9;
+   `Rules-of-Rules.md` §12). What a fix and a feature require is the active
+   module's, in its §3 contribution.
+3. **Command specs.** `catalyst spec <command>` prints only a command's
+   bullet and procedure from `CODE-OF-CONDUCT.md` §4, which stays the
+   canonical text. Command files run it first
+   (`templates/slash-command.template.md`); catalyst holds its own
+   deployment to 800 words per command (`catalyst spec --budget 800`).
+4. **Entity type definitions.** An ETD may declare `location` (the
+   folder's parent in the working copy, e.g. `development`) and, per field,
+   `required_when_closed`: the field must be filled once the artifact's
+   `Status` is a closed state. `catalyst validate` reports a violation as
+   the new `closed-incomplete` error (`MODULE-SPECIFICATION.md` §4).
+5. **Documentation only:** `GLOSSARY.md` defines every term catalyst
+   invents; the portability claim is narrowed to what is tested (Claude
+   Code supported and tested; other agents untested).
+
+## Steps for every deployment
+
+1. **Refresh the kernel files.** Recompose the deployed `CODE-OF-CONDUCT.md`
+   and `rules/Rules-of-Rules.md` from the `0.40.0` kernel templates and the
+   active module's release matching kernel `0.40.0`, the same composition
+   `catalyst init` performs (`MODULE-SPECIFICATION.md` §6): the module's
+   §3/§4 under `### From module <module-id>`, its meta-rules appended. Keep
+   the deployment's resolved placeholders and signed `rr-META-` IDs. Use
+   `catalyst recompose --base-kernel <0.39.0 kernel> --base-module <the
+   module version it was composed from> --kernel <0.40.0 kernel>
+   --module-dir <new module>`: a three-way merge that keeps the
+   deployment's own edits and marks any conflict for the user (leave
+   anything listed in `.frozen` alone).
+   Refresh `INVARIANTS.md` wherever the deployment carries a copy.
+2. **Refresh the command files** (or their fallback, `BOOTSTRAP.md` §1)
+   from `0.40.0`: the kernel's from the catalyst release, the module's from
+   its `commands/`. Each now reads its spec with `catalyst spec <name>`.
+3. **Re-vendor the CLI.** Replace `.criterion/bin/catalyst.pyz` with the
+   `0.40.0` release's; check it with
+   `python3 .criterion/bin/catalyst.pyz spec --help` and that
+   `journal append --help` lists `--tier`.
+4. **Refresh the module.** Replace `.criterion/modules/<module-id>/` with
+   the whole tree of the module's release matching kernel `0.40.0` (never
+   cherry-picked files). Its schemas may gain `location` and
+   `required_when_closed`, and its templates may change. Then apply the
+   module's own `0.40.0` migration if its `migrations/migrations.md` lists
+   one (for example, a new template version).
+5. **Check.** Run `catalyst check`. A new `closed-incomplete` error means an
+   artifact was closed before one of its fields became required on close.
+   List every one for the user. **Never fabricate the missing records** to
+   satisfy the check. For each, the user chooses:
+   - **reopen it** (`/status`), and record the missing work properly as it
+     is confirmed or continued, before closing it again; or
+   - **leave it closed with a note** — a `comment` meta-tag on it
+     (`/meta-tag <id>`) recording why it closed without them — knowing
+     that `catalyst check` keeps reporting it.
+6. **Version.** Set `.criterion/version.txt` and the pointer's
+   `kernel_version` to `0.40.0`, and the module version in `DEPLOYMENT.md`.
+7. **Journal.** Append one entry with
+   `catalyst journal append --command /sync-framework --action sync
+   --artifact "kernel 0.40.0" --intent "<adopt explicit install, ceremony
+   tiers and command specs>" --file <each touched file>`. Never rewrite the
+   journal (INV-17); earlier entries simply have no `tier`.
+
+A shared deployment lands all of this as one pull request
+(`catalyst criterion push`).
+
+## Rollback
+
+Restore the `0.39.0` kernel files, command files, vendored CLI, module tree
+and `version.txt`. Entries written with a `tier` stay valid under the
+`0.39.0` CLI, which ignores the field; no journal line changes.
