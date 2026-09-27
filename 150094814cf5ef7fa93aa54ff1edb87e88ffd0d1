@@ -1,0 +1,624 @@
+"""Shared deployments on plain git (Rules-of-Rules.md §13, INV-18).
+
+A shared ("repoed") deployment's working copy is a git submodule of the
+product repository at `.criterion`, pointing at the criterion repository:
+every product commit pins the rules in force. Contributors land changes
+through pull requests against the shared branch; CI runs `catalyst check`
+and `catalyst criterion integrity` on the pull request, and branch
+protection makes those gates real.
+
+- create:    turn a local-only deployment into a submodule on a new remote.
+- join:      check out a shared deployment in a fresh clone of the product.
+- status:    where the working copy stands against the shared branch.
+- push:      commit, rebase on the shared branch (the journal merges by
+             union, indexes are regenerated), check, push with a lease and
+             open a pull request. A real conflict stops the push; the agent
+             may propose a resolution as a RECON case, a human decides.
+- sync:      fast-forward to the shared branch; refuses while local work is
+             uncommitted or unpushed.
+- integrity: nothing either side of a merge had — entity IDs, rule IDs,
+             index rows, journal lines — may be missing from the result.
+- protect:   branch protection for the shared branch (GitHub, explicit --yes).
+"""
+from __future__ import annotations
+
+import datetime
+import json
+import os
+import re
+import shutil
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from catalyst.deployment import Deployment
+
+DEFAULT_BRANCH = "criterion"
+ATTRIBUTES_HEADER = "# catalyst: append-only and regenerated files merge by union (catalyst criterion)"
+CI_WORKFLOW = ".github/workflows/catalyst.yml"
+ENTITY_ID_RE = re.compile(r"\b([A-Z][A-Z0-9]*-\d{6}-[A-Za-z0-9]{8})\b")
+RULE_HEAD_RE = re.compile(r"^#{2,3}\s+(?:\d+\.\s+)?`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", re.M)
+ARTIFACT_NAME_RE = re.compile(r"(?:^|/)([A-Z][A-Z0-9]*-\d{6})-[^/]+\.md$")
+INDEX_ROW_RE = re.compile(r"^\|\s*\[`?([A-Za-z]+-\d{3,6}(?:-[A-Za-z0-9]+)*)`?\]\(", re.M)
+
+
+CI_TEMPLATE = """\
+# Written by `catalyst criterion create` (rewritten by it while this line stays). Runs the catalyst gates on every
+# pull request against the shared branch: branch protection
+# (`catalyst criterion protect`) requires this check to pass.
+name: catalyst
+on:
+  pull_request:
+    branches: [{{BRANCH}}]
+  push:
+    branches: [{{BRANCH}}]
+jobs:
+  catalyst:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: fetch the journal's pinned blobs
+        run: |
+          # a brand-new repository has no pins yet; any other failure fails
+          if git ls-remote --exit-code origin refs/catalyst/journal >/dev/null; then
+            git fetch origin refs/catalyst/journal:refs/catalyst/journal
+          fi
+      - name: catalyst check
+        run: python3 bin/catalyst.pyz --working-copy . check
+      - name: nothing recorded was lost in the merge
+        if: github.event_name == 'pull_request'
+        run: python3 bin/catalyst.pyz --working-copy . criterion integrity
+"""
+
+
+class CriterionError(Exception):
+    pass
+
+
+class CriterionConflict(CriterionError):
+    """A rebase hit a conflict git cannot resolve on its own."""
+
+    def __init__(self, files: list[str]):
+        self.files = files
+        super().__init__(
+            "rebasing onto the shared branch conflicts in: " + ", ".join(files) +
+            ". Nothing was pushed. Resolve by hand, or record a proposed resolution "
+            "as a RECON case for a human to accept (/reconcile) — never auto-apply one.")
+
+
+def run(repo: Path, *args: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
+    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, input=input)
+    if check and res.returncode != 0:
+        raise CriterionError(f"git {' '.join(args)} failed in {repo}: {(res.stderr or res.stdout).strip()}")
+    return res
+
+
+def out(repo: Path, *args: str) -> str:
+    return run(repo, *args).stdout.strip()
+
+
+def shared_branch(dep: Deployment) -> str:
+    return str(dep.pointer.get("criterion_branch") or DEFAULT_BRANCH)
+
+
+def is_submodule(project_root: Path) -> bool:
+    gm = project_root / ".gitmodules"
+    if not gm.is_file():
+        return False
+    res = subprocess.run(["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
+                         capture_output=True, text=True)
+    return any(line.split()[-1] == ".criterion" for line in res.stdout.splitlines())
+
+
+def dirty(wc: Path) -> list[str]:
+    return [line[3:] for line in out(wc, "status", "--porcelain").splitlines() if line.strip()]
+
+
+# --- merge-safe storage -----------------------------------------
+def attribute_paths(dep: Deployment) -> list[str]:
+    """Files that merge by union: the append-only journal and every index
+    catalyst regenerates (rows from both sides are kept, then regenerated)."""
+    # rules/rules.md is hand-maintained (not regenerated): concurrent edits
+    # there must surface as conflicts, not as silently duplicated rows.
+    paths = ["development/journal.jsonl"]
+    for etd in dep.etds.values():
+        folder = dep.folder(etd)
+        if folder is not None and etd.naming != "free-form":
+            paths.append(f"{folder.relative_to(dep.root).as_posix()}/{folder.name}.md")
+    return sorted(set(paths))
+
+
+def write_attributes(dep: Deployment) -> bool:
+    """Write the working copy's .gitattributes; True if it changed."""
+    target = dep.root / ".gitattributes"
+    old = target.read_text(encoding="utf-8") if target.is_file() else ""
+    generated = {f"{p} merge=union" for p in attribute_paths(dep)}
+    lines, kept, in_block = old.splitlines(), [], False
+    for line in lines:                  # drop only the block catalyst wrote
+        if line.startswith(ATTRIBUTES_HEADER):
+            in_block = True
+            continue
+        if in_block and line.endswith(" merge=union"):
+            continue
+        in_block = False
+        if line.strip() and line not in generated:
+            kept.append(line)
+    body = [ATTRIBUTES_HEADER] + [f"{p} merge=union" for p in attribute_paths(dep)]
+    new = "\n".join(kept + ([""] if kept else []) + body) + "\n"
+    if new != old:
+        target.write_text(new, encoding="utf-8")
+        return True
+    return False
+
+
+def write_ci(dep: Deployment, template: str) -> bool:
+    """Write the CI workflow, or refresh one catalyst wrote (its first line
+    says so); a workflow the team replaced is left alone."""
+    target = dep.root / CI_WORKFLOW
+    new = template.replace("{{BRANCH}}", shared_branch(dep))
+    if target.is_file():
+        old = target.read_text(encoding="utf-8")
+        if not old.startswith("# Written by `catalyst criterion create`") or old == new:
+            return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(new, encoding="utf-8")
+    return True
+
+
+# --- shared pins ------------------------------------------------------------
+REMOTE_PINS = "refs/catalyst/remote-journal"
+
+
+def share_pins(wc: Path, publish: bool = True) -> int:
+    """Merge the remote's journal pins into ours and (with publish) push the
+    result, so every clone holds every blob the journal references. Pin
+    trees are unions: nobody's pins are lost when two contributors pin in
+    parallel. Returns how many blobs the merged set holds."""
+    for attempt in range(3):            # a concurrent pin push: fetch, merge, retry
+        try:
+            return _share_pins_once(wc, publish)
+        except CriterionError:
+            if attempt == 2:
+                raise
+    return 0
+
+
+def _share_pins_once(wc: Path, publish: bool) -> int:
+    from catalyst import journal
+    has_remote = run(wc, "fetch", "-q", "origin", f"+{journal.PIN_REF}:{REMOTE_PINS}",
+                     check=False).returncode == 0
+    local = run(wc, "rev-parse", "-q", "--verify", journal.PIN_REF, check=False).stdout.strip()
+    remote = run(wc, "rev-parse", "-q", "--verify", REMOTE_PINS, check=False).stdout.strip() if has_remote else ""
+    if remote and local != remote:
+        if not local or run(wc, "merge-base", "--is-ancestor", local, remote, check=False).returncode == 0:
+            run(wc, "update-ref", journal.PIN_REF, remote, local or "0" * 40)   # fast-forward
+        elif run(wc, "merge-base", "--is-ancestor", remote, local, check=False).returncode != 0:
+            names = journal.pinned(wc) | {line.split("\t", 1)[1] for line in
+                                          out(wc, "ls-tree", REMOTE_PINS).splitlines() if "\t" in line}
+            tree = run(wc, "mktree", input="".join(f"100644 blob {n}\t{n}\n" for n in sorted(names))).stdout.strip()
+            commit = out(wc, "-c", "user.name=catalyst", "-c", "user.email=catalyst@localhost",
+                         "commit-tree", tree, "-p", local, "-p", remote, "-m", "catalyst journal: merge pins")
+            run(wc, "update-ref", journal.PIN_REF, commit, local)
+    if publish and run(wc, "rev-parse", "-q", "--verify", journal.PIN_REF, check=False).returncode == 0:
+        run(wc, "push", "-q", "origin", f"{journal.PIN_REF}:{journal.PIN_REF}")
+    return len(journal.pinned(wc))
+
+
+# --- integrity --------------------------------------------------
+@dataclass
+class Facts:
+    journal: set[str] = field(default_factory=set)
+    ids: set[str] = field(default_factory=set)       # defined: artifact files, rule headings
+    rows: set[str] = field(default_factory=set)      # registered in an index
+
+
+def facts_at(wc: Path, rev: str) -> Facts:
+    """What a revision of the working copy records, read straight from git."""
+    listing = run(wc, "ls-tree", "-r", "-z", "--name-only", rev).stdout
+    names = [n for n in listing.split("\0") if n]
+    md = [n for n in names if n.endswith(".md")] + (
+        ["development/journal.jsonl"] if "development/journal.jsonl" in names else [])
+    facts = Facts()
+    if not md:
+        return facts
+    res = subprocess.run(["git", "-C", str(wc), "cat-file", "--batch"],
+                         input="".join(f"{rev}:{n}\n" for n in md).encode(), capture_output=True)
+    if res.returncode != 0:
+        raise CriterionError(f"git cat-file --batch failed in {wc}: {res.stderr.decode().strip()}")
+    batch = res.stdout          # sizes are in bytes: parse bytes, decode each body
+    contents: dict[str, str] = {}
+    pos = 0
+    for name in md:
+        header_end = batch.index(b"\n", pos)
+        header = batch[pos:header_end].split()
+        if header and header[-1] == b"missing":
+            pos = header_end + 1
+            continue
+        size = int(header[2])
+        body_start = header_end + 1
+        contents[name] = batch[body_start:body_start + size].decode("utf-8", errors="replace")
+        pos = body_start + size + 1
+    for name, text in contents.items():
+        if name == "development/journal.jsonl":
+            facts.journal = {line for line in text.splitlines() if line.strip()}
+            continue
+        m = ARTIFACT_NAME_RE.search(name)
+        if m:
+            ids = ENTITY_ID_RE.findall(text)
+            facts.ids.add(next((i for i in ids if i.startswith(m.group(1) + "-")), m.group(1)))
+        if name.startswith("rules/") and "/templates/" not in name:
+            facts.ids.update(RULE_HEAD_RE.findall(text))
+            if name == "rules/rules.md":
+                facts.rows.update(re.findall(r"`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", text))
+        facts.rows.update(INDEX_ROW_RE.findall(text))
+    return facts
+
+
+def integrity(wc: Path, head: str = "HEAD", parents: list[str] | None = None) -> list[str]:
+    """Everything any parent recorded must still be recorded at `head`.
+    Without explicit parents, `head`'s own parents are used (a merge commit,
+    such as a pull request's merge ref in CI)."""
+    if parents is None:
+        parents = out(wc, "rev-list", "--parents", "-n", "1", head).split()[1:]
+    result = facts_at(wc, head)
+    problems = []
+    for p in parents:
+        before = facts_at(wc, p)
+        short = out(wc, "rev-parse", "--short", p)
+        for line in sorted(before.journal - result.journal):
+            problems.append(f"journal line from {short} is missing: {line[:100]}")
+        for i in sorted(before.ids - result.ids):
+            problems.append(f"{i} (defined in {short}) is missing")
+        for i in sorted(before.rows - result.rows):
+            problems.append(f"{i} (registered in {short}) is no longer registered")
+    return problems
+
+
+# --- status / sync ----------------------------------------------------------
+@dataclass
+class Status:
+    mode: str
+    remote: str | None
+    branch: str
+    current: str | None
+    dirty: list[str]
+    ahead: int | None
+    behind: int | None
+
+
+def status(dep: Deployment, fetch: bool = False) -> Status:
+    wc = dep.root
+    mode = "submodule" if is_submodule(dep.project_root) else "local"
+    if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
+        return Status(mode, None, shared_branch(dep), None, [], None, None)
+    remote = run(wc, "remote", "get-url", "origin", check=False).stdout.strip() or None
+    branch = shared_branch(dep)
+    if fetch and remote:
+        run(wc, "fetch", "-q", "origin")
+    current = run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip() or None
+    ahead = behind = None
+    if remote and run(wc, "rev-parse", "-q", "--verify", f"origin/{branch}", check=False).returncode == 0:
+        counts = out(wc, "rev-list", "--left-right", "--count", f"origin/{branch}...HEAD").split()
+        behind, ahead = int(counts[0]), int(counts[1])
+    return Status(mode, remote, branch, current, dirty(wc), ahead, behind)
+
+
+def guard_branch_reset(wc: Path, branch: str) -> None:
+    """Refuse to reset the local shared branch if it holds commits the
+    remote does not (e.g. HEAD was detached by `git submodule update`)."""
+    if run(wc, "rev-parse", "-q", "--verify", f"refs/heads/{branch}", check=False).returncode != 0:
+        return
+    extra = run(wc, "rev-list", f"refs/heads/{branch}", "--not", "--remotes=origin", check=False).stdout.split()
+    if extra:
+        raise CriterionError(f"local branch '{branch}' has {len(extra)} commit(s) not on the remote — "
+                             "push them (`catalyst criterion push`) before syncing")
+
+
+def unpushed(wc: Path, branch: str) -> list[str]:
+    """Local commits that no remote branch contains."""
+    res = run(wc, "rev-list", "HEAD", "--not", "--remotes=origin", check=False)
+    return res.stdout.split() if res.returncode == 0 else []
+
+
+def sync(dep: Deployment) -> str:
+    """Fast-forward the working copy to the shared branch. Refuses while
+    local work would be lost."""
+    wc, branch = dep.root, shared_branch(dep)
+    changes = dirty(wc)
+    if changes:
+        raise CriterionError(f"{len(changes)} uncommitted change(s) in the working copy "
+                             f"({', '.join(changes[:5])}) — `catalyst criterion push` them first")
+    run(wc, "fetch", "-q", "--prune", "origin")
+    local = unpushed(wc, branch)
+    if local:
+        raise CriterionError(f"{len(local)} local commit(s) are not on the remote — "
+                             "`catalyst criterion push` them first")
+    guard_branch_reset(wc, branch)
+    run(wc, "checkout", "-q", "-B", branch, f"origin/{branch}")
+    share_pins(wc, publish=False)
+    return out(wc, "rev-parse", "--short", "HEAD")
+
+
+# --- push -------------------------------------------
+@dataclass
+class PushResult:
+    branch: str
+    commits: int
+    pr: str | None
+    regenerated: list[str]
+
+
+def _topic(user: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-") or "contributor"
+    return f"{slug}/{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
+         checker=None) -> PushResult:
+    from catalyst.corpus import load_corpus
+    from catalyst.deployment import load, load_working_copy
+    from catalyst.indexes import regenerate
+
+    wc, branch = dep.root, shared_branch(dep)
+    if not run(wc, "remote", "get-url", "origin", check=False).stdout.strip():
+        raise CriterionError("the working copy has no remote — `catalyst criterion create <url>` first")
+    user = str(signer.get("git_username") or signer.get("name"))
+    run(wc, "fetch", "-q", "--prune", "origin")
+    base = f"origin/{branch}"
+    has_base = run(wc, "rev-parse", "-q", "--verify", base, check=False).returncode == 0
+    current = run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip()
+    topic = current if current and current != branch else ""
+    remote_topic = ""
+    if topic:
+        remote_topic = run(wc, "rev-parse", "-q", "--verify", f"origin/{topic}", check=False).stdout.strip()
+        merged = has_base and remote_topic and run(
+            wc, "merge-base", "--is-ancestor", remote_topic, base, check=False).returncode == 0
+        if not remote_topic and run(wc, "config", f"branch.{topic}.remote", check=False).stdout.strip():
+            topic = ""                  # pushed before, branch now deleted: its PR was merged
+        elif merged:
+            topic = ""                  # its pull request was merged: start a new one
+        elif remote_topic and run(wc, "merge-base", "--is-ancestor", remote_topic, "HEAD",
+                                  check=False).returncode != 0:
+            raise CriterionError(
+                f"origin/{topic} has commits this working copy does not have (a reviewer's?) — "
+                f"`git -C {wc} pull --rebase origin {topic}` first; nothing was pushed")
+    if not topic:
+        topic, remote_topic = _topic(user), ""
+    if current != topic:
+        run(wc, "checkout", "-q", "-B", topic)
+    write_attributes(dep)
+    if dirty(wc):
+        run(wc, "add", "-A")
+        run(wc, "-c", f"user.name={user}", "commit", "-q", "-m", message)
+    pre_rebase = out(wc, "rev-parse", "HEAD") if run(wc, "rev-parse", "-q", "--verify", "HEAD",
+                                                      check=False).returncode == 0 else None
+    if has_base:
+        res = run(wc, "-c", f"user.name={user}", "rebase", "-q", base, check=False)
+        if res.returncode != 0:
+            files = out(wc, "diff", "--name-only", "--diff-filter=U").splitlines()
+            run(wc, "rebase", "--abort", check=False)
+            raise CriterionConflict(files or ["(see git status)"])
+    # Rows merged by union are regenerated in ID order.
+    fresh = load_working_copy(wc) if dep.standalone else load(dep.project_root)
+    from catalyst import journal
+    changes = regenerate(fresh, load_corpus(fresh))
+    regenerated = [str(c.path.relative_to(wc)) for c in changes]
+    # Files the rebase merged (by union, or a clean three-way merge of both
+    # sides' edits) match neither side's journaled version: record their
+    # merged state, with the regeneration.
+    rebased = set(out(wc, "diff", "--name-only", pre_rebase, "HEAD").splitlines()) if pre_rebase else set()
+    merged = [p[len(journal.WC):] for p in journal.unjournaled(fresh)
+              if p.startswith(journal.WC) and p[len(journal.WC):] in rebased]
+    touched = sorted(set(regenerated) | set(merged))
+    if touched:
+        journal.append(fresh, journal.AppendRequest(
+            command="catalyst criterion push", action="update",
+            artifact="files merged by rebasing onto the shared branch", targets=[],
+            intent=["Rebasing onto the shared branch merged both sides' changes to these files "
+                    "(append-only and index files by union, then indexes rewritten in ID order by "
+                    "catalyst index regen); this records their merged state."],
+            files=[str(wc / p) for p in touched], actor=user, allow_unchanged=True))
+        run(wc, "add", "-A")
+        run(wc, "-c", f"user.name={user}", "commit", "-q", "-m", "Regenerate indexes after rebase")
+    report = (checker or _check)(fresh)
+    if report:
+        raise CriterionError("catalyst check fails on the rebased work — nothing was pushed:\n" + report)
+    if has_base:
+        lost = integrity(wc, "HEAD", [base])
+        if lost:
+            raise CriterionError("the rebase lost recorded content — nothing was pushed:\n" + "\n".join(lost))
+        commits = int(out(wc, "rev-list", "--count", f"{base}..HEAD"))
+    else:
+        commits = int(out(wc, "rev-list", "--count", "HEAD"))
+    if commits == 0:
+        return PushResult(topic, 0, None, regenerated)
+    # An explicit lease: the remote branch must still be what we built on.
+    run(wc, "push", "-q", f"--force-with-lease=refs/heads/{topic}:{remote_topic}", "-u", "origin",
+        f"HEAD:refs/heads/{topic}")
+    try:
+        share_pins(wc)
+    except CriterionError as exc:           # the pins go with the next push; the work is safe
+        print(f"catalyst: journal pins not shared yet ({exc})")
+    pr = open_pull_request(wc, branch, topic, message) if open_pr else None
+    return PushResult(topic, commits, pr, regenerated)
+
+
+def _check(dep: Deployment) -> str:
+    from catalyst.check import run as run_checks
+    report = run_checks(dep)
+    return "\n".join(report.errors)
+
+
+def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
+    if shutil.which("gh") is None:
+        return None
+    existing = subprocess.run(["gh", "pr", "view", head, "--json", "url", "--jq", ".url"],
+                              cwd=wc, capture_output=True, text=True)
+    if existing.returncode == 0 and existing.stdout.strip():
+        return existing.stdout.strip()
+    res = subprocess.run(["gh", "pr", "create", "--base", base, "--head", head, "--title", title,
+                          "--body", "Opened by `catalyst criterion push`. CI runs `catalyst check` "
+                          "and `catalyst criterion integrity` on this pull request."],
+                         cwd=wc, capture_output=True, text=True)
+    return res.stdout.strip().splitlines()[-1] if res.returncode == 0 and res.stdout.strip() else None
+
+
+# --- create / join ----------------------------------------------
+def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template: str | None = None) -> list[str]:
+    """Publish a local-only working copy to `url` and make it the product
+    repository's `.criterion` submodule. Stages the product changes; the
+    caller commits them."""
+    project, wc = dep.project_root, dep.root
+    link = project / ".criterion"
+    if is_submodule(project):
+        raise CriterionError(".criterion is already a submodule of this project")
+    if not link.is_symlink():
+        raise CriterionError(".criterion is not a symlink to an agent-owned working copy; "
+                             "move an in-project working copy into agent-owned space first")
+    steps = []
+    if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
+        run(wc, "init", "-q")
+        steps.append("initialised the working copy as a git repository")
+    dep.pointer["criterion_branch"] = branch
+    written = []
+    if write_attributes(dep):
+        written.append(".gitattributes")
+        steps.append("wrote .gitattributes (journal and indexes merge by union)")
+    if ci_template and write_ci(dep, ci_template):
+        written.append(CI_WORKFLOW)
+        steps.append(f"wrote {CI_WORKFLOW} (catalyst check + integrity on pull requests)")
+    if written:
+        from catalyst import journal
+        user = next((u for u in _users(dep) if u.get("active", True)), {})
+        journal.append(dep, journal.AppendRequest(
+            command="catalyst criterion create", action="create",
+            artifact="shared deployment: merge attributes and CI", targets=[],
+            intent=[f"Publishing the working copy to {url} as a shared deployment: the journal and "
+                    "regenerated indexes merge by union, and the criterion repository's CI runs "
+                    "catalyst check and the integrity check on every pull request."],
+            files=[str(wc / w) for w in written],
+            actor=str(user.get("git_username") or user.get("name") or "catalyst"),
+            allow_unchanged=True))
+    if dirty(wc):
+        run(wc, "add", "-A")
+        run(wc, "commit", "-q", "-m", "Publish the catalyst working copy")
+    if run(wc, "remote", "get-url", "origin", check=False).returncode == 0:
+        run(wc, "remote", "set-url", "origin", url)
+    else:
+        run(wc, "remote", "add", "origin", url)
+    remote_head = run(wc, "ls-remote", "--heads", "origin", branch).stdout.strip()
+    if remote_head:
+        run(wc, "fetch", "-q", "origin", branch)
+        if run(wc, "merge-base", "--is-ancestor", f"origin/{branch}", "HEAD", check=False).returncode != 0:
+            raise CriterionError(f"{url} already has a '{branch}' branch this working copy does not contain")
+    run(wc, "push", "-q", "-u", "origin", f"HEAD:refs/heads/{branch}")
+    try:
+        share_pins(wc)
+        steps.append(f"pushed the working copy and its journal pins to {url} ({branch})")
+    except CriterionError as exc:
+        steps.append(f"pushed the working copy to {url} ({branch}); journal pins not shared yet: {exc}")
+    agent_owned = os.path.realpath(link)
+    gitignore = project / ".gitignore"
+    old_gitignore = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else None
+    link.unlink()
+    if gitignore.is_file():
+        lines = [line for line in gitignore.read_text(encoding="utf-8").splitlines()
+                 if line.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
+                 and not line.startswith("# catalyst working copy:")]
+        gitignore.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    try:
+        run(project, "submodule", "add", "-b", branch, url, ".criterion")
+    except CriterionError as exc:
+        # put the project back exactly as it was: symlink, .gitignore, no half submodule
+        run(project, "rm", "-q", "--cached", "-r", "--ignore-unmatch", ".criterion", check=False)
+        shutil.rmtree(project / ".criterion", ignore_errors=True)
+        git_dir = Path(out(project, "rev-parse", "--absolute-git-dir"))
+        shutil.rmtree(git_dir / "modules" / ".criterion", ignore_errors=True)
+        gm = project / ".gitmodules"
+        if gm.is_file() and not gm.read_text(encoding="utf-8").strip():
+            gm.unlink()
+            run(project, "rm", "-q", "--cached", "--ignore-unmatch", ".gitmodules", check=False)
+        link.symlink_to(agent_owned)
+        if old_gitignore is not None:
+            gitignore.write_text(old_gitignore, encoding="utf-8")
+        raise CriterionError(f"adding the submodule failed, so nothing changed in the project "
+                             f"(the working copy is still at {agent_owned}, now also on {url}): {exc}") from exc
+    steps.append("added .criterion as a submodule of the product repository (staged, not committed)")
+    pointer_path = next(project.glob("*.catalyst"))
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
+                    "updated": datetime.date.today().isoformat()})
+    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+    run(project, "add", pointer_path.name, ".gitmodules", *([".gitignore"] if gitignore.is_file() else []))
+    steps.append(f"updated {pointer_path.name} (repoed, catalyst_repo_url, criterion_branch)")
+    steps.append(f"the old agent-owned copy at {agent_owned} is no longer used; remove it once satisfied")
+    return steps
+
+
+def _users(dep: Deployment) -> list[dict]:
+    try:
+        data = json.loads((dep.root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [u for u in data.get("users", []) if isinstance(u, dict)]
+
+
+def join(project_root: Path) -> str:
+    """Check out the shared working copy in a clone of the product repository."""
+    if not is_submodule(project_root):
+        raise CriterionError("this project has no .criterion submodule — nothing to join")
+    run(project_root, "submodule", "update", "--init", ".criterion")
+    wc = project_root / ".criterion"
+    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    branch = str(pointer.get("criterion_branch") or DEFAULT_BRANCH)
+    run(wc, "fetch", "-q", "--prune", "origin")
+    if run(wc, "rev-parse", "-q", "--verify", f"origin/{branch}", check=False).returncode != 0:
+        raise CriterionError(f"the criterion repository has no '{branch}' branch")
+    changes = dirty(wc)
+    if changes:
+        raise CriterionError(f"{len(changes)} uncommitted change(s) in .criterion — commit or discard them first")
+    guard_branch_reset(wc, branch)
+    run(wc, "checkout", "-q", "-B", branch, f"origin/{branch}")
+    share_pins(wc, publish=False)
+    return out(wc, "rev-parse", "--short", "HEAD")
+
+
+# --- protect ----------------------------------------------------
+def protection_payload(check_name: str = "catalyst") -> dict:
+    return {
+        "required_status_checks": {"strict": True, "contexts": [check_name]},
+        "enforce_admins": False,
+        "required_pull_request_reviews": {"required_approving_review_count": 0},
+        "restrictions": None,
+        "allow_force_pushes": False,
+        "allow_deletions": False,
+    }
+
+
+def github_repo(url: str) -> str | None:
+    m = re.search(r"github\.com[:/]([^/]+/[^/]+?)(?:\.git)?$", url)
+    return m.group(1) if m else None
+
+
+def protect(dep: Deployment, apply: bool) -> str:
+    url = run(dep.root, "remote", "get-url", "origin", check=False).stdout.strip()
+    repo = github_repo(url)
+    if repo is None:
+        raise CriterionError(f"branch protection is set up for GitHub remotes only (origin: {url or 'none'})")
+    branch = shared_branch(dep)
+    payload = json.dumps(protection_payload())
+    endpoint = f"repos/{repo}/branches/{branch}/protection"
+    if not apply:
+        return f"would PUT {endpoint}:\n{payload}\n(re-run with --yes to apply)"
+    if shutil.which("gh") is None:
+        raise CriterionError("gh is not installed")
+    res = subprocess.run(["gh", "api", "-X", "PUT", endpoint, "--input", "-"], input=payload,
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        raise CriterionError(f"gh api {endpoint} failed: {res.stderr.strip() or res.stdout.strip()}")
+    return f"protected {repo}:{branch} — pull requests required, status check 'catalyst' required"
