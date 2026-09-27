@@ -1,0 +1,97 @@
+"""Regenerate each per-file entity type's `<folder>/<folder>.md` index from
+the artifact files themselves, so an index can never drift from what is on
+disk (or conflict in a merge — regenerate instead of merging).
+
+Each index keeps its own prose and its table's header columns; rows are
+rebuilt, one per artifact in ID order: `ID` links the file, `Title` is the
+artifact's H1 title, any other column is the artifact field of the same
+name (loosely matched, refs rendered bare and comma-separated).
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from catalyst.corpus import Artifact, Corpus, is_empty, norm_field, ref_values
+from catalyst.deployment import Deployment
+
+DEFAULT_COLUMNS = ["ID", "Title", "Status"]
+PLACEHOLDER_RE = re.compile(r"^\*\(none yet.*\)\*\s*$")
+
+
+@dataclass
+class IndexChange:
+    path: Path
+    old: str
+    new: str
+
+
+def _split(text: str) -> tuple[list[str], list[str] | None, list[str]]:
+    """(lines before the table, header columns or None, lines after it)."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if (line.startswith("|") and i + 1 < len(lines)
+                and re.match(r"^\|\s*:?-{3,}", lines[i + 1])):
+            header = [c.strip() for c in line.strip().strip("|").split("|")]
+            j = i + 2
+            while j < len(lines) and lines[j].startswith("|"):
+                j += 1
+            return lines[:i], header, lines[j:]
+    return lines, None, []
+
+
+def _cell(art: Artifact, column: str) -> str:
+    key = norm_field(column)
+    if key == "id":
+        return f"[{art.id}]({art.file.name})"
+    if key == "title":
+        return art.title
+    raw = art.get(column)
+    if raw is None or is_empty(raw):
+        return ""
+    values = ref_values(raw) if "`" in raw else [raw.strip()]
+    return ", ".join(v.replace("|", "\\|") for v in values)
+
+
+def _number(art: Artifact) -> int:
+    m = re.match(r"^[A-Z]+-(\d+)", art.id)
+    return int(m.group(1)) if m else 0
+
+
+def render(existing: str, title: str, arts: list[Artifact]) -> str:
+    before, header, after = _split(existing) if existing else ([f"# {title} index", ""], None, [])
+    if existing and header is None and not arts:
+        return existing        # an empty index without a table stays as written
+    columns = header or DEFAULT_COLUMNS
+    rows = [f"| {' | '.join(columns)} |", f"|{'|'.join('---' for _ in columns)}|"]
+    for art in sorted(arts, key=_number):
+        rows.append(f"| {' | '.join(_cell(art, c) for c in columns)} |")
+    if arts:
+        after = [line for line in after if not PLACEHOLDER_RE.match(line.strip())]
+    while before and not before[-1].strip():
+        before.pop()
+    out = [*before, "", *rows]
+    tail = list(after)
+    while tail and not tail[0].strip():
+        tail.pop(0)
+    if tail:
+        out += ["", *tail]
+    return "\n".join(out).rstrip() + "\n"
+
+
+def regenerate(dep: Deployment, corpus: Corpus, write: bool = True) -> list[IndexChange]:
+    changes = []
+    for prefix, arts in sorted(corpus.by_prefix.items()):
+        etd = dep.etds[prefix]
+        folder = dep.folder(etd)
+        if folder is None:
+            continue
+        index = folder / f"{folder.name}.md"
+        old = index.read_text(encoding="utf-8") if index.is_file() else ""
+        new = render(old, etd.plural_name, arts)
+        if new != old:
+            changes.append(IndexChange(index, old, new))
+            if write:
+                index.write_text(new, encoding="utf-8")
+    return changes
