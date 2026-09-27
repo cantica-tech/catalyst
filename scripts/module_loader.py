@@ -230,19 +230,22 @@ def _read_pointer(project_root: Path) -> dict[str, Any]:
 
 
 def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
-    """The deployment root for `project_root`: the pointer's "agent-source"
-    when it names a real directory (same rule as
-    check_deployment.find_deploy_root), else an in-tree .criterion/."""
+    """The deployment root for `project_root` (same rule as
+    check_deployment.find_deploy_root): <project root>/.criterion — symlink
+    followed, or the in-project directory — else a pre-0.37.0 pointer's
+    legacy "agent-source" when it names a real directory."""
     if not project_root:
         return None
     root = Path(project_root).resolve()
+    local = root / DEPLOY_DIRNAME
+    if local.is_dir():
+        return local
     source = _read_pointer(root).get("agent-source")
     if source:
         candidate = Path(str(source)).expanduser()
         if candidate.is_dir():
             return candidate
-    legacy = root / DEPLOY_DIRNAME
-    return legacy if legacy.is_dir() else None
+    return None
 
 
 def resolve_module_id(project_root: Path | str | None) -> str | None:

@@ -154,12 +154,14 @@ agent to simply remember.
 `.criterion/` itself is the agent's own governance context for the
 project — not part of the developed code structure, so it doesn't build
 inside the project's own tree at all. It builds in **agent-owned space**
-instead, and the target project tracks exactly one small, committed file
-for it, `<app-name>.catalyst`, whose `agent-source` field points at where
-the real working copy lives; `/project create`/`remove`/`export`/`import`
-manage that lifecycle. An agent with no owned-space concept falls back to
-building `.criterion/` directly in the project, gitignored there
-instead. Either way, `/criterion` is the opt-in mechanism for a team
+instead, at a location each agent computes per machine, and the project
+reaches it through a gitignored `.criterion` symlink at its root. The
+target project tracks exactly one small, committed file for it,
+`<app-name>.catalyst`, which holds no path, so it is identical on every
+clone; `/project create`/`remove`/`export`/`import` manage that
+lifecycle. An agent with no owned-space concept (or a platform without
+symlinks) falls back to building `.criterion/` directly in the project,
+gitignored there instead. Either way, `/criterion` is the opt-in mechanism for a team
 that wants the working copy to persist and sync across contributors,
 through a dedicated repository rather than a commit into the product's
 own history.
@@ -178,3 +180,8 @@ that file.
 
 All three load `BOOTSTRAP.md`, the single portable install core. Open the
 selected file and follow its instructions from top to bottom.
+
+## License
+
+Apache License 2.0 — see `LICENSE`. Contributions: `CONTRIBUTING.md`;
+security reports: `SECURITY.md`.

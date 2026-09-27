@@ -68,23 +68,28 @@ one-line placeholder; numbers are never reused.
   `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4).
 - **INV-6 — Working copy in agent-owned space; one tracked pointer.** The
   deployment's real working copy is a directory named `.criterion/`,
-  living in **agent-owned space** resolved per the running agent
-  (`BOOTSTRAP.md` §1) — never inside the developed project's own tree.
-  The target project tracks exactly one file for this: `<app-name>.catalyst`
+  living in **agent-owned space** — the running agent's own per-project
+  storage, computed per machine from that agent's conventions
+  (`BOOTSTRAP.md` §1), never recorded in a tracked file and never inside
+  the developed project's own tree. The project reaches it through one
+  path, `<project root>/.criterion`: a gitignored symlink to the
+  agent-owned copy, which the agent creates or repairs at install,
+  `/criterion get`, `/project import` and every session start. The
+  target project tracks exactly one file for this: `<app-name>.catalyst`
   (JSON, project root, committed — the only catalyst artifact the
-  project's own repo ever carries), whose `agent-source` field names
-  where the real working copy actually is. `.criterion/DEPLOYMENT.md`
-  stays the source of record for deployment/repo metadata, inside the
-  working copy wherever it's now rooted (unchanged in role — only its
-  location moved); `<app-name>.catalyst` mirrors the same `repoed`/
-  `catalyst_repo`/`catalyst_repo_url`/`created_by` fields for project-root
-  visibility without resolving `agent-source` first. Fallback for an agent with no
-  owned-space concept: keep `.criterion/` directly in the project
-  instead, gitignored, never committed. When switching agents, the newly active
-  agent updates `<app-name>.catalyst` (`agent`, `agent-source`, `updated`), mirrors
-  `.criterion/` into the new `agent-source` location (exact copy, overwriting the
-  destination — never a partial merge), updates `CRITERION_DIR` in `Taskfile.yml`,
-  and updates its persistent framework memory note. `/criterion` (INV-18) is the
+  project's own repo ever carries), which holds no path.
+  `.criterion/DEPLOYMENT.md` stays the source of record for
+  deployment/repo metadata; `<app-name>.catalyst` mirrors the same
+  `repoed`/`catalyst_repo`/`catalyst_repo_url`/`created_by` fields for
+  project-root visibility. Fallback for an agent with no owned-space
+  concept, or a platform without symlinks: `.criterion/` is a real
+  directory in the project instead, gitignored, never committed. When
+  switching agents, the newly active agent mirrors `.criterion/` into its
+  own owned location (exact copy, overwriting the destination — never a
+  partial merge), repoints the symlink, updates `<app-name>.catalyst`'s
+  `agent` and `updated`, and updates its persistent framework memory
+  note. Pre-0.37.0 pointers may still carry `agent-source`; tools honor
+  it until migrated. `/criterion` (INV-18) is the
   opt-in, repo-backed persistence/sync layer on top of either shape —
   never a commit into the product's own repo. `/project
   create`/`remove`/`export`/`import` (INV-19) manage the lifecycle;

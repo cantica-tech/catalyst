@@ -238,7 +238,8 @@ the seven currently exist anywhere.
 - `/criterion get <repo> <username>` — join an already-repoed
   deployment: download `<repo>`'s `criterion` branch and check out
   `<username>.criterion` (branch-safe form) from it as this user's
-  local `.criterion/`. `<username>` is this user's `git_username`,
+  local `.criterion/` (in the running agent's owned location, linked by
+  the gitignored `.criterion` symlink — INV-6). `<username>` is this user's `git_username`,
   same identity-migration treatment as `create`. Also asks which branch
   to push to and records `criterion_branch`, same as `create`.
 - `/criterion push [--force]` — refuses if not yet repoed (point to
@@ -276,21 +277,23 @@ the seven currently exist anywhere.
   names a `Workflow` (`WORKFLOW-NNNNNN`, `Rules-of-Rules.md` §19), read
   its `## Steps`/`## Gates / exit criteria` before choosing a verb.
 - `/project create <project name>` — install a fresh catalyst deployment
-  here (`Rules-of-Rules.md` §14): resolve `agent-source`, build the
-  working copy there, and write `<app-name>.catalyst` at this project's
-  root. Refuses if a deployment already exists here.
+  here (`Rules-of-Rules.md` §14): resolve the agent-owned location,
+  build the working copy there, write `<app-name>.catalyst` at this
+  project's root (no path in it), create the `.criterion` symlink, and
+  gitignore `/.criterion`. Refuses if a deployment already exists here.
 - `/project remove <project name> [force]` — un-link the local
-  `<app-name>.catalyst` pointer; the working copy, memory note, and any
-  `criterion` repo are left untouched (retire in place). `force`
-  additionally deletes the working copy at `agent-source` and this
+  `<app-name>.catalyst` pointer and `.criterion` symlink; the working
+  copy, memory note, and any `criterion` repo are left untouched (retire
+  in place). `force` additionally deletes the working copy and this
   agent's memory note for the project — confirm explicitly first; never
   touches a `criterion` repo.
 - `/project export <project name> [export filename]` — bundle every file
-  under the working copy, plus its pointer fields (minus
-  `agent-source`), into one JSON export. Default filename:
+  under the working copy, plus its pointer fields (never a path), into
+  one JSON export. Default filename:
   `<project name>-catalyst-export-<UTC timestamp>.json`.
 - `/project import <export filename> [force]` — install a bundle into
-  the current project. Refuses if a deployment already exists here,
+  the current project, in this agent's owned location, linked by a
+  fresh `.criterion` symlink. Refuses if a deployment already exists here,
   unless `force` is given, in which case it overwrites the existing one
   — confirm explicitly first.
 - `/switch-agent [agent-id]` — force the agent-switch procedure (hard
@@ -298,15 +301,16 @@ the seven currently exist anywhere.
   procedure) to run now, regardless of whether the running agent's
   identity already appears to match `<app-name>.catalyst`'s `agent`
   field. The manual escape hatch for when the automatic per-session
-  check is skipped or only partially completes (e.g. `agent-source`
-  already relocated but the pointer's `agent` field never updated to
-  match). Resolves `agent-source` for `<agent-id>` (defaulting to the
+  check is skipped or only partially completes (e.g. the working copy
+  already mirrored but the pointer's `agent` field never updated to
+  match). Resolves the owned location of `<agent-id>` (defaulting to the
   running agent's own identifier if omitted) per `BOOTSTRAP.md` §1,
-  updates `<app-name>.catalyst` (`agent`, `agent-source`, `updated`)
-  unconditionally, mirrors `.criterion/` into the resolved location if
-  it existed elsewhere (exact copy, overwriting the destination — never
-  a partial merge), updates `Taskfile.yml`'s `CRITERION_DIR`, and
-  refreshes persistent framework memory.
+  mirrors `.criterion/` into it if it existed elsewhere (exact copy,
+  overwriting the destination — never a partial merge), repoints the
+  `.criterion` symlink, updates `<app-name>.catalyst` (`agent`,
+  `updated`) unconditionally, and refreshes persistent framework memory.
+  No `Taskfile.yml` edit: it reaches the working copy through the
+  symlink.
 - `/status` — update an artifact or work item's `Status` field.
 - `/audit <file-name>` — analyze the change-impact of the specified file by
   checking the current repository state, the file's role in the framework,
@@ -509,7 +513,10 @@ When the user enters `/criterion get <repo> <username>: ...`, validate
 suggested alternative if it doesn't survive sanitization uniquely against
 already-registered users. Download `<repo>`'s `criterion` branch content
 and check out `<username>.criterion` (branch-safe form) from it as
-this user's local `.criterion/`, creating a `IAM/users/users.json`
+this user's local `.criterion/` — in the running agent's owned location
+(`BOOTSTRAP.md` §1), then create or repair the `.criterion` symlink at
+the project root and make sure `/.criterion` is gitignored (INV-6) —
+creating a `IAM/users/users.json`
 entry for them first if one doesn't already exist. **Ask which branch
 this actor will push to**, same as `create` above (the just-created
 `<username>.criterion` is the default), and record
@@ -587,31 +594,35 @@ When the user enters `/project create <project name>: ...`, refuse if a
 `<app-name>.catalyst` pointer or an in-project `.criterion/` already
 exists at this project's root — point to `/project import ... force`
 instead. Otherwise run the instantiation procedure
-(`INSTANTIATION-GUIDE.md`): resolve `agent-source` (`BOOTSTRAP.md` §1),
-build the working copy there, then write `<app-name>.catalyst` from
-`templates/catalyst-pointer.template.json` with `<project name>` and the
-resolved `agent-source`. Report the result; per hard rule 4, nothing is
-committed automatically.
+(`INSTANTIATION-GUIDE.md`): resolve the agent-owned location
+(`BOOTSTRAP.md` §1), build the working copy there, then write
+`<app-name>.catalyst` from `templates/catalyst-pointer.template.json`
+with `<project name>` (the pointer holds no path), create the
+`.criterion` symlink at the project root pointing at the working copy
+(or keep the in-project fallback directory), and add `/.criterion` to the
+project's `.gitignore` if absent. Report the result; per hard rule 4,
+nothing is committed automatically.
 
 When the user enters `/project remove <project name> [force]: ...`,
-without `force`: delete this project's `<app-name>.catalyst` (and, on
-the in-project fallback, stop treating that `.criterion/` as active)
-— nothing else. The working copy at `agent-source`, this agent's memory
-note, and any `criterion` repo are left exactly as they are (never
+without `force`: delete this project's `<app-name>.catalyst` and its
+`.criterion` symlink (on the in-project fallback, stop treating that
+`.criterion/` as active) — nothing else. The working copy, this agent's
+memory note, and any `criterion` repo are left exactly as they are (never
 delete, retire in place — `Rules-of-Rules.md` §14). With `force`: this is
 externally-visible within this agent's own state and hard to reverse, so
 confirm explicitly with the user first, distinct from the general assent
 already implied by invoking this command; then additionally delete the
-working copy at `agent-source` and this agent's memory note for the
-project. Never delete a `criterion` repo — that is a separate,
+working copy (agent-owned, or the in-project fallback) and this agent's
+memory note for the project. Never delete a `criterion` repo — that is a separate,
 possibly multi-contributor, externally-hosted artifact outside a local
 removal's scope, regardless of `force`.
 
 When the user enters `/project export <project name> [export filename]:
-...`, resolve `agent-source` for `<project name>` and read every file
-under its working copy into one JSON bundle keyed by path relative to
-`.criterion/`, plus the pointer fields from `<app-name>.catalyst`
-(all but `agent-source`, which is meaningless outside this machine).
+...`, resolve the working copy for `<project name>` (`Rules-of-Rules.md`
+§14's resolution order) and read every file under it into one JSON
+bundle keyed by path relative to `.criterion/`, plus the pointer fields
+from `<app-name>.catalyst` (never a path — a legacy `agent-source`,
+meaningless outside this machine, is dropped).
 Write it to `<export filename>` if given, else
 `<project name>-catalyst-export-<UTC timestamp>.json` in the current
 directory. Report the result.
@@ -621,11 +632,12 @@ without `force`: refuse if a `<app-name>.catalyst` pointer or an
 in-project `.criterion/` already exists at the current project's
 root — point to the `force` form instead. Otherwise (or with `force`,
 after confirming explicitly with the user what will be overwritten):
-parse the bundle, resolve a **fresh** `agent-source` (never the
-exporting machine's original), materialize every bundled file there,
-then write `<app-name>.catalyst` carrying the bundle's pointer fields
-over as-is (`repoed`, `catalyst_repo`, `catalyst_repo_url`,
-`created_by`) with `agent-source` set to the new location. Append one
+parse the bundle, resolve this agent's own owned location on this
+machine (never the exporting machine's), materialize every bundled file
+there, create the `.criterion` symlink at the project root pointing at
+it and gitignore `/.criterion`, then write `<app-name>.catalyst`
+carrying the bundle's pointer fields over as-is (`repoed`,
+`catalyst_repo`, `catalyst_repo_url`, `created_by`), with no path. Append one
 journal entry for the import (`action: "import"`), then report the
 result.
 

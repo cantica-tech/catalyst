@@ -11,17 +11,6 @@
 version: "3"
 
 vars:
-  # This deployment's *.catalyst pointer's own agent-source field (INV-6),
-  # copied here as a literal — NOT `sh:`-computed. Task resolves an
-  # `includes.taskfile` path before dynamic (`sh:`) vars are evaluated, so
-  # a dynamic value here silently produces an empty path and "no Taskfile
-  # found" (confirmed by hand: a plain `cmds:` var with the identical `sh:`
-  # script resolves fine, only the `includes:` use fails). Update by hand
-  # (or via /sync-framework) if agent-source ever changes — the same
-  # "set once, rarely revisited" tradeoff the pointer's own field already
-  # has. Falls back to a bare `.criterion` for an agent with no owned-space
-  # concept (INV-6's documented fallback).
-  CRITERION_DIR: "/Users/oliviersteck/.claude/projects/-Users-oliviersteck-sources-catalyst/.criterion"
   # Resolves the deployed agent's CLI binary from the pointer's "agent"
   # field. "claude-code" is the one known id whose CLI binary name differs
   # from the id itself; any other agent id is assumed to already be its
@@ -37,8 +26,13 @@ vars:
   AGENT_CMD: '{{.AGENT_CMD_OVERRIDE | default (printf "%s -p" .AGENT_BIN)}}'
 
 includes:
+  # Catalyst-operation dispatch tasks, from the working copy reached through
+  # .criterion — a gitignored symlink into agent-owned space (INV-6).
+  # Optional, so a clone without a working copy (CI, a new contributor)
+  # still runs this project's own tasks.
   common:
-    taskfile: '{{.CRITERION_DIR}}/Taskfile.common.yml'
+    taskfile: .criterion/Taskfile.common.yml
+    optional: true
     flatten: true
     vars:
       AGENT_CMD: '{{.AGENT_CMD}}'
@@ -90,7 +84,7 @@ tasks:
       - task: test
 
   release:
-    desc: "Package and release the kernel and modules into versioned zipped archives with manifests"
+    desc: "Package the kernel and modules into versioned zipped archives with manifests (no commit, no push)"
     cmds:
       - python3 scripts/package_release.py
       - task: check:command-parity
@@ -98,6 +92,13 @@ tasks:
       - task: check:plugin-contracts
       - task: check:kernel-purity
       - task: test
+
+  release:publish:
+    desc: "Package, copy releases into PUBLISH_DIR (a distribution repository checkout), then commit and push the module repositories and PUBLISH_DIR"
+    requires:
+      vars: [PUBLISH_DIR]
+    cmds:
+      - python3 scripts/package_release.py --publish-dir "{{.PUBLISH_DIR}}" --push
 
   dogfood:
     desc: "Vet this repository against its own rules (catalyst-development-only)"

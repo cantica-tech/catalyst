@@ -437,6 +437,16 @@ module template, definition, meta-rule, invariant, command, task and
 migration comes from the active module and is composed per
 `MODULE-SPECIFICATION.md` §6. The pointer must name its module.
 
+### From `0.36.0`: computed working-copy location
+
+Target version `0.37.0`. Full procedure:
+`migrations/0.37.0/computed-working-copy-location.md` (this repository)
+— not duplicated here. The pointer drops `agent-source`: the agent-owned
+location is computed per machine and reached through a gitignored
+`.criterion` symlink at the project root, which the root `Taskfile.yml`
+includes as `.criterion/Taskfile.common.yml` (`optional: true`, no
+`CRITERION_DIR`).
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current

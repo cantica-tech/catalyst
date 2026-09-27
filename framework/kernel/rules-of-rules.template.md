@@ -718,29 +718,44 @@ that check.
 INV-6 (revised): the working copy — a directory always named
 `.criterion/` — is not built inside the target project's own tree. It
 builds in **agent-owned space**: a per-project data location the running
-agent already maintains, outside the project being governed. The target
-project tracks exactly one file for it, at its root: **`<app-name>.catalyst`**
-(JSON, from `templates/catalyst-pointer.template.json`), whose
-`agent-source` field names where the working copy actually is. This is
+agent already maintains, outside the project being governed. Its location
+is computed per machine by the running agent from its own conventions
+(`BOOTSTRAP.md` §1; each agent's shim says how) and is never written into
+a tracked file. The target project tracks exactly one file for it, at its
+root: **`<app-name>.catalyst`** (JSON, from
+`templates/catalyst-pointer.template.json`), which holds no path. This is
 the only catalyst artifact the target project's own repo ever carries —
-small, safe to commit, no rule/artifact/journal content in it.
+small, safe to commit, no rule/artifact/journal content in it, identical
+on every machine.
+
+**One access path.** `<project root>/.criterion` is how everything —
+agents, tools, the project's own `Taskfile.yml` — reaches the working
+copy: a **symlink** to the agent-owned `.criterion/`, always gitignored
+(`/.criterion` in the project's `.gitignore`). The agent creates or
+repairs it at install, at `/criterion get` and `/project import`, and at
+every session start (`BOOTSTRAP.md` §1.1). Every document path written
+`.criterion/...` therefore means the same thing on every machine and for
+every agent. Tools resolve the working copy in this order: (1)
+`<project root>/.criterion` (symlink followed, or a real directory); (2)
+legacy — a pointer's `agent-source` field, if present and an existing
+directory (pre-0.37.0 pointers may still carry `agent-source`; tools
+honor it until migrated); (3) any tool-specific extra fallback. The
+project root is the directory holding the `*.catalyst` pointer.
 
 `.criterion/DEPLOYMENT.md` (§13) keeps its existing role unchanged —
 the source of record for `repoed`, `catalyst_repo`, `catalyst_repo_url`,
-`created_by` — it just now lives inside the working copy wherever
-`agent-source` currently puts it. `<app-name>.catalyst` mirrors those same
-four fields at the project root so they're visible without resolving
-`agent-source` first; any command that writes them (`/criterion create`,
-`/criterion push --force`) updates both files in the same step. If they
-ever disagree, `.criterion/DEPLOYMENT.md` wins — it is the source of
-record.
+`created_by` — inside the working copy. `<app-name>.catalyst` mirrors those
+same four fields at the project root; any command that writes them
+(`/criterion create`, `/criterion push --force`) updates both files in
+the same step. If they ever disagree, `.criterion/DEPLOYMENT.md` wins —
+it is the source of record.
 
-**No agent owned-space concept available:** fall back to building
-`.criterion/` directly inside the target project, gitignored there,
-never committed. `<app-name>.catalyst` still gets written at the project
-root — its `agent-source` just names the in-project path instead. Every
-mechanism below (migration, export, import) treats this fallback as an
-ordinary `agent-source` value, not a special case.
+**No agent owned-space concept available, or no symlinks on this
+platform:** fall back to building `.criterion/` directly inside the
+target project as a real directory, gitignored there, never committed.
+`<app-name>.catalyst` still gets written at the project root, unchanged.
+Every mechanism below (migration, export, import) treats this fallback
+as just another shape of `<project root>/.criterion`, not a special case.
 
 ### Migration from the pre-pointer-file model
 
@@ -751,22 +766,20 @@ anywhere. Detect this (a `.criterion/` dir at the project root and no
 structural change, so confirm with the user before proceeding, the same
 courtesy as `/criterion create`:
 
-1. Resolve `agent-source` per `BOOTSTRAP.md` §1. If the running agent has
-   no owned-space concept, there is nothing to migrate — stop here; the
-   in-project fallback shape already **is** the target shape, it just
-   still needs its `<app-name>.catalyst` pointer written (step 3 below,
-   skipping step 2).
+1. Resolve the agent-owned location per `BOOTSTRAP.md` §1. If the
+   running agent has no owned-space concept, there is nothing to move —
+   stop here; the in-project fallback shape already **is** the target
+   shape, it just still needs its `<app-name>.catalyst` pointer written
+   (step 3 below, skipping step 2).
 2. **Move**, not copy, the entire existing `.criterion/` tree from
-   the project root to the resolved `agent-source` location.
-3. Write `<app-name>.catalyst` at the project root: `agent-source` set to
-   the (possibly unchanged, on the fallback) working-copy location;
+   the project root to the resolved agent-owned location, then create
+   the `.criterion` symlink at the project root pointing at it.
+3. Write `<app-name>.catalyst` at the project root (no path in it);
    `repoed`/`catalyst_repo`/`catalyst_repo_url`/`created_by` carried over
    from the existing `.criterion/DEPLOYMENT.md` if one exists, else
    left at their unset defaults.
-4. If the move actually relocated the tree (step 2 ran): delete the
-   now-empty `.criterion/` from the project root, and remove its line
-   from that project's `.gitignore` (leave the file itself in place, even
-   if now empty).
+4. Make sure `/.criterion` is in that project's `.gitignore` — the
+   symlink (or the fallback directory) is never committed.
 5. Append one journal entry, in the working copy's new location, for the
    migration itself (`action: "migrate"`, `intent` describing the move,
    `files` covering the old and new `DEPLOYMENT.md`/pointer locations by
@@ -781,11 +794,11 @@ courtesy as `/criterion create`:
 ### Agent switching procedure
 
 When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
-1. Resolve the running agent's `agent-source` path per `BOOTSTRAP.md` §1 (agent-owned space for the running agent, or in-project fallback `.criterion/`).
-2. Update `<app-name>.catalyst`: set `agent` to the current agent's identifier, `agent-source` to the resolved path, and `updated` to the current date string (`YYYY-MM-DD`).
-3. If the `.criterion/` working copy existed in the previous `agent-source` location, mirror it into the new `agent-source` location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
-4. Update `Taskfile.yml` at the project root: set the `CRITERION_DIR` variable to match the new `agent-source` path.
-5. Update persistent framework memory (and deployment notes) with the current agent name, resolved `agent-source` directory, and update timestamp.
+1. Resolve the running agent's own owned location per `BOOTSTRAP.md` §1 (or the in-project fallback `.criterion/`).
+2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
+3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`.
+4. Update `<app-name>.catalyst`: set `agent` to the current agent's identifier and `updated` to the current date string (`YYYY-MM-DD`) — nothing else; the pointer holds no path, and the project's `Taskfile.yml` needs no edit.
+5. Update persistent framework memory (and deployment notes) with the current agent name, resolved working-copy location, and update timestamp.
 
 `/switch-agent [agent-id]` runs this same procedure on demand, unconditionally
 (steps 1–5 above, without first checking whether identity actually differs)
@@ -800,19 +813,20 @@ The lifecycle commands for this model (full command spec:
 `CODE-OF-CONDUCT.md` §4).
 
 - **`create <name>`** is the explicit, named entry point for the
-  instantiation procedure (`INSTANTIATION-GUIDE.md`) — resolves
-  `agent-source`, builds a fresh working copy there, and writes
-  `<app-name>.catalyst`. Refuses if a pointer file or an in-project
+  instantiation procedure (`INSTANTIATION-GUIDE.md`) — resolves the
+  agent-owned location, builds a fresh working copy there, writes
+  `<app-name>.catalyst` (no path in it), creates the `.criterion`
+  symlink, and adds `/.criterion` to the project's `.gitignore`. Refuses if a pointer file or an in-project
   `.criterion/` already exists here — that's `/project import
   --force`'s job, not `create`'s.
 - **`remove <name>`** un-links locally only: deletes the project's
-  `<app-name>.catalyst` (and, on the fallback, stops treating the
-  in-project `.criterion/` as active). The working copy itself, this
+  `<app-name>.catalyst` and the `.criterion` symlink (on the fallback,
+  it stops treating the in-project `.criterion/` as active). The working copy itself, this
   agent's memory note, and any `criterion` repo are all left exactly as
   they are — never delete, retire in place (`rr-META-004`), same
   principle as user retirement (§11).
-- **`remove <name> force`** additionally deletes the working copy at
-  `agent-source` and this agent's memory note for the project. This is
+- **`remove <name> force`** additionally deletes the working copy (agent-owned,
+  or the in-project fallback) and this agent's memory note for the project. This is
   the one genuinely destructive path here — confirm explicitly before
   proceeding, the same as `/criterion create`'s repo creation or
   `--force` push. It never touches a `criterion` repo: that's a
@@ -820,16 +834,17 @@ The lifecycle commands for this model (full command spec:
   outside the blast radius of a local removal.
 - **`export <name> [file]`** reads every file under the working copy and
   writes one JSON bundle — relative path → file content, plus the
-  pointer fields (minus `agent-source`, which is meaningless outside the
-  exporting machine). Default filename when omitted:
-  `<name>-catalyst-export-<UTC timestamp>.json`, written to the current
-  directory.
+  pointer fields (never a path, which is meaningless outside the
+  exporting machine — a legacy `agent-source` is dropped). Default
+  filename when omitted: `<name>-catalyst-export-<UTC timestamp>.json`,
+  written to the current directory.
 - **`import <file>`** installs a bundle into the current project — same
   refusal condition as `create` if a deployment already exists here.
-  Resolves a fresh `agent-source` (never the exporting machine's), writes
-  every bundled file there, writes `<app-name>.catalyst` with the
-  bundle's pointer fields carried over as-is, and appends one journal
-  entry for the import.
+  Resolves this agent's own owned location on this machine (never the
+  exporting machine's), writes every bundled file there, creates the
+  `.criterion` symlink (with `/.criterion` gitignored), writes
+  `<app-name>.catalyst` with the bundle's pointer fields carried over
+  as-is, and appends one journal entry for the import.
 - **`import <file> force`** is the one case allowed to proceed even when
   a deployment already exists here — it overwrites it. Warn what's about
   to be replaced and confirm explicitly first, same tier of
@@ -1082,13 +1097,14 @@ clean.
 Spawned via the `Agent` tool with `isolation: "worktree"` — one agent,
 not a four-eyes pair (see "Why not four-eyes" below). Since
 `.criterion/` lives entirely outside this repository, in agent-owned
-space resolved through `catalyst.catalyst`'s `agent-source` field
-(INV-6), a worktree checkout has no path to it — except that
-`catalyst.catalyst` itself is a tracked file and will still be present
-in the checkout. The agent's prompt must therefore state explicit,
-forceful prohibitions, not rely on the worktree's isolation alone:
-never resolve any `*.catalyst` pointer's `agent-source` field or read
-anything under a path so resolved; never read anything named
+space reached only through the gitignored `.criterion` symlink at the
+repository root (INV-6), a worktree checkout has no path to it — the
+symlink is untracked, so absent there, though `catalyst.catalyst` itself
+is a tracked file and will still be present in the checkout. The agent's
+prompt must therefore state explicit, forceful prohibitions, not rely on
+the worktree's isolation alone: never compute the agent-owned location,
+never resolve any `*.catalyst` pointer's legacy `agent-source` field, and
+never read anything under a path so resolved; never read anything named
 `.criterion/` under any form it might be reached; never consult `git
 log` or commit messages, which narrate exactly what changed in the
 live deployment — current file content only.

@@ -13,15 +13,24 @@ independent of process modules) plus its process modules
    - Zips the module contents (excluding .git, node_modules, catalyst output).
    - Includes manifest.json inside the zip and alongside it.
    - Saves to <module repo>/catalyst/modules/<id>/v[version]/
-   - Commits and pushes changes to origin main of the module repository.
+   - With --push only: commits and pushes to origin main of the module
+     repository.
 
 2. Catalyst Kernel:
    - Zips framework/kernel/.
    - Includes manifest.json inside the zip and alongside it.
    - Saves to catalyst/kernel/v[version]/ at the root workspace.
+
+3. With --publish-dir DIR: copies every release into DIR/catalyst/ (a
+   distribution repository checkout) and refreshes its release READMEs;
+   with --push as well, commits and pushes DIR to origin main.
+
+Nothing is committed or pushed without --push (INV-4: no push without the
+user's explicit assent).
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
@@ -93,7 +102,7 @@ def run_cmd(cmd: list[str], cwd: Path) -> str:
     return res.stdout.strip()
 
 
-def package_module(root: Path, module: ModuleInfo) -> Path:
+def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
     module_dir = module.dir
     kernel_version = read_kernel_version(root)
 
@@ -142,6 +151,9 @@ def package_module(root: Path, module: ModuleInfo) -> Path:
 
     print(f"Packaged {module.id} module v{module.version} -> {dest_dir}")
 
+    if not push:
+        return dest_dir
+
     # Commit and push in the module repository
     try:
         run_cmd(["git", "add", "catalyst"], cwd=module_dir)
@@ -158,9 +170,9 @@ def package_module(root: Path, module: ModuleInfo) -> Path:
     return dest_dir
 
 
-def package_modules(root: Path) -> list[Path]:
+def package_modules(root: Path, push: bool = False) -> list[Path]:
     """Package every catalogued module that is checked out."""
-    return [package_module(root, m) for m in catalogued_modules(root)]
+    return [package_module(root, m, push) for m in catalogued_modules(root)]
 
 
 def read_kernel_version(root: Path) -> str:
@@ -206,6 +218,11 @@ def package_kernel(root: Path) -> Path:
                 continue
             zf.write(file, arcname=str(rel_path))
 
+        # The kernel ships under catalyst's own license.
+        license_file = root / "LICENSE"
+        if license_file.is_file():
+            zf.write(license_file, arcname="LICENSE")
+
     # Remove legacy unversioned zip if present
     canonical_zip_path = dest_dir / "kernel.zip"
     if canonical_zip_path.is_file():
@@ -215,21 +232,13 @@ def package_kernel(root: Path) -> Path:
     return dest_dir
 
 
-def update_cantica_tech_readmes(cantica_dir: Path) -> None:
-    catalyst_dir = cantica_dir / "catalyst"
+def update_publish_readmes(publish_dir: Path) -> None:
+    """Refresh the release READMEs under publish_dir/catalyst/. The
+    distribution repository's own root README is left to that repository."""
+    catalyst_dir = publish_dir / "catalyst"
     catalyst_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Root cantica-tech/README.md
-    root_readme = cantica_dir / "README.md"
-    root_readme.write_text(
-        "# CanticaTech Release Artifacts Repository\n\n"
-        "This repository serves as the central distribution repository for CanticaTech release artifacts, specifications, kernel releases, and process modules.\n\n"
-        "## Repository Structure\n\n"
-        "- **[catalyst/](catalyst/README.md)**: Official release archives, versioned manifests, and distribution packages for the Catalyst kernel and process modules.\n",
-        encoding="utf-8"
-    )
-
-    # 2. catalyst/README.md
+    # 1. catalyst/README.md
     cat_readme = catalyst_dir / "README.md"
     cat_readme.write_text(
         "# Catalyst Kernel & Module Releases\n\n"
@@ -240,7 +249,7 @@ def update_cantica_tech_readmes(cantica_dir: Path) -> None:
         encoding="utf-8"
     )
 
-    # 3. catalyst/kernel/README.md
+    # 2. catalyst/kernel/README.md
     kernel_dir = catalyst_dir / "kernel"
     kernel_dir.mkdir(parents=True, exist_ok=True)
     kernel_releases = []
@@ -277,7 +286,7 @@ def update_cantica_tech_readmes(cantica_dir: Path) -> None:
 
     (kernel_dir / "README.md").write_text("\n".join(kernel_readme_lines) + "\n", encoding="utf-8")
 
-    # 4. catalyst/modules/README.md & 5. catalyst/modules/<module>/README.md
+    # 3. catalyst/modules/README.md & 4. catalyst/modules/<module>/README.md
     mod_root_dir = catalyst_dir / "modules"
     mod_root_dir.mkdir(parents=True, exist_ok=True)
 
@@ -361,23 +370,25 @@ def update_cantica_tech_readmes(cantica_dir: Path) -> None:
     (mod_root_dir / "README.md").write_text("\n".join(mod_overview_lines) + "\n", encoding="utf-8")
 
 
-def deploy_to_cantica_tech(root: Path) -> Path | None:
-    cantica_dir = root.parent / "cantica-tech"
-    if not cantica_dir.is_dir():
-        print(f"Warning: cantica-tech repository directory not found at {cantica_dir}")
+def publish_releases(root: Path, publish_dir: Path, push: bool = False) -> Path | None:
+    """Copy the kernel and every catalogued module release into
+    publish_dir/catalyst/ and refresh its release READMEs; with push, commit
+    and push publish_dir to origin main."""
+    if not publish_dir.is_dir():
+        print(f"Warning: publish directory not found at {publish_dir}")
         return None
 
     kernel_version = read_kernel_version(root)
 
     # (source, target) directory pairs: the kernel, then each catalogued module.
     kernel_src = root / "catalyst" / "kernel" / f"v{kernel_version}"
-    kernel_dest = cantica_dir / "catalyst" / "kernel" / f"v{kernel_version}"
+    kernel_dest = publish_dir / "catalyst" / "kernel" / f"v{kernel_version}"
     pairs = [(kernel_src, kernel_dest)]
     released = [f"kernel v{kernel_version}"]
     for module in catalogued_modules(root):
         rel = Path("catalyst") / "modules" / module.id / f"v{module.version}"
         mod_src = module.dir / rel
-        pairs.append((mod_src, cantica_dir / rel))
+        pairs.append((mod_src, publish_dir / rel))
         if mod_src.is_dir():
             released.append(f"{module.id} module v{module.version}")
 
@@ -393,33 +404,42 @@ def deploy_to_cantica_tech(root: Path) -> Path | None:
                 if f.is_file():
                     (dest / f.name).write_bytes(f.read_bytes())
 
-    # Update README documentation and release tables in cantica-tech
-    update_cantica_tech_readmes(cantica_dir)
+    update_publish_readmes(publish_dir)
 
-    print(f"Deployed release artifacts to cantica-tech repository at {cantica_dir}")
+    print(f"Published release artifacts to {publish_dir}")
 
-    # Commit and push in cantica-tech
+    if not push:
+        return publish_dir
+
     try:
-        run_cmd(["git", "add", "catalyst"], cwd=cantica_dir)
-        status = run_cmd(["git", "status", "--porcelain"], cwd=cantica_dir)
+        run_cmd(["git", "add", "catalyst"], cwd=publish_dir)
+        status = run_cmd(["git", "status", "--porcelain"], cwd=publish_dir)
         if status:
-            run_cmd(["git", "commit", "-m", f"Deploy release: {', '.join(released)}"], cwd=cantica_dir)
-            run_cmd(["git", "push", "origin", "main"], cwd=cantica_dir)
-            print("Committed and pushed release to git@github.com:oliben67/cantica-tech.git")
+            run_cmd(["git", "commit", "-m", f"Deploy release: {', '.join(released)}"], cwd=publish_dir)
+            run_cmd(["git", "push", "origin", "main"], cwd=publish_dir)
+            print(f"Committed and pushed release from {publish_dir}")
         else:
-            print("No changes to commit in cantica-tech repository.")
+            print(f"No changes to commit in {publish_dir}.")
     except Exception as exc:
-        print(f"Warning: Git commit/push in cantica-tech repository failed: {exc}")
+        print(f"Warning: Git commit/push in {publish_dir} failed: {exc}")
 
-    return cantica_dir
+    return publish_dir
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--publish-dir", type=Path,
+                        help="distribution repository checkout to copy releases into")
+    parser.add_argument("--push", action="store_true",
+                        help="commit and push the module repositories and the publish directory")
+    args = parser.parse_args(argv)
+
     print("Starting release packaging...")
-    package_modules(ROOT)
+    package_modules(ROOT, args.push)
     package_kernel(ROOT)
-    deploy_to_cantica_tech(ROOT)
-    print("Release packaging and deployment completed successfully.")
+    if args.publish_dir:
+        publish_releases(ROOT, args.publish_dir.expanduser().resolve(), args.push)
+    print("Release packaging completed successfully.")
     return 0
 
 

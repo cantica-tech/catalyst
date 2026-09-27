@@ -33,9 +33,10 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Optional `layout` override read, or default layout selected
 - [ ] Rule document(s) and short lowercase prefixes chosen per project seams
 
-## Deploy skeleton (into `.criterion/` at the resolved `agent-source`, INV-6)
-- [ ] `agent-source` resolved (`BOOTSTRAP.md §1`) — agent-owned per-project
-      storage if available, else the in-project fallback
+## Deploy skeleton (into `.criterion/` at the resolved agent-owned location, INV-6)
+- [ ] Agent-owned location resolved (`BOOTSTRAP.md §1`) — agent-owned
+      per-project storage if available, computed per machine and never
+      recorded in a tracked file, else the in-project fallback
 - [ ] Active module chosen and named in the pointer's `module` field — no
       default module; ask the user, listing `framework/modules/catalog.md`
       (`INSTANTIATION-GUIDE.md` §1 step 4)
@@ -123,21 +124,24 @@ from drifting. The guide holds the rationale; this holds the checks.
       space per INV-6 — not this project's own tree; one task per command in
       the composed §4), with the module's `Taskfile.module.yml` tasks
       appended (`MODULE-SPECIFICATION.md` §6.5), and a project root
-      `Taskfile.yml` exists resolving `.criterion`'s location and the
-      deployed agent's CLI binary from the `*.catalyst` pointer, with
-      `includes: common: {taskfile: '{{.CRITERION_DIR}}/Taskfile.common.yml', flatten: true, vars: {AGENT_CMD: ...}}`
+      `Taskfile.yml` exists resolving the deployed agent's CLI binary from
+      the `*.catalyst` pointer, with
+      `includes: common: {taskfile: .criterion/Taskfile.common.yml, optional: true, flatten: true, vars: {AGENT_CMD: ...}}`
+      and no machine-specific path
       (see `INSTANTIATION-GUIDE.md` §1 step 5 for the full snippet) plus
       this project's own operational tasks
 
 ## Finalize
 - [ ] `dev-instructions.yaml` deleted after successful deploy
 - [ ] `<app-name>.catalyst` written at the target project's own root, from
-      `templates/catalyst-pointer.template.json`, `agent-source` and
-      `module` set (INV-6) — the only catalyst artifact the target project's own repo
-      ever carries
-- [ ] On the no-owned-space fallback only: `.criterion/` added to the
-      target project's own `.gitignore` — not needed if already there
-      from a prior instantiation
+      `templates/catalyst-pointer.template.json`, `module` set and no
+      path in it (INV-6) — the only catalyst artifact the target project's
+      own repo ever carries
+- [ ] `.criterion` symlink created at the target project's root, pointing
+      at the agent-owned working copy (on the no-owned-space or
+      no-symlink fallback, `.criterion/` is the real directory instead)
+- [ ] `/.criterion` in the target project's own `.gitignore` — not needed
+      if already there from a prior instantiation
 - [ ] Deployment target cached in the memory tool if one is available
       (optional — `<app-name>.catalyst` and `.criterion/DEPLOYMENT.md`
       are read fresh regardless, `INSTANTIATION-GUIDE.md §6`)
@@ -146,8 +150,8 @@ from drifting. The guide holds the rationale; this holds the checks.
 
 ## Definition of done
 - [ ] Every item above `[x]` in the ledger; no silent skips
-- [ ] `scripts/check_deployment.py` passes (resolves `.criterion/` via
-      `<app-name>.catalyst`'s `agent-source`, or the in-project fallback)
+- [ ] `scripts/check_deployment.py` passes (resolves the working copy
+      through the project-root `.criterion`)
 - [ ] Deployed tree presented to user; **no commit/push yet** (INV-4)
 - [ ] On the retrofit path, if no work items exist yet, offered to run
       `ANALYSIS-PLAYBOOK.md` (not applicable on the greenfield path — it reads

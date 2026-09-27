@@ -173,19 +173,23 @@ creates concrete rules for that particular project.
    per-instance document, since each registry is one JSON array, not
    one-file-per-instance.
    (The working-copy directory is always named `.criterion/`, but it
-   is not built inside the target project's own tree: resolve
-   **agent-source** first — a location this agent owns (a per-project
-   data directory the running agent already maintains, if it has one),
-   distinct from the project being governed — and build the tree there
-   instead. Write `<app-name>.catalyst` (from
-   `templates/catalyst-pointer.template.json`) at the target project's
-   own root, tracked normally, with its `agent-source` field pointing at
-   that location — this pointer file is the *only* catalyst artifact the
-   target project's own repo ever carries. If the running agent has no
-   such owned-space concept, fall back to building `.criterion/`
-   directly inside the target project instead, and add it to that
-   project's own `.gitignore` — still not committed, but no relocation
-   possible without agent support. Either way, `/criterion` (§13,
+   is not built inside the target project's own tree: resolve the
+   **agent-owned location** first — a location this agent owns (a
+   per-project data directory the running agent already maintains, if it
+   has one), distinct from the project being governed, computed per
+   machine from the agent's own conventions and never written into a
+   tracked file — and build the tree there instead. Link it into the
+   project as a `.criterion` symlink at the project root, and add
+   `/.criterion` to the project's `.gitignore`: that symlink is the one
+   path everything uses to reach the working copy. Write
+   `<app-name>.catalyst` (from `templates/catalyst-pointer.template.json`)
+   at the target project's own root, tracked normally; it holds no path
+   — this pointer file is the *only* catalyst artifact the target
+   project's own repo ever carries. If the running agent has no such
+   owned-space concept, or the platform has no symlinks, fall back to
+   building `.criterion/` directly inside the target project as a real
+   directory, gitignored the same way — still not committed, but no
+   relocation possible without agent support. Either way, `/criterion` (§13,
    opt-in) remains the durable, shareable persistence layer for teams
    that want the working copy to survive and sync across contributors,
    via a dedicated repository, never by committing it into the product's
@@ -270,33 +274,20 @@ creates concrete rules for that particular project.
    concern, see `CLAUDE.md`'s "Taskfiles" entry. Create the project's own root
    `Taskfile.yml` if none exists yet, resolving the deployed agent's CLI
    binary from the `*.catalyst` pointer's `agent` field so every
-   dispatched command stays agent-generic, and pointing the include at
-   `.criterion`'s real location (the pointer's own `agent-source` field —
-   same field `find_deploy_root`/`resolveCorpusRoot` already read
-   elsewhere), copied in as a **literal**, not `sh:`-computed: Task
-   resolves an `includes.taskfile` path before dynamic (`sh:`) vars are
-   evaluated, so a dynamic value there silently resolves to an empty
-   string and fails with "no Taskfile found" (confirmed by hand — the
-   identical `sh:` script works fine as an ordinary task var, only the
-   `includes:` use breaks). Update this literal by hand (or via
-   `/sync-framework`) if `agent-source` ever changes — the same
-   "set once, rarely revisited" tradeoff the pointer's own field already
-   has:
+   dispatched command stays agent-generic, and including
+   `.criterion/Taskfile.common.yml` — the project-root `.criterion`
+   symlink (INV-6), so the same relative path works on every machine and
+   for every agent, and no machine-specific path ever lands in this
+   tracked file. The include is `optional: true`, so the project's own
+   tasks still run on a clone where `.criterion` isn't set up yet (Task
+   follows the symlink transparently):
    ```yaml
    vars:
-     # Copied from this deployment's *.catalyst pointer's agent-source
-     # field (INV-6) — see the note above for why this must be a literal.
-     # Falls back to a bare `.criterion` for an agent with no owned-space
-     # concept (INV-6's documented fallback).
-     CRITERION_DIR: "<absolute path from *.catalyst's agent-source field>"
      # Resolves the deployed agent's CLI binary from the pointer's "agent"
      # field. "claude-code" is the one known id whose CLI binary name
      # differs from the id itself; any other agent id is assumed to
      # already be its own binary name. Falls back to "claude" — today's
-     # only known agent — when no pointer/field is found. This one is
-     # safe to compute dynamically:
-     # the `includes:`-timing restriction above only applies to
-     # CRITERION_DIR, since only it feeds an include path.
+     # only known agent — when no pointer/field is found.
      AGENT_ID:
        sh: |
          f=$(ls *.catalyst 2>/dev/null | head -1)
@@ -308,7 +299,11 @@ creates concrete rules for that particular project.
 
    includes:
      common:
-       taskfile: '{{.CRITERION_DIR}}/Taskfile.common.yml'
+       # The gitignored .criterion symlink (or in-project fallback
+       # directory) at the project root — INV-6. Optional, so a clone
+       # without it still runs this project's own tasks.
+       taskfile: .criterion/Taskfile.common.yml
+       optional: true
        flatten: true
        vars:
          AGENT_CMD: '{{.AGENT_CMD}}'
@@ -552,7 +547,7 @@ before continuing.
 ## 6. Remember the deployment target across sessions
 
 After a successful instantiation, record the project root path and the
-resolved `agent-source` (§1) in the persistent memory store, if one is
+resolved working-copy location (§1) in the persistent memory store, if one is
 available, so later sessions can recover which project this framework was
 deployed into without having to rediscover it. This is a convenience
 cache, not the source of truth: `<app-name>.catalyst` at the project root
@@ -565,7 +560,8 @@ Keep a compact note with at least:
 
 - the framework name (`catalyst framework`)
 - the deployed project path
-- the resolved `agent-source` path (where `.criterion/` actually lives)
+- the resolved working-copy location (where the `.criterion` symlink
+  points on this machine)
 - the date or context of the instantiation
 - any short notes that help identify the project later
 
@@ -573,7 +569,7 @@ When this guide is used again for the same project, check memory first and
 reuse the existing note as the default project context. If a prior note
 already exists for that project, update it instead of creating a duplicate.
 When switching agents, update this persistent memory note alongside `<app-name>.catalyst`
-(`agent`, `agent-source`, `updated`) and `Taskfile.yml` (`CRITERION_DIR`).
+(`agent`, `updated`) and the `.criterion` symlink.
 This makes the association durable across sessions and keeps the project's
 instantiated ruleset available whenever the guide is used again.
 

@@ -14,7 +14,8 @@ the project's active module (resolved through module_loader from the
 are declared in its module.yaml `required_paths:`. When no module resolves,
 only the kernel checks run.
 
-Exit 0 = clean, exit 1 = violations found (fails CI / Stop hook).
+Exit 0 = clean, exit 1 = violations found (fails CI; scripts/stop_hook.py
+turns it into a blocking Claude Code Stop hook).
 
 Scope note: only checks the structural invariants that are machine-verifiable
 from the tree. Behavioural rules (INV-1..INV-4) are not checkable here and remain
@@ -37,8 +38,10 @@ from module_loader import (
 
 DEPLOY_DIRNAME = ".criterion"
 # <app-name>.catalyst — the tracked pointer file at a target project's root.
-# Its "agent-source" field names where the actual .criterion/ working
-# copy lives (agent-owned space, not necessarily inside the project tree).
+# The working copy is reached through <project root>/.criterion — a
+# gitignored symlink into agent-owned space, or the real directory for an
+# agent with no owned space (INV-6). Pre-0.37.0 pointers may still name it in
+# an "agent-source" field, honored as a legacy fallback until migrated.
 POINTER_SUFFIX = ".catalyst"
 # <id>-<short-summary>.md ; id like recon-000001, rule prefixes, domains, etc.
 NAME_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*-[a-z0-9][a-z0-9-]*\.md$", re.I)
@@ -153,9 +156,9 @@ def build_model(module: ModuleManifest | None = None) -> DeploymentModel:
 
 
 def _resolve_pointer(pointer_path: Path) -> Path | None:
-    """Read a <app-name>.catalyst pointer file's "agent-source" field and
-    return it as a Path if it names a real directory, else None (malformed
-    or stale pointer — callers fall back to legacy in-tree discovery)."""
+    """Read a pre-0.37.0 <app-name>.catalyst pointer's legacy "agent-source"
+    field and return it as a Path if it names a real directory, else None
+    (no such field, malformed or stale pointer)."""
     try:
         data = json.loads(pointer_path.read_text())
     except (OSError, json.JSONDecodeError):
@@ -181,18 +184,18 @@ def find_project_root(start: Path) -> Path | None:
 
 
 def find_deploy_root(start: Path) -> Path | None:
-    """Prefer the pointer-file model: a *<app-name>.catalyst file at or above
-    `start` whose "agent-source" resolves to a real directory. Fall back to
-    the legacy model — a `.criterion/` directory itself at or above
-    `start` — for deployments not yet migrated (INV-6)."""
+    """The working copy for the nearest project at or above `start`:
+    <project root>/.criterion (a symlink into agent-owned space, followed,
+    or the in-project directory), else a pre-0.37.0 pointer's legacy
+    "agent-source" (INV-6)."""
     for base in (start, *start.parents):
+        candidate = base / DEPLOY_DIRNAME
+        if candidate.is_dir():
+            return candidate
         for pointer in sorted(base.glob(f"*{POINTER_SUFFIX}")):
             resolved = _resolve_pointer(pointer)
             if resolved is not None:
                 return resolved
-        candidate = base / DEPLOY_DIRNAME
-        if candidate.is_dir():
-            return candidate
     return None
 
 
@@ -533,6 +536,49 @@ def check_definitions_exist(root: Path, model: DeploymentModel | None = None) ->
     return errors
 
 
+
+def _read_pointer_data(project_root: Path) -> dict:
+    for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
+        try:
+            data = json.loads(pointer.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(data, dict):
+            return data
+    return {}
+
+
+def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
+    """The working copy's version.txt, the pointer's kernel_version (legacy
+    name: framework_version) and — when the project is catalyst's own
+    repository (framework/kernel/ present) — the kernel's own version.txt
+    must all agree. Drift means a migration was skipped or half-applied."""
+    errors: list[str] = []
+    deployed_file = root / "version.txt"
+    if not deployed_file.is_file():
+        return [f"{DEPLOY_DIRNAME}/version.txt is missing"]
+    deployed = deployed_file.read_text().strip()
+    if project_root is None:
+        return errors
+    pointer = _read_pointer_data(project_root)
+    declared = pointer.get("kernel_version") or pointer.get("framework_version")
+    field = "kernel_version" if "kernel_version" in pointer else "framework_version"
+    if declared and declared != deployed:
+        errors.append(
+            f"version drift: the pointer's {field} is {declared} but "
+            f"{DEPLOY_DIRNAME}/version.txt is {deployed}"
+        )
+    kernel_file = project_root / "version.txt"
+    if (project_root / "framework" / "kernel").is_dir() and kernel_file.is_file():
+        kernel = kernel_file.read_text().strip()
+        if kernel != deployed:
+            errors.append(
+                f"version drift: the kernel is {kernel} but this repository's "
+                f"own deployment is {deployed} — run /sync-framework"
+            )
+    return errors
+
+
 def main() -> int:
     root = find_deploy_root(Path.cwd())
     if root is None:
@@ -560,6 +606,7 @@ def main() -> int:
     errors += check_users_have_userid(root)
     errors += check_journal_exists(root)
     errors += check_definitions_exist(root, model)
+    errors += check_version_drift(root, project_root)
 
     if errors:
         print(f"catalyst deployment validation FAILED ({len(errors)} issue(s)):")

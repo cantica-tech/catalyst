@@ -3,7 +3,6 @@
   "kernel_version": "<catalyst-kernel-version>",
   "module": "<active-module-id, from framework/modules/catalog.md>",
   "agent": "<current-agent-identity, e.g. claude-code>",
-  "agent-source": "<absolute path to the real .criterion/ working copy, in agent-owned space>",
   "repoed": false,
   "catalyst_repo": null,
   "catalyst_repo_url": null,

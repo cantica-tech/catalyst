@@ -7,7 +7,7 @@ drift is visible against a written record. Deploy to
 
 ## Resolved mode (from BOOTSTRAP.md §1)
 - Sub-agents: <parallel | sequential-fallback>
-- Agent-source: <resolved agent-owned path | in-project fallback>
+- Working copy: <resolved agent-owned path, linked as .criterion | in-project fallback>
 - Memory: <memory-tool cache | .criterion/DEPLOYMENT.md + <app-name>.catalyst read fresh>
 - Slash commands: <native | named-procedure-fallback>
 
