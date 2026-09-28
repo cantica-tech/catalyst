@@ -6,6 +6,32 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.41.0 — unreleased
+
+Beta-readiness Phase 4: the beta gate's tooling (migration
+`0.41.0/traced-commits-and-format.md`).
+
+- Every commit traces to the chain: `catalyst hook commit-msg` (installed
+  with `catalyst hook install`) and `catalyst trace <range>` in CI require
+  a commit to cite an artifact or rule ID that resolves (an ambiguous short
+  ID must be written in full) or to be a `chore:`; merges are exempt.
+- `framework/kernel/FORMAT.md`: the on-disk format, 1.0-rc; pointers declare
+  `format`, and `catalyst check` reads only formats it supports. 1.0 is
+  declared after the multi-user trial.
+- `catalyst report`: actors, tiers, traced commits, artifacts, validate
+  totals — the trial's measurements.
+- `beta/`: the multi-user trial protocol, a timed newcomer quickstart and a
+  feedback template.
+- From a two-contributor dry run: `criterion push` fetches the others'
+  journal pins before checking; `criterion create` journals the product
+  files it changes; `join` fetches the product's pins; `journal pin
+  --share` shares both repositories' pins; `sync` removes merged topic
+  branches; merged concurrent edits are notes, not warnings.
+- From a newcomer dry run: `journal restore` rebuilds a file first
+  journaled after the timestamp from that entry's `before` (the content it
+  had until then); the quickstart commits the working copy and clones the
+  beta branch.
+
 ## 0.40.0 — unreleased
 
 Beta-readiness Phase 3: product shape (migration

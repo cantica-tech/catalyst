@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -88,6 +89,8 @@ def cmd_journal(args) -> int:
         return 0
     if args.journal_command == "verify":
         issues = j.verify(dep)
+        notes = [i for i in issues if i.level == "note"]
+        issues = [i for i in issues if i.level != "note"]
         errors = [i for i in issues if i.level == "error"]
         failing = issues if args.strict else errors
         if args.json:
@@ -102,7 +105,8 @@ def cmd_journal(args) -> int:
                 print(f"({len(hidden)} warning(s) on entries written before the catalyst CLI; "
                       "--legacy lists them)")
             print(f"catalyst journal verify {'FAILED' if failing else 'passed'}: "
-                  f"{len(errors)} error(s), {len(issues) - len(errors)} warning(s)")
+                  f"{len(errors)} error(s), {len(issues) - len(errors)} warning(s)"
+                  + (f", {len(notes)} note(s) (merged concurrent edits)" if notes else ""))
         return 1 if failing else 0
     if args.journal_command == "restore":
         restored, missing = j.restore(dep, args.timestamp, args.out)
@@ -113,6 +117,18 @@ def cmd_journal(args) -> int:
     counts = j.pin_all(dep)
     for repo, n in counts.items():
         print(f"{repo}: pinned {n} new blob(s) under {j.PIN_REF}")
+    if args.share:
+        from catalyst.criterion import CriterionError, share_pins
+        repos = [dep.root] + ([] if dep.standalone else [dep.project_root])
+        for repo in repos:
+            if subprocess.run(["git", "-C", str(repo), "remote", "get-url", "origin"],
+                              capture_output=True).returncode != 0:
+                continue
+            try:
+                print(f"{repo.name}: {share_pins(repo)} blob(s) pinned on the remote")
+            except CriterionError as exc:
+                print(f"catalyst: {exc}", file=sys.stderr)
+                return 1
     return 0
 
 
@@ -163,8 +179,66 @@ def cmd_check(args) -> int:
     return 1 if failing else 0
 
 
+def cmd_report(args) -> int:
+    from catalyst.report import build, render
+
+    r = build(open_deployment(args), args.since)
+    if args.json:
+        json.dump(r, sys.stdout, indent=2)
+        print()
+    else:
+        sys.stdout.write(render(r))
+    return 0
+
+
+def cmd_trace(args) -> int:
+    from catalyst.corpus import load_corpus
+    from catalyst.trace import trace
+
+    corpus, repo = None, Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+    if not args.pattern_only:
+        dep = open_deployment(args)
+        corpus, repo = load_corpus(dep), dep.project_root
+    try:
+        checked, failures = trace(repo, args.range, corpus)
+    except ValueError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    for f in failures:
+        print(f"ERROR   {f.sha} {f.subject[:60]!r}: {f.reason}")
+    print(f"catalyst trace {'FAILED' if failures else 'passed'}: {checked} commit(s) checked, "
+          f"{len(failures)} without a trace" + (" (pattern only)" if corpus is None else ""))
+    return 1 if failures else 0
+
+
 def cmd_hook(args) -> int:
     from catalyst.check import hook_stop
+
+    if args.hook_command == "commit-msg":
+        from catalyst.corpus import load_corpus
+        from catalyst.trace import check_message
+        try:
+            corpus = load_corpus(open_deployment(args))
+        except DeploymentNotFound:
+            return 0
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], capture_output=True, text=True)
+        if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
+            return 0                         # a merge carries its parents' trace (as in `trace`)
+        reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
+        if reason:
+            print(f"catalyst: commit refused — {reason}.\nCite the artifact or rule this commit serves "
+                  "(e.g. <PREFIX>-000012 or its full ID), or start the subject with `chore:` "
+                  "if no rule's behaviour changes. Bypass once: git commit --no-verify.", file=sys.stderr)
+            return 1
+        return 0
+    if args.hook_command == "install":
+        from catalyst.trace import install_hook
+        try:
+            print(f"installed {install_hook(open_deployment(args).project_root)}")
+        except ValueError as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        return 0
 
     try:
         dep = open_deployment(args)
@@ -351,6 +425,22 @@ def build_parser() -> argparse.ArgumentParser:
     q = hk.add_parser("stop", help="end-of-turn hook: exit 2 with failures on stderr")
     q.add_argument("--strict", action="store_true")
     q.set_defaults(func=cmd_hook)
+    q = hk.add_parser("commit-msg", help="git commit-msg hook: the message must trace to the chain")
+    q.add_argument("message_file")
+    q.set_defaults(func=cmd_hook)
+    q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
+    q.set_defaults(func=cmd_hook)
+
+    p = sub.add_parser("report", help="usage report: actors, tiers, traced commits, open artifacts")
+    p.add_argument("--since", help="only history from this date/time on (ISO 8601)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("trace", help="check that every commit in a range cites an artifact or rule ID")
+    p.add_argument("range", nargs="?", default="HEAD~1..HEAD", help="git revision range (default: HEAD~1..HEAD)")
+    p.add_argument("--pattern-only", action="store_true",
+                   help="no working copy (e.g. CI of a local-only deployment): accept any well-formed ID")
+    p.set_defaults(func=cmd_trace)
 
     p = sub.add_parser("recompose", help="merge kernel/module template changes into the deployed "
                        "documents, keeping local edits (three-way)")
@@ -407,6 +497,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("out", type=Path, help="side directory (must be empty or absent)")
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("pin", help="pin every referenced blob so git gc keeps it")
+    q.add_argument("--share", action="store_true",
+                   help="also merge with and push the remote's pins (working copy and product repository)")
     q.set_defaults(func=cmd_journal)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")

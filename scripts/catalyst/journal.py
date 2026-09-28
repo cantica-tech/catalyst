@@ -384,7 +384,7 @@ def verify(dep: Deployment) -> list[Issue]:
                 if before is not None and before in seen[path]:
                     # both sides of a merge edited this file from the same
                     # earlier state: a fork, resolved by a later entry
-                    issues.append(Issue("warning", "concurrent-edit", n,
+                    issues.append(Issue("note", "concurrent-edit", n,
                                         f"{path}: edited from an earlier state than line {last[path][1]} "
                                         "(merged work)", not cli))
                 else:
@@ -439,13 +439,21 @@ def restore(dep: Deployment, timestamp: str, out: Path) -> tuple[list[str], list
         raise JournalError(f"{out} exists and is not an empty directory — restore never overwrites")
     until = parse_time(timestamp)
     state: dict[str, str | None] = {}
+    later_before: dict[str, str | None] = {}     # a file first journaled after `until`: its `before`
     for _, entry, _ in read(dep):
         t = _entry_time(entry) if entry else None
-        if entry is None or t is None or t > until:
+        if entry is None or t is None:
             continue
         for f in entry.get("files", []) or []:
-            if isinstance(f, dict) and "path" in f:
-                state[entry_path(dep, entry, f)] = f.get("after")
+            if not (isinstance(f, dict) and "path" in f):
+                continue
+            path = entry_path(dep, entry, f)
+            if t <= until:
+                state[path] = f.get("after")
+            else:
+                later_before.setdefault(path, f.get("before"))
+    for path, sha in later_before.items():
+        state.setdefault(path, sha)
     restored, missing = [], []
     for path, sha in sorted(state.items()):
         where = locate(dep, path)

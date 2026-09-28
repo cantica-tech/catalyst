@@ -116,9 +116,10 @@ def test_create_publishes_and_makes_a_submodule(world):
     attrs = (ada / ".criterion" / ".gitattributes").read_text()
     assert "development/journal.jsonl merge=union" in attrs and "items/items.md merge=union" in attrs
     assert (ada / ".criterion" / cr.CI_WORKFLOW).is_file()
-    last = json.loads((ada / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()[-1])
-    assert last["command"] == "catalyst criterion create"
-    assert {f["path"] for f in last["files"]} == {".criterion/.gitattributes", f".criterion/{cr.CI_WORKFLOW}"}
+    entries = [json.loads(l) for l in (ada / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()]
+    created = [e for e in entries if e["command"] == "catalyst criterion create"]
+    assert {f["path"] for f in created[0]["files"]} == {".criterion/.gitattributes", f".criterion/{cr.CI_WORKFLOW}"}
+    assert {f["path"] for f in created[1]["files"]} == {"app.catalyst", ".gitmodules", ".gitignore"}
     assert "/.criterion" not in (ada / ".gitignore").read_text()
     # the product commit pins the rules version
     assert git(ada, "ls-tree", "HEAD", ".criterion").split()[1] == "commit"
@@ -361,3 +362,17 @@ def test_push_journals_a_refreshed_gitattributes(world):
     res = push(world, "ada", "thing", checker=lambda dep: "\n".join(
         str(i) for i in j.verify(dep) if i.level == "error"))
     assert res.commits >= 1 and "rules/rules.md" not in attrs.read_text()
+
+
+def test_dirty_keeps_the_first_path_whole(world):
+    wc = world["bob"] / ".criterion"
+    (wc / "DEPLOYMENT.md").write_text("changed\n")
+    assert "DEPLOYMENT.md" in cr.dirty(wc)
+
+
+def test_sync_removes_merged_topic_branches(world):
+    add_item(world["ada"], "ada", "Thing")
+    a = push(world, "ada", "thing")
+    merge_topic(world, a.branch)
+    cr.sync(load(world["ada"]))
+    assert a.branch not in git(world["ada"] / ".criterion", "branch", "--format=%(refname:short)")

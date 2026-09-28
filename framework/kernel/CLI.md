@@ -59,9 +59,9 @@ the project or its working copy works. Run from the agent-owned working
 copy's real path (outside the project), the CLI refuses rather than guess
 the project.
 
-Outside any catalyst project (no `*.catalyst` pointer), `catalyst check`
-exits `0` and `catalyst hook stop` exits `0`, so a fresh clone or a CI
-runner is not failed. A project whose pointer exists but whose working copy
+Outside any catalyst project (no `*.catalyst` pointer), `catalyst check`,
+`catalyst hook stop` and `catalyst hook commit-msg` exit `0`, so a fresh
+clone or a CI runner is not failed. A project whose pointer exists but whose working copy
 is unreachable fails: `check` exits `1`, `hook stop` exits `2`.
 
 ### Signer
@@ -154,12 +154,19 @@ left to grow.
 
 ### `catalyst check [--strict] [--json]`
 
-Every check a deployment can run on itself, in one pass: the deployment's
-structure, the traceability chain (`validate`), the journal (`journal
-verify`) and index freshness (`index regen --check`). Journal warnings on
-entries written before the CLI are summarised in one line
-(`journal verify --legacy` lists them). Exits `1` on any error, or on any
-warning under `--strict`.
+Every check a deployment can run on itself, in one pass: the on-disk
+format version, the deployment's structure, the traceability chain
+(`validate`), the journal (`journal verify`) and index freshness
+(`index regen --check`). Journal warnings on entries written before the
+CLI are summarised in one line (`journal verify --legacy` lists them).
+Exits `1` on any error, or on any warning under `--strict`.
+
+**Format check.** The pointer's `format` field declares the on-disk format
+the deployment is written in (`FORMAT.md`). A pointer with no `format` is
+a **warning** (a deployment from before format `1.0-rc`; migration
+`0.41.0` adds the field). A `format` this CLI does not read is an
+**error**: update the vendored CLI, or migrate the deployment. A bare
+working copy (`--working-copy`) has no pointer and skips this check.
 
 ### `catalyst validate [--strict] [--json]`
 
@@ -200,6 +207,96 @@ they are fixed, and `0` otherwise. When the hook input says a stop hook
 already blocked this stop, it reports the failures without blocking
 again, so an unfixable failure cannot loop a session. Without a
 deployment it exits `0`. See [Hooks](#hooks).
+
+### `catalyst hook commit-msg <message-file>`
+
+A git `commit-msg` hook: every product commit traces to the chain (INV-5
+at commit granularity). It exits `0` when the message
+
+- cites an artifact or rule ID that resolves in the deployment — in full
+  (`ITEM-000012-Ab3xR9pQ`, `br-AUTH-000003-Ab3xR9pQ`) or short
+  (`ITEM-000012`, `br-AUTH-000003`: the full ID with its userid dropped,
+  matching one that exists); or
+- has a subject line starting `chore:` or `chore(<scope>):` (any case):
+  a chore changes no rule's behaviour and needs no artifact
+  (`CODE-OF-CONDUCT.md` §9).
+
+Otherwise it exits `1` and says why on stderr: no ID cited, or IDs cited
+that resolve to nothing. Lines starting `#` (git's comment lines) are
+ignored. A merge commit (git is concluding a merge) is let through, as
+`trace` skips merges. Outside a deployment, or with its working copy
+unreachable, it lets the commit through. `git commit --no-verify`
+bypasses it once; `catalyst trace` in CI still catches the commit.
+
+### `catalyst hook install`
+
+Writes the `commit-msg` hook above, executable, into the project
+repository's `hooks/commit-msg` under its git directory
+(`.git/hooks/commit-msg`). The hook runs
+`python3 .criterion/bin/catalyst.pyz hook commit-msg` from the repository
+root, so it follows every re-vendored CLI. It refuses (exit `1`) when a
+`commit-msg` hook already exists that catalyst did not write — merge the
+two by hand — and rewrites its own. It writes into `.git/`, so it runs
+only with the user's assent; it is offered after install
+(`INSTANTIATION-GUIDE.md`). A repository that sets `core.hooksPath` must
+call the hook from there.
+
+### `catalyst trace [<range>] [--pattern-only]`
+
+Checks that every commit in a git revision range traces, by the same rule
+as `hook commit-msg`: `<range>` is anything `git log` accepts
+(`main..HEAD`, `<sha>~1..<sha>`, `HEAD` for the whole history; default
+`HEAD~1..HEAD`). Merge commits are skipped: they carry their parents'
+trace. Prints one `ERROR <sha> '<subject>': <reason>` line per commit
+without a trace, then a summary; exits `1` if any, and on a bad range.
+
+`--pattern-only` needs no deployment: it accepts any well-formed full or
+six-digit short ID (`<PREFIX>-NNNNNN[-<userid>]`,
+`<doc-prefix>-<DOMAIN>-NNNNNN[-<userid>]`) without resolving it. Use it
+where CI has no working copy — the product repository of a local-only
+deployment, whose `.criterion` is gitignored. With a working copy (a
+shared deployment, submodule checked out), run it without the flag so
+each ID must resolve. The repository is the project root, or the current
+directory with `--pattern-only` (`--project <dir>` before `trace` picks
+another).
+
+In CI, check the commits a push or pull request adds. Existing history
+is not checked: start from the commit the check was introduced at. On
+GitHub Actions (checkout with `fetch-depth: 0`):
+
+```sh
+if [ "$EVENT" = "pull_request" ]; then range="$BASE_SHA..$HEAD_SHA"          # the PR's commits
+elif [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
+  range="$BEFORE..$SHA"                                                    # a push
+else range="$SHA~1..$SHA"; fi                                              # a new branch's first push
+python3 .criterion/bin/catalyst.pyz trace "$range"                          # or: trace --pattern-only
+```
+
+with `EVENT`, `BASE_SHA`, `HEAD_SHA`, `BEFORE` and `SHA` set from
+`github.event_name`, `github.event.pull_request.base.sha`,
+`github.event.pull_request.head.sha`, `github.event.before` and
+`github.sha`. Without a working copy, run the zipapp from a catalyst
+release instead of `.criterion/bin/`.
+
+### `catalyst report [--since <date>] [--json]`
+
+What a deployment's history says about how it is used — the measurement
+side of a trial:
+
+- journal entries and active days; entries per actor, per tier
+  (`untiered` for entries without one) and per command (top ten);
+- commits traced: of the product repository's non-merge commits (the
+  last 200 reachable from `HEAD`, or all since `--since`), how many trace
+  by the `hook commit-msg` rule;
+- artifacts per entity type and `Status`; the number of reconciliation
+  cases;
+- `validate`'s error and warning counts.
+
+`--since` (ISO 8601) limits journal entries and commits to that time on.
+`--json` prints the same as one JSON object (`entries`, `actors`,
+`tiers`, `commands`, `active_days`, `artifacts`, `reconciliations`,
+`errors`, `warnings`, `commits`, `commits_traced`). Exits `0`.
+With `--working-copy` there is no product repository: commits are `0`.
 
 ### `catalyst id next <PREFIX> [--as <user>]`
 
@@ -282,7 +379,9 @@ problems on legacy entries are warnings, hidden behind a count unless
 Materialises every journaled file as it stood at `<timestamp>` (ISO 8601,
 e.g. `2026-09-27T18:00:00Z`; any offset is converted to UTC, and times are
 compared as times, not strings) into the side directory `<out>`, at its
-journal path. `<out>` must be absent or an empty directory: restore never
+journal path: a file's latest journaled `after` at or before `<timestamp>`, or,
+for a file first journaled later, that first entry's `before` (a file created
+later is absent). `<out>` must be absent or an empty directory: restore never
 touches the live tree, never overwrites and never writes outside `<out>`. Exits `1` and lists the paths whose blob
 is missing from the object store.
 
@@ -292,6 +391,12 @@ Pins every blob any journal entry references under `refs/catalyst/journal`
 in its repository, so `git gc` can never prune it. `journal append` pins
 its own blobs; run `pin` once to backfill entries written before the CLI,
 and after cloning or importing a working copy.
+
+`--share` also merges each repository's pins with its `origin`'s and pushes
+the result — the working copy's and the product repository's — so every
+clone holds every blob the journal references. `catalyst criterion push`
+shares the working copy's pins on its own; run `pin --share` when you push
+the product repository (it pushes only the pin ref, never a branch).
 
 ### `catalyst index regen [--check [--diff]]`
 
@@ -381,10 +486,15 @@ order:
    working copy lacks (a reviewer's suggestion), it refuses: pull them
    first. Rewrites `.gitattributes`; commits every change with
    `<message>`.
-3. Rebases onto the shared branch. A conflict aborts the rebase and
+3. Rebases onto the shared branch (after fetching the other contributors'
+   journal pins, so their entries verify). A conflict aborts the rebase and
    fails with the conflicting files: nothing is pushed. Resolve by hand,
-   or record a proposed resolution as a `RECON-` case for a human to
-   accept (`/reconcile`); never apply one automatically.
+   or withdraw your side and record a proposed resolution as a `RECON-`
+   case for a human to accept (`/reconcile`); never apply one
+   automatically. To withdraw a conflicting edit: take the shared version
+   of the file (`git -C .criterion checkout origin/<shared> -- <file>`),
+   journal and commit that, open the `RECON-` case with your proposed
+   content, then `push` again.
 4. Regenerates the indexes (`index regen`) and, when the union merge or
    the regeneration changed an index, appends one journal entry
    (`command: "catalyst criterion push"`, `action: "update"`) recording
@@ -446,6 +556,14 @@ the indexes in ID order and journals every file the rebase merged. The
 team's own lines in the file are kept. Everything else merges normally, and a
 conflict there stops the push.
 
+A hosting service's merge button does not apply `merge=union`, so a pull
+request that has fallen behind the shared branch may show conflicts there:
+run `push` again (it rebases, where the union applies). Branch protection's
+"up to date before merging" rule (`protect` sets it) makes this the normal
+path. Each union merge also leaves `concurrent-edit` notes in `journal
+verify`: history of merged work, never a warning or an error, and they do
+not fail `--strict`.
+
 #### The CI workflow
 
 `create` writes `.github/workflows/catalyst.yml` into the criterion
@@ -492,7 +610,15 @@ settings at install). An agent without hook support runs `catalyst check`
 at the end of every artifact-changing command instead
 (`CODE-OF-CONDUCT.md` §4).
 
+The git side is agent-independent: `catalyst hook install` puts
+`catalyst hook commit-msg` in the project repository's `commit-msg` hook,
+so every commit traces whoever — or whatever — makes it, and
+`catalyst trace` re-checks the same rule in CI.
+
 ## Related docs
+
+- [`FORMAT.md`](FORMAT.md) — the on-disk format every command reads and writes.
+- [`migrations/0.41.0/traced-commits-and-format.md`](migrations/0.41.0/traced-commits-and-format.md) — traced commits, the commit-msg hook, the pointer's `format`.
 
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §12 — the journal's schema and immutability.
 - [`rules-of-development.template.md`](rules-of-development.template.md) §4 — the commands that call the CLI.

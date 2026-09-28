@@ -165,6 +165,20 @@ def test_restore_materialises_state_at_a_time(project, tmp_path):
         j.restore(dep, t1, tmp_path / "side")
 
 
+def test_restore_before_a_files_first_entry_uses_its_before(project, tmp_path):
+    """A file first journaled after the timestamp is restored as its first
+    entry's `before`: the content it had until that change."""
+    dep = load(project)
+    path = ".criterion/items/ITEM-000001-first-item.md"
+    original = item(project).read_text()
+    item(project).write_text("changed later\n")
+    entry = j.append(dep, req([path], timestamp="2026-06-01T00:00:00Z"))
+    assert entry["files"][0]["before"]
+    restored, missing = j.restore(dep, "2026-05-01T00:00:00Z", tmp_path / "side")
+    assert missing == [] and restored == [path]
+    assert (tmp_path / "side" / path).read_text() == original
+
+
 def test_cli_append_verify_pin(project, capsys):
     item(project).write_text("changed\n")
     assert main(["journal", "append", "--command", "/status", "--action", "status-change",

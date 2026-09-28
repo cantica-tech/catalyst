@@ -16,6 +16,11 @@ from catalyst.deployment import Deployment
 from catalyst.indexes import regenerate
 from catalyst.validate import ERROR, validate
 
+# On-disk format versions this CLI reads (framework/kernel/FORMAT.md). A
+# deployment declares its own in the pointer's `format` field.
+FORMAT = "1.0-rc"
+SUPPORTED_FORMATS = {"1.0-rc"}
+
 
 @dataclass
 class Report:
@@ -33,6 +38,14 @@ class Report:
 
 def run(dep: Deployment) -> Report:
     report = Report()
+    if not dep.standalone:
+        declared = dep.pointer.get("format")
+        if declared is None:
+            report.warnings.append(f"format: the pointer declares no `format` (pre-{FORMAT} deployment; "
+                                   "migration 0.41.0 adds it)")
+        elif declared not in SUPPORTED_FORMATS:
+            report.errors.append(f"format: the deployment is format {declared}; this catalyst reads "
+                                 f"{', '.join(sorted(SUPPORTED_FORMATS))} — sync the CLI or the deployment")
     structure, report.scope = structural_errors(
         dep.root, None if dep.standalone else dep.project_root, dep.module)
     report.errors += [f"structure: {e}" for e in structure]
@@ -42,6 +55,8 @@ def run(dep: Deployment) -> Report:
             f"chain {f.code}: {f.where}: {f.message}")
     legacy = 0
     for i in journal.verify(dep):
+        if i.level == "note":
+            continue                         # history (e.g. merged concurrent edits), not a problem
         if i.legacy and i.level != "error":
             legacy += 1
             continue

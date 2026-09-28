@@ -164,6 +164,9 @@ Every command that creates or changes an artifact, rule, domain or
 3. `catalyst check` — unless the agent's end-of-turn hook already runs
    `catalyst hook stop`; resolve every error before reporting.
 
+A product commit made for the change cites the artifact or rule it serves
+(or its subject starts `chore:`) — §9, "Traced commits".
+
 - `/user-add <name> <role>` — register a new user in
   `IAM/users/users.json` with an initial role from
   `IAM/roles/roles.json`. Refuses if `<name>` is already registered —
@@ -798,6 +801,21 @@ when no §4 command is involved: `--command` is then the tier itself
 afterward, the same "never delete, retire in place" principle as a
 retired rule (`Rules-of-Rules.md` §4) applies here in its strictest
 form: nothing about a written entry ever changes, period.
+
+**Traced commits.** The chain reaches the product repository's history
+too (INV-5): every product commit's message cites an artifact or rule ID
+that resolves in this deployment — full (`<PREFIX>-NNNNNN-<userid>`,
+`<doc-prefix>-<DOMAIN>-NNNNNN-<userid>`) or short (the same without the
+userid) — or its subject starts `chore:` or `chore(<scope>):` when the
+change is a chore. A fix or a feature cites its artifact; a commit that
+only edits a rule cites the rule. Merge commits are not checked.
+`catalyst hook commit-msg`, installed with `catalyst hook install` (with
+the user's assent — it writes into `.git/hooks`), refuses an untraced
+commit; `catalyst trace <range>` re-checks new commits in CI
+(`--pattern-only` where CI has no working copy). The agent writes traced
+messages itself and never bypasses the hook (`--no-verify`) without the
+user's say-so. History from before the check was introduced is not
+checked.
 
 Two read-only commands operate on the journal without writing to it
 themselves: `/journal [--since <date>] [--artifact <id>] [--actor <name>]

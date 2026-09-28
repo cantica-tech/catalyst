@@ -117,7 +117,8 @@ def is_submodule(project_root: Path) -> bool:
 
 
 def dirty(wc: Path) -> list[str]:
-    return [line[3:] for line in out(wc, "status", "--porcelain").splitlines() if line.strip()]
+    # not out(): stripping would eat the first line's leading status column
+    return [line[3:] for line in run(wc, "status", "--porcelain").stdout.splitlines() if line.strip()]
 
 
 # --- merge-safe storage -----------------------------------------
@@ -342,6 +343,10 @@ def sync(dep: Deployment) -> str:
     guard_branch_reset(wc, branch)
     run(wc, "checkout", "-q", "-B", branch, f"origin/{branch}")
     share_pins(wc, publish=False)
+    # topic branches whose work is in the shared branch are done with
+    for topic in run(wc, "branch", "--format=%(refname:short)", "--merged", f"origin/{branch}").stdout.split():
+        if topic != branch and "/" in topic:
+            run(wc, "branch", "-q", "-d", topic, check=False)
     return out(wc, "rev-parse", "--short", "HEAD")
 
 
@@ -380,6 +385,10 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
         raise CriterionError("the working copy has no remote — `catalyst criterion create <url>` first")
     user = str(signer.get("git_username") or signer.get("name"))
     run(wc, "fetch", "-q", "--prune", "origin")
+    try:
+        share_pins(wc, publish=False)          # others' journal blobs, before anything is checked
+    except CriterionError:
+        pass
     base = f"origin/{branch}"
     has_base = run(wc, "rev-parse", "-q", "--verify", base, check=False).returncode == 0
     current = run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip()
@@ -573,6 +582,23 @@ def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template:
                     "updated": datetime.date.today().isoformat()})
     pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
     run(project, "add", pointer_path.name, ".gitmodules", *([".gitignore"] if gitignore.is_file() else []))
+    from catalyst import journal
+    from catalyst.deployment import load
+    shared = load(project)
+    user = next((u for u in _users(shared) if u.get("active", True)), {})
+    journal.append(shared, journal.AppendRequest(
+        command="catalyst criterion create", action="update", artifact="deployment shared", targets=[],
+        intent=[f"The working copy is now the .criterion submodule of {url}; the pointer records the "
+                "sharing and .gitignore no longer ignores .criterion."],
+        files=[str(project / p) for p in (pointer_path.name, ".gitmodules", ".gitignore")
+               if (project / p).is_file()],
+        actor=str(user.get("git_username") or user.get("name") or "catalyst"), allow_unchanged=True))
+    run(wc, "add", "-A")
+    run(wc, *_ident(wc, str(user.get("git_username") or user.get("name") or "catalyst")),
+        "commit", "-q", "-m", "Journal the sharing of the deployment")
+    run(wc, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
+    steps.append("journaled the product files it changed (pointer, .gitmodules, .gitignore); share the "
+                 "product repository's journal pins with `catalyst journal pin --share` when you push it")
     steps.append(f"updated {pointer_path.name} (repoed, catalyst_repo_url, criterion_branch)")
     steps.append(f"the old agent-owned copy at {agent_owned} is no longer used; remove it once satisfied")
     return steps
@@ -603,6 +629,11 @@ def join(project_root: Path) -> str:
     guard_branch_reset(wc, branch)
     run(wc, "checkout", "-q", "-B", branch, f"origin/{branch}")
     share_pins(wc, publish=False)
+    if run(project_root, "remote", "get-url", "origin", check=False).returncode == 0:
+        try:
+            share_pins(project_root, publish=False)     # the product repository's journal blobs
+        except CriterionError:
+            pass
     return out(wc, "rev-parse", "--short", "HEAD")
 
 

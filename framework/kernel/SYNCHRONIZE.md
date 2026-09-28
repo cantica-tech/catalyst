@@ -488,6 +488,17 @@ and `Rules-of-Rules.md`, refresh the command files, the vendored CLI and
 the module, and list any `closed-incomplete` artifact for the user —
 never fabricate what it lacks.
 
+### From `0.40.0`: traced commits, the on-disk format version
+
+Target version `0.41.0`. Full procedure:
+`migrations/0.41.0/traced-commits-and-format.md` (this repository) — not
+duplicated here. Every product commit cites an artifact or rule ID, or is
+a `chore:` (INV-5 at commit granularity), enforced by
+`catalyst hook commit-msg` and `catalyst trace` in CI. The pointer gains
+`"format": "1.0-rc"` (`FORMAT.md`). Add the field, re-vendor the CLI,
+recompose the governing documents, offer `catalyst hook install` (with the
+user's assent) and a CI trace step; existing history is not checked.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current

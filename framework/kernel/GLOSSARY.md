@@ -36,8 +36,9 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   the agent's own conventions and never written into a tracked file. A
   local-only working copy lives there (INV-6, `BOOTSTRAP.md` §1).
 - **`<app-name>.catalyst` (the pointer).** The one small JSON file the
-  product repository tracks at its root: project name, kernel version,
-  active module, agent, sharing fields. It holds no path (INV-6).
+  product repository tracks at its root: project name, format version,
+  kernel version, active module, agent, sharing fields. It holds no path
+  (INV-6, `FORMAT.md` §1).
 - **catalyzer.** The plugin manager command, `/catalyzer`
   (`list`/`activate`/`download`/`deactivate`/`upgrade`/`downgrade`); a
   *plugin* (below) is what it manages. The `-catalyzer` commands edit the
@@ -66,6 +67,12 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   type: ID prefix, folder, location, grounding, fields and workflow
   (`MODULE-SPECIFICATION.md` §4). The CLI reads ETDs, so it knows every
   type without naming any.
+- **Format, format version.** The on-disk format of a deployment — the
+  pointer, the working copy's files, entity files, indexes, rules, the
+  journal — specified in `FORMAT.md`. The pointer's `format` field names
+  the version a deployment is written in (`1.0-rc`, declared `1.0` once
+  the multi-user trial needs no change); `catalyst check` verifies the CLI
+  reads it. Distinct from the kernel version, which changes far more often.
 - **Four-eyes.** A check by a second, independent agent pass that has not
   seen the first pass's reasoning (`ANALYSIS-PLAYBOOK.md`).
 - **Grounding, grounding type.** An artifact's link down the chain. The
@@ -141,6 +148,11 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   behaviour), **feature** (new or changed behaviour). The active module
   says what each tier requires (its `CODE-OF-CONDUCT.md` §3 contribution);
   when unsure, the higher tier.
+- **Traced commit.** A product commit whose message cites an artifact or
+  rule ID that resolves in the deployment (full, or short without the
+  userid), or whose subject starts `chore:`: the chain (INV-5) at commit
+  granularity. Checked by `catalyst hook commit-msg` and `catalyst trace`
+  (`CLI.md`).
 - **WORKFLOW.** `WORKFLOW-NNNNNN`: a repeatable multi-step procedure other
   entities may reference to guide their process; never itself work
   (INV-24).

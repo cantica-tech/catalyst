@@ -126,8 +126,14 @@ the journal, regenerating indexes, validating the traceability chain — are
 code, not prose: the `catalyst` command line, vendored into every deployment
 as `.criterion/bin/catalyst.pyz`. Procedures call it and keep only the
 judgment parts in prose; agents with an end-of-turn hook run
-`catalyst hook stop` so every turn ends on a passing `catalyst check`. See
-[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
+`catalyst hook stop` so every turn ends on a passing `catalyst check`.
+Commits trace too: a git `commit-msg` hook (`catalyst hook install`) and
+`catalyst trace` in CI require every product commit to cite an artifact or
+rule ID, or to be marked `chore:`. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md); every file the CLI
+reads and writes is specified in
+[`framework/kernel/FORMAT.md`](framework/kernel/FORMAT.md) (format
+`1.0-rc`).
 
 ## Multi-user sync: criterion
 
@@ -190,6 +196,11 @@ two paths:
 
 Either way, the active module decides what the day-to-day view of open work
 looks like; see its repository.
+
+To try catalyst by hand in about fifteen minutes, follow
+[`beta/QUICKSTART.md`](beta/QUICKSTART.md). The beta's multi-user trial —
+its protocol and the feedback form — is in [`beta/`](beta/)
+([`TRIAL.md`](beta/TRIAL.md), [`FEEDBACK.md`](beta/FEEDBACK.md)).
 
 ## Agents
 

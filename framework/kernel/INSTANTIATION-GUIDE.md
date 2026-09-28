@@ -216,6 +216,17 @@ lives, and, afterwards, its first rules.
    ```
    Add that project's own operational tasks in this same root
    `Taskfile.yml`, alongside — never inside — the included common tasks.
+
+   **Offer the commit-msg hook.** Every product commit must cite an
+   artifact or rule ID, or start `chore:` (INV-5, `CODE-OF-CONDUCT.md` §9).
+   Offer to run `catalyst hook install`, which writes the project
+   repository's `.git/hooks/commit-msg`; run it only on the user's assent,
+   and if it refuses because a `commit-msg` hook already exists, show the
+   user both and let them merge. If the project has CI, offer a step that
+   runs `catalyst trace` on the commits each push or pull request adds
+   (`--pattern-only` while the deployment is local-only, since CI has no
+   working copy; `CLI.md` has the GitHub Actions snippet). Commits made
+   before either existed are not checked.
    When plugins are needed, pull their content directly from each plugin's
    own repository; no plugin may be sourced from this framework repository.
 6. **Populate what the module requires.** If a document the module's

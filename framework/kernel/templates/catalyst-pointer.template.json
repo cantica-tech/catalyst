@@ -1,5 +1,6 @@
 {
   "project_name": "<project-name>",
+  "format": "1.0-rc",
   "kernel_version": "<catalyst-kernel-version>",
   "module": "<active-module-id, from framework/modules/catalog.md>",
   "agent": "<current-agent-identity, e.g. claude-code>",

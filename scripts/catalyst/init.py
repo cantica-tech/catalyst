@@ -317,7 +317,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md; vendored bin/catalyst.pyz")
 
     # --- the project side ---------------------------------------------------
-    pointer = {"project_name": req.name, "kernel_version": version, "module": manifest.id,
+    from catalyst.check import FORMAT
+    pointer = {"project_name": req.name, "format": FORMAT, "kernel_version": version, "module": manifest.id,
                "agent": req.agent, "repoed": False, "catalyst_repo": None, "catalyst_repo_url": None,
                "created_by": req.user, "criterion_branch": None, "created": stamp, "updated": stamp}
     pointer_path = project / f"{req.name}.catalyst"

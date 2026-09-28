@@ -68,6 +68,11 @@ from drifting. The guide holds the rationale; this holds the checks.
       `includes: common: {taskfile: .criterion/Taskfile.common.yml, optional: true, flatten: true, vars: {AGENT_CMD: ...}}`
       and no machine-specific path (see `INSTANTIATION-GUIDE.md` §1 step 5
       for the full snippet) plus this project's own operational tasks
+- [ ] `catalyst hook install` offered; run only on the user's assent (it
+      writes `.git/hooks/commit-msg`); an existing foreign hook left for
+      the user to merge
+- [ ] If the project has CI: a `catalyst trace <range>` step on new commits
+      offered (`--pattern-only` while local-only; `CLI.md`)
 - [ ] Any document the module requires at instantiation that still carries
       `{{PLACEHOLDER}}` text populated by the command the module names
 - [ ] Root `README.md` extended with the project's structure and links to

@@ -510,8 +510,9 @@ what stays judgment.
   plus `<app-name>.catalyst`'s `repoed: true`, `catalyst_repo_url` and
   `criterion_branch`. The tools read these; `create` writes them.
 - **Working copy** (the criterion repository): a `.gitattributes` that
-  merges the journal, `rules/rules.md` and every generated entity index
-  by union (`merge=union`), and `.github/workflows/catalyst.yml`, which
+  merges the journal and every generated entity index by union
+  (`merge=union`; `rules/rules.md` is hand-maintained, so concurrent
+  edits to it conflict instead — `FORMAT.md` §8), and `.github/workflows/catalyst.yml`, which
   runs `catalyst --working-copy . check` and
   `catalyst --working-copy . criterion integrity` on every pull request
   against the shared branch.

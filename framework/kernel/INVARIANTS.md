@@ -67,7 +67,10 @@ one-line placeholder; numbers are never reused.
   exist otherwise, so the chain can't reach through it; without one
   active, the module's grounded artifacts chain directly to their
   grounding → domain. The module's own chain specifics live in its
-  `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4).
+  `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4). At commit
+  granularity: every product commit cites an artifact or rule ID that
+  resolves in the deployment, or its subject starts `chore:`; merges are
+  not checked (`catalyst hook commit-msg`, `catalyst trace`, `CLI.md`).
 - **INV-6 — Working copy outside the product tree; one tracked pointer.**
   The deployment's working copy is a directory named `.criterion/`, and
   the project reaches it through one path, `<project root>/.criterion`.
