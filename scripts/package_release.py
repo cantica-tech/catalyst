@@ -287,6 +287,8 @@ def update_publish_readmes(publish_dir: Path) -> None:
         "## Release Categories\n\n"
         "- **[kernel/](kernel/README.md)**: Catalyst kernel releases (the module-independent part of the framework: specifications, templates, definitions, and plugins).\n"
         "- **[modules/](modules/README.md)**: Catalyst process modules, one directory per module id.\n"
+        + ("- **[vsix/](vsix/README.md)**: VS Code extension releases (`.vsix`), each with the kernel versions it works with.\n"
+           if (catalyst_dir / "vsix" / "README.md").is_file() else "")
         + ("- **[example/](example/README.md)**: a small project governed by catalyst, end to end.\n"
            if (catalyst_dir / "example" / "README.md").is_file() else ""),
         encoding="utf-8"
