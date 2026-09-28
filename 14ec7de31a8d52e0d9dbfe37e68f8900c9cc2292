@@ -1,0 +1,216 @@
+# catalyst quickstart
+
+**Target: 15 minutes, on a stopwatch.** Start it when you begin step 1 and
+note the time at the end of each step — [`FEEDBACK.md`](FEEDBACK.md) asks
+for it.
+
+You will install catalyst into a fresh repository, document one rule, fix
+the code that breaks it, commit the fix with a traced message, and check
+the result. Every command is meant to be pasted as is, in order, into one
+shell (bash or zsh). No agent is needed: this is the path the agent
+follows for you, done by hand, so you can see each piece.
+
+## 0. Before the clock starts
+
+You need:
+
+- `python3` 3.9 or later and `git`, with `git config user.name` and
+  `user.email` set;
+- a catalyst checkout, with its CLI built into `dist/catalyst.pyz`;
+- a checkout of the process module the trial uses,
+  `catalyst-software-engineering` (listed in catalyst's
+  `framework/modules/catalog.md`).
+
+```sh
+git clone git@github.com:oliben67/catalyst.git
+git clone git@github.com:oliben67/catalyst-software-engineering.git
+cd catalyst && PYTHONPATH=scripts python3 -c 'from pathlib import Path; import package_release as p; print(p.build_cli(Path("."), Path("dist/catalyst.pyz")))' && cd ..
+```
+
+(`task build:cli` does the same if you have Task.) Then set these once, in
+the shell you will use — adjust the two paths and your name:
+
+```sh
+CATALYST="$PWD/catalyst"
+MODULE="$PWD/catalyst-software-engineering"
+ME="Ada Lovelace"
+ME_GIT=ada
+```
+
+## 1. A fresh repository (1 minute)
+
+A one-function program whose greeting is wrong on purpose.
+
+```sh
+mkdir greet && cd greet
+git init -q
+printf 'def greet(name):\n    return "hello " + name\n' > greet.py
+git add greet.py && git commit -qm "chore: project skeleton"
+```
+
+## 2. Install catalyst (2 minutes)
+
+```sh
+python3 "$CATALYST/dist/catalyst.pyz" init --name greet --module software-engineering \
+  --user "$ME" --git-username "$ME_GIT" --rule-doc greeting-rules:gr \
+  --kernel "$CATALYST/framework/kernel" --module-dir "$MODULE"
+catalyst() { python3 "$PWD/.criterion/bin/catalyst.pyz" "$@"; }
+catalyst hook install
+git add greet.catalyst .gitignore && git commit -qm "chore: install catalyst"
+```
+
+What happened: `init` built the working copy in `.criterion/` (rules,
+entity folders, your user, an empty journal, the vendored CLI) and wrote
+`greet.catalyst`, the one file the repository tracks. `.criterion/` is
+gitignored and has its own git history. `hook install` added a
+`commit-msg` hook: from now on every commit must cite an artifact or rule
+ID, or start `chore:` — as these two did. The `catalyst` function saves
+typing; run everything from `greet/`.
+
+## 3. Document the first rule (5 minutes)
+
+A rule lives in a **domain**, registered first; its ID comes from the CLI.
+
+```sh
+cat > .criterion/rules/domains/gr-GREET-greeting-output.md <<EOF
+# \`GREET\` — Greeting output
+
+**Document:** rules/greeting-rules.md
+**Name:** greeting-output
+**Defined:** $(date +%F)
+**Parent:** none
+**Sub-domains:** none
+
+## Scope
+
+What the greeting says, and how it is written.
+
+## Relationship to other domains
+
+None.
+EOF
+echo "| [\`GREET\`](gr-GREET-greeting-output.md) | rules/greeting-rules.md | $(date +%F) |" >> .criterion/rules/domains/domains.md
+RULE=$(catalyst id next-rule gr GREET) && echo "$RULE"
+```
+
+Now the rule itself, in the rule document, and its line in the global
+rules index:
+
+```sh
+cat > .criterion/rules/greeting-rules.md <<EOF
+# Greeting rules
+
+Prefix: \`gr\`.
+
+## Contents
+
+- [\`GREET\`](#greeting-output) — \`$RULE\`
+
+## Greeting output
+
+> **Domain:** \`GREET\` — see [domains/gr-GREET-greeting-output.md](domains/gr-GREET-greeting-output.md).
+
+### \`$RULE\` The greeting is capitalised and punctuated
+
+✅ working. \`greet("Ada")\` returns \`Hello, Ada!\`. Implemented: \`greet.py\`.
+
+## Linked Artifacts — Quick Index
+
+*(none yet)*
+EOF
+cat > .criterion/rules/rules.md <<EOF
+# Rules index
+
+## Documents
+
+| Prefix | Document | Domains |
+|---|---|---|
+| \`gr\` | [\`greeting-rules.md\`](greeting-rules.md) | \`GREET\` |
+
+## Rule IDs
+
+- \`$RULE\` — The greeting is capitalised and punctuated
+EOF
+catalyst journal append --command "rule edit" --action create --artifact "$RULE" --target "$RULE" \
+  --intent "Document how the greeting must read, so the code has a rule to answer to." \
+  --file .criterion/rules/greeting-rules.md --file .criterion/rules/rules.md \
+  --file .criterion/rules/domains/domains.md --file .criterion/rules/domains/gr-GREET-greeting-output.md
+catalyst check
+```
+
+`journal append` recorded who changed which files, why, and each file's
+content hash before and after. `check` should pass with no errors.
+
+## 4. A traced fix (4 minutes)
+
+`greet.py` breaks the rule you just wrote, so this change restores a
+documented rule's behaviour: a **fix**. With this module, a fix is a bug
+report targeting the rule.
+
+```sh
+BUG=$(catalyst id next BUG) && echo "$BUG"
+BUG_FILE=.criterion/development/bugs/${BUG%-*}-greeting-not-capitalised.md
+cat > "$BUG_FILE" <<EOF
+# \`$BUG\` — Greeting is not capitalised
+
+| Field | Value |
+|---|---|
+| **ID** | \`$BUG\` |
+| **Name** | \`greeting-not-capitalised\` |
+| **Status** | Closed |
+| **Severity** | Low |
+| **Opened** | $(date +%F) |
+| **Targets** | \`$RULE\` |
+| **Domain** | \`GREET\` |
+| **Area** | \`greet.py\` |
+| **Steps** | *(none)* |
+| **Signed-off-by** | $ME |
+
+## Description
+
+\`greet("Ada")\` returns \`hello Ada\`; \`$RULE\` requires \`Hello, Ada!\`. Fixed in \`greet.py\`.
+EOF
+printf 'def greet(name):\n    return f"Hello, {name}!"\n' > greet.py
+catalyst index regen
+catalyst journal append --command /create-bug --action create --artifact "$BUG" --target "$RULE" --tier fix \
+  --intent "Restore $RULE: the greeting was lower-case and unpunctuated." \
+  --file greet.py --file "$BUG_FILE" --file .criterion/development/bugs/bugs.md
+```
+
+## 5. Commit with a traced message, and check (3 minutes)
+
+First, an untraced commit — the hook refuses it:
+
+```sh
+git add greet.py
+git commit -m "fix the greeting"
+```
+
+Then the same commit, citing the bug (the short form, without your userid,
+is enough):
+
+```sh
+git commit -qm "${BUG%-*}: capitalise and punctuate the greeting"
+catalyst trace HEAD
+catalyst check
+catalyst report
+```
+
+`trace HEAD` checks every commit in the history: three, all traced.
+`check` passes. `report` shows the journal entries, the tiers, `commits
+traced: 3/3` and the closed bug.
+
+**Stop the clock.**
+
+## What you have
+
+- `greet.py` line 2 answers "why is it like this?": its commit cites the
+  bug, the bug targets the rule, the rule says what the greeting must be,
+  and the journal holds each file's exact before-and-after.
+- `python3 .criterion/bin/catalyst.pyz journal restore <timestamp> /tmp/greet-then`
+  rebuilds every recorded file as it stood at any moment.
+- In real work your agent does steps 3 and 4 for you (`/create-bug`, the
+  rule edit), and you review them.
+
+Now fill in [`FEEDBACK.md`](FEEDBACK.md). The full picture: the example
+project in the release distribution, and `framework/kernel/CLI.md`.

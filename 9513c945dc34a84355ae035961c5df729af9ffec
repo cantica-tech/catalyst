@@ -1,0 +1,14 @@
+{
+  "project_name": "<project-name>",
+  "format": "1.0-rc",
+  "kernel_version": "<catalyst-kernel-version>",
+  "module": "<active-module-id, from framework/modules/catalog.md>",
+  "agent": "<current-agent-identity, e.g. claude-code>",
+  "repoed": false,
+  "catalyst_repo": null,
+  "catalyst_repo_url": null,
+  "created_by": null,
+  "criterion_branch": null,
+  "created": "<YYYY-MM-DD>",
+  "updated": "<YYYY-MM-DD>"
+}
