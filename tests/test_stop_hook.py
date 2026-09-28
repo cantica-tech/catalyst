@@ -19,7 +19,10 @@ def fake_root(tmp_path: Path, failing: set[str]) -> Path:
     pkg.mkdir()
     (pkg / "__init__.py").write_text("")
     code = 1 if "catalyst check" in failing else 0
-    (pkg / "__main__.py").write_text(f"print('catalyst check said {code}')\nraise SystemExit({code})\n")
+    (pkg / "__main__.py").write_text(
+        "import sys\n"
+        f"code = {code} if sys.argv[1] == 'check' else 0\n"
+        "print(f'catalyst {sys.argv[1]} said {code}')\nraise SystemExit(code)\n")
     return tmp_path
 
 

@@ -1,11 +1,45 @@
 # catalyst
 
-**catalyst is a portable, model-agnostic development framework that a coding
-agent installs into a project and then works within.** It gives any codebase a
-single, traceable structure for its rules, its development work, its agile
-process, who's accountable for what, and a real history of why every change
-happened — so every change traces down to a documented rule, and every rule
-back up to the work that exercises it.
+**Persistent, verifiable project memory for codebases developed with AI
+coding agents.** An agent forgets between sessions why the code is the way
+it is, and nothing it leaves behind says which requirement a line serves.
+catalyst is for developers and teams who build with an agent and still need
+to answer "why does this code do X?" months later. The agent works inside a
+small, structured record kept next to the project: documented rules, work
+that traces to those rules, and an append-only journal of every change —
+so every change traces to a documented rule, and every rule back to the
+work that exercises it. A tested CLI keeps the IDs, the journal and the
+indexes honest, so the record can be checked rather than trusted.
+
+catalyst is in **beta**. Claude Code is the supported and tested agent;
+others can follow `AGENT.md`/`SYSTEM.md` but are untested (see
+[Agents](#agents)).
+
+### What it looks like
+
+A fictional project: one rule, one piece of work fixing it, one journal line.
+
+```text
+rules/business-rules.md
+  br-AUTH-000003-Ab3xR9pQ  ✅ A password-reset link expires after 30 minutes.
+
+ITEM-000012-Ab3xR9pQ-reset-link-never-expires.md
+  Targets: br-AUTH-000003-Ab3xR9pQ   Status: Done   Signed-off-by: Ada Lovelace
+
+development/journal.jsonl
+  {"command": "/status", "action": "status-change", "tier": "fix",
+   "artifact": "ITEM-000012-Ab3xR9pQ", "targets": ["br-AUTH-000003-Ab3xR9pQ"],
+   "intent": ["Reset links honour the 30-minute expiry again"],
+   "files": [{"path": "src/auth/reset.py", "before": "9f2c…", "after": "41ab…"}, …]}
+
+$ python3 .criterion/bin/catalyst.pyz check
+catalyst check passed: 0 error(s), 0 warning(s)
+```
+
+Months later, `/journal --rule br-AUTH-000003-Ab3xR9pQ` lists every change
+made for that rule, and `/journal-restore <timestamp>` rebuilds the tree as
+it stood. The terms used here are defined in the
+[glossary](framework/kernel/GLOSSARY.md).
 
 ## Kernel and modules
 
@@ -141,7 +175,11 @@ no concrete, activatable plugin yet.
 
 ## Getting started
 
-Deployment follows one of two paths, chosen at install time:
+Ask your agent to install catalyst into the project; nothing is installed
+until you do. Under Claude Code the mechanical part is one command,
+`catalyst init` (see `CLAUDE.md`); the agent then works with you on the
+judgment — the rule documents, the first rules. The install follows one of
+two paths:
 
 - **Greenfield** — no code yet: the stack, tooling, and dev-environment
   decisions get written and implemented as the project's first rules,
@@ -153,15 +191,17 @@ Deployment follows one of two paths, chosen at install time:
 Either way, the active module decides what the day-to-day view of open work
 looks like; see its repository.
 
-## Portable by design
+## Agents
 
-catalyst is built to run under **any** capable coding agent — Claude Code, a
-generic tool-using agent, or a system-prompted model — by detecting what the
-running agent can do and falling back when a capability is absent. It installs
-itself into a fixed deploy target (`.criterion/`) on first load, and stays
-grounded across long runs through explicit anti-drift mechanisms (an invariants
-file, deployment ledgers, and a re-ground cadence) rather than trusting the
-agent to simply remember.
+catalyst's documents are written to be agent-agnostic: they detect what the
+running agent can do and fall back when a capability is absent. Only
+**Claude Code** is supported and tested today. Other agents can follow
+`AGENT.md` or `SYSTEM.md`, and the `catalyst` CLI works from any shell, but
+those paths are untested. catalyst installs only when you ask
+(`catalyst init`, INV-2), and stays grounded across long runs through
+explicit anti-drift mechanisms (an invariants file, deployment ledgers, a
+re-ground cadence and an end-of-turn `catalyst check`) rather than trusting
+the agent to simply remember.
 
 `.criterion/` itself is the agent's own governance context for the
 project — not part of the developed code structure, so it doesn't build
@@ -191,8 +231,9 @@ that file.
 - `AGENT.md` — running a generic agent workflow.
 - `SYSTEM.md` — running the system-level prompt.
 
-All three load `BOOTSTRAP.md`, the single portable install core. Open the
-selected file and follow its instructions from top to bottom.
+All three load `BOOTSTRAP.md`, the single install core. Open the selected
+file and follow its instructions from top to bottom. `CLAUDE.md` is the only
+tested path.
 
 ## License
 

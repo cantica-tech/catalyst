@@ -35,7 +35,7 @@ step and the machine checks below.
       artifact-type folder(s) (full INV-20 `templates/`+catalog
       treatment, templates resolved from the plugin's own repository or
       the named `plugins/_prototyping/` schema) and command file(s)
-      (into `.claude/commands/`) — same mechanism first-load
+      (into `.claude/commands/`) — same mechanism
       instantiation uses for core templates. Two content-contributing
       plugins of the same category must not both be active if they'd
       deploy the same artifact-type folder — refuse the second, point

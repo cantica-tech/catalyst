@@ -94,7 +94,7 @@ class Validator:
             if not ok:
                 self.add(ERROR, "dangling-ref", self.rel(art.file),
                          f"`{fd.name}` cites `{v}`, which resolves to nothing")
-            elif fd.target_type and kind != fd.target_type:
+            elif fd.target_type and kind not in fd.target_type.split("|"):
                 self.add(WARNING, "ref-type", self.rel(art.file),
                          f"`{fd.name}` cites `{v}` (a {kind}); the ETD expects {fd.target_type}")
             elif kind == "rule" and self.corpus.rules[v][0].retired:
@@ -115,6 +115,10 @@ class Validator:
                      f"filename does not start with {etd.id_prefix}-{m.group(1)}- (ID `{art.id}`)")
         # declared fields
         grounded = etd.grounding == "none"
+        # "**Closed**", "Closed ✅", "`Closed`" all mean Closed
+        m = re.match(r"[\s*`_]*([A-Za-z][A-Za-z -]*[A-Za-z])", art.get("Status") or "")
+        status = m.group(1).lower() if m else ""
+        closed = status in {s.lower() for s in etd.workflow.closed_states}
         for fd in etd.fields:
             if fd.name == "ID":
                 continue
@@ -122,6 +126,9 @@ class Validator:
             if raw is None or is_empty(raw):
                 if fd.required:
                     self.add(ERROR, "required-field", where, f"required field `{fd.name}` is missing or empty")
+                elif fd.required_when_closed and closed:
+                    self.add(ERROR, "closed-incomplete", where,
+                             f"`{fd.name}` must be filled before a {etd.name.lower()} is {status}")
                 continue
             if fd.kind == "enum" and fd.allowed_values:
                 allowed = {a.lower() for a in fd.allowed_values}

@@ -6,7 +6,7 @@ process modules (`MODULE-SPECIFICATION.md`), which are versioned in their
 own repositories. The kernel is versioned by the repository's root
 [`version.txt`](../../version.txt) and released as `kernel-v<version>.zip`.
 
-A project-agnostic, portable specification for how any codebase organizes
+A project-agnostic specification for how any codebase organizes
 its rules, its development work, its agile process, its planning, its
 accountability, and its own change history — extrapolated from the
 concrete system built in this repo's own [`.criterion/`](../../.criterion/)
@@ -15,9 +15,13 @@ this project, built via the retrofit path (§4 below); this folder is the
 generic template for standing the same system up in any project so it
 can create rules that fit that project's reality.
 
-(`criterion` is also the default shared branch of a *shared*
-deployment's criterion repository — INV-18, §13 of
-`rules-of-rules.template.md`.)
+The specification is written to be agent-agnostic, but only Claude Code is
+supported and tested today; other agents can follow `AGENT.md`/`SYSTEM.md`
+and the `catalyst` CLI works from any shell, untested. Terms are defined in
+[`GLOSSARY.md`](GLOSSARY.md) — including the several things named
+"criterion" (the `.criterion` working copy, the criterion repository, the
+`/criterion` command, and `criterion`, the default shared branch; INV-18,
+§13 of `rules-of-rules.template.md`).
 
 ## What this framework is
 
@@ -93,6 +97,7 @@ own repository — it's never part of what a deployed project carries.
 |---|---|
 | [`rules-of-rules.template.md`](rules-of-rules.template.md) | Generic meta-rules: conflict-checking, done-bar, ID scheme, domain standard, retirement. Copy to `<project>/rules/Rules-of-Rules.md` and fill in placeholders. |
 | [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for development artifacts and meta-tags; the active module's document types and commands are inserted from its `code-of-conduct.module.md`. Copy to `<project>/CODE-OF-CONDUCT.md`. |
+| [`GLOSSARY.md`](GLOSSARY.md) | Every term catalyst invents (kernel, module, ETD, working copy, criterion, journal, tiers, ...), in one place. |
 | [`CLI.md`](CLI.md) | Reference for the `catalyst` command line: the mechanical steps (IDs, userids, journal, indexes, chain validation, the end-of-turn hook) that procedures call instead of describing. |
 | [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) | Standard specification for Catalyst Process Modules, Module Manifests (`module.yaml`), Entity Type Definitions (`.yaml`), and layout. |
 | [`schemas/`](schemas/) | Machine-readable JSON schemas (`module-manifest.schema.json`, `entity-type-definition.schema.json`) for module and ETD validation. |

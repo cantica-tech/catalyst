@@ -6,6 +6,30 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.40.0 — unreleased
+
+Beta-readiness Phase 3: product shape (migration
+`0.40.0/explicit-install-and-tiers.md`).
+
+- `catalyst init` installs catalyst deterministically — every entity
+  folder with its index, templates and README, the composed
+  CODE-OF-CONDUCT and Rules-of-Rules, definitions, the first user, the
+  journal, the vendored CLI, the pointer — and a fresh install passes
+  `catalyst check`. Installing is only ever an explicit request (INV-2).
+- Three ceremony tiers (reference module 2.2.0): a chore is one journal
+  entry (`--tier chore`), a fix is a bug report, a feature a requirement
+  with steps —
+  enforced by the new ETD field flag `required_when_closed`
+  (`closed-incomplete`).
+- `catalyst spec <command>` prints only what one command needs from
+  CODE-OF-CONDUCT §4 (at most ~1,300 tokens, against ~32k for the full
+  documents); catalyst holds every command to a 1,000-word budget.
+- `framework/kernel/GLOSSARY.md`; name collisions explained.
+- ETDs can declare `location` (a folder's parent, e.g. `development`).
+- The portability claim is narrowed: Claude Code is supported and tested;
+  other agents are untested.
+- README leads with what catalyst is for.
+
 ## 0.39.0 — unreleased
 
 Beta-readiness Phase 2: shared deployments on git (`catalyst criterion`,

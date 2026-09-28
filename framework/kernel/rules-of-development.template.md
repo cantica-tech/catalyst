@@ -28,6 +28,10 @@ and follow the ID scheme in §3.
 The active module may declare an entity type for which "no rule applies"
 is a legitimate answer (pure repo hygiene with no bearing on any documented
 behavior or process) — but it must be stated explicitly, not left blank.
+Likewise, a change that alters no rule's behaviour at all may be a
+**chore** (§9): no artifact, one journal entry whose empty `targets`
+states explicitly that it serves no rule — when the active module defines
+ceremony tiers (its §3 contribution).
 
 ## 2. Users, roles, and signing
 
@@ -147,13 +151,16 @@ this deployment's canonical command list.
 Mechanical steps are calls to the catalyst CLI (`CLI.md`), never
 re-derived by hand. **`catalyst <args>`** is shorthand for
 `python3 .criterion/bin/catalyst.pyz <args>` (or `task catalyst -- <args>`).
+`catalyst spec <name>` prints one command's own bullet and procedure from
+this section; command files read that instead of the whole document.
 Every command that creates or changes an artifact, rule, domain or
 `Status` ends the same way, after its own steps below:
 
 1. `catalyst index regen` — rebuild every entity index from the files.
 2. `catalyst journal append --command /<name> --action <action>
-   --artifact <id> [--target <rule-id> ...] --intent "<goal>"
-   --file <path> ...` — one entry covering every touched file (§9).
+   --artifact <id> [--target <rule-id> ...] [--tier <tier>]
+   --intent "<goal>" --file <path> ...` — one entry covering every touched
+   file (§9).
 3. `catalyst check` — unless the agent's end-of-turn hook already runs
    `catalyst hook stop`; resolve every error before reporting.
 
@@ -278,10 +285,10 @@ the seven currently exist anywhere.
   names a `Workflow` (`WORKFLOW-NNNNNN`, `Rules-of-Rules.md` §19), read
   its `## Steps`/`## Gates / exit criteria` before choosing a verb.
 - `/project create <project name>` — install a fresh catalyst deployment
-  here (`Rules-of-Rules.md` §14): resolve the agent-owned location,
-  build the working copy there, write `<app-name>.catalyst` at this
-  project's root (no path in it), create the `.criterion` symlink, and
-  gitignore `/.criterion`. Refuses if a deployment already exists here.
+  here, on this explicit request (`Rules-of-Rules.md` §14, INV-2): resolve
+  the inputs, run `catalyst init` (working copy in agent-owned space,
+  `<app-name>.catalyst` with no path in it, `.criterion` symlink,
+  `/.criterion` gitignored). Refuses if a deployment already exists here.
 - `/project remove <project name> [force]` — un-link the local
   `<app-name>.catalyst` pointer and `.criterion` symlink; the working
   copy, memory note, and any `criterion` repo are left untouched (retire
@@ -532,14 +539,13 @@ When the user enters `/project create <project name>: ...`, refuse if a
 `<app-name>.catalyst` pointer or an in-project `.criterion/` already
 exists at this project's root — point to `/project import ... force`
 instead. Otherwise run the instantiation procedure
-(`INSTANTIATION-GUIDE.md`): resolve the agent-owned location
-(`BOOTSTRAP.md` §1), build the working copy there, then write
-`<app-name>.catalyst` from `templates/catalyst-pointer.template.json`
-with `<project name>` (the pointer holds no path), create the
-`.criterion` symlink at the project root pointing at the working copy
-(or keep the in-project fallback directory), and add `/.criterion` to the
-project's `.gitignore` if absent. Report the result; per hard rule 4,
-nothing is committed automatically.
+(`INSTANTIATION-GUIDE.md` §1): resolve the module, rule documents, first
+user and agent-owned location (`BOOTSTRAP.md` §1), then run
+`catalyst init --name <project name> ...`, which builds the working copy,
+writes `<app-name>.catalyst` (no path in it), links `.criterion` (or keeps
+the in-project fallback directory) and gitignores `/.criterion`; then the
+guide's judgment steps. Report the result; per hard rule 4, nothing is
+committed automatically.
 
 When the user enters `/project remove <project name> [force]: ...`,
 without `force`: delete this project's `<app-name>.catalyst` and its
@@ -776,7 +782,19 @@ instead of any of it. Concretely: make the edit(s), then run
 `catalyst journal append` once, with a `--file` for every file the
 command touched; it records each file's real `before`/`after` hashes and
 pins the blobs. Entries are written only this way, never by hand, and the
-agent's judgment goes into `--intent` and `--target`. Entries are immutable — never edited, deleted, or reordered
+agent's judgment goes into `--intent`, `--target` and `--tier`.
+
+**Ceremony tiers.** `--tier chore|fix|feature` records how much ceremony a
+change carries: a **chore** changes no rule's behaviour, a **fix** restores
+a documented rule's behaviour, a **feature** adds or changes behaviour. The
+agent picks the tier, states it to the user before starting, and escalates
+(chore → fix → feature) if the change turns out bigger; when unsure, the
+higher tier. A chore needs no artifact: its one entry has no `--target`
+(`targets: []`), which says explicitly that it serves no rule. What a fix
+and a feature require — which artifacts, which steps, which tests — is the
+active module's, in its §3 contribution. A tiered change is journaled even
+when no §4 command is involved: `--command` is then the tier itself
+(e.g. `--command chore --action update --tier chore`). Entries are immutable — never edited, deleted, or reordered
 afterward, the same "never delete, retire in place" principle as a
 retired rule (`Rules-of-Rules.md` §4) applies here in its strictest
 form: nothing about a written entry ever changes, period.

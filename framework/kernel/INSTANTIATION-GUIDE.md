@@ -10,9 +10,9 @@ creates concrete rules for that particular project.
 > scoped to the git repository provided by the environment and the repository
 > name itself.
 >
-> Hard rule: when the catalyst framework is first loaded into memory for a
-> project, it MUST be installed immediately into that project using the
-> instantiation steps in this guide.
+> Hard rule: catalyst is installed into a project ONLY when the user
+> explicitly asks for it (`catalyst init`, `/project create`, or in plain
+> words). Loading or reading catalyst never installs it; at most, offer to.
 >
 > Hard rule: after that first installation, the framework MUST be referred to
 > as "catalyst" or "catalyst framework" in all subsequent guidance,
@@ -23,271 +23,177 @@ creates concrete rules for that particular project.
 > Hard rule: the model SHALL NEVER push anything in this project, catalyst,
 > without the user's explicit assent.
 
+An install is two kinds of work. Everything mechanical — the working copy's
+skeleton, the composed governing documents, the seeded module, definitions,
+the first user, the journal, the vendored CLI, the pointer and the
+`.criterion` symlink — is one deterministic command, `catalyst init`
+(step 4, `CLI.md`). What stays with the agent is judgment: the project's
+name, its module, its rule documents, its first user, where the working copy
+lives, and, afterwards, its first rules.
+
 1. Decide your rule document(s) and their prefixes based on the project’s
    actual structure (e.g. one document per natural seam in the system — UI
    vs. backend, or per-service in a multi-service repo). Pick a short
-   lowercase prefix per document.
-2. Before creating the project layout, locate configuration for the
-   framework name. Look for a project-local `dev-instructions.yaml` in the
-   project where this guide is being run. If it exists, read its `name` value
-   and, if present, its optional `layout` tree. If it does not exist, ask
-   the user for the project name and use the current project root directory
-   name as the default.
-
-   The required format for that file is now:
+   lowercase prefix per document. Each becomes one `--rule-doc
+   <file>:<prefix>` (e.g. `business-rules:br`); with none, `catalyst init`
+   creates `<name>-rules.md` with prefix `br`.
+2. Resolve the project name. Look for a project-local `dev-instructions.yaml`
+   in the project where this guide is being run. If it exists, read its
+   `name` value; if it does not, ask the user for the project name and use
+   the current project root directory name as the default.
    ```yaml
    name: "project-name"
-   layout:
-     project-root:
-       - rules:
-           - rules-of-rules.md
    ```
+   The `name` must be a simple project identifier, not a full path or a
+   nested object; the pointer becomes `<name>.catalyst`. `catalyst init`
+   builds the standard layout (step 3); an optional `layout` key left in an
+   older bootstrap file is not applied — tell the user if one is present.
+   After the install completes successfully, remove `dev-instructions.yaml`:
+   it was only bootstrap metadata.
+3. Resolve the rest of `catalyst init`'s inputs:
+   - **The active module** (`--module <id>`). There is no default module; if
+     the user has not said which one, list the production modules in
+     `framework/modules/catalog.md` and ask. `catalyst init` finds a module
+     checked out next to the project or to catalyst as `catalyst-<id>`;
+     otherwise pass `--module-dir <dir>` (a checkout of the module's
+     repository at the release matching this kernel version). Like plugins,
+     a module is never sourced from this framework repository.
+   - **The first user** (`--user <name>`, `--git-username <name>`), who is
+     registered as Admin — a deployment is not valid without one active user
+     (INV-16). Ask who it should be if it isn't obvious from context.
+   - **The agent-owned location** (`--at <dir>`). The working-copy
+     directory is always named `.criterion/`, but it is not built inside the
+     target project's own tree: it goes in a location this agent owns (a
+     per-project data directory the running agent already maintains),
+     computed per machine from the agent's own conventions — its shim says
+     how — and never written into a tracked file (INV-6). Without `--at`
+     (an agent with no owned-space concept, or a platform without
+     symlinks), the working copy is a real `.criterion/` directory in the
+     project, gitignored the same way.
+   - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
+     pointer's `agent` field, and, for an agent with command files, where
+     they go (`--commands-dir <dir>`).
+   - Optionally, **where the project's tests live** (`--test-locations`),
+     which fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2 — on the
+     greenfield path this comes out of the testing decision (§3).
+4. **Run `catalyst init`** from the project root (or pass `--project
+   <root>`), with `--kernel <framework/kernel>` of the catalyst checkout or
+   kernel release when running the zipapp. It refuses if the project
+   already has a `*.catalyst` pointer or a `.criterion`, or if the target
+   location is not empty. In order, it:
+   - composes `CODE-OF-CONDUCT.md` (the kernel's
+     `rules-of-development.template.md` with the module's
+     `code-of-conduct.module.md` §3/§4 inserted under
+     `### From module <module-id>`), `rules/Rules-of-Rules.md` (the kernel's
+     `rules-of-rules.template.md` with the module's
+     `rules-of-rules.module.md` appended), `ACCESS-CONTROL.md` (verbatim) and
+     `Taskfile.common.yml` (the kernel's tasks, then the module's), resolving
+     `{{RULES_DIR}}`, `{{RULE_DOCS_LIST}}` and `{{TEST_LOCATIONS}}` and
+     signing meta-rule IDs with the first user's userid
+     (`MODULE-SPECIFICATION.md` §6);
+   - seeds the whole module into `modules/<module-id>/` (never cherry-picked
+     files);
+   - creates every entity folder with the uniform shape (INV-20): its
+     `templates/` (`README.md`, the `templates-<type>.md` catalog with a `v1`
+     row, `TEMPLATE-<TYPE>-v1.md`), its `README.md` and its `<folder>.md`
+     index — the kernel's `rules/` (with `rules.md` listing the rule
+     documents, and each rule document seeded with `## Contents` and
+     `## Linked Artifacts — Quick Index`), `rules/domains/`,
+     `reconciliations/`, `workflows/` and `development/meta-tags/`, plus one
+     per module entity type at the place its ETD names (`location`), and
+     every path the module's manifest requires;
+   - copies the latest definition of every kernel and module type to
+     `definitions/<type>.md`, with `definitions/README.md` — frozen from
+     then on (INV-23, step 7 below);
+   - writes `IAM/users/` and `IAM/roles/` with their templates, registers
+     the first user with a fresh userid as Admin, and seeds `roles.json`
+     from the kernel's default role mapping (INV-16, INV-26);
+   - writes an empty `development/journal.jsonl`, `version.txt`,
+     `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
+     root `README.md`, and vendors the CLI at `bin/catalyst.pyz`;
+   - writes `<app-name>.catalyst` at the project root (no path in it; the
+     only catalyst file the product repository tracks), links `.criterion`
+     to the working copy when `--at` was given, and adds `/.criterion` to
+     the project's `.gitignore`;
+   - with `--commands-dir`, writes one command file per command of the
+     composed `CODE-OF-CONDUCT.md` §4 (the kernel's and the module's);
+   - initialises the working copy's own git history, and journals the
+     install as its first entry.
 
-   The `name` value is the configurable project name used for the
-   instantiated project data. It must be a simple project identifier, not a
-   full path or a nested object. The optional `layout` value lets the
-   deployment override the default directory structure. If no `layout` is
-   provided, the deployment must use the default structure described below.
+   It commits nothing in the project repository. From here on,
+   `catalyst <args>` means `python3 .criterion/bin/catalyst.pyz <args>`.
+   `work-items/` is **not** built — it only comes into being if a
+   project-management-type plugin is activated later (`Rules-of-Rules.md`
+   §8, INV-22; `ARTIFACT-LAYOUT.md`).
 
-   After the deployment completes successfully, remove the project-local
-   `dev-instructions.yaml` file from the project root. It was only needed as
-   temporary bootstrap metadata for discovering the project name and any
-   custom layout override, and is no longer needed once the framework has
-   been deployed.
-3. Pick a root layout, e.g.:
+   The resulting working copy (the module's folders vary by module):
    ```
-   <project-root>/.criterion/
-     .ledger/
+   <agent-owned location>/.criterion/     # reached as <project root>/.criterion
+     .git/                  # the working copy's own history
      ACCESS-CONTROL.md
      CODE-OF-CONDUCT.md
      DEPLOYMENT.md
      README.md
+     Taskfile.common.yml
      version.txt
+     bin/
+       catalyst.pyz
      definitions/
        README.md
        <type>.md
      modules/
-       <module-id>/         # the active module, seeded from its release (step 4)
-         module.yaml
-         version.txt
-         schemas/
-         templates/
-         definitions/
-         commands/
-         migrations/
-         skills/
-         rules-of-rules.module.md
-         code-of-conduct.module.md
-         INVARIANTS.module.md
-         Taskfile.module.yml
+       <module-id>/         # the whole module tree
      rules/
-       templates/
-         README.md
-         templates-rule.md
-         TEMPLATE-RULE-v1.md
+       templates/           # README.md, templates-rule.md, TEMPLATE-RULE-v1.md
        domains/
          templates/
-           README.md
-           templates-domain.md
-           TEMPLATE-DOMAIN-v1.md
          README.md
          domains.md
-         <prefix>-<CODE>-<short-description>.md
        README.md
        Rules-of-Rules.md
        rules.md
-       business/
-         business-rules.md
-         <rule-doc-1>.md
-       ui/
-         ui-rules.md
-         <rule-doc-2>.md
-     <folder>/              # one per active-module entity type (step 4)
+       <rule-doc>.md        # one per --rule-doc
+     <folder>/              # a module entity type with no `location`
        templates/
-         README.md
-         templates-<type>.md
-         TEMPLATE-<TYPE>-v1.md
        README.md
        <folder>.md
-       <PREFIX-NNNNNN-short-summary>.md
-     reconciliations/
-       templates/
-         README.md
-         templates-reconciliation.md
-         TEMPLATE-RECONCILIATION-v1.md
-       README.md
-       reconciliations.md
-     workflows/
-       templates/
-         README.md
-         templates-workflow.md
-         TEMPLATE-WORKFLOW-v1.md
-       README.md
-       workflows.md
+     reconciliations/       # templates/, README.md, reconciliations.md
+     workflows/             # templates/, README.md, workflows.md
      IAM/
-       users/
-         templates/
-           README.md
-           templates-users.md
-           TEMPLATE-USERS-v1.json
-         README.md
-         users.json
-       roles/
-         templates/
-           README.md
-           templates-roles.md
-           TEMPLATE-ROLES-v1.json
-         README.md
-         roles.json
-     plugins/
-       <type>/
-         <name>/            # an activated plugin's own install (its own repo)
+       users/               # templates/, README.md, users.json
+       roles/               # templates/, README.md, roles.json
      development/
-       <folder>/            # active-module entity types the module places here
-       meta-tags/
-         templates/
-           README.md
-           templates-meta-tag.md
-           TEMPLATE-META-TAG-v1.md
-         README.md
-         meta-tags.md
-       README.md
+       <folder>/            # a module entity type with `location: development`
+       meta-tags/           # templates/, README.md, meta-tags.md
        journal.jsonl
    ```
-   `work-items/` is **not** built here — it's not part of the core
-   layout (`Rules-of-Rules.md` §8, INV-22). It only comes into being if
-   and when a project-management-type plugin is activated later; see
-   `ARTIFACT-LAYOUT.md`'s "Optional, plugin-provided: `work-items/`" for
-   the shape it deploys when one is.
-   Every artifact-type folder above follows the same shape (`Rules-of-Rules.md`
-   §15, `INVARIANTS.md` INV-20): a `templates/` subdirectory (its own
-   `README.md`, a `templates-<type>.md` catalog — Version | File |
-   Timestamp | Notes — and the current `TEMPLATE-<TYPE>-vN.md`, files
-   only, never a subfolder, never edited in place once a newer version
-   exists), its own `README.md`, the `<type>.md` instance catalog, and
-   free-form space underneath for the actual artifacts (files and
-   folders, any depth — e.g. rule documents nested by domain). `IAM/users/`
-   and `IAM/roles/` get the same `templates/` treatment as every other
-   type, except the versioned file is the registry's *seed shape*
-   (`TEMPLATE-USERS-vN.json`/`TEMPLATE-ROLES-vN.json`) rather than a
-   per-instance document, since each registry is one JSON array, not
-   one-file-per-instance.
-   (The working-copy directory is always named `.criterion/`, but it
-   is not built inside the target project's own tree: resolve the
-   **agent-owned location** first — a location this agent owns (a
-   per-project data directory the running agent already maintains, if it
-   has one), distinct from the project being governed, computed per
-   machine from the agent's own conventions and never written into a
-   tracked file — and build the tree there instead. Link it into the
-   project as a `.criterion` symlink at the project root, and add
-   `/.criterion` to the project's `.gitignore`: that symlink is the one
-   path everything uses to reach the working copy. Write
-   `<app-name>.catalyst` (from `templates/catalyst-pointer.template.json`)
-   at the target project's own root, tracked normally; it holds no path
-   — this pointer file is the *only* catalyst artifact the target
-   project's own repo ever carries. If the running agent has no such
-   owned-space concept, or the platform has no symlinks, fall back to
-   building `.criterion/` directly inside the target project as a real
-   directory, gitignored the same way — still not committed, but no
-   relocation possible without agent support. Either way, `/criterion` (§13,
-   opt-in) is how a team shares the working copy: it moves to a
-   dedicated criterion repository, mounted as the product's `.criterion`
-   submodule — the product commits only the gitlink, never the working
-   copy's content. See `Rules-of-Rules.md` §14 for migrating a deployment that
-   already exists in the old, purely in-project shape, and
-   `migrations/` (this repository) for migrating an existing deployment
-   built under an older layout of this section itself to the current
-   one. The framework only cares that the chain from every active-module
+   The framework only cares that the chain from every active-module
    artifact to its grounding type (a kernel rule) to a domain stays intact
-   — extended upward through epic→story→task only when an agile
-   project-management plugin is active (INV-5, INV-22) — not the folder
-   names.
-   The `domains/` folder nests under `rules/` (`Rules-of-Rules.md` §7) —
-   domains exist only to group rules, so they live where rules live, not
-   as a top-level sibling. The `<folder>/` entries above stand for the
-   active module's entity types: each ETD in the module's `schemas/`
-   names its own `folder` (and whether it sits at the root or under
-   `development/`), and the module's own meta-rules
-   (`rules-of-rules.module.md`, composed in step 4) say what each type is
-   for and how its artifacts link to one another and to rules. The kernel
-   never names them (INV-30). The
-   `reconciliations/` folder also sits at the root, alongside the active
-   module's root-level folders — not nested under `work-items/`
-   — and holds `RECON-NNNNNN` cases opened for a conflict that stopped
-   `/criterion push`, or manually (`Rules-of-Rules.md` §16).
-   `work-items/` itself is not built at all here — it's plugin-only
-   (`Rules-of-Rules.md` §8, INV-22); skip it entirely for a core
-   instantiation.)
-4. Seed and compose the active module (`MODULE-SPECIFICATION.md` §6). The
-   `<app-name>.catalyst` pointer MUST name it in its `module` field —
-   there is no default module; if the user has not said which one, list
-   the production modules in `framework/modules/catalog.md` and ask.
-   Then:
-   - **Seed** the module from its catalogued repository, at the release
-     that matches this kernel version (its default branch only if no
-     release exists yet), into `.criterion/modules/<module-id>/` — the
-     whole module tree, never cherry-picked files. Like plugins, a module
-     is never sourced from this framework repository.
-   - **Rules-of-Rules:** append the module's `rules-of-rules.module.md`
-     to the deployed `rules/Rules-of-Rules.md`, after the kernel's
-     sections, under a `### From module <module-id>` heading
-     (§6.1). Module rule IDs keep their numbers; a kernel placeholder
-     line for an `rr-META-NNN` that moved to the module stays in place.
-   - **CODE-OF-CONDUCT:** insert the `## 3.` and `## 4.` sections of the
-     module's `code-of-conduct.module.md` at the end of the deployed
-     `CODE-OF-CONDUCT.md` §3 and §4 respectively, each under a
-     `### From module <module-id>` heading (§6.2). The composed §4
-     (kernel plus module) is the canonical command list step 5 deploys.
-   - **Invariants:** read the module's `INVARIANTS.module.md` together
-     with the kernel's `INVARIANTS.md` (§6.4); both bind the deployment.
-   - **Definitions:** the module's `definitions/` join the kernel's in
-     step 7 (§6.3).
-   - **Taskfile:** append the tasks of the module's `Taskfile.module.yml`
-     to the deployed `Taskfile.common.yml` in step 5 (§6.5).
-   - **Artifact folders:** build one artifact-type folder per module
-     entity type, at the place its ETD names, in step 6, from the
-     module's `templates/`.
-   - **Migrations:** a fresh deployment starts at the current version, so
-     no migration runs now; `/sync-framework` later applies module and
-     kernel migrations together in version order (§6.6,
-     `SYNCHRONIZE.md`).
-   Record the module id and version in `DEPLOYMENT.md`.
-5. Ensure the deployed
-   framework exposes **every** documented custom slash command from
-   the composed `CODE-OF-CONDUCT.md` §4 — `rules-of-development.template.md`
-   §4 plus the active module's §4 (step 4) — the canonical list; don't
-   re-enumerate a subset of it here or anywhere else, that's exactly how it
-   drifts — in the same way the framework defines them, so they are
-   available in the deployed environment. Under Claude Code this
-   concretely means: one `.claude/commands/<name>.md` file per command,
-   created from `templates/slash-command.template.md` (see `CLAUDE.md`'s
-   "Slash commands" entry for the exact mechanism). When plugins are
-   needed, pull their content directly from each plugin's own repository;
-   no plugin may be sourced from this framework repository, and every
-   plugin must have its own repository with no exceptions. Also deploy
-   `templates/Taskfile.common.template.yml` as `Taskfile.common.yml`
-   **inside `.criterion/`** (agent-owned space per INV-6 — never the
-   target project's own tree, unlike `.claude/commands/` which stays
-   project-root only because Claude Code's own fixed discovery path
-   forces it there), with the active module's `Taskfile.module.yml` tasks
-   appended to it (step 4) — same canonical composed §4 list, same drift
-   concern, see `CLAUDE.md`'s "Taskfiles" entry. Create the project's own root
-   `Taskfile.yml` if none exists yet, resolving the deployed agent's CLI
-   binary from the `*.catalyst` pointer's `agent` field so every
-   dispatched command stays agent-generic, and including
-   `.criterion/Taskfile.common.yml` — the project-root `.criterion`
-   symlink (INV-6), so the same relative path works on every machine and
-   for every agent, and no machine-specific path ever lands in this
-   tracked file. The include is `optional: true`, so the project's own
-   tasks still run on a clone where `.criterion` isn't set up yet (Task
-   follows the symlink transparently):
+   (INV-5), not the folder names. The module's meta-rules
+   (`rules-of-rules.module.md`, composed above) say what each of its types
+   is for; the kernel never names them (INV-30). `plugins/<type>/<name>/`
+   appears when a plugin is activated; `.ledger/` holds the agent's install
+   ledger (`BOOTSTRAP.md` §3).
+5. **Wire the agent and the project's tasks.** If the running agent
+   supports an end-of-turn hook, register `catalyst hook stop` the way its
+   shim says (`CLI.md` "Hooks"). An agent without command files instead
+   exposes each command of the composed `CODE-OF-CONDUCT.md` §4 as a named
+   procedure and lists them in the deployed `README.md` (`BOOTSTRAP.md` §1)
+   — the composed §4 is the canonical list; never re-enumerate a subset of
+   it anywhere else. Create the project's own root `Taskfile.yml` if none
+   exists yet, including `.criterion/Taskfile.common.yml` through the
+   project-root `.criterion` path (INV-6), so the same relative path works
+   on every machine and for every agent and no machine-specific path ever
+   lands in this tracked file. The include is `optional: true`, so the
+   project's own tasks still run on a clone where `.criterion` isn't set up
+   yet:
    ```yaml
    vars:
      # Resolves the deployed agent's CLI binary from the pointer's "agent"
      # field. "claude-code" is the one known id whose CLI binary name
      # differs from the id itself; any other agent id is assumed to
-     # already be its own binary name. Falls back to "claude" — today's
-     # only known agent — when no pointer/field is found.
+     # already be its own binary name. Falls back to "claude" when no
+     # pointer/field is found.
      AGENT_ID:
        sh: |
          f=$(ls *.catalyst 2>/dev/null | head -1)
@@ -310,143 +216,55 @@ creates concrete rules for that particular project.
    ```
    Add that project's own operational tasks in this same root
    `Taskfile.yml`, alongside — never inside — the included common tasks.
-
-   **Vendor the catalyst CLI** (`CLI.md`). Copy `bin/catalyst.pyz` from
-   the kernel release into `.criterion/bin/catalyst.pyz` (from catalyst's
-   own checkout instead: `task build:cli`, then copy
-   `dist/catalyst.pyz`). The deployed `Taskfile.common.yml` carries the
-   template's `catalyst` pass-through task (`task catalyst -- <args>`),
-   the one task that is not a slash command. From here on,
-   `catalyst <args>` means `python3 .criterion/bin/catalyst.pyz <args>`,
-   and every later step uses it for IDs, userids, indexes and the
-   journal. If the running agent supports an end-of-turn hook, register
-   `catalyst hook stop` as that hook the way its shim says (under Claude
-   Code: merge `agents/claude-code/settings.template.json` from this
-   repository into the project's `.claude/settings.json`).
-6. For **every** artifact-type folder (`Rules-of-Rules.md` §15, INV-20):
-   create its `templates/` subdirectory, copy the matching
-   `templates/*.template.*` — from this framework for a kernel type, from
-   the seeded `.criterion/modules/<module-id>/templates/` for an
-   active-module type — into it as
-   `TEMPLATE-<TYPE>-v1.md` (first version — new versions only ever get
-   added later, never an in-place edit), write that `templates/`
-   folder's own `README.md`, and seed its `templates-<type>.md` catalog
-   with one row for `v1` (Version | File | Timestamp | Notes — today's
-   date, "initial version"). Then write the artifact-type folder's own
-   `README.md` and its `<type>.md` instance catalog (the kernel's
-   `reconciliations.md`, `meta-tags.md`, `domains.md`, `workflows.md`,
-   plus one `<folder>.md` per active-module entity type).
-   This loop does not include `work-items/` or any of its subtypes
-   (`boards.md`/`epics.md`/`stories.md`/`tasks.md`/`spikes.md`/
-   `sprints.md`/`tickets.md`) — that folder is
-   plugin-only (step 3's note above) and isn't built during core
-   instantiation at all. `workflows.md` is core now (`Rules-of-Rules.md`
-   §19, INV-24), so it's in the list above, not this exclusion.
-
-   Keep each type's templates in the same folder as its actual
-   artifacts so the template and the concrete files live together
-   (nested one level deeper, under `<folder>/templates/`, but still
-   co-located). Domain files nest under `rules/domains/`, which
-   gets this same full treatment (its own `templates/`, `README.md`,
-   `domains.md`).
-
-   Also deploy any non-artifact file the active module's meta-rules and
-   invariants require at instantiation (for example a generated summary
-   document), from the module's own `templates/`, and run whatever
-   command the module names to populate it, so no template's
-   `{{PLACEHOLDER}}` text is left in place. Also create
-   `IAM/users/templates/` and `IAM/roles/templates/` the same way as any
-   other type in this loop: copy `templates/users.template.json` in as
-   `TEMPLATE-USERS-v1.json` and `templates/roles.template.json` in as
-   `TEMPLATE-ROLES-v1.json`, each with its own `README.md` and a
-   `templates-users.md`/`templates-roles.md` catalog seeded with a `v1`
-   row. Then seed `IAM/roles/roles.json` from `TEMPLATE-ROLES-v1.json`
-   (its default agile-role mapping) and `IAM/users/users.json` from
-   `TEMPLATE-USERS-v1.json` (empty array) — both a hard requirement
-   (`INVARIANTS.md` INV-16). **Then immediately run `/user-add` for at least one
-   person** — unlike every other on-demand artifact, deployment is not
-   actually complete with an empty `users.json`: a project must have at
-   least one active user (INV-16). Ask the user who that first
-   registered user should be and what role they hold if it isn't obvious
-   from context. Also copy
-   `templates/journal.template.jsonl` (empty) to
-   `development/journal.jsonl` — a hard requirement (`INVARIANTS.md`
-   INV-17). From this point on, every command that creates, modifies,
-   closes, or retires a rule-linked artifact, rule, domain, or work item,
-   or changes a `Status` field, appends one entry to it as its last step
-   with `catalyst journal append` (`CODE-OF-CONDUCT.md` §9) — including
-   every step of this instantiation itself from here onward. Once the
-   artifact folders exist, `catalyst index regen` writes every entity
-   index's rows.
-7. Deploy `framework/kernel/definitions/` and the active module's
-   `definitions/` (`INVARIANTS.md` INV-23, `MODULE-SPECIFICATION.md` §6.3) —
-   one short prose file per real entity type explaining what it is and
-   what it's for, distinct from the `templates/` files' field-and-shape
-   definitions. For each type, copy
-   only its *latest* `DEFINITION-<TYPE>-vN.md` content into
-   `.criterion/definitions/<type>.md` (flat — one file per type, no nested
-   subfolder in the deployed copy; the versioned-history subfolders under
-   `framework/kernel/definitions/` and the module's `definitions/` are
-   source structure only). Also copy `framework/kernel/definitions/README.md` to
-   `.criterion/definitions/README.md` so the freeze/versioning convention
-   travels with the deployment. **This step never runs again after first
-   deploy for a type that already has a deployed definition** — see
-   `SYNCHRONIZE.md`'s definitions carve-out; only `/sync-framework` adding a
-   brand-new type, or an explicit `/migrate-definition`, ever touches a
-   `.criterion/definitions/<type>.md` file after this.
-8. Create a root-level `README.md` in the deployed framework directory that
-   explains the project's rule-and-workflow structure, the deployment path,
-   and the main artifact folders. This README should be created during both
-   deployment and synchronization so the deployed framework always has a
-   custom, project-specific landing page. In addition, create a `README.md`
-   in every major deployed folder (`rules/`, `rules/domains/`,
-   `reconciliations/`, `workflows/`, `IAM/users/`, `IAM/roles/`,
-   `development/`, `development/meta-tags/`, `modules/<module-id>/`, and
-   every active-module `<folder>/`) and in every `templates/` subdirectory
-   (INV-20) that briefly explains that folder's purpose and link to it
-   from the root README so the structure is discoverable and
-   self-documenting. Also copy `framework/kernel/ACCESS-CONTROL.md`
-   to `.criterion/ACCESS-CONTROL.md` verbatim (no project-specific
-   customization, unlike this README) — a root-level governing reference,
-   same treatment as `CODE-OF-CONDUCT.md`/`Rules-of-Rules.md`: created on
-   first deploy, refreshed on `/sync-framework` whenever this framework
-   version actually changes it, linked from the root README so it's
-   discoverable.
+   When plugins are needed, pull their content directly from each plugin's
+   own repository; no plugin may be sourced from this framework repository.
+6. **Populate what the module requires.** If a document the module's
+   meta-rules or invariants require at instantiation (for example a
+   generated summary) still carries template `{{PLACEHOLDER}}` text, run
+   the command the module names to populate it. Additional users are added
+   with `/user-add`.
+7. **Definitions stay frozen.** `catalyst init` copied only the *latest*
+   `DEFINITION-<TYPE>-vN.md` of each kernel and module type into
+   `.criterion/definitions/<type>.md` (flat; the versioned subfolders are
+   source structure only). This never runs again for a type that already
+   has a deployed definition — see `SYNCHRONIZE.md`'s definitions
+   carve-out; only `/sync-framework` adding a brand-new type, or an explicit
+   `/migrate-definition`, ever touches one after this (INV-23).
+8. **Customise the landing page.** The root `README.md` `catalyst init`
+   writes is a stub: extend it with the project's rule-and-workflow
+   structure and links to each folder's `README.md`, so the structure is
+   discoverable. `ACCESS-CONTROL.md` stays verbatim (refreshed only by
+   `/sync-framework`).
 9. Create whatever starter artifacts the active module's meta-rules call
    for, based on the project's rule documents (for example, a description
    document such as `UI-Rules.md` for UI rules or `business-rules.md` for
    business rules), and keep them aligned with the rule IDs or source
    documents that define the expected behavior. Starter artifacts must be
    concrete and tied to specific application areas, screens, flows, or
-   components, because later work is grounded on them.
-10. Create your first rule document(s) with a `## Contents` heading and the
-   `## Linked Artifacts — Quick Index` heading (even if empty;
-   `Rules-of-Rules.md` §6) — the rest fills
-   in as domains/rules get added, each per `Rules-of-Rules.md` §6, so the
-   framework produces rules that are specific to this project. This is a hard
-   requirement: every rule must be stored as its own markdown file under the
-   rule type directory it belongs to, appear in the corresponding type index,
-   and be listed in the global `rules.md` index. In addition, every rule and
-   development artifact name must follow the descriptive format
-   **`<id>-<short-summary>`**, and the corresponding markdown filename must
-   follow **`<id>-<short-summary>.md`**; bare IDs or bare-ID filenames are no
-   longer acceptable. Existing deployed items must be renamed during deployment
-   or synchronization to meet this rule. There must be exactly one *current*
-   `TEMPLATE-RULE-vN.md` file, in `rules/templates/` (INV-8, INV-20), and
-   none inside the rule-type directories. No rule may be orphaned by
-   missing a type, a local index entry, or a global index entry. This
-   same descriptive-naming requirement is a hard requirement for domain
-   files: every file under `rules/domains/` must be named
-   `<prefix>-<CODE>-<short-summary>.md` (or
-   `<prefix>-<PARENT>.<SUB>-<short-summary>.md` for a sub-domain), never the
-   bare `<prefix>-<CODE>.md` — see `Rules-of-Rules.md` §7. Allocate each
-   rule ID with `catalyst id next-rule <doc-prefix> <DOMAIN> --as <signer>`.
+   components, because later work is grounded on them. Every one is
+   journaled with `catalyst journal append` (`CODE-OF-CONDUCT.md` §9), like
+   every later change.
+10. Write your first rules into the seeded rule document(s), each per
+   `Rules-of-Rules.md` §6 and in the domain it belongs to (`rules/domains/`,
+   §7), so the framework produces rules that are specific to this project.
+   This is a hard requirement: every rule is listed in its document's
+   `## Contents` and in the global `rules.md` index (INV-8), and every rule,
+   development-artifact and domain file follows the descriptive format
+   **`<id>-<short-summary>.md`** — bare IDs are not acceptable (INV-7); a
+   domain file is `<prefix>-<CODE>-<short-summary>.md` (or
+   `<prefix>-<PARENT>.<SUB>-<short-summary>.md` for a sub-domain,
+   `Rules-of-Rules.md` §7). There is exactly one *current*
+   `TEMPLATE-RULE-vN.md`, in `rules/templates/` (INV-8, INV-20). Allocate
+   each rule ID with `catalyst id next-rule <doc-prefix> <DOMAIN> --as
+   <signer>`.
 11. Finish with `catalyst check`. Resolve every error before calling the
-   deployment done; warnings may remain, and are reported to the user.
+   install done; warnings may remain, and are reported to the user. Present
+   the deployed tree; nothing is committed or pushed without the user's
+   assent (INV-4).
 
 ## 2. Choosing your agile flavor
 
-`work-items/` is plugin-only (§1 step 3, `Rules-of-Rules.md` §8) — this
+`work-items/` is plugin-only (§1 step 4, `Rules-of-Rules.md` §8) — this
 choice only matters if and when a project-management-type plugin is
 activated. Nothing below the work-items layer changes regardless.
 Above it, once such a plugin is active:
@@ -479,7 +297,10 @@ after the fact.
    decisions — e.g. `dev-environment-rules.md` with a short prefix such
    as `env` or `dx` — separate from the application's business/UI rule
    documents, since these rules govern the toolchain and workflow, not
-   product behavior. Add it to the rule document list from §1 step 1.
+   product behavior. Add it to the rule document list from §1 step 1, so
+   `catalyst init` seeds it (`--rule-doc dev-environment-rules:env`), and
+   run the install (§1 steps 2–5) before step 2 below: its domains and
+   rules need the working copy to exist.
 2. Work through the foundational decision areas with the user, one
    domain per area, creating each `rules/domains/<prefix>-<CODE>-<short-description>.md`
    file per §7 before writing rule bullets under it. Typical areas
@@ -490,7 +311,9 @@ after the fact.
    - **Code style** — linter, formatter, and their configs.
    - **Testing** — test framework, coverage tool, and where tests live.
      This also fills in `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2
-     for every rule created afterward, including application rules.
+     for every rule created afterward, including application rules (pass
+     it as `--test-locations` if already decided at install, else edit it
+     into the deployed `Rules-of-Rules.md` §2).
    - **CI/CD** — pipeline provider, what gates a merge.
    - **Local dev environment** — how a new contributor gets running
      (devcontainer, Docker Compose, Nix, a setup script — whatever the
@@ -506,11 +329,9 @@ after the fact.
    against the (still-empty) scaffold — e.g. the linter exits zero, the
    CI workflow runs green — not a unit test.
 4. Once the dev-environment rule document has its first pass of domains
-   and rules, continue with §1 steps 2 onward to deploy the rest of the
-   framework skeleton (the active module's artifact folders,
-   reconciliations) around it. That rule document stands in for the
-   starter artifacts in §1 step 9 — there is no product behavior yet to
-   ground them on.
+   and rules, continue with §1 steps 6 onward. That rule document stands
+   in for the starter artifacts in §1 step 9 — there is no product
+   behavior yet to ground them on.
 5. As soon as real application code starts, that work is a normal
    active-module artifact (per `CODE-OF-CONDUCT.md` §1) against a
    business/UI rule document
@@ -519,9 +340,9 @@ after the fact.
 
 ## 4. Retrofitting an existing project
 
-1. Do **not** try to write every rule up front. Start with
-   `Rules-of-Rules.md`, `CODE-OF-CONDUCT.md` (or your project's
-   equivalents) and an empty `rules/domains/` directory.
+1. Do **not** try to write every rule up front. Start with what
+   `catalyst init` gives you (§1): `Rules-of-Rules.md`,
+   `CODE-OF-CONDUCT.md` and an empty `rules/domains/` directory.
 2. Gather rules incrementally — per functional area, as you touch it, or
    via a dedicated audit pass (parallel research agents/subagents
    covering one rule category each, cross-checked against the codebase

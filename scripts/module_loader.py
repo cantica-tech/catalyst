@@ -33,6 +33,9 @@ class FieldDefinition:
     allowed_values: list[str] = field(default_factory=list)
     target_type: str | None = None
     backref: str | None = None
+    # must be non-empty once the entity's Status is one of its workflow's
+    # closed states (e.g. a feature cannot close without its steps)
+    required_when_closed: bool = False
 
 
 @dataclass
@@ -60,6 +63,9 @@ class ETD:
     # "id-summary" (files named <id>-<short-summary>.md) or "free-form"
     # (files keyed by a free-form name, exempt from that naming check).
     naming: str = "id-summary"
+    # The folder's parent inside the working copy ("" = the working copy's
+    # root), e.g. "development" for development/<folder>/.
+    location: str = ""
     fields: list[FieldDefinition] = field(default_factory=list)
     workflow: WorkflowDefinition = field(
         default_factory=lambda: WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
@@ -282,6 +288,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
     grounding = d.get("grounding", "none")
     grounding_field = d.get("grounding_field")
     naming = str(d.get("naming") or "id-summary")
+    location = str(d.get("location") or "").strip("/")
 
     fields: list[FieldDefinition] = []
     for f in d.get("fields", []):
@@ -294,6 +301,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
                     allowed_values=f.get("allowed_values", []) or [],
                     target_type=f.get("target_type"),
                     backref=f.get("backref"),
+                    required_when_closed=bool(f.get("required_when_closed", False)),
                 )
             )
 
@@ -315,6 +323,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
         grounding=grounding,
         grounding_field=grounding_field,
         naming=naming,
+        location=location,
         fields=fields,
         workflow=wf,
     )

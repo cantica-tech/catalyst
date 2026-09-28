@@ -82,7 +82,7 @@ def cmd_journal(args) -> int:
             command=args.cmd, action=args.action, artifact=args.artifact,
             targets=args.target or [], intent=args.intent or [], files=args.file or [],
             actor=str(signer.get("git_username") or signer.get("name")),
-            allow_unchanged=args.allow_unchanged))
+            allow_unchanged=args.allow_unchanged, tier=args.tier))
         print(json.dumps(entry, ensure_ascii=False) if args.json else
               f"journaled {len(entry['files'])} file(s) at {entry['timestamp']}")
         return 0
@@ -229,6 +229,86 @@ def cmd_criterion(args) -> int:
     return 0
 
 
+def cmd_init(args) -> int:
+    from catalyst.init import InitError, InitRequest, init
+    from module_loader import REPO_ROOT
+
+    kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
+    if not (kernel / "rules-of-rules.template.md").is_file():
+        print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
+        return 2
+    docs = []
+    for spec in args.rule_doc or []:
+        doc, _, prefix = spec.partition(":")
+        docs.append((doc if doc.endswith(".md") else doc + ".md", prefix or "br"))
+    project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+    try:
+        steps = init(InitRequest(
+            project=project, name=args.name, module_id=args.module, user=args.user, kernel=kernel,
+            module=args.module_dir, git_username=args.git_username, rule_docs=docs,
+            test_locations=args.test_locations, at=args.at, agent=args.agent,
+            commands_dir=args.commands_dir, userid=args.userid))
+    except InitError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    for step in steps:
+        print(f"- {step}")
+    print("Next: write the first rules (catalyst id next-rule), then `catalyst check`. Nothing was committed "
+          "in the project repository.")
+    return 0
+
+
+def cmd_spec(args) -> int:
+    from catalyst.spec import SpecError, commands, general, spec
+
+    dep = open_deployment(args)
+    try:
+        if args.budget is not None:
+            over = [(len(spec(dep, c).split()), c) for c in commands(dep)]
+            over = sorted(o for o in over if o[0] > args.budget)
+            for words, c in over:
+                print(f"ERROR   /{c}: {words} words (budget {args.budget})")
+            print(f"catalyst spec budget {'FAILED' if over else 'passed'}: "
+                  f"{len(commands(dep))} commands, budget {args.budget} words each")
+            return 1 if over else 0
+        if args.general:
+            sys.stdout.write(general(dep))
+            return 0
+        if not args.command:
+            print("\n".join(f"/{c}" for c in commands(dep)))
+            return 0
+        sys.stdout.write(spec(dep, args.command))
+        return 0
+    except SpecError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+
+
+def cmd_recompose(args) -> int:
+    from catalyst.compose import deployed_params, recompose
+
+    dep = open_deployment(args)
+    if dep.module is None:
+        print("catalyst: the deployment has no active module", file=sys.stderr)
+        return 1
+    params = deployed_params(dep.root, dep.module.id)
+    new_module = args.module_dir or dep.module.path
+    try:
+        results = recompose(dep.root, params, (args.base_kernel, args.base_module),
+                            (args.kernel, new_module), write=not args.check, force=args.force)
+    except RuntimeError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    for r in results:
+        state = ("frozen, skipped" if r.frozen else f"{r.conflicts} conflict(s)" if r.conflicts
+                 else ("merged" if r.changed else "unchanged"))
+        print(f"{'would update' if args.check and r.changed else state:>14}  .criterion/{r.path}")
+    conflicts = sum(r.conflicts for r in results)
+    if conflicts:
+        print(f"{conflicts} conflict(s) left marked (<<<<<<<) for a human or agent to resolve")
+    return 1 if conflicts or (args.check and any(r.changed for r in results)) else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"catalyst {__version__}")
@@ -243,6 +323,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.set_defaults(func=cmd_validate)
 
+    p = sub.add_parser("init", help="install catalyst into this project (explicit only, INV-2)")
+    p.add_argument("--name", required=True, help="the project name (the pointer is <name>.catalyst)")
+    p.add_argument("--module", required=True, help="the active process module id")
+    p.add_argument("--user", required=True, help="the first user's name (becomes Admin)")
+    p.add_argument("--git-username", help="the first user's git username")
+    p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
+                   help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
+    p.add_argument("--test-locations", help="where the project's tests live (Rules-of-Rules §2)")
+    p.add_argument("--at", type=Path, help="agent-owned location for the working copy "
+                   "(the agent's shim says where); default: .criterion in the project")
+    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
+    p.add_argument("--commands-dir", type=Path, help="write command files here, e.g. .claude/commands")
+    p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
+                   "(default: this checkout's)")
+    p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
+    p.add_argument("--userid", help=argparse.SUPPRESS)       # fixed first userid: reproducible examples
+    p.set_defaults(func=cmd_init)
+
     p = sub.add_parser("check", help="run every check: structure, chain, journal, indexes")
     p.add_argument("--strict", action="store_true", help="treat warnings as errors")
     p.add_argument("--json", action="store_true")
@@ -253,6 +351,24 @@ def build_parser() -> argparse.ArgumentParser:
     q = hk.add_parser("stop", help="end-of-turn hook: exit 2 with failures on stderr")
     q.add_argument("--strict", action="store_true")
     q.set_defaults(func=cmd_hook)
+
+    p = sub.add_parser("recompose", help="merge kernel/module template changes into the deployed "
+                       "documents, keeping local edits (three-way)")
+    p.add_argument("--base-kernel", type=Path, required=True,
+                   help="framework/kernel the deployment was composed from (the old version)")
+    p.add_argument("--base-module", type=Path, required=True, help="the module directory it was composed from")
+    p.add_argument("--kernel", type=Path, required=True, help="the new framework/kernel")
+    p.add_argument("--module-dir", type=Path, help="the new module directory (default: the deployed one)")
+    p.add_argument("--check", action="store_true", help="change nothing; exit 1 if anything would change")
+    p.add_argument("--force", action="store_true", help="also merge documents listed in .frozen")
+    p.set_defaults(func=cmd_recompose)
+
+    p = sub.add_parser("spec", help="print only what one command needs from CODE-OF-CONDUCT §4")
+    p.add_argument("command", nargs="?", help="e.g. status or /check-rules (none: list commands)")
+    p.add_argument("--general", action="store_true", help="the §4 rules that apply to every command")
+    p.add_argument("--budget", type=int, metavar="WORDS",
+                   help="check every command's spec against a word budget (exit 1 if over)")
+    p.set_defaults(func=cmd_spec)
 
     p = sub.add_parser("id", help="allocate the next ID (never reused)")
     ids = p.add_subparsers(dest="id_command", required=True)
@@ -277,6 +393,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--file", action="append", help="a touched file (repeatable)")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--allow-unchanged", action="store_true")
+    q.add_argument("--tier", choices=["chore", "fix", "feature"],
+                   help="the change's ceremony tier (a chore needs no artifact)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("verify", help="check hash chains, blobs, pins and unjournaled edits")

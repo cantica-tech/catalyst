@@ -131,7 +131,8 @@ format and live in `framework/kernel/entities/`.
 | `id_prefix` | `string` | Yes | Uppercase ID prefix. |
 | `name` | `string` | Yes | Singular name. |
 | `plural_name` | `string` | Yes | Plural name. |
-| `folder` | `string` | Yes | Folder relative to the working-copy root. |
+| `folder` | `string` | Yes | The type's folder name. |
+| `location` | `string` | No | Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first. |
 | `naming` | `string` | No | `id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7). |
 | `grounding` | `string` | Yes | `required` (links directly to the grounding type), `inherited` (through a parent entity), or `none`. |
 | `grounding_field` | `string` | Conditional | Field holding the grounding link; required unless `grounding` is `none`. |
@@ -148,6 +149,7 @@ format and live in `framework/kernel/entities/`.
 | `allowed_values` | `list[string]` | Conditional | Values for `enum`. |
 | `target_type` | `string` | Conditional | Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`. |
 | `backref` | `string` | Optional | The field on the target that lists this entity back. |
+| `required_when_closed` | `boolean` | Optional | For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`. |
 
 ### 4.3 Workflow (`workflow`)
 
@@ -157,6 +159,10 @@ format and live in `framework/kernel/entities/`.
 | `states` | `list[string]` | Yes | All valid statuses. |
 | `closed_states` | `list[string]` | Yes | Statuses meaning done. |
 | `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
+
+The machine-readable form of this schema is
+`schemas/entity-type-definition.schema.json`; it carries `location` and
+the per-field `required_when_closed`.
 
 ### 4.4 ETD example (`schemas/item.yaml`)
 

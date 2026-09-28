@@ -1,14 +1,15 @@
-# Catalyst Bootstrap (portable, model-agnostic)
+# Catalyst Bootstrap
 
 This is the single install entry point for the **catalyst** framework. The
 per-agent files (`CLAUDE.md`, `AGENT.md`, `SYSTEM.md`) are thin shims that all
 point here, so there is exactly one source of truth and the three entry prompts
 cannot drift apart.
 
-Load this file first, then follow it top to bottom. Everything below is written
-to work for **any** capable coding agent — Claude Code, a generic tool-using
-agent, or a system-prompted model — by detecting what the running agent can do
-and falling back when a capability is absent.
+Load this file first, then follow it top to bottom. It is written to be
+agent-agnostic — it detects what the running agent can do and falls back when
+a capability is absent — but only **Claude Code** is supported and tested
+today. Other agents can follow `AGENT.md`/`SYSTEM.md`, and the `catalyst` CLI
+works from any shell, but those paths are untested.
 
 ---
 
@@ -20,9 +21,10 @@ These are non-negotiable and apply for the entire session. They are restated in
 1. **Repo-scoped references only.** When referring to catalyst, never mention a
    local drive, local folder, or local path. Refer to it only as the git
    repository provided by the environment and by the repository name itself.
-2. **Install on first load.** The first time catalyst is loaded into memory for
-   a project, install it into that project immediately, using the instantiation
-   procedure — do not wait to be asked again.
+2. **Install only when asked.** Loading or reading catalyst never installs
+   it. Install into a project only when the user explicitly asks
+   (`catalyst init`, `/project create`, or in plain words), using the
+   install procedure (§2); otherwise, at most offer to.
 3. **Name it "catalyst".** After the first install, always call it "catalyst" or
    "catalyst framework" in all guidance, memory, and discussion. Its
    module-independent part (`framework/kernel/`) is **the kernel**; the
@@ -123,50 +125,47 @@ on demand — see `CODE-OF-CONDUCT.md` §4.
 
 ## 2. Install procedure
 
-Read these kernel files from this repository, in this order, before writing
-anything into the target project (the kernel lives under `framework/kernel/`;
-process modules are versioned separately — `MODULE-SPECIFICATION.md`):
+Run this only on the user's explicit request (hard rule 2). The mechanical
+part is one command, `catalyst init` (`framework/kernel/CLI.md`); the agent
+keeps the judgment. Read first, from this repository: `framework/kernel/INVARIANTS.md`
+(in full), `framework/kernel/README.md`, `framework/kernel/INSTANTIATION-GUIDE.md`
+and `framework/kernel/INSTANTIATION-CHECKLIST.md` (the tickable version you
+work against). Then:
 
-1. `framework/kernel/INVARIANTS.md` — the hard rules, in full.
-2. `framework/kernel/README.md` — the four-layer model.
-3. `framework/kernel/MODULE-SPECIFICATION.md` — the module specification & ETD schemas.
-4. `framework/kernel/INSTANTIATION-GUIDE.md` — the full deploy steps.
-5. `framework/kernel/INSTANTIATION-CHECKLIST.md` — the tickable version you
-   will actually execute against.
-
-Then execute the instantiation by **working the checklist**, not from memory of
-the guide:
-
-1. Open `framework/kernel/INSTANTIATION-CHECKLIST.md`. Create the deployment
-   ledger from it (§3) with every item `[ ] pending`.
-2. Discover the project name and optional layout: look for a project-local
-   `dev-instructions.yaml`. If present, read its `name` (and optional `layout`);
-   if absent, ask the user for the project name, defaulting to the target repo
-   name. After a successful deploy, delete that bootstrap file.
-3. Resolve the agent-owned location (§1) and deploy the framework into `.criterion/`
-   there per the guide: copy the rule / development / work-item templates,
-   create the index files, write the per-folder and root `README.md`, seed
-   the first rule document(s) with the required `## Contents` and
-   `## Linked Artifacts — Quick Index` headings. Then write `<app-name>.catalyst`
-   at the target project's own root, from
-   `templates/catalyst-pointer.template.json` (it holds no path), create
-   the `.criterion` symlink at the project root pointing at the working
-   copy, and add `/.criterion` to the target project's own `.gitignore`
-   (hard rule 6) — on the no-owned-space fallback, `.criterion/` is the
-   real directory, gitignored the same way.
-4. Tick each ledger item as you complete it. If an item is blocked, mark it
+1. **Ledger.** Create the deployment ledger from the checklist (§3), every
+   item `[ ] pending`.
+2. **Resolve the inputs** — judgment, asked of the user when not evident:
+   - the project name: from a project-local `dev-instructions.yaml`'s `name`
+     if present (deleted after a successful install), else ask, defaulting
+     to the repository name;
+   - the active module: no default; list the production modules in
+     `framework/modules/catalog.md` and ask;
+   - the rule document(s) and a short lowercase prefix for each, one per
+     natural seam of the project (`INSTANTIATION-GUIDE.md` §1);
+   - the first user (name and git username), who becomes Admin;
+   - the agent-owned location for the working copy (§1; the agent's shim
+     says how to compute it), or none for the in-project fallback.
+3. **Run `catalyst init`** from the project root with those inputs
+   (`--name`, `--module`, `--user`, `--git-username`, `--rule-doc
+   <file>:<prefix>` per document, `--at <location>`, `--agent <id>`, and
+   `--commands-dir <dir>` if the agent has command files). It builds the
+   whole skeleton: composed governing documents, the seeded module, every
+   entity folder with its index and templates catalog, frozen definitions,
+   the first user with a userid, the journal, the vendored CLI, the
+   `<app-name>.catalyst` pointer and the gitignored `.criterion` symlink.
+   It refuses if catalyst is already installed.
+4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
+   end-of-turn hook if the agent has one, add the project's root
+   `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
+   stack, tooling, dev environment and CI decided as the first rules, §3) or
+   **retrofit** (existing code: rules gathered incrementally, optionally
+   bootstrapped with `framework/kernel/ANALYSIS-PLAYBOOK.md`, §4) — and
+   `catalyst check`.
+5. Tick each ledger item as you complete it. If an item is blocked, mark it
    `[!] blocked: <reason>` and surface it — never silently skip.
-5. Record the deployment target (§1 memory row).
-6. **Do not commit or push.** Present the deployed tree and wait for explicit
+6. Record the deployment target (§1 memory row).
+7. **Do not commit or push.** Present the deployed tree and wait for explicit
    assent before any git write (hard rule 4).
-
-For an existing codebase with no prior rules, follow the retrofit path
-(`INSTANTIATION-GUIDE.md §4`) and, once the skeleton exists, offer to run
-`framework/kernel/ANALYSIS-PLAYBOOK.md` to bootstrap the first real rules.
-For a codebase with no code yet — greenfield: stack, tooling, dev environment,
-CI all still to be chosen — follow the greenfield path
-(`INSTANTIATION-GUIDE.md §3`) instead, which establishes those decisions as the
-first rules before any application code is written.
 
 ---
 

@@ -75,6 +75,83 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 
 ## Commands
 
+### `catalyst init`
+
+```
+catalyst init --name <name> --module <module-id> --user <name> [--git-username <u>]
+              [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
+              [--at <dir>] [--agent <id>] [--commands-dir <dir>]
+              [--kernel <framework/kernel>] [--module-dir <dir>]
+```
+
+Installs catalyst into the project (the current directory, or
+`--project <dir>` given before `init`) — only ever on the user's explicit
+request (INV-2); nothing runs it on load. It is the mechanical half of
+`INSTANTIATION-GUIDE.md` §1 (step 4 lists everything it writes); the agent
+decides its inputs and does the judgment steps after it.
+
+- `--name` names the project; the pointer is `<name>.catalyst`.
+- `--module` is the active module's id. The module is found in a sibling
+  checkout named `catalyst-<id>` (next to the project or to catalyst), or
+  given with `--module-dir`.
+- `--user` and `--git-username` register the first user, as Admin, with a
+  fresh userid (INV-16, INV-26).
+- `--rule-doc <file>:<prefix>` (repeatable) seeds a rule document and its
+  ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
+  document, `<name>-rules.md`, prefix `br`.
+- `--test-locations` fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2.
+- `--at <dir>` builds the working copy in agent-owned space and links
+  `<project root>/.criterion` to it; without it, `.criterion/` is a real
+  directory in the project. Either way `/.criterion` is gitignored (INV-6).
+- `--agent` is recorded in the pointer's `agent` field.
+- `--commands-dir <dir>` (relative to the project) receives one command
+  file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
+  from the catalyst checkout's own command files (never `/dogfood`), then
+  the module's `commands/`.
+- `--kernel` is the `framework/kernel` directory of a catalyst checkout or
+  kernel release. It defaults to the checkout the CLI runs from, so it is
+  required when running a vendored `catalyst.pyz`.
+
+It refuses (exit `1`, nothing written) if the project already has a
+`*.catalyst` pointer or a `.criterion`, or the `--at` directory is not
+empty. On success it prints one line per step, commits nothing in the
+project repository, gives the working copy its own git history, and
+journals the install as the first entry.
+
+### `catalyst recompose --base-kernel <dir> --base-module <dir> --kernel <dir> [--module-dir <dir>] [--check]`
+
+Brings the deployed `CODE-OF-CONDUCT.md`, `rules/Rules-of-Rules.md`,
+`ACCESS-CONTROL.md` and `Taskfile.common.yml` up to new kernel and module
+templates without losing the deployment's own edits: it composes each
+document from the old templates (`--base-*`, the versions the deployment
+was built from) and from the new ones, and merges the difference into the
+deployed file (`git merge-file`). The composition parameters (meta-rule
+signer, rule documents) are read back from the deployment. A conflict is
+left marked (`<<<<<<<`) and reported; exit `1` if any remains. `--check`
+changes nothing and exits `1` if a document would change. Used by
+`/sync-framework`; the old templates come from the previous kernel
+release (or `git archive <old tag> framework/kernel`).
+
+### `catalyst spec [<command>] [--budget <words>]`
+
+Prints only what one command needs from the deployed `CODE-OF-CONDUCT.md`
+§4 — its bullet and its "When the user enters `/<command>`" procedure —
+followed by a one-line reminder of the common ending (signer, IDs, index
+regeneration, journal). The canonical text is still §4; `spec` only
+selects it, so an agent reads a command's few hundred words instead of the
+whole document. Command files call it first (`templates/slash-command.template.md`);
+the full document is read only when the spec points elsewhere or a
+judgment needs the Rules-of-Rules sections it cites. `<command>` may be
+given with or without its `/`; without one, `spec` lists every command.
+An unknown command exits `1`.
+
+`--budget <words>` checks every command's spec against a word budget and
+exits `1`, listing each command over it. catalyst holds its own deployment
+to **1,000 words** per command: its end-of-turn check runs
+`catalyst spec --budget 1000` (`SPEC_BUDGET` in `scripts/stop_hook.py`), so a
+command whose procedure outgrows the budget is split or tightened, not
+left to grow.
+
 ### `catalyst check [--strict] [--json]`
 
 Every check a deployment can run on itself, in one pass: the deployment's
@@ -96,6 +173,7 @@ Findings come in two levels.
 | `duplicate-id` | A rule or artifact ID is defined more than once. |
 | `dangling-ref` | A reference field cites an ID that resolves to nothing. |
 | `required-field` | A field the ETD marks required is missing or empty. |
+| `closed-incomplete` | The artifact's `Status` is one of its workflow's closed states, but a field the ETD marks `required_when_closed` is empty (`MODULE-SPECIFICATION.md` §4.2). |
 | `ungrounded` | An artifact whose type grounds (`required` or `inherited`) has no resolvable grounding link (INV-5). |
 | `signer` | `Signed-off-by` is missing or names an unregistered user (INV-16). |
 | `id-shape` | An ID is not `<PREFIX>-NNNNNN-<registered userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
@@ -161,7 +239,8 @@ uppercase letter or collides with a registered userid (INV-26).
 catalyst journal append --command <cmd> --action <action> --artifact <id|description>
                         --intent <text> [--intent <text> ...]
                         --file <path> [--file <path> ...]
-                        [--target <id> ...] [--as <user>] [--allow-unchanged] [--json]
+                        [--target <id> ...] [--tier chore|fix|feature]
+                        [--as <user>] [--allow-unchanged] [--json]
 ```
 
 Appends one entry to `development/journal.jsonl` with the real UTC time,
@@ -176,7 +255,14 @@ the signer as `actor`, and each file's `before`/`after` git blob hashes
   relative to the current directory; it is recorded per the
   [path convention](#journal-conventions). A deleted file records
   `after: null`.
-- `--target` (repeatable) is a rule or artifact ID the change serves.
+- `--target` (repeatable) is a rule or artifact ID the change serves. A
+  change that serves no rule has none: its entry carries `targets: []`.
+- `--tier` records the change's ceremony tier in the entry's `tier` field:
+  `chore` (no rule's behaviour changes; needs no artifact), `fix`
+  (restores a documented rule's behaviour) or `feature` (new or changed
+  behaviour). Anything else is rejected. What each tier requires beyond the
+  entry is the active module's (`CODE-OF-CONDUCT.md` §3, §9); the tier is
+  omitted from entries that do not state one.
 - A file whose content equals its last journaled state is rejected, since
   it did not change; `--allow-unchanged` accepts it deliberately.
 - `--json` prints the written entry.
@@ -410,7 +496,8 @@ at the end of every artifact-changing command instead
 
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §12 — the journal's schema and immutability.
 - [`rules-of-development.template.md`](rules-of-development.template.md) §4 — the commands that call the CLI.
-- [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) — vendoring the CLI and registering the hook at install.
+- [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) — what `catalyst init` does, and the judgment steps around it.
+- [`migrations/0.40.0/explicit-install-and-tiers.md`](migrations/0.40.0/explicit-install-and-tiers.md) — explicit install, ceremony tiers, `catalyst spec`.
 - [`migrations/0.38.0/catalyst-cli.md`](migrations/0.38.0/catalyst-cli.md) — bringing an existing deployment onto the CLI.
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §13 — shared deployments, what `catalyst criterion` guarantees.
 - [`migrations/0.39.0/criterion-on-git.md`](migrations/0.39.0/criterion-on-git.md) — moving a repoed deployment onto the submodule model.

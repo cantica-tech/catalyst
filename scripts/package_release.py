@@ -286,7 +286,9 @@ def update_publish_readmes(publish_dir: Path) -> None:
         "This directory contains official versioned release packages and manifests for the Catalyst framework: its kernel and its process modules.\n\n"
         "## Release Categories\n\n"
         "- **[kernel/](kernel/README.md)**: Catalyst kernel releases (the module-independent part of the framework: specifications, templates, definitions, and plugins).\n"
-        "- **[modules/](modules/README.md)**: Catalyst process modules, one directory per module id.\n",
+        "- **[modules/](modules/README.md)**: Catalyst process modules, one directory per module id.\n"
+        + ("- **[example/](example/README.md)**: a small project governed by catalyst, end to end.\n"
+           if (catalyst_dir / "example" / "README.md").is_file() else ""),
         encoding="utf-8"
     )
 

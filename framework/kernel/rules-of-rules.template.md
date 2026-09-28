@@ -418,7 +418,8 @@ command, entity and files.
     {"path": ".criterion/items/ITEM-000001-foo.md", "before": null, "after": "a1b2c3...(40 hex)"},
     {"path": ".criterion/items/items.md", "before": "d4e5f6...", "after": "g7h8i9..."}
   ],
-  "writer": "catalyst/<version>"
+  "writer": "catalyst/<version>",
+  "tier": "chore | fix | feature (optional)"
 }
 ```
 
@@ -427,7 +428,10 @@ command, entity and files.
   non-rule-linked entity type of the active module). This
   is the machine-readable half of the chain invariant (INV-5) — every
   entry either names the rule(s) it serves or explicitly carries none,
-  never leaves it ambiguous.
+  never leaves it ambiguous. A chore's entry carries none by definition.
+- **`tier`** — optional: the change's ceremony tier, `chore`, `fix` or
+  `feature` (`CODE-OF-CONDUCT.md` §9); the active module says what each
+  requires.
 - **`intent`** — the *why*, as one or more full statements of purpose
   (what the actor was trying to achieve), not a terse label. Plural
   because one atomic change sometimes serves more than one goal (e.g.
@@ -469,7 +473,8 @@ artifact, rule, domain, or work item, or changes a `Status` field
 `catalyst journal append` covering every file the command touched, then
 report the result. This is the last step of the command, after
 everything else it already does — it does not replace any of a command's
-existing steps.
+existing steps. A chore (`CODE-OF-CONDUCT.md` §9) is journaled the same
+way, with `--tier chore` and no target, though it touches no artifact.
 
 ### Complements, does not duplicate, `catalyst-git`
 
@@ -713,8 +718,9 @@ The lifecycle commands for this model (full command spec:
 `CODE-OF-CONDUCT.md` §4).
 
 - **`create <name>`** is the explicit, named entry point for the
-  instantiation procedure (`INSTANTIATION-GUIDE.md`) — resolves the
-  agent-owned location, builds a fresh working copy there, writes
+  instantiation procedure (`INSTANTIATION-GUIDE.md`, INV-2) — resolves the
+  agent-owned location and runs `catalyst init`, which builds a fresh
+  working copy there, writes
   `<app-name>.catalyst` (no path in it), creates the `.criterion`
   symlink, and adds `/.criterion` to the project's `.gitignore`. Refuses if a pointer file or an in-project
   `.criterion/` already exists here — that's `/project import
@@ -943,7 +949,7 @@ that same content.
 - the slash-command file(s) it deploys into `.claude/commands/`.
 
 **`/catalyzer activate <name> <version>` materializes this content**,
-the same mechanism first-load instantiation already uses to copy core
+the same mechanism instantiation already uses to copy core
 templates into a fresh deployment (`INSTANTIATION-GUIDE.md` §1): create
 the named artifact-type folder(s) with their `templates/`+catalog+
 `README.md`, and copy the named command file(s) into `.claude/commands/`.

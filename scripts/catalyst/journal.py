@@ -27,6 +27,7 @@ JOURNAL = "development/journal.jsonl"
 PIN_REF = "refs/catalyst/journal"
 WC = ".criterion/"
 ACTIONS = ("create", "update", "close", "retire", "status-change", "sync")
+TIERS = ("chore", "fix", "feature")      # how much ceremony the change carries
 REQUIRED = ("timestamp", "actor", "command", "action", "artifact", "targets", "intent", "files")
 
 
@@ -253,6 +254,7 @@ class AppendRequest:
     actor: str
     allow_unchanged: bool = False
     timestamp: str = field(default_factory=now)
+    tier: str | None = None
 
 
 def head_blob(repo: Path, rel: str) -> str | None:
@@ -263,6 +265,8 @@ def head_blob(repo: Path, rel: str) -> str | None:
 def append(dep: Deployment, req: AppendRequest) -> dict:
     if req.action not in ACTIONS:
         raise JournalError(f"action '{req.action}' is not one of {', '.join(ACTIONS)}")
+    if req.tier is not None and req.tier not in TIERS:
+        raise JournalError(f"tier '{req.tier}' is not one of {', '.join(TIERS)}")
     if not req.intent or not all(i.strip() for i in req.intent):
         raise JournalError("at least one non-empty --intent is required: the goal, not a label")
     if not req.files:
@@ -281,6 +285,8 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
         repo, rel = where
         before = previous[path] if path in previous else head_blob(repo, rel)
         after = git(repo, "hash-object", "-w", "--", rel) if (repo / rel).is_file() else None
+        if after:
+            _EXISTS[(str(repo), after)] = True      # written now: never trust a stale "absent"
         if before == after and not req.allow_unchanged:
             raise JournalError(f"{path} is unchanged since its last journaled state "
                                "(pass --allow-unchanged if that is intended)")
@@ -290,6 +296,8 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
     entry = {"timestamp": req.timestamp, "actor": req.actor, "command": req.command,
              "action": req.action, "artifact": req.artifact, "targets": req.targets,
              "intent": req.intent, "files": files, "writer": f"catalyst/{__version__}"}
+    if req.tier:
+        entry["tier"] = req.tier
     for repo, shas in to_pin.items():   # pin first: a failed pin leaves no entry behind
         pin(repo, shas)
     path = journal_path(dep)
@@ -388,8 +396,13 @@ def verify(dep: Deployment) -> list[Issue]:
                 repo = where[0]
                 for sha in (before, after):
                     if sha and not blob_exists(repo, sha):
-                        issues.append(Issue(level(cli), "missing-blob", n,
-                                            f"{path}: blob {sha[:10]} is not in {repo.name}'s object store", not cli))
+                        # a before inherited from a legacy entry carries that entry's gap
+                        inherited = sha == before and path in last and not last[path][2]
+                        strict = cli and not inherited
+                        issues.append(Issue(level(strict), "missing-blob", n,
+                                            f"{path}: blob {sha[:10]} is not in {repo.name}'s object store"
+                                            + (" (inherited from a pre-CLI entry)" if inherited else ""),
+                                            not strict))
                 if cli and after:
                     if repo not in pins:
                         pins[repo] = pinned(repo)

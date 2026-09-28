@@ -50,10 +50,36 @@ def run(dep: Deployment) -> Report:
     if legacy:
         report.warnings.append(f"journal: {legacy} warning(s) on pre-CLI entries "
                                "(`catalyst journal verify --legacy`)")
+    for path in unrecorded_changes(dep):
+        report.warnings.append(f"journal unrecorded-change: {path} is changed in git but not recorded "
+                               "in the journal (`catalyst journal append`)")
     for c in regenerate(dep, corpus, write=False):
         report.warnings.append(f"index: .criterion/{c.path.relative_to(dep.root)} is out of date "
                                "(`catalyst index regen`)")
     return report
+
+
+def unrecorded_changes(dep: Deployment) -> list[str]:
+    """Product files git sees as changed or new whose current content is not
+    what the journal last recorded — work that has not been journaled yet
+    (edits to already-journaled files are journal-verify errors instead)."""
+    import subprocess
+    if dep.standalone:
+        return []
+    res = subprocess.run(["git", "-C", str(dep.project_root), "status", "--porcelain", "-uall", "-z"],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        return []
+    paths = []
+    for item in res.stdout.split("\0"):
+        if len(item) > 3 and not item[3:].startswith(".criterion"):
+            paths.append(item[3:])
+    if not paths:
+        return []
+    last = journal.last_after(dep)
+    present = [p for p in paths if (dep.project_root / p).is_file()]
+    # paths already in the journal are reported by `journal verify` (unjournaled)
+    return sorted(p for p in present if p not in last)
 
 
 def hook_stop(dep: Deployment, stdin=None, strict: bool = False) -> int:

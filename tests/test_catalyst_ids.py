@@ -109,3 +109,11 @@ def test_ids_seen_only_in_the_journal_are_not_reused(tmp_path):
         f'{{"artifact": "ITEM-000005-{USERID}"}}\n')
     corpus = load_corpus(dep)
     assert next_entity_id(dep, corpus, "ITEM", corpus.user(USER)) == f"ITEM-000006-{USERID}"
+
+
+def test_next_rule_needs_a_registered_domain_even_when_none_exist(tmp_path):
+    project, dep, _ = setup(tmp_path)
+    (project / ".criterion" / "rules" / "domains" / "domains.md").write_text("# Domains index\n")
+    corpus = load_corpus(dep)
+    with pytest.raises(IdError, match="not registered"):
+        next_rule_id(dep, corpus, "br", "AUTH", corpus.user(USER))

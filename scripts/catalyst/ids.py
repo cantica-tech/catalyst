@@ -82,7 +82,7 @@ def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict) -
 
 def next_rule_id(dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str,
                  signer: dict) -> str:
-    if corpus.domains and domain not in corpus.domains and domain != "META":
+    if domain not in corpus.domains and domain != "META":
         raise IdError(f"domain '{domain}' is not registered in rules/domains/domains.md")
     pattern = re.compile(rf"^[a-z]+-{re.escape(domain)}-(\d{{3,6}})")
     ever = set(corpus.rules) | corpus.indexed_rules      # defined or merely indexed

@@ -128,6 +128,11 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
 
     readme = (publish_dir / "catalyst" / "modules" / "README.md").read_text()
     assert "Example Process Module" in readme
+    assert "example/" not in (publish_dir / "catalyst" / "README.md").read_text()
+    (publish_dir / "catalyst" / "example").mkdir()
+    (publish_dir / "catalyst" / "example" / "README.md").write_text("# Example\n")
+    pr.publish_releases(root, publish_dir)
+    assert "[example/](example/README.md)" in (publish_dir / "catalyst" / "README.md").read_text()
 
     # 4. With push, the module repositories and the publish directory are
     # committed and pushed

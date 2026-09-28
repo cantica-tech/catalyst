@@ -19,8 +19,10 @@ one-line placeholder; numbers are never reused.
 
 - **INV-1 — Repo-scoped references.** Never mention a local drive, folder, or
   path when referring to catalyst. Only the git repository and repository name.
-- **INV-2 — Install on first load.** First load into a project ⇒ install
-  immediately via the instantiation procedure.
+- **INV-2 — Install only when asked.** Loading or reading catalyst never
+  installs it. Install into a project only on the user's explicit request
+  (`catalyst init`, `/project create`, or asking in plain words), via the
+  instantiation procedure; otherwise at most offer to.
 - **INV-3 — Name it "catalyst".** Always "catalyst" / "catalyst framework"
   thereafter, in guidance, memory, and discussion. The framework is the
   **kernel** (`framework/kernel/`, everything independent of process
@@ -202,7 +204,7 @@ one-line placeholder; numbers are never reused.
   naming artifact-type folder(s) (full INV-20 treatment) and/or
   slash-command file(s) it deploys into the target project.
   `/catalyzer activate` materializes this content — the same mechanism
-  first-load instantiation uses to copy core templates in;
+  instantiation uses to copy core templates in;
   `/catalyzer deactivate` removes exactly what was added, never
   artifact instances the deployment already created with it. Two
   content-contributing plugins that would deploy the same artifact-type

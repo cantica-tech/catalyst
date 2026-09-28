@@ -46,6 +46,10 @@ class Deployment:
     def folder(self, etd: ETD) -> Path | None:
         """The ETD's folder in the working copy: at the root, or nested one
         level down (e.g. development/bugs)."""
+        if etd.location:
+            declared = self.root / etd.location / etd.folder
+            if declared.is_dir():
+                return declared
         direct = self.root / etd.folder
         if direct.is_dir():
             return direct

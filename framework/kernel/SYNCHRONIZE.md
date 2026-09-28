@@ -475,6 +475,19 @@ contributors land changes through pull requests (`catalyst criterion`,
 and the identity migration are withdrawn. A local-only deployment only
 bumps its version.
 
+### From `0.39.0`: explicit install, ceremony tiers, command specs
+
+Target version `0.40.0`. Full procedure:
+`migrations/0.40.0/explicit-install-and-tiers.md` (this repository) —
+not duplicated here. Installing becomes an explicit request carried out
+by `catalyst init` (INV-2 revised); journal entries may carry a ceremony
+`tier` (`chore`/`fix`/`feature`); command files read their spec with
+`catalyst spec <name>`; ETDs may declare `location` and per-field
+`required_when_closed` (`closed-incomplete`). Recompose `CODE-OF-CONDUCT.md`
+and `Rules-of-Rules.md`, refresh the command files, the vendored CLI and
+the module, and list any `closed-incomplete` artifact for the user —
+never fabricate what it lacks.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current

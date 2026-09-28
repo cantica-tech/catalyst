@@ -3,13 +3,19 @@
 > Copy this file to `.claude/commands/{{command-name}}.md` in the target
 > project, once per command listed in the deployed `CODE-OF-CONDUCT.md` §4
 > (kernel and active-module entries alike), and resolve every
-> `{{PLACEHOLDER}}`. See `INSTANTIATION-GUIDE.md` §1 step 5 and `CLAUDE.md`'s "Slash commands" entry — this template exists
+> `{{PLACEHOLDER}}`. `catalyst init --commands-dir <dir>` writes them at install. See `INSTANTIATION-GUIDE.md` §1 steps 4–5 and `CLAUDE.md`'s "Slash commands" entry — this template exists
 > because that entry requires it, not as an optional convenience.
 
 This file becomes the literal prompt Claude Code runs when the user types
 `/{{command-name}}`. Keep it a **thin, procedural pointer back to
 `CODE-OF-CONDUCT.md` §4** — the canonical behavior spec — rather than
-duplicating that spec's prose here. That's what keeps the command correct
+duplicating that spec's prose here. It reads that spec with
+`catalyst spec {{command-name}}`, which prints only this command's bullet
+and procedure from §4 (`CLI.md`), not the whole document: the agent's
+reading load per command stays within a budget (catalyst holds its own to
+1,000 words). The full document is opened only when the spec points
+elsewhere or a judgment needs the Rules-of-Rules sections it cites. An
+alias reads its primary command's spec. That's what keeps the command correct
 across a `/sync-framework` without needing its own edit: if the framework
 changes what `/meta-tag` does, the deployed `CODE-OF-CONDUCT.md` gets
 synced and this file's instructions ("follow §4") are still accurate
@@ -28,8 +34,12 @@ description: {{one-line, matching this command's bullet in CODE-OF-CONDUCT.md §
 argument-hint: {{expected arguments, e.g. "<short description> [--flag value]"}}
 ---
 
-{{One-line restating the command's purpose.}} Full spec:
+{{One-line restating the command's purpose.}} Sources:
 `.criterion/CODE-OF-CONDUCT.md` §4{{, template: .criterion/<dir>/TEMPLATE-<TYPE>.md — only if this command creates an artifact}}.
+First run `catalyst spec {{command-name}}` and follow it: it prints this command's
+part of `CODE-OF-CONDUCT.md` §4, the canonical text. Open the sources
+above in full only when the spec points elsewhere or a judgment needs
+the Rules-of-Rules sections they cite.
 Input: $ARGUMENTS
 
 1. {{If this command creates a numbered artifact: resolve the signer

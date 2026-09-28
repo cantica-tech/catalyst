@@ -23,6 +23,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+SPEC_BUDGET = 1000     # words any one command may need from CODE-OF-CONDUCT §4
+
 CHECKS = [
     "check_deployment.py",
     "check_plugins.py",
@@ -39,6 +41,8 @@ def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
     failures = []
     commands = [(check, [sys.executable, str(root / "scripts" / check)]) for check in CHECKS]
     commands.append(("catalyst check", [sys.executable, "-m", "catalyst", "check"]))
+    commands.append(("catalyst spec budget", [sys.executable, "-m", "catalyst", "spec", "--budget",
+                                              str(SPEC_BUDGET)]))
     env = {**os.environ, "PYTHONPATH": str(root / "scripts")}
     for name, cmd in commands:
         res = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True)

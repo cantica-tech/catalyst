@@ -237,3 +237,42 @@ def test_before_hash_in_a_subdirectory_project(tmp_path, monkeypatch):
     committed = j.git(mono, "rev-parse", "HEAD:app/app.catalyst")
     (project / "app.catalyst").write_text((project / "app.catalyst").read_text() + " ")
     assert j.append(dep, req(["app.catalyst"]))["files"][0]["before"] == committed
+
+
+def test_tier_is_recorded_and_checked(project):
+    dep = load(project)
+    write(project / "README.md", "typo fixed\n")
+    entry = j.append(dep, req(["README.md"], action="create", targets=[], tier="chore"))
+    assert entry["tier"] == "chore"
+    with pytest.raises(j.JournalError, match="tier"):
+        j.append(dep, req(["README.md"], allow_unchanged=True, tier="epic"))
+
+
+def test_blobs_written_after_a_verify_are_still_pinned(project):
+    dep = load(project)
+    j.verify(dep)                                   # warms the existence cache
+    write(project / "fresh.txt", "new\n")
+    sha = j.git(project, "hash-object", "fresh.txt")
+    j.prefetch(project, {sha})                      # cached as absent
+    entry = j.append(dep, req(["fresh.txt"], action="create"))
+    assert entry["files"][0]["after"] in j.pinned(project)
+
+
+def test_missing_before_inherited_from_a_legacy_entry_only_warns(project):
+    dep = load(project)
+    legacy = {"timestamp": "2026-01-01T00:00:00Z", "actor": "x", "command": "x", "action": "update",
+              "artifact": "x", "targets": [], "intent": ["x"],
+              "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}]}
+    j.journal_path(dep).write_text(json.dumps(legacy) + "\n")
+    item(project).write_text("current\n")
+    j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
+    assert [i for i in j.verify(dep) if i.level == "error"] == []
+
+
+def test_check_warns_about_new_unjournaled_product_files(project):
+    from catalyst.check import unrecorded_changes
+    dep = load(project)
+    write(project / "src" / "new.py", "x = 1\n")
+    assert unrecorded_changes(dep) == ["src/new.py"]
+    j.append(dep, req(["src/new.py"], action="create", tier="feature"))
+    assert unrecorded_changes(dep) == []
