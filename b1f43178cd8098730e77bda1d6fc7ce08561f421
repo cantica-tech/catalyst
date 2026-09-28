@@ -1,0 +1,109 @@
+"""Every commit traces to the chain (INV-5 at commit granularity).
+
+A product commit's message must cite an artifact or rule ID that resolves in
+the deployment — in full (`<PREFIX>-NNNNNN-<userid>`, `<doc>-<DOMAIN>-NNNNNN-
+<userid>`) or short (`<PREFIX>-NNNNNN`, matching a full ID) — or be marked as
+a chore (a subject starting `chore:` or `chore(...)`: no rule's behaviour
+changes, the chore tier). Merge commits are not checked.
+
+`catalyst hook commit-msg` applies it as a git commit-msg hook;
+`catalyst trace <range>` checks a range of commits (CI). Without a working
+copy (a CI checkout of a local-only deployment), `--pattern-only` accepts any
+well-formed ID.
+"""
+from __future__ import annotations
+
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from catalyst.corpus import Corpus
+
+TOKEN_RE = re.compile(r"\b([A-Za-z][A-Za-z0-9]*-(?:[A-Z][A-Z0-9]*-)?\d{3,6}(?:-[A-Za-z0-9]{8})?)\b")
+FULL_SHAPE = re.compile(r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?)$")
+CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
+HOOK = """#!/bin/sh
+# Installed by `catalyst hook install`: every commit cites an artifact or rule ID,
+# or is marked `chore:` (catalyst trace). Bypass once with `git commit --no-verify`.
+exec python3 "$(git rev-parse --show-toplevel)/.criterion/bin/catalyst.pyz" hook commit-msg "$1"
+"""
+
+
+@dataclass
+class Failure:
+    sha: str
+    subject: str
+    reason: str
+
+
+def cited(message: str) -> list[str]:
+    body = "\n".join(l for l in message.splitlines() if not l.startswith("#"))
+    return TOKEN_RE.findall(body)
+
+
+def resolves(corpus: Corpus, token: str, all_ids: set[str]) -> bool:
+    if token in all_ids:
+        return True
+    return any(i.startswith(token + "-") for i in all_ids)     # short form of a full ID
+
+
+def check_message(message: str, corpus: Corpus | None) -> str | None:
+    """None when the message traces; else why not."""
+    lines = [l for l in message.splitlines() if l.strip() and not l.startswith("#")]
+    if not lines:
+        return "empty message"
+    if CHORE_RE.match(lines[0]):
+        return None
+    tokens = cited(message)
+    if corpus is None:
+        if any(FULL_SHAPE.match(t) for t in tokens):
+            return None
+        return "cites no artifact or rule ID (or mark it `chore:`)"
+    all_ids = corpus.all_ids()
+    if any(resolves(corpus, t, all_ids) for t in tokens):
+        return None
+    if tokens:
+        return f"cites {', '.join(sorted(set(tokens))[:3])}, which resolve to nothing in the deployment"
+    return "cites no artifact or rule ID (or mark it `chore:`)"
+
+
+def commits(repo: Path, rev_range: str) -> list[tuple[str, list[str], str]]:
+    res = subprocess.run(["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", rev_range],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
+    out = []
+    for record in res.stdout.split("\x1e"):
+        record = record.strip("\n")
+        if not record:
+            continue
+        sha, parents, body = record.split("\x00", 2)
+        out.append((sha, parents.split(), body))
+    return out
+
+
+def trace(repo: Path, rev_range: str, corpus: Corpus | None) -> tuple[int, list[Failure]]:
+    checked, failures = 0, []
+    for sha, parents, body in commits(repo, rev_range):
+        if len(parents) > 1:
+            continue                                  # merges carry their parents' trace
+        checked += 1
+        reason = check_message(body, corpus)
+        if reason:
+            failures.append(Failure(sha[:10], body.splitlines()[0] if body else "", reason))
+    return checked, failures
+
+
+def install_hook(project_root: Path) -> Path:
+    git_dir = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir"],
+                             capture_output=True, text=True)
+    if git_dir.returncode != 0:
+        raise ValueError(f"{project_root} is not a git repository")
+    hook = Path(git_dir.stdout.strip()) / "hooks" / "commit-msg"
+    if hook.exists() and "catalyst hook install" not in hook.read_text(encoding="utf-8", errors="ignore"):
+        raise ValueError(f"{hook} exists and was not written by catalyst — merge it by hand")
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(HOOK, encoding="utf-8")
+    hook.chmod(0o755)
+    return hook
