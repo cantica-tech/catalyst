@@ -1,4 +1,5 @@
 import json
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -141,7 +142,8 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     commits = [c for c in calls if c[:2] == ["git", "commit"]]
     assert commits[0][-1] == "Release example-process module v1.2.0"
     assert commits[1][-1] == "Deploy release: kernel v0.33.0, example-process module v1.2.0"
-    assert calls.count(["git", "push", "origin", "main"]) == 2
+    assert calls.count(["git", "push", "origin", "HEAD:main"]) == 1  # module, from its main worktree
+    assert calls.count(["git", "push", "origin", "main"]) == 1  # publish directory
 
 
 def test_publish_releases_missing_dir(tmp_path: Path):
@@ -165,3 +167,38 @@ def test_package_modules_without_catalog(tmp_path: Path):
     root = tmp_path / "catalyst"
     root.mkdir()
     assert pr.package_modules(root) == []
+
+
+def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path):
+    """The module checkout sits on development: the archive is committed on
+    origin main, and development neither receives it nor gets pushed."""
+    def git(*args, cwd):
+        return subprocess.run(["git", *args], cwd=cwd, check=True, text=True,
+                              capture_output=True).stdout.strip()
+
+    origin = tmp_path / "origin.git"
+    git("init", "-q", "--bare", str(origin), cwd=tmp_path)
+    mod_dir = tmp_path / "catalyst-example-process"
+    git("clone", "-q", str(origin), str(mod_dir), cwd=tmp_path)
+    for k, v in (("user.name", "T"), ("user.email", "t@example.com")):
+        git("config", k, v, cwd=mod_dir)
+    (mod_dir / "module.yaml").write_text("id: example-process\n")
+    git("add", ".", cwd=mod_dir)
+    git("commit", "-q", "-m", "init", cwd=mod_dir)
+    git("push", "-q", "origin", "HEAD:main", cwd=mod_dir)
+    git("checkout", "-q", "-b", "development", cwd=mod_dir)
+    dev_head = git("rev-parse", "HEAD", cwd=mod_dir)
+
+    dest = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
+    dest.mkdir(parents=True)
+    (dest / "manifest.json").write_text("{}\n")
+    module = pr.ModuleInfo("example-process", "Example", "d", "1.2.0", mod_dir)
+    pr.commit_module_release(module, dest)
+
+    assert git("rev-parse", "HEAD", cwd=mod_dir) == dev_head
+    assert git("branch", "--show-current", cwd=mod_dir) == "development"
+    files = git("ls-tree", "-r", "--name-only", "main", cwd=origin)
+    assert "catalyst/modules/example-process/v1.2.0/manifest.json" in files
+    assert git("log", "-1", "--format=%s", "main", cwd=origin) == "Release example-process module v1.2.0"
+    assert "development" not in git("branch", cwd=origin)
+    assert git("worktree", "list", "--porcelain", cwd=mod_dir).count("worktree ") == 1

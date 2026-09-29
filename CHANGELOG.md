@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.42.1 — 2026-09-29
+
+- `task release:publish` commits a module's release archive onto the
+  module repository's `origin/main` through a temporary worktree, whatever
+  branch its checkout is on; it no longer commits on the checked-out
+  branch and pushes a stale local `main`.
+- No layout change, no migration.
+
 ## 0.42.0 — 2026-09-29
 
 Changes made outside catalyst (roadmap manual-changes, items 30–33;
