@@ -13,8 +13,9 @@ independent of process modules) plus its process modules
    - Zips the module contents (excluding .git, node_modules, catalyst output).
    - Includes manifest.json inside the zip and alongside it.
    - Saves to <module repo>/catalyst/modules/<id>/v[version]/
-   - With --push only: commits and pushes to origin main of the module
-     repository.
+   - With --push only: commits it onto origin main of the module
+     repository, through a temporary worktree (whatever branch the
+     checkout is on), and pushes it.
 
 2. Catalyst Kernel:
    - Zips framework/kernel/, plus the `catalyst` CLI as bin/catalyst.pyz.
@@ -157,20 +158,41 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
     if not push:
         return dest_dir
 
-    # Commit and push in the module repository
     try:
-        run_cmd(["git", "add", "catalyst"], cwd=module_dir)
-        status = run_cmd(["git", "status", "--porcelain"], cwd=module_dir)
-        if status:
-            run_cmd(["git", "commit", "-m", f"Release {module.id} module v{module.version}"], cwd=module_dir)
-            run_cmd(["git", "push", "origin", "main"], cwd=module_dir)
-            print(f"Committed and pushed module release from {module_dir}")
-        else:
-            print(f"No changes to commit in {module.id} module repository.")
+        commit_module_release(module, dest_dir)
     except Exception as exc:
         print(f"Warning: Git commit/push in module repository failed: {exc}")
 
     return dest_dir
+
+
+def commit_module_release(module: ModuleInfo, dest_dir: Path) -> None:
+    """Commit the packaged release onto the module repository's origin main
+    and push it, through a temporary worktree: the module checkout is
+    usually on development, whose branch must not receive the archive (and
+    pushing main from that checkout would push a stale local main)."""
+    module_dir = module.dir
+    rel = dest_dir.relative_to(module_dir)
+    run_cmd(["git", "fetch", "origin", "main"], cwd=module_dir)
+    with tempfile.TemporaryDirectory() as tmp:
+        worktree = Path(tmp) / "main"
+        run_cmd(["git", "worktree", "add", "--detach", str(worktree), "origin/main"], cwd=module_dir)
+        try:
+            target = worktree / rel
+            target.mkdir(parents=True, exist_ok=True)
+            for f in dest_dir.iterdir():
+                if f.is_file():
+                    shutil.copy2(f, target / f.name)
+            run_cmd(["git", "add", "-f", str(rel)], cwd=worktree)
+            status = run_cmd(["git", "status", "--porcelain"], cwd=worktree)
+            if status:
+                run_cmd(["git", "commit", "-m", f"Release {module.id} module v{module.version}"], cwd=worktree)
+                run_cmd(["git", "push", "origin", "HEAD:main"], cwd=worktree)
+                print(f"Committed and pushed module release to {module.id} origin main")
+            else:
+                print(f"No changes to commit in {module.id} module repository.")
+        finally:
+            run_cmd(["git", "worktree", "remove", "--force", str(worktree)], cwd=module_dir)
 
 
 def package_modules(root: Path, push: bool = False) -> list[Path]:
