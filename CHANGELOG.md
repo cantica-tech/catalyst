@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## 0.42.0 — unreleased
+## 0.42.0 — 2026-09-29
 
 Changes made outside catalyst (roadmap manual-changes, items 30–33;
 migration `0.42.0/changes-outside-catalyst.md`).
@@ -24,10 +24,10 @@ migration `0.42.0/changes-outside-catalyst.md`).
 - `catalyst init` writes `journal_since`; `catalyst report` counts
   commits with changes outside catalyst, unrecorded and adopted.
 - The reference module (2.3.0) says what an adopted fix or feature
-  requires; the catalyst-git plugin (next release) triggers the kernel's detection
-  on each new commit.
+  requires; the catalyst-git plugin (0.4.0) triggers the kernel's
+  detection on each new commit.
 
-## 0.41.0 — unreleased
+## 0.41.0 — released with 0.42.0
 
 Beta-readiness Phase 4: the beta gate's tooling (migration
 `0.41.0/traced-commits-and-format.md`).
@@ -53,7 +53,7 @@ Beta-readiness Phase 4: the beta gate's tooling (migration
   had until then); the quickstart commits the working copy and clones the
   beta branch.
 
-## 0.40.0 — unreleased
+## 0.40.0 — released with 0.42.0
 
 Beta-readiness Phase 3: product shape (migration
 `0.40.0/explicit-install-and-tiers.md`).
@@ -77,7 +77,7 @@ Beta-readiness Phase 3: product shape (migration
   other agents are untested.
 - README leads with what catalyst is for.
 
-## 0.39.0 — unreleased
+## 0.39.0 — released with 0.42.0
 
 Beta-readiness Phase 2: shared deployments on git (`catalyst criterion`,
 INV-6/INV-18 revised, migration `0.39.0/criterion-on-git.md`).
@@ -102,7 +102,7 @@ INV-6/INV-18 revised, migration `0.39.0/criterion-on-git.md`).
 - `journal verify` treats merge forks as concurrent edits (warnings).
 - The feature freeze recorded in `CONTRIBUTING.md` is lifted.
 
-## 0.38.0 — unreleased
+## 0.38.0 — released with 0.42.0
 
 Beta-readiness Phase 1: the `catalyst` CLI (`framework/kernel/CLI.md`).
 Python, stdlib only, shipped as the single-file zipapp `catalyst.pyz`
@@ -130,7 +130,7 @@ Python, stdlib only, shipped as the single-file zipapp `catalyst.pyz`
   guessed from git config.
 - Migration `0.38.0/catalyst-cli.md`.
 
-## 0.37.0 — unreleased
+## 0.37.0 — released with 0.42.0
 
 Beta-readiness Phase 0.
 
