@@ -57,6 +57,7 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     assert "/.criterion" in (req.project / ".gitignore").read_text()
     pointer = json.loads((req.project / "app.catalyst").read_text())
     assert pointer["module"] == "example-process" and pointer["repoed"] is False
+    assert pointer["journal_since"] == ""        # no commit yet: the whole history is governed
     user = json.loads((root / "IAM" / "users" / "users.json").read_text())["users"][0]
     assert user["git_username"] == "ada" and len(user["userid"]) == 8
     coc = (root / "CODE-OF-CONDUCT.md").read_text()
@@ -198,3 +199,14 @@ def test_single_template_named_like_its_folder_is_the_item_template(tmp_path):
     root = load(req.project).root
     assert "named like its folder" in (root / "items" / "templates" / "TEMPLATE-ITEM-v1.md").read_text()
     assert (root / "items" / "items.md").read_text().startswith("# Items index")
+
+
+def test_init_after_a_first_commit_sets_the_baseline_there(tmp_path):
+    req = request(tmp_path)
+    (req.project / "main.py").write_text("print('hi')\n")
+    subprocess.run(["git", "-C", str(req.project), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(req.project), "-c", "user.name=a", "-c", "user.email=a@a",
+                    "commit", "-qm", "skeleton"], check=True)
+    head = subprocess.check_output(["git", "-C", str(req.project), "rev-parse", "HEAD"], text=True).strip()
+    init(req)
+    assert json.loads((req.project / "app.catalyst").read_text())["journal_since"] == head

@@ -87,6 +87,20 @@ def cmd_journal(args) -> int:
         print(json.dumps(entry, ensure_ascii=False) if args.json else
               f"journaled {len(entry['files'])} file(s) at {entry['timestamp']}")
         return 0
+    if args.journal_command == "adopt":
+        from catalyst import unrecorded
+        try:
+            entries = unrecorded.adopt(dep, args.revs, args.intent or [], tier=args.tier,
+                                       targets=args.target or [], artifact=args.artifact, actor=args.as_user)
+        except ValueError as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        for e in entries:
+            print(json.dumps(e, ensure_ascii=False) if args.json else
+                  f"adopted {e['commit'][:10]} ({e['actor']}): {len(e['files'])} file(s)")
+        if not entries:
+            print("nothing to adopt: every change in those commits is already in the journal")
+        return 0
     if args.journal_command == "verify":
         issues = j.verify(dep)
         notes = [i for i in issues if i.level == "note"]
@@ -192,23 +206,73 @@ def cmd_report(args) -> int:
 
 
 def cmd_trace(args) -> int:
+    from catalyst import unrecorded
     from catalyst.corpus import load_corpus
     from catalyst.trace import trace
 
-    corpus, repo = None, Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+    dep, corpus, repo = None, None, Path(os.path.abspath(args.project)) if args.project else Path.cwd()
     if not args.pattern_only:
         dep = open_deployment(args)
         corpus, repo = load_corpus(dep), dep.project_root
     try:
         checked, failures = trace(repo, args.range, corpus)
+        manual, lvl = [], "warning"
+        if corpus is not None and not dep.standalone and unrecorded.baseline_missing(dep):
+            print(f"WARNING unrecorded-change: {unrecorded.MISSING_BASELINE}")
+        elif corpus is not None and not dep.standalone and unrecorded.baseline(dep) is not None:
+            pairs, lvl = unrecorded.recorded(dep), unrecorded.level(dep)
+            for c in unrecorded.commits(repo, unrecorded.scoped(dep, [args.range])):
+                missing = unrecorded.unrecorded_in(c, pairs)
+                if missing:
+                    manual.append(unrecorded.Commit(c.sha, c.author, c.subject, missing))
     except ValueError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     for f in failures:
         print(f"ERROR   {f.sha} {f.subject[:60]!r}: {f.reason}")
-    print(f"catalyst trace {'FAILED' if failures else 'passed'}: {checked} commit(s) checked, "
-          f"{len(failures)} without a trace" + (" (pattern only)" if corpus is None else ""))
-    return 1 if failures else 0
+    for c in manual:
+        print(f"{'ERROR  ' if lvl == 'error' else 'WARNING'} unrecorded-change: {unrecorded.describe(c)}")
+    failed = bool(failures) or (lvl == "error" and bool(manual))
+    print(f"catalyst trace {'FAILED' if failed else 'passed'}: {checked} commit(s) checked, "
+          f"{len(failures)} without a trace" + (" (pattern only)" if corpus is None else
+                                                 f", {len(manual)} with unrecorded changes"))
+    return 1 if failed else 0
+
+
+def cmd_unrecorded(args) -> int:
+    from catalyst import unrecorded
+
+    dep = open_deployment(args)
+    if dep.standalone:
+        print("catalyst: a standalone working copy has no product history", file=sys.stderr)
+        return 1
+    if unrecorded.baseline(dep) is None and not args.range:
+        print(f"catalyst: the pointer declares no `{unrecorded.BASELINE_KEY}` (migration 0.42.0); "
+              "pass a range to check one", file=sys.stderr)
+        return 1
+    if unrecorded.baseline_missing(dep):
+        print(f"catalyst: {unrecorded.MISSING_BASELINE}", file=sys.stderr)
+        return 1
+    try:
+        pairs = unrecorded.recorded(dep)
+        revs = unrecorded.scoped(dep, [args.range or "HEAD"])
+        found = [unrecorded.Commit(c.sha, c.author, c.subject, m)
+                 for c in unrecorded.commits(dep.project_root, revs)
+                 if (m := unrecorded.unrecorded_in(c, pairs))]
+    except ValueError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        json.dump([{"commit": c.sha, "author": c.author, "subject": c.subject,
+                    "files": [{"path": p, "before": b, "after": a} for p, b, a in c.changes]}
+                   for c in found], sys.stdout, indent=2)
+        print()
+    else:
+        for c in found:
+            print(unrecorded.describe(c))
+        print(f"{len(found)} commit(s) with changes not in the journal "
+              f"(checked as {unrecorded.level(dep)}s)")
+    return 1 if found and unrecorded.level(dep) == "error" else 0
 
 
 def cmd_hook(args) -> int:
@@ -225,6 +289,21 @@ def cmd_hook(args) -> int:
         if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
             return 0                         # a merge carries its parents' trace (as in `trace`)
         reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
+        if not reason:
+            from catalyst import unrecorded
+            dep = open_deployment(args)
+            missing = unrecorded.staged(dep) if unrecorded.baseline(dep) is not None else []
+            if missing:
+                paths = ", ".join(p for p, _, _ in missing[:5]) + (" ..." if len(missing) > 5 else "")
+                advice = ("Journal them first (`catalyst journal append --file <path>`), or record the "
+                          "commit afterwards with `catalyst journal adopt HEAD`.")
+                if unrecorded.level(dep) == "error":
+                    print(f"catalyst: commit refused — {len(missing)} staged file(s) not recorded in the "
+                          f"journal: {paths}.\n{advice} Bypass once: git commit --no-verify.", file=sys.stderr)
+                    return 1
+                print(f"catalyst: warning — {len(missing)} staged file(s) not recorded in the journal: "
+                      f"{paths}.\n{advice} (A warning during the beta; from format 1.0 this refuses "
+                      "the commit.)", file=sys.stderr)
         if reason:
             print(f"catalyst: commit refused — {reason}.\nCite the artifact or rule this commit serves "
                   "(e.g. <PREFIX>-000012 or its full ID), or start the subject with `chore:` "
@@ -436,6 +515,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_report)
 
+    p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
+    p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_unrecorded)
+
     p = sub.add_parser("trace", help="check that every commit in a range cites an artifact or rule ID")
     p.add_argument("range", nargs="?", default="HEAD~1..HEAD", help="git revision range (default: HEAD~1..HEAD)")
     p.add_argument("--pattern-only", action="store_true",
@@ -485,6 +569,15 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--allow-unchanged", action="store_true")
     q.add_argument("--tier", choices=["chore", "fix", "feature"],
                    help="the change's ceremony tier (a chore needs no artifact)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_journal)
+    q = js.add_parser("adopt", help="record commits made outside catalyst in the journal (origin manual)")
+    q.add_argument("revs", nargs="+", help="a commit, several, or a range (A..B)")
+    q.add_argument("--intent", action="append", help="why the change was made (repeatable, required)")
+    q.add_argument("--target", action="append", help="a rule/artifact ID this serves (repeatable)")
+    q.add_argument("--artifact", help="the artifact ID or a short description (default: commit <sha>)")
+    q.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    q.add_argument("--as", dest="as_user", help="actor (default: the commit's git author)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("verify", help="check hash chains, blobs, pins and unjournaled edits")

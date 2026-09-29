@@ -134,6 +134,9 @@ one-line placeholder; numbers are never reused.
   that point reconstructs the exact tree state then, via `/journal-restore`
   into a side directory — never overwriting the live tree outright.
   Entries are immutable once written: never edited, deleted, or reordered.
+  A product commit after the pointer's `journal_since` whose changes no
+  entry records was made outside catalyst: it is detected, and adopted
+  into the journal or reverted, never silently left (`/adopt`).
   Complements — does not duplicate — the `catalyst-git` plugin's
   continuous compliance auditing of a *deployed project*; this journal is
   core, applies to catalyst's own deployment too, and records history

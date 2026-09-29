@@ -10,5 +10,6 @@
   "created_by": null,
   "criterion_branch": null,
   "created": "<YYYY-MM-DD>",
-  "updated": "<YYYY-MM-DD>"
+  "updated": "<YYYY-MM-DD>",
+  "journal_since": "<product HEAD commit sha at install, or \"\" with no commit yet>"
 }

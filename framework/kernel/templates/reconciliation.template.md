@@ -4,7 +4,8 @@
 > that need resolving, never a unit of work with its own acceptance
 > criteria (`Rules-of-Rules.md` §16). Opened when `/criterion push`
 > stops on a conflict and the agent proposes a resolution (never applying
-> it), for a rights-mismatch (`Rules-of-Rules.md` §11), or manually.
+> it), for a rights-mismatch (`Rules-of-Rules.md` §11), for a contested
+> change committed outside catalyst (`/adopt`), or manually.
 
 | Field | Value |
 |---|---|
@@ -12,7 +13,7 @@
 | **Name** | short descriptive summary summarizing the reconciliation's purpose — follows Rules of Rules naming conventions |
 | **Entity** | type + ID/path of the artifact actually being reconciled |
 | **Workflow** | `WORKFLOW-NNNNNN` guiding this case's resolution, if any — optional, leave blank unless a documented procedure for this recurring kind of conflict exists (`Rules-of-Rules.md` §19) |
-| **Trigger** | `rights-mismatch` / `merge-conflict` / `manual` |
+| **Trigger** | `rights-mismatch` / `merge-conflict` / `unrecorded-change` / `manual` |
 | **Status** | `Open` / `Under Review` / `Resolved-Accepted` / `Resolved-Accepted-with-Edits` / `Resolved-Rejected` / `Closed` |
 | **Proposer** | name (role) — see `IAM/users/users.json` |
 | **Baseline** | content hash + short description of `criterion`'s version at open time |

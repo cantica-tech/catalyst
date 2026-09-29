@@ -53,8 +53,15 @@ def run(dep: Deployment) -> Report:
     for f in validate(dep, corpus):
         (report.errors if f.level == ERROR else report.warnings).append(
             f"chain {f.code}: {f.where}: {f.message}")
+    from catalyst import unrecorded
+    manual = unrecorded.since_baseline(dep) if not dep.standalone and unrecorded.baseline(dep) is not None else []
+    # a journaled file whose committed state is an unrecorded change: reported once, below, at the
+    # beta's level — not also as an `unjournaled` error
+    committed_by_hand = {path for c in manual for path, _, _ in c.changes}
     legacy = 0
     for i in journal.verify(dep):
+        if i.code == "unjournaled" and i.path in committed_by_hand and _matches_head(dep, i.path):
+            continue
         if i.level == "note":
             continue                         # history (e.g. merged concurrent edits), not a problem
         if i.legacy and i.level != "error":
@@ -68,10 +75,30 @@ def run(dep: Deployment) -> Report:
     for path in unrecorded_changes(dep):
         report.warnings.append(f"journal unrecorded-change: {path} is changed in git but not recorded "
                                "in the journal (`catalyst journal append`)")
+    if not dep.standalone:
+        if unrecorded.baseline_missing(dep):
+            report.warnings.append(f"unrecorded-change: {unrecorded.MISSING_BASELINE}")
+        elif unrecorded.baseline(dep) is None:
+            report.warnings.append(f"unrecorded-change: the pointer declares no `{unrecorded.BASELINE_KEY}`, so "
+                                   "changes committed outside catalyst are not checked (migration 0.42.0)")
+        else:
+            sink = report.errors if unrecorded.level(dep) == "error" else report.warnings
+            for c in manual:
+                sink.append(f"unrecorded-change: {unrecorded.describe(c)}")
     for c in regenerate(dep, corpus, write=False):
         report.warnings.append(f"index: .criterion/{c.path.relative_to(dep.root)} is out of date "
                                "(`catalyst index regen`)")
     return report
+
+
+def _matches_head(dep: Deployment, path: str) -> bool:
+    """The file's working-tree content is what HEAD commits (edited, then committed as is)."""
+    where = journal.locate(dep, path)
+    if where is None:
+        return False
+    repo, rel = where
+    current = journal.current_hashes(repo, [rel]).get(rel)
+    return current is not None and current == journal.head_blob(repo, rel)
 
 
 def unrecorded_changes(dep: Deployment) -> list[str]:

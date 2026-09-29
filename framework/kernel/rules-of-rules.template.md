@@ -449,6 +449,15 @@ command, entity and files.
   was ever committed or staged (nothing is committed or staged,
   `INVARIANTS.md` INV-4). `null` means the file didn't exist before
   (create) or doesn't exist after (delete).
+- **`origin`/`commit`** — only on an entry written by `catalyst journal
+  adopt`: `origin` is `manual` and `commit` the product commit whose
+  changes were made outside catalyst and accepted afterwards
+  (`CODE-OF-CONDUCT.md` §9, "Changes made outside catalyst"). Its `after`
+  is the commit's blob and its `before` the file's last journaled state
+  (else the parent's blob); its `actor` is the commit's git author unless
+  `--as` names someone else. A file journaled again since that commit
+  carries `superseded: true` (and the parent's blob as `before`): history
+  only, outside the hash chain, never the file's current state.
 - **`writer`** — `catalyst/<version>` on every CLI-written entry;
   `catalyst journal verify` holds those to errors and only warns on
   entries without it.
@@ -461,7 +470,8 @@ command, entity and files.
 
 `catalyst journal restore <T> <side-dir>` (behind `/journal-restore`)
 takes, for every path in any entry with `timestamp <= T`, the `after`
-hash of its latest such entry (absent if `null`) and materialises it
+hash of its latest such entry (absent if `null`) — and for a path first
+journaled after `T`, that first entry's `before` — and materialises it
 into the side directory — **never the live working tree**; replacing it
 is the user's call once they have reviewed the reconstruction.
 
@@ -882,7 +892,10 @@ procedure for the ordinary case.
 **Opened** by the agent when `/criterion push` stops on a conflict and
 it has a resolution to propose (§13), or manually by any actor who wants
 a second opinion recorded before landing a change. `Trigger` records
-which: `merge-conflict`, `rights-mismatch`, or `manual`. `Baseline`
+which: `merge-conflict`, `rights-mismatch`, `unrecorded-change` (a
+product change committed outside catalyst that `/adopt` could not settle
+alone — `Baseline` the parent's version, `Proposed` the commit's), or
+`manual`. `Baseline`
 captures the shared branch's current content for the entity at open
 time; `Proposed` captures the version being contested (for a conflict,
 the proposed resolution). Nothing is applied until a human accepts it.

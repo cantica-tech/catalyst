@@ -6,6 +6,27 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.42.0 — unreleased
+
+Changes made outside catalyst (roadmap manual-changes, items 30–33;
+migration `0.42.0/changes-outside-catalyst.md`).
+
+- A product commit after the pointer's new `journal_since` baseline that
+  changes a file to a blob no journal entry records is an *unrecorded
+  change*: `catalyst unrecorded [range] [--json]` lists them, and `check`,
+  `trace` and the commit-msg hook report them. Warnings during the beta
+  (format 1.0-rc), errors from format 1.0 or with `"strict_journal":
+  true`. Merges and the working copy are skipped.
+- `catalyst journal adopt <commit...|A..B>` records each commit as one
+  entry (`origin: manual`, `commit: <sha>`, the git author as actor),
+  oldest first; `/adopt` drives accept, reject (revert, with assent) or a
+  `RECON-` case (Trigger `unrecorded-change`).
+- `catalyst init` writes `journal_since`; `catalyst report` counts
+  commits with changes outside catalyst, unrecorded and adopted.
+- The reference module (2.3.0) says what an adopted fix or feature
+  requires; the catalyst-git plugin (next release) triggers the kernel's detection
+  on each new commit.
+
 ## 0.41.0 — unreleased
 
 Beta-readiness Phase 4: the beta gate's tooling (migration

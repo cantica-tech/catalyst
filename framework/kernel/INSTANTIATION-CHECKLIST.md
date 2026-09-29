@@ -48,7 +48,8 @@ from drifting. The guide holds the rationale; this holds the checks.
         `IAM/roles/roles.json` (INV-16, INV-26)
       - empty `development/journal.jsonl` (INV-17), `version.txt`,
         `DEPLOYMENT.md`, root `README.md`, `bin/catalyst.pyz`
-      - `<app-name>.catalyst` at the project root (no path, INV-6),
+      - `<app-name>.catalyst` at the project root (no path, INV-6;
+        `journal_since` = the project's `HEAD`),
         `.criterion` symlink (unless in-project fallback), `/.criterion`
         in the project's `.gitignore`
       - command files, one per command of the composed §4, if

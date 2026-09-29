@@ -34,6 +34,11 @@ codes are listed in `CLI.md`.
   the CLI does not read — update the vendored CLI, or migrate the
   deployment. A bare working copy (`--working-copy`) has no pointer and is
   not format-checked.
+- **The declared format sets how strict the history checks are.** While
+  it is a release candidate, [unrecorded changes](#7-the-journal) are
+  warnings; from `1.0` they are errors, as are commits without a trace in
+  the hook and `trace` — the same rollout. A pointer may opt in earlier
+  with `"strict_journal": true`.
 
 ## General conventions
 
@@ -71,7 +76,8 @@ parses as a JSON object.
   "created_by": "Ada Lovelace",
   "criterion_branch": null,
   "created": "2026-09-28",
-  "updated": "2026-09-28"
+  "updated": "2026-09-28",
+  "journal_since": "4f1c2a9e0b7d3c5e8a6f9b2d1c0e7a3b5d8f6c4e"
 }
 ```
 
@@ -88,6 +94,8 @@ parses as a JSON object.
 | `created_by` | string or null | The installing user's name (`ACCESS-CONTROL.md`). Informational. | — |
 | `criterion_branch` | string or null | The shared branch; `null` means `criterion`. | — |
 | `created`, `updated` | date | When the pointer was written and last changed. | — |
+| `journal_since` | string | The baseline for changes made outside catalyst: the product commit after which every commit's changes must be in the journal (`catalyst init` writes `HEAD`); `""` checks the whole history. | `check`: warning if absent (history not checked); unrecorded changes after it reported (§7). |
+| `strict_journal` | boolean | Optional, default `false`: `true` makes unrecorded changes errors before format `1.0`. | — |
 
 The pointer holds no path. `agent-source`, a path written by kernels
 before 0.37.0, is still honoured when present and never written.
@@ -387,6 +395,9 @@ never edited, deleted or reordered (INV-17). Empty is valid.
 | `files[].before`, `files[].after` | string or null | The file's git blob SHA-1 (40 lowercase hex) before and after; `null` when it did not exist (create) or no longer exists (delete). |
 | `writer` | string | `catalyst/<version>` on every CLI-written entry. |
 | `tier` | string | Optional: `chore`, `fix` or `feature`. |
+| `origin` | string | Optional: `manual` on an entry `catalyst journal adopt` wrote for a commit made outside catalyst. |
+| `commit` | string | With `origin`: the adopted product commit's full sha. |
+| `files[].superseded` | bool | Optional, on an adopted entry: the file was journaled again after the commit, so this records history only — excluded from the hash chain, the file's last state and restore. |
 
 - **Pinning.** Every blob an entry references is kept reachable under the
   ref **`refs/catalyst/journal`** of the repository it was hashed into: a
@@ -402,6 +413,14 @@ never edited, deleted or reordered (INV-17). Empty is valid.
   since its last entry — errors on CLI-written entries, warnings on legacy
   ones. `catalyst check` also warns about a product file git shows as
   changed that the journal has never recorded.
+- **Unrecorded changes.** A non-merge product commit after the pointer's
+  `journal_since` that changes a file to a blob that was not its latest
+  journaled `after` as of the commit (a hand revert included), and was not
+  adopted for that commit, is an unrecorded change (`catalyst unrecorded`; `check`,
+  `trace` and the commit-msg hook report it): a warning while the format
+  is a release candidate, an error from `1.0` or under `strict_journal`.
+  `.criterion` is never a product file. `catalyst journal adopt` records
+  it (`origin`, `commit`); rejecting it means reverting the commit.
 
 ## 8. `.gitattributes` (shared deployments)
 
@@ -455,6 +474,9 @@ CLI reads any type an ETD declares.
   `chore:` or `chore(<scope>):` (INV-5; `catalyst hook commit-msg`,
   `catalyst trace`, `CLI.md`). A commit message is not a file of the
   format, but the trace convention is part of it.
+- Commits whose product changes the journal records (§7), after the
+  pointer's `journal_since`; a change made outside catalyst is adopted
+  or reverted.
 
 ## Related docs
 
@@ -463,3 +485,4 @@ CLI reads any type an ETD declares.
 - [`ARTIFACT-LAYOUT.md`](ARTIFACT-LAYOUT.md) — the working copy's tree at a glance.
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §3, §7, §12, §13 — rule IDs, domains, the journal, shared deployments.
 - [`migrations/0.41.0/traced-commits-and-format.md`](migrations/0.41.0/traced-commits-and-format.md) — adding `format` to an existing pointer.
+- [`migrations/0.42.0/changes-outside-catalyst.md`](migrations/0.42.0/changes-outside-catalyst.md) — adding `journal_since` to an existing pointer.

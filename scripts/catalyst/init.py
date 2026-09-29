@@ -321,6 +321,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     pointer = {"project_name": req.name, "format": FORMAT, "kernel_version": version, "module": manifest.id,
                "agent": req.agent, "repoed": False, "catalyst_repo": None, "catalyst_repo_url": None,
                "created_by": req.user, "criterion_branch": None, "created": stamp, "updated": stamp}
+    # changes committed after this point must be journaled (unrecorded.py); "" = the whole history
+    head = subprocess.run(["git", "-C", str(project), "rev-parse", "--verify", "-q", "HEAD"],
+                          capture_output=True, text=True)
+    pointer["journal_since"] = head.stdout.strip() if head.returncode == 0 else ""
     pointer_path = project / f"{req.name}.catalyst"
     created.append(pointer_path)
     _write(pointer_path, json.dumps(pointer, indent=2))

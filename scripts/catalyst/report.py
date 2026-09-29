@@ -36,6 +36,9 @@ def build(dep: Deployment, since: str | None = None) -> dict:
                 continue
             commits += 1
             traced += check_message(body, corpus) is None
+    from catalyst import unrecorded
+    manual = unrecorded.since_baseline(dep) if not dep.standalone else []
+    adopted = sum(e.get("origin") == "manual" for e in entries)
     return {
         "entries": len(entries),
         "actors": dict(collections.Counter(str(e.get("actor")) for e in entries).most_common()),
@@ -48,6 +51,8 @@ def build(dep: Deployment, since: str | None = None) -> dict:
         "warnings": sum(f.level != ERROR for f in findings),
         "commits": commits,
         "commits_traced": traced,
+        "unrecorded_commits": len(manual),
+        "adopted_commits": adopted,
     }
 
 
@@ -57,6 +62,8 @@ def render(r: dict) -> str:
              f"- actors: " + (", ".join(f"{a} ({n})" for a, n in r["actors"].items()) or "none"),
              f"- tiers: " + (", ".join(f"{t} ({n})" for t, n in r["tiers"].items()) or "none"),
              f"- commits traced: {r['commits_traced']}/{r['commits']}",
+             f"- commits with changes outside catalyst: {r['unrecorded_commits']} unrecorded, "
+             f"{r['adopted_commits']} adopted",
              f"- reconciliation cases: {r['reconciliations']}",
              f"- validate: {r['errors']} error(s), {r['warnings']} warning(s)", "", "## Artifacts", ""]
     for prefix, statuses in r["artifacts"].items():

@@ -112,7 +112,9 @@ lives, and, afterwards, its first rules.
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
      root `README.md`, and vendors the CLI at `bin/catalyst.pyz`;
    - writes `<app-name>.catalyst` at the project root (no path in it; the
-     only catalyst file the product repository tracks), links `.criterion`
+     only catalyst file the product repository tracks; its `journal_since`
+     is the project's `HEAD`, or `""` with no commit yet — the baseline
+     after which changes made outside catalyst are detected), links `.criterion`
      to the working copy when `--at` was given, and adds `/.criterion` to
      the project's `.gitignore`;
    - with `--commands-dir`, writes one command file per command of the

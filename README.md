@@ -129,7 +129,10 @@ judgment parts in prose; agents with an end-of-turn hook run
 `catalyst hook stop` so every turn ends on a passing `catalyst check`.
 Commits trace too: a git `commit-msg` hook (`catalyst hook install`) and
 `catalyst trace` in CI require every product commit to cite an artifact or
-rule ID, or to be marked `chore:`. See
+rule ID, or to be marked `chore:`. Changes made by hand, straight into
+git, are caught too: `catalyst unrecorded`, `check` and `trace` report
+every commit whose changes the journal does not record, and `/adopt`
+either records it in the journal or reverts it. See
 [`framework/kernel/CLI.md`](framework/kernel/CLI.md); every file the CLI
 reads and writes is specified in
 [`framework/kernel/FORMAT.md`](framework/kernel/FORMAT.md) (format

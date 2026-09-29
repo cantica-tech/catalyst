@@ -116,7 +116,10 @@ It refuses (exit `1`, nothing written) if the project already has a
 `*.catalyst` pointer or a `.criterion`, or the `--at` directory is not
 empty. On success it prints one line per step, commits nothing in the
 project repository, gives the working copy its own git history, and
-journals the install as the first entry.
+journals the install as the first entry. The pointer's `journal_since` is
+the project's `HEAD` at install (`""` with no commit yet): the baseline
+after which [changes made outside catalyst](#catalyst-unrecorded-range---json)
+are checked.
 
 ### `catalyst recompose --base-kernel <dir> --base-module <dir> --kernel <dir> [--module-dir <dir>] [--check]`
 
@@ -156,7 +159,8 @@ left to grow.
 
 Every check a deployment can run on itself, in one pass: the on-disk
 format version, the deployment's structure, the traceability chain
-(`validate`), the journal (`journal verify`) and index freshness
+(`validate`), the journal (`journal verify`), changes committed outside
+catalyst (`unrecorded`) and index freshness
 (`index regen --check`). Journal warnings on entries written before the
 CLI are summarised in one line (`journal verify --legacy` lists them).
 Exits `1` on any error, or on any warning under `--strict`.
@@ -167,6 +171,13 @@ a **warning** (a deployment from before format `1.0-rc`; migration
 `0.41.0` adds the field). A `format` this CLI does not read is an
 **error**: update the vendored CLI, or migrate the deployment. A bare
 working copy (`--working-copy`) has no pointer and skips this check.
+
+**Unrecorded changes.** Each commit after the pointer's `journal_since`
+with an [unrecorded change](#catalyst-unrecorded-range---json) is reported
+at that command's level: a warning during the beta, an error from format
+`1.0` or under `"strict_journal": true`. A pointer with no `journal_since`
+is a warning (history not checked; migration `0.42.0` adds the field). A
+bare working copy skips this check.
 
 ### `catalyst validate [--strict] [--json]`
 
@@ -228,6 +239,13 @@ ignored. A merge commit (git is concluding a merge) is let through, as
 unreachable, it lets the commit through. `git commit --no-verify`
 bypasses it once; `catalyst trace` in CI still catches the commit.
 
+A traced message is then checked for staged product files whose content
+no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---json)):
+a warning on stderr during the beta, a refusal (exit `1`) from format
+`1.0` or under `"strict_journal": true`. Journal them first, or adopt the
+commit afterwards (`catalyst journal adopt HEAD`). No `journal_since` in
+the pointer: not checked.
+
 ### `catalyst hook install`
 
 Writes the `commit-msg` hook above, executable, into the project
@@ -249,6 +267,12 @@ as `hook commit-msg`: `<range>` is anything `git log` accepts
 `HEAD~1..HEAD`). Merge commits are skipped: they carry their parents'
 trace. Prints one `ERROR <sha> '<subject>': <reason>` line per commit
 without a trace, then a summary; exits `1` if any, and on a bad range.
+
+With a working copy (not `--pattern-only`) and a `journal_since` in the
+pointer, it also prints one `unrecorded-change` line per commit of the
+range (after the baseline) with [unrecorded changes](#catalyst-unrecorded-range---json),
+as `WARNING` during the beta and `ERROR` from format `1.0` or under
+`"strict_journal": true`; only at error level do they fail the trace.
 
 `--pattern-only` needs no deployment: it accepts any well-formed full or
 six-digit short ID (`<PREFIX>-NNNNNN[-<userid>]`,
@@ -290,13 +314,40 @@ side of a trial:
   by the `hook commit-msg` rule;
 - artifacts per entity type and `Status`; the number of reconciliation
   cases;
+- commits with changes outside catalyst: those after `journal_since`
+  still unrecorded, and those adopted (entries with `origin: manual`);
 - `validate`'s error and warning counts.
 
 `--since` (ISO 8601) limits journal entries and commits to that time on.
 `--json` prints the same as one JSON object (`entries`, `actors`,
 `tiers`, `commands`, `active_days`, `artifacts`, `reconciliations`,
-`errors`, `warnings`, `commits`, `commits_traced`). Exits `0`.
+`errors`, `warnings`, `commits`, `commits_traced`, `unrecorded_commits`,
+`adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
+
+### `catalyst unrecorded [<range>] [--json]`
+
+Lists the **unrecorded changes**: non-merge product commits that change a
+file to a git blob that was not its latest journaled `after` as of the
+commit (a hand revert to an older journaled state counts), unless that
+commit was adopted — work written by hand, straight into git (`CODE-OF-CONDUCT.md` §9, "Changes made outside
+catalyst"). Only history after the pointer's `journal_since` baseline is
+checked (a commit; `""` for the whole history); `<range>` (anything `git
+log` accepts) narrows it further. Paths are relative to the project, also
+when it is a subdirectory of its repository. A baseline this clone does
+not have (a shallow checkout, rewritten history) is reported, not
+crashed on: history is then not checked until the full history is
+fetched (`check` and `trace` warn; `unrecorded` exits `1`). The working copy (`.criterion`) is never
+a product file. Prints one line per commit — sha, author, subject, the
+files — then a count; `--json` prints a list of `{commit, author,
+subject, files: [{path, before, after}]}`.
+
+Severity follows the format rollout: a **warning** while the pointer's
+`format` is a release candidate (`1.0-rc`, the beta), an **error** from
+format `1.0`, or earlier when the pointer sets `"strict_journal": true`.
+Exits `1` only when something is found at error level (and on a bad range,
+a standalone working copy, or a pointer with no `journal_since` and no
+`<range>`); `0` otherwise. `/adopt` resolves each one.
 
 ### `catalyst id next <PREFIX> [--as <user>]`
 
@@ -363,6 +414,32 @@ the signer as `actor`, and each file's `before`/`after` git blob hashes
 - A file whose content equals its last journaled state is rejected, since
   it did not change; `--allow-unchanged` accepts it deliberately.
 - `--json` prints the written entry.
+
+### `catalyst journal adopt`
+
+```
+catalyst journal adopt <commit> [<commit> ...] | <A>..<B>
+                       --intent <text> [--intent <text> ...]
+                       [--target <id> ...] [--artifact <id|description>]
+                       [--tier chore|fix|feature] [--as <user>] [--json]
+```
+
+Records commits made outside catalyst in the journal after the fact: for
+each commit, oldest first, one entry with its unrecorded changes
+(`command: "/adopt"`, `action: "update"`, each file's `after` the
+commit's blob), `origin: "manual"` and `commit: <sha>`
+(`Rules-of-Rules.md` §12). A file whose journal chain has not moved past
+the commit continues it: `before` is its last journaled state (else the
+parent's blob). A file journaled again since the commit is recorded as
+history only — `superseded: true`, `before` the parent's blob — so it
+never becomes the file's current state and `journal verify` keeps it out
+of the chain. The actor is the commit's git author
+unless `--as` names one; `--artifact` defaults to `commit <sha>`.
+`--intent` is required, as for `append`. Named commits are adopted alone,
+a range commit by commit. Files already recorded are skipped; a commit
+with nothing unrecorded writes nothing. Adopting several commits oldest
+first keeps each file's hash chain unbroken. Rejecting a change instead
+means reverting it (`/adopt`).
 
 ### `catalyst journal verify [--strict] [--legacy] [--json]`
 
@@ -613,11 +690,14 @@ at the end of every artifact-changing command instead
 The git side is agent-independent: `catalyst hook install` puts
 `catalyst hook commit-msg` in the project repository's `commit-msg` hook,
 so every commit traces whoever — or whatever — makes it, and
-`catalyst trace` re-checks the same rule in CI.
+`catalyst trace` re-checks the same rule in CI. Commits that bypass the
+journal are caught the same way, by the hook, `trace` and `check`, and
+resolved with `/adopt`.
 
 ## Related docs
 
 - [`FORMAT.md`](FORMAT.md) — the on-disk format every command reads and writes.
+- [`migrations/0.42.0/changes-outside-catalyst.md`](migrations/0.42.0/changes-outside-catalyst.md) — changes made outside catalyst: `unrecorded`, `journal adopt`, the pointer's `journal_since`.
 - [`migrations/0.41.0/traced-commits-and-format.md`](migrations/0.41.0/traced-commits-and-format.md) — traced commits, the commit-msg hook, the pointer's `format`.
 
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §12 — the journal's schema and immutability.

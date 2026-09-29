@@ -168,7 +168,8 @@ def last_after(dep: Deployment) -> dict[str, str | None]:
         prefetch(repo, shas)
     for _, entry, _ in entries:
         for f in (entry or {}).get("files", []) or []:
-            if isinstance(f, dict) and "path" in f:
+            # a superseded file is history recorded after the fact, not the file's current state
+            if isinstance(f, dict) and "path" in f and not f.get("superseded"):
                 last[entry_path(dep, entry, f)] = f.get("after")
     return last
 
@@ -331,6 +332,7 @@ class Issue:
     line: int
     message: str
     legacy: bool = False    # about an entry not written by the catalyst CLI
+    path: str | None = None  # the file an issue is about, when it is about one
 
     def __str__(self) -> str:
         where = f"journal.jsonl:{self.line}" if self.line else "journal.jsonl"
@@ -380,7 +382,8 @@ def verify(dep: Deployment) -> list[Issue]:
                                     f"{recorded} is machine-specific (INV-1, INV-6)", not cli))
             before, after = f.get("before"), f.get("after")
             path = entry_path(dep, entry, f)
-            if path in last and last[path][0] != before:
+            superseded = bool(f.get("superseded"))        # adopted history, outside the chain
+            if not superseded and path in last and last[path][0] != before:
                 if before is not None and before in seen[path]:
                     # both sides of a merge edited this file from the same
                     # earlier state: a fork, resolved by a later entry
@@ -409,7 +412,8 @@ def verify(dep: Deployment) -> list[Issue]:
                     if after not in pins[repo]:
                         issues.append(Issue("warning", "unpinned", n,
                                             f"{path}: blob {after[:10]} is not pinned — `catalyst journal pin`"))
-            last[path] = (after, n, cli)
+            if not superseded:
+                last[path] = (after, n, cli)
             seen.setdefault(path, {None}).update({before, after})
 
     by_repo: dict[Path, list[str]] = {}
@@ -427,7 +431,7 @@ def verify(dep: Deployment) -> list[Issue]:
         if current != after:
             state = "deleted" if current is None else "changed"
             issues.append(Issue(level(cli), "unjournaled", n,
-                                f"{path} {state} since its last journal entry", not cli))
+                                f"{path} {state} since its last journal entry", not cli, path=path))
     return issues
 
 
@@ -445,7 +449,7 @@ def restore(dep: Deployment, timestamp: str, out: Path) -> tuple[list[str], list
         if entry is None or t is None:
             continue
         for f in entry.get("files", []) or []:
-            if not (isinstance(f, dict) and "path" in f):
+            if not (isinstance(f, dict) and "path" in f) or f.get("superseded"):
                 continue
             path = entry_path(dep, entry, f)
             if t <= until:

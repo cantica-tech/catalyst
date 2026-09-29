@@ -108,6 +108,11 @@ tasks:
     cmds:
       - '{{.AGENT_CMD}} "/reconcile {{.CLI_ARGS}}"'
 
+  adopt:
+    desc: "List product changes committed outside catalyst and accept (journal) or reject each: [<commit>|<range>]"
+    cmds:
+      - '{{.AGENT_CMD}} "/adopt {{.CLI_ARGS}}"'
+
   project:
     desc: "Manage a catalyst deployment: <create|remove|export|import> ..."
     cmds:

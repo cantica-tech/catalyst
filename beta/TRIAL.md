@@ -71,7 +71,8 @@ Show, on a real project, that a shared deployment:
   ```
 
   and adds a short entry to the trial log: the report's figures (journal
-  entries per actor and tier, commits traced, validate errors and
+  entries per actor and tier, commits traced, commits with changes
+  outside catalyst — unrecorded and adopted —, validate errors and
   warnings, reconciliation cases) and anything that went wrong.
 
 ## Logging issues

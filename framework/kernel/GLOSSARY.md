@@ -31,6 +31,12 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 
 ## Terms
 
+- **Adopt.** Accepting an *unrecorded change* (below) into the journal after
+  the fact: `catalyst journal adopt <commit>` writes one entry per commit
+  with `origin: manual`, the commit's sha and its git author as actor. The
+  `/adopt` command drives the choice — adopt, reject (revert, with the
+  user's assent) or, when contested, a `RECON-` case
+  (`CODE-OF-CONDUCT.md` §9).
 - **Agent-owned space.** A per-project data directory the running agent
   already maintains outside the project's tree, computed per machine from
   the agent's own conventions and never written into a tracked file. A
@@ -39,6 +45,11 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   product repository tracks at its root: project name, format version,
   kernel version, active module, agent, sharing fields. It holds no path
   (INV-6, `FORMAT.md` §1).
+- **Baseline (`journal_since`).** The pointer field naming the product
+  commit after which every commit's changes must be in the journal;
+  history before it is not checked for *unrecorded changes*. `catalyst
+  init` sets it to `HEAD`; `""` means the whole history; absent, nothing is
+  checked and `catalyst check` warns (`FORMAT.md` §1).
 - **catalyzer.** The plugin manager command, `/catalyzer`
   (`list`/`activate`/`download`/`deactivate`/`upgrade`/`downgrade`); a
   *plugin* (below) is what it manages. The `-catalyzer` commands edit the
@@ -153,6 +164,12 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   userid), or whose subject starts `chore:`: the chain (INV-5) at commit
   granularity. Checked by `catalyst hook commit-msg` and `catalyst trace`
   (`CLI.md`).
+- **Unrecorded change.** A product commit after the *baseline* that changes
+  a file to a state (git blob) no journal entry records: work written by
+  hand, straight into git. Listed by `catalyst unrecorded`, reported by
+  `check`, `trace` and the commit-msg hook; a warning during the beta, an
+  error from format `1.0`. Resolved by *adopting* or reverting it
+  (`CODE-OF-CONDUCT.md` §9).
 - **WORKFLOW.** `WORKFLOW-NNNNNN`: a repeatable multi-step procedure other
   entities may reference to guide their process; never itself work
   (INV-24).
