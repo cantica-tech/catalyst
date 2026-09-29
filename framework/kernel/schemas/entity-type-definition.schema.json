@@ -90,6 +90,10 @@
           "backref": {
             "type": "string",
             "description": "Corresponding field on target entity to back-populate."
+          },
+          "required_when_closed": {
+            "type": "boolean",
+            "description": "The field must be non-empty once the entity's Status is one of its workflow's closed states."
           }
         },
         "additionalProperties": false
@@ -153,6 +157,10 @@
       ],
       "default": "id-summary",
       "description": "File naming: `id-summary` (`<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7)."
+    },
+    "location": {
+      "type": "string",
+      "description": "Parent folder of `folder` inside the working copy, e.g. `development` (default: the working copy's root)."
     }
   },
   "additionalProperties": false

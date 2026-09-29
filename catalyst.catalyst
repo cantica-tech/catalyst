@@ -1,14 +1,15 @@
 {
   "project_name": "catalyst",
-  "framework_version": "0.32.1",
+  "format": "1.0-rc",
+  "journal_since": "34265fa16f4e7b29193768d0b51316324a624dac",
+  "kernel_version": "0.42.0",
   "module": "software-engineering",
   "agent": "claude-code",
-  "agent-source": "/Users/oliviersteck/.claude/projects/-Users-oliviersteck-sources-catalyst/.criterion",
-  "repoed": true,
+  "repoed": false,
   "catalyst_repo": "criterion",
   "catalyst_repo_url": "git@github.com:oliben67/criterion.git",
   "created_by": "Olivier Steck",
   "criterion_branch": "criterion",
   "created": "2026-08-23",
-  "updated": "2026-09-24"
+  "updated": "2026-09-28"
 }

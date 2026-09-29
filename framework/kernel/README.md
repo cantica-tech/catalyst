@@ -6,7 +6,7 @@ process modules (`MODULE-SPECIFICATION.md`), which are versioned in their
 own repositories. The kernel is versioned by the repository's root
 [`version.txt`](../../version.txt) and released as `kernel-v<version>.zip`.
 
-A project-agnostic, portable specification for how any codebase organizes
+A project-agnostic specification for how any codebase organizes
 its rules, its development work, its agile process, its planning, its
 accountability, and its own change history — extrapolated from the
 concrete system built in this repo's own [`.criterion/`](../../.criterion/)
@@ -15,9 +15,13 @@ this project, built via the retrofit path (§4 below); this folder is the
 generic template for standing the same system up in any project so it
 can create rules that fit that project's reality.
 
-(`criterion` is a different thing entirely as of INV-18 — the
-canonical branch name in a *repoed* deployment's dedicated sync
-repository, not a folder. See §13 of `rules-of-rules.template.md`.)
+The specification is written to be agent-agnostic, but only Claude Code is
+supported and tested today; other agents can follow `AGENT.md`/`SYSTEM.md`
+and the `catalyst` CLI works from any shell, untested. Terms are defined in
+[`GLOSSARY.md`](GLOSSARY.md) — including the several things named
+"criterion" (the `.criterion` working copy, the criterion repository, the
+`/criterion` command, and `criterion`, the default shared branch; INV-18,
+§13 of `rules-of-rules.template.md`).
 
 ## What this framework is
 
@@ -74,17 +78,18 @@ record: exact git content hashes before/after per touched file, the
 rule(s) it served, and the actual intent behind it. Precise enough that
 `/journal-restore <timestamp>` can materialize the tree as it stood at
 any point into a side directory — real reconstruction, not narrative.
-See `Rules-of-Rules.md` §12.
+Entries are written by `catalyst journal append` ([`CLI.md`](CLI.md)),
+never by hand. See `Rules-of-Rules.md` §12.
 
-A deployment can additionally opt into being **repoed**: `.criterion/`
-mirrored through a dedicated repository so multiple contributors converge
-on one agreed-upon state instead of silently diverging.
-`/criterion create`/`get`/`push` manage it; every push is vetted against
-the framework's own rules (`/check-rules` plus a four-eyes drift check)
-before an AI-assisted merge lands it on the canonical `criterion`
-branch. `/dogfood` runs that same vetting procedure standalone, but only
-against catalyst's own repository — it's never part of what a deployed
-project carries. See `Rules-of-Rules.md` §13.
+A deployment can additionally opt into being **shared**: its working copy
+moves to a dedicated criterion repository, mounted as the product's
+`.criterion` submodule, and contributors land changes through pull
+requests that CI checks with `catalyst check` and
+`catalyst criterion integrity`. A conflict stops the push; the agent
+never applies a merge. `/criterion create`/`get`/`push`/`sync`/`status`
+manage it (`CLI.md`, `Rules-of-Rules.md` §13). `/dogfood` (a
+`/check-rules` plus four-eyes drift check) runs only against catalyst's
+own repository — it's never part of what a deployed project carries.
 
 ## Files in this folder
 
@@ -92,6 +97,9 @@ project carries. See `Rules-of-Rules.md` §13.
 |---|---|
 | [`rules-of-rules.template.md`](rules-of-rules.template.md) | Generic meta-rules: conflict-checking, done-bar, ID scheme, domain standard, retirement. Copy to `<project>/rules/Rules-of-Rules.md` and fill in placeholders. |
 | [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for development artifacts and meta-tags; the active module's document types and commands are inserted from its `code-of-conduct.module.md`. Copy to `<project>/CODE-OF-CONDUCT.md`. |
+| [`GLOSSARY.md`](GLOSSARY.md) | Every term catalyst invents (kernel, module, ETD, working copy, criterion, journal, tiers, ...), in one place. |
+| [`CLI.md`](CLI.md) | Reference for the `catalyst` command line: the mechanical steps (IDs, userids, journal, indexes, chain validation, traced commits, the end-of-turn and commit-msg hooks, usage reports) that procedures call instead of describing. |
+| [`FORMAT.md`](FORMAT.md) | The on-disk format specification (version `1.0-rc`): the pointer, the working copy, entity and index files, rules, domains, users and roles, the journal, and what `catalyst check`/`validate` enforce for each. |
 | [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) | Standard specification for Catalyst Process Modules, Module Manifests (`module.yaml`), Entity Type Definitions (`.yaml`), and layout. |
 | [`schemas/`](schemas/) | Machine-readable JSON schemas (`module-manifest.schema.json`, `entity-type-definition.schema.json`) for module and ETD validation. |
 | [`templates/`](templates/) | Generic kernel document templates (rule, domain, meta-tag, reconciliation, workflow, templates catalog, slash-command, Taskfile, roles, users, journal, pointer). The active module ships its own entity templates. |

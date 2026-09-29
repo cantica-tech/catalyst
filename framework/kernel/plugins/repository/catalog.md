@@ -16,4 +16,4 @@ mark the plugin as excluded from named kernel versions.
 
 | Plugin | Repository | Release | Tag | Compatibility |
 | --- | --- | --- | --- | --- |
-| [catalyst-git](catalyst-git) | git@github.com:oliben67/catalyst-git.git | v0.3.0 | 0.3.0 | * |
+| [catalyst-git](catalyst-git) | git@github.com:oliben67/catalyst-git.git | v0.4.0 | 0.4.0 | * |

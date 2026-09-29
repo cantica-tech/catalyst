@@ -32,7 +32,7 @@ entities, it defers to the active module's migration for that version.
 
 ## When a migration doesn't apply
 
-A deployment created fresh (via `/project create` or first-load install)
+A deployment created fresh (via `/project create` or `catalyst init`)
 after the "From" version already has the target shape — these plans are
 only ever relevant when synchronizing an **older** existing deployment
 forward, never for a new install.

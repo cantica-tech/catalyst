@@ -73,6 +73,7 @@ def make_valid_deployment(tmp_path: Path) -> Path:
     (rules / "templates").mkdir()
 
     (rules / "templates" / "TEMPLATE-RULE-v1.md").write_text("# Rule template\n")
+    (root / "version.txt").write_text("0.37.0\n")
     (rules / "rules.md").write_text(
         "# Rules index\n\n- br-AUTH-000001-Ab3xR9pQ-login-flow\n"
     )
@@ -133,6 +134,56 @@ def test_find_deploy_root_locates_from_nested_dir(tmp_path: Path):
 
 
 def test_find_deploy_root_returns_none_when_absent(tmp_path: Path):
+    assert cd.find_deploy_root(tmp_path) is None
+
+
+def test_find_deploy_root_follows_criterion_symlink(tmp_path: Path):
+    """0.37.0: the pointer holds no path; <project>/.criterion is a
+    gitignored symlink into agent-owned space."""
+    project = tmp_path / "project"
+    nested = project / "src"
+    nested.mkdir(parents=True)
+    agent_owned = tmp_path / "agent-space" / ".criterion"
+    agent_owned.mkdir(parents=True)
+    (project / "myapp.catalyst").write_text(json.dumps({"project_name": "myapp"}))
+    (project / ".criterion").symlink_to(agent_owned)
+    assert cd.find_deploy_root(project).resolve() == agent_owned.resolve()
+    assert cd.find_deploy_root(nested).resolve() == agent_owned.resolve()
+    assert cd.find_project_root(nested) == project
+
+
+def test_find_deploy_root_symlink_wins_over_legacy_agent_source(tmp_path: Path):
+    project = tmp_path / "project"
+    project.mkdir()
+    current = tmp_path / "current" / ".criterion"
+    stale = tmp_path / "stale" / ".criterion"
+    current.mkdir(parents=True)
+    stale.mkdir(parents=True)
+    (project / "myapp.catalyst").write_text(json.dumps({
+        "project_name": "myapp",
+        "agent-source": str(stale),
+    }))
+    (project / ".criterion").symlink_to(current)
+    assert cd.find_deploy_root(project).resolve() == current.resolve()
+
+
+def test_find_deploy_root_dangling_symlink_falls_back_to_legacy_pointer(tmp_path: Path):
+    project = tmp_path / "project"
+    project.mkdir()
+    legacy = tmp_path / "agent-space" / ".criterion"
+    legacy.mkdir(parents=True)
+    (project / "myapp.catalyst").write_text(json.dumps({
+        "project_name": "myapp",
+        "agent-source": str(legacy),
+    }))
+    (project / ".criterion").symlink_to(tmp_path / "gone")
+    assert cd.find_deploy_root(project) == legacy
+
+
+def test_find_deploy_root_pathless_pointer_without_criterion(tmp_path: Path):
+    """A 0.37.0 pointer on a machine where the working copy isn't set up
+    yet (fresh clone, CI) resolves to nothing rather than guessing."""
+    (tmp_path / "myapp.catalyst").write_text(json.dumps({"project_name": "myapp"}))
     assert cd.find_deploy_root(tmp_path) is None
 
 
@@ -725,3 +776,41 @@ def test_main_uses_module_declared_by_pointer(tmp_path: Path, monkeypatch, capsy
     capsys.readouterr()
     assert cd.main() == 0
     assert "module example-process" in capsys.readouterr().out
+
+
+def test_version_drift_missing_version_file(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    (root / "version.txt").unlink()
+    assert cd.check_version_drift(root, tmp_path) == [".criterion/version.txt is missing"]
+
+
+def test_version_drift_pointer_mismatch(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    (tmp_path / "myapp.catalyst").write_text(json.dumps({"kernel_version": "0.36.0"}))
+    errors = cd.check_version_drift(root, tmp_path)
+    assert errors == ["version drift: the pointer's kernel_version is 0.36.0 "
+                      "but .criterion/version.txt is 0.37.0"]
+
+
+def test_version_drift_legacy_framework_version_field(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    (tmp_path / "myapp.catalyst").write_text(json.dumps({"framework_version": "0.32.1"}))
+    assert "framework_version is 0.32.1" in cd.check_version_drift(root, tmp_path)[0]
+
+
+def test_version_drift_agreeing_versions(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    (tmp_path / "myapp.catalyst").write_text(json.dumps({"kernel_version": "0.37.0"}))
+    assert cd.check_version_drift(root, tmp_path) == []
+
+
+def test_version_drift_kernel_repo_behind(tmp_path: Path):
+    """In catalyst's own repository the dogfood deployment must track the
+    kernel's own version."""
+    root = make_valid_deployment(tmp_path)
+    (tmp_path / "framework" / "kernel").mkdir(parents=True)
+    (tmp_path / "version.txt").write_text("0.38.0\n")
+    errors = cd.check_version_drift(root, tmp_path)
+    assert errors == ["version drift: the kernel is 0.38.0 but this repository's "
+                      "own deployment is 0.37.0 — run /sync-framework"]
+

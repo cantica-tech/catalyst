@@ -93,7 +93,7 @@ module" and `<entity-type>` (`INVARIANTS.md` INV-30).
    keeping its entries.
 11. **Verify.** Run `scripts/check_deployment.py` and resolve every reported
     issue.
-12. **Journal.** Append one entry (`action: "migrate"`, `intent`
+12. **Journal.** Append one entry (`action: "sync"`, `intent`
     describing the recomposition, `files` covering every touched path by
     content hash) — never rewrite the journal itself (INV-17).
 13. **Version.** Set `.criterion/version.txt` and the pointer's

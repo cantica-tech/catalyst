@@ -1,11 +1,45 @@
 # catalyst
 
-**catalyst is a portable, model-agnostic development framework that a coding
-agent installs into a project and then works within.** It gives any codebase a
-single, traceable structure for its rules, its development work, its agile
-process, who's accountable for what, and a real history of why every change
-happened — so every change traces down to a documented rule, and every rule
-back up to the work that exercises it.
+**Persistent, verifiable project memory for codebases developed with AI
+coding agents.** An agent forgets between sessions why the code is the way
+it is, and nothing it leaves behind says which requirement a line serves.
+catalyst is for developers and teams who build with an agent and still need
+to answer "why does this code do X?" months later. The agent works inside a
+small, structured record kept next to the project: documented rules, work
+that traces to those rules, and an append-only journal of every change —
+so every change traces to a documented rule, and every rule back to the
+work that exercises it. A tested CLI keeps the IDs, the journal and the
+indexes honest, so the record can be checked rather than trusted.
+
+catalyst is in **beta**. Claude Code is the supported and tested agent;
+others can follow `AGENT.md`/`SYSTEM.md` but are untested (see
+[Agents](#agents)).
+
+### What it looks like
+
+A fictional project: one rule, one piece of work fixing it, one journal line.
+
+```text
+rules/business-rules.md
+  br-AUTH-000003-Ab3xR9pQ  ✅ A password-reset link expires after 30 minutes.
+
+ITEM-000012-Ab3xR9pQ-reset-link-never-expires.md
+  Targets: br-AUTH-000003-Ab3xR9pQ   Status: Done   Signed-off-by: Ada Lovelace
+
+development/journal.jsonl
+  {"command": "/status", "action": "status-change", "tier": "fix",
+   "artifact": "ITEM-000012-Ab3xR9pQ", "targets": ["br-AUTH-000003-Ab3xR9pQ"],
+   "intent": ["Reset links honour the 30-minute expiry again"],
+   "files": [{"path": "src/auth/reset.py", "before": "9f2c…", "after": "41ab…"}, …]}
+
+$ python3 .criterion/bin/catalyst.pyz check
+catalyst check passed: 0 error(s), 0 warning(s)
+```
+
+Months later, `/journal --rule br-AUTH-000003-Ab3xR9pQ` lists every change
+made for that rule, and `/journal-restore <timestamp>` rebuilds the tree as
+it stood. The terms used here are defined in the
+[glossary](framework/kernel/GLOSSARY.md).
 
 ## Kernel and modules
 
@@ -85,29 +119,50 @@ as it stood at any point into a side directory for inspection — a real
 point-in-time reconstruction, never a guess, and never applied to the live
 tree automatically. `/journal` is the read-only query side.
 
+## The catalyst CLI
+
+The mechanical steps — allocating IDs, drawing userids, hashing files into
+the journal, regenerating indexes, validating the traceability chain — are
+code, not prose: the `catalyst` command line, vendored into every deployment
+as `.criterion/bin/catalyst.pyz`. Procedures call it and keep only the
+judgment parts in prose; agents with an end-of-turn hook run
+`catalyst hook stop` so every turn ends on a passing `catalyst check`.
+Commits trace too: a git `commit-msg` hook (`catalyst hook install`) and
+`catalyst trace` in CI require every product commit to cite an artifact or
+rule ID, or to be marked `chore:`. Changes made by hand, straight into
+git, are caught too: `catalyst unrecorded`, `check` and `trace` report
+every commit whose changes the journal does not record, and `/adopt`
+either records it in the journal or reverts it. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md); every file the CLI
+reads and writes is specified in
+[`framework/kernel/FORMAT.md`](framework/kernel/FORMAT.md) (format
+`1.0-rc`).
+
 ## Multi-user sync: criterion
 
-A deployment stays local by default, but can opt into being **repoed**:
-`.criterion/` mirrored through a dedicated repository so multiple
-people working on the same project converge instead of silently diverging.
-`/criterion create`/`get` bootstrap or join it, and run an **identity
-migration** on first contact: once a contributor's real git identity is
-resolved, every existing `Signed-off-by` that named their old, unresolved
-identity gets rewritten to match it going forward. The journal itself is
-never rewritten — immutability is the harder invariant, so the migration
-is recorded as a new journal entry instead, not a silent edit to old ones.
-Every contributor pushes to their own branch via `/criterion push`,
-which vets the incoming change against the framework's own rules and
-merges it — using AI-assisted resolution only where a plain merge can't —
-into the shared canonical branch, then syncs the result back down locally.
+A deployment stays local by default, but can opt into being **shared**
+on plain git. `/criterion create` (`catalyst criterion create <url>`)
+publishes the working copy to a dedicated criterion repository and makes
+`.criterion` a submodule of the product repository, so every product
+commit pins the rules in force. Contributors check it out with
+`/criterion get`, and land changes through pull requests against the
+shared branch with `/criterion push`: it rebases (the journal and the
+generated indexes merge by union), runs `catalyst check` and an integrity
+check that nothing recorded was lost, and opens the pull request; the
+criterion repository's CI runs the same checks, and
+`catalyst criterion protect` makes them required. The AI never applies a
+merge: a real conflict stops the push, and a proposed resolution waits as
+a reconciliation case for a human. IDs stay unique across contributors
+through their userid suffix, so nobody renumbers. Identity is still
+self-declared; branch protection and review are the real controls. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
 
 ## Dogfooding
 
-The same vetting procedure — `/check-rules` plus an independent four-eyes
+A vetting procedure — `/check-rules` plus an independent four-eyes
 sub-agent pass checking whether the actual state still matches what the
-rules claim — backs both `/criterion push`'s incoming-change check and a
-standalone command, `/dogfood`, that runs it on demand against catalyst's
-own repository. `/dogfood` is deliberately **not** part of what gets
+rules claim — runs as a standalone command, `/dogfood`, on demand against
+catalyst's own repository. `/dogfood` is deliberately **not** part of what gets
 deployed into other projects: it only ever exists in catalyst's own repo,
 for verifying catalyst's own rules against catalyst's own actual state,
 never as something an ordinary deployment carries around.
@@ -129,7 +184,11 @@ no concrete, activatable plugin yet.
 
 ## Getting started
 
-Deployment follows one of two paths, chosen at install time:
+Ask your agent to install catalyst into the project; nothing is installed
+until you do. Under Claude Code the mechanical part is one command,
+`catalyst init` (see `CLAUDE.md`); the agent then works with you on the
+judgment — the rule documents, the first rules. The install follows one of
+two paths:
 
 - **Greenfield** — no code yet: the stack, tooling, and dev-environment
   decisions get written and implemented as the project's first rules,
@@ -141,28 +200,38 @@ Deployment follows one of two paths, chosen at install time:
 Either way, the active module decides what the day-to-day view of open work
 looks like; see its repository.
 
-## Portable by design
+To try catalyst by hand in about fifteen minutes, follow
+[`beta/QUICKSTART.md`](beta/QUICKSTART.md). The beta's multi-user trial —
+its protocol and the feedback form — is in [`beta/`](beta/)
+([`TRIAL.md`](beta/TRIAL.md), [`FEEDBACK.md`](beta/FEEDBACK.md)).
 
-catalyst is built to run under **any** capable coding agent — Claude Code, a
-generic tool-using agent, or a system-prompted model — by detecting what the
-running agent can do and falling back when a capability is absent. It installs
-itself into a fixed deploy target (`.criterion/`) on first load, and stays
-grounded across long runs through explicit anti-drift mechanisms (an invariants
-file, deployment ledgers, and a re-ground cadence) rather than trusting the
-agent to simply remember.
+## Agents
+
+catalyst's documents are written to be agent-agnostic: they detect what the
+running agent can do and fall back when a capability is absent. Only
+**Claude Code** is supported and tested today. Other agents can follow
+`AGENT.md` or `SYSTEM.md`, and the `catalyst` CLI works from any shell, but
+those paths are untested. catalyst installs only when you ask
+(`catalyst init`, INV-2), and stays grounded across long runs through
+explicit anti-drift mechanisms (an invariants file, deployment ledgers, a
+re-ground cadence and an end-of-turn `catalyst check`) rather than trusting
+the agent to simply remember.
 
 `.criterion/` itself is the agent's own governance context for the
 project — not part of the developed code structure, so it doesn't build
 inside the project's own tree at all. It builds in **agent-owned space**
-instead, and the target project tracks exactly one small, committed file
-for it, `<app-name>.catalyst`, whose `agent-source` field points at where
-the real working copy lives; `/project create`/`remove`/`export`/`import`
-manage that lifecycle. An agent with no owned-space concept falls back to
-building `.criterion/` directly in the project, gitignored there
-instead. Either way, `/criterion` is the opt-in mechanism for a team
-that wants the working copy to persist and sync across contributors,
-through a dedicated repository rather than a commit into the product's
-own history.
+instead, at a location each agent computes per machine, and the project
+reaches it through a gitignored `.criterion` symlink at its root. The
+target project tracks exactly one small, committed file for it,
+`<app-name>.catalyst`, which holds no path, so it is identical on every
+clone; `/project create`/`remove`/`export`/`import` manage that
+lifecycle. An agent with no owned-space concept (or a platform without
+symlinks) falls back to building `.criterion/` directly in the project,
+gitignored there instead. Either way, `/criterion` is the opt-in mechanism for a team
+that wants the working copy shared across contributors: it moves to a
+dedicated criterion repository, mounted as the product's `.criterion`
+submodule, so the product commits only a gitlink — never the working
+copy's content.
 
 `BOOTSTRAP.md` is the single source of truth. Everything else here either points
 at it or extends it.
@@ -176,5 +245,11 @@ that file.
 - `AGENT.md` — running a generic agent workflow.
 - `SYSTEM.md` — running the system-level prompt.
 
-All three load `BOOTSTRAP.md`, the single portable install core. Open the
-selected file and follow its instructions from top to bottom.
+All three load `BOOTSTRAP.md`, the single install core. Open the selected
+file and follow its instructions from top to bottom. `CLAUDE.md` is the only
+tested path.
+
+## License
+
+Apache License 2.0 — see `LICENSE`. Contributions: `CONTRIBUTING.md`;
+security reports: `SECURITY.md`.

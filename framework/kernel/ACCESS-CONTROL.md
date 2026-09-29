@@ -8,8 +8,8 @@ kernel version changes it (`INSTANTIATION-GUIDE.md` §1 step 8,
 `INVARIANTS.md`, `rules-of-rules.template.md`, and `IAM/roles/roles.json`;
 those remain the source of truth. Written because no single place
 previously laid out the full read/write picture per role, or answered
-"when can the agent write without asking, signed as the identity the
-`*.catalyst` pointer names."
+"when can the agent write without asking, and signed as whom", and what
+actually controls a shared deployment.
 
 ## 1. Read is universal. Write is advisory, with two genuinely enforced exceptions.
 
@@ -35,6 +35,12 @@ of role or identity:
   `IAM/roles/roles.json`. This is the *one* place role genuinely determines
   whether a write is allowed at all, not just whether it's noted.
 
+Both are enforced by the agent, which trusts the self-declared signer. In a
+shared deployment (`rr-META-013`), the gates that do not depend on the
+agent's good faith are the hosting service's: who may merge into the
+shared branch, pull-request review, and the required `catalyst` check,
+which `catalyst criterion protect` turns on (§4).
+
 ## 2. Per-role rights
 
 | Role | Read | Write (advisory — proceeds either way, per INV-25) | Reconciliation (`/reconcile`, enforced) |
@@ -46,7 +52,7 @@ of role or identity:
 | QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/status` on verification items | `propose` |
 | Stakeholder | everything | propose ideas and planning items to the active module | `none` |
 | Release Manager | everything | `/sync-framework`, `/catalyzer`, cutting releases | `full` |
-| Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/criterion push` (unrestricted), `/reconcile` | `full` |
+| Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/criterion create`, `/reconcile` | `full` |
 
 The "Write" column is each role's *typical* scope (`IAM/roles/roles.json`'s
 `actions` field) — a signal for what to expect and note on mismatch, not an
@@ -55,13 +61,9 @@ active process module names its own commands for these typical actions in
 its documentation; a deployment may list them in `roles.json` via
 `/role-modify`.
 
-**A third, real (non-advisory, non-refusing) role effect** exists alongside
-these: **signed-object push scoping** (`rr-META-013`, "Signed-object
-scoping"). A non-`Admin` contributor's `/criterion push` only ever pushes
-artifact files whose `Signed-off-by` names them — a file someone else signed
-is silently excluded from *that push* (reported, not hidden). `Admin` is
-exempt and pushes everything. This doesn't refuse the push or gate a specific
-write; it changes *how much* one push contains.
+Role does not scope what `/criterion push` carries: every contributor's
+push holds their whole change, and the pull request is where it is
+reviewed.
 
 ## 3. What "advisory" actually means, concretely
 
@@ -80,74 +82,58 @@ mechanism: a mismatch is visible in the artifact and in the journal entry
 that records the write, same principle `rr-META-016` gives reconciliation's
 `Resolver` field.
 
-## 4. Identity: what the `*.catalyst` pointer actually names
+## 4. Identity and the shared deployment's real controls
 
-The pointer (`DEPLOYMENT.md` in the framework's own terms) carries
-exactly **one** human-identity field:
-**`created_by`** — and only when the deployment is `repoed: true`. It's set
-once, at `/criterion create`'s first call, to whoever ran it
-(`rr-META-013`). `criterion_branch` also encodes identity indirectly for a
-repoed deployment (a contributor branch is `<branch-safe-name>.criterion`),
-but that's *this local checkout's* pushing identity, not necessarily the
-identity signing every artifact in it.
+The `*.catalyst` pointer names no human signer that anything relies on.
+`created_by` (set by the pre-0.39.0 `/criterion create`) is informational;
+`criterion_branch` names the shared branch everyone lands on, not a person.
+**`agent`/`chatAgents`** are a different axis entirely — which AI tool runs
+the deployment. Signing identity is session-resolved per §3.
 
-**`agent`/`chatAgents` are a different axis entirely** — which AI tool runs
-the deployment (`"claude-code"`, a Copilot binding, etc.), resolved by
-`agent-launch.ts`/`agent-bridge.ts`. Neither field names a human signer.
-"The user detailed in the `*.catalyst` file," read literally, can only mean
-`created_by` — a non-repoed deployment's pointer names no user at all, and
-signing identity there is purely session-resolved per §3 above.
+In a shared deployment (`rr-META-013`):
 
-## 5. When should the agent auto-write signed as `created_by`?
+- **Registration comes first.** A contributor is registered with
+  `/user-add` (which draws their `userid`) before signing anything; the
+  registration lands through a pull request like any other change. Their
+  `userid` suffixes every ID they allocate, which is what keeps IDs unique
+  across contributors (`Rules-of-Rules.md` §6).
+- **Identity is still self-declared.** `--as <user>` and `Signed-off-by`
+  record who the operator says they are; catalyst cannot verify it, and a
+  signature already written is never rewritten.
+- **The real controls are the host's.** Who can push to the criterion
+  repository, who may merge a pull request into the shared branch, and
+  whether review and the `catalyst` check are required. `catalyst criterion
+  protect --yes` (GitHub) requires pull requests and the check, and forbids
+  force-pushes and deletion of the branch. Without it, anyone with write
+  access can push to the shared branch directly, and every gate in this
+  document is agent courtesy only.
+- **The AI never applies a merge.** A conflict stops `/criterion push`; a
+  resolution the agent proposes waits as a `RECON-` case, and resolving it
+  stays role-gated (§1).
 
-This is the practical question INV-25 raises once identity enters the
-picture: given writes proceed without asking, *which* identity does the
+## 5. When may the agent sign without asking?
+
+Given writes proceed without asking (INV-25), *which* identity does the
 agent sign as, without asking that either?
 
-**Safe to default to `created_by` without asking:**
-- **Not repoed at all.** There's no contributor model yet — whichever name
-  the session already resolved (or `created_by` once one exists) is the only
-  plausible signer.
-- **Single-maintainer mode** (`criterion_branch` is `criterion` itself).
-  `rr-META-013` already refuses this mode's own push path to anyone but
-  `created_by` — the deployment's own design assumes one operator. Defaulting
-  every write's `Signed-off-by` to them is consistent with a mode that's
-  already gated that way.
-- **Exactly one active user in `IAM/users/users.json`.** Regardless of
-  `created_by`, if there's only one person who *can* plausibly be signing,
-  ambiguity doesn't exist.
+**Safe without asking:**
+- **Exactly one active user in `IAM/users/users.json`.** Nobody else can
+  plausibly be signing; the CLI signs as them without `--as`.
 - **An identity already resolved this session.** Per §3 step 1 — once
   established, INV-25 means never re-asking or re-confirming it for
   subsequent writes in the same session.
 
-**Not safe — resolve identity properly instead of defaulting to
-`created_by`:**
-- **A real multi-contributor repoed deployment** (`criterion_branch` is
-  `<name>.criterion`, not `criterion`) **with more than one active user.**
-  `created_by` is whoever *created the repo link*, not necessarily who's
-  operating this checkout right now — signing everything as them would
-  misattribute a genuine contributor's work. Derive identity from
-  `criterion_branch` (strip `.criterion`, reverse the branch-safe transform
-  as far as it goes) or ask once and cache it for the session, same as any
-  non-repoed deployment's first write.
-- **A `git_username` has already been recorded for the actual operator**
-  (`rr-META-013`'s identity migration) that differs from `created_by`. Once
-  migrated, `git_username` is the correct signer for that person going
-  forward — `created_by` on the pointer doesn't update to track it.
-
-In short: `created_by` is a reasonable **zero-configuration fallback** for
-the common solo or single-maintainer case, never a substitute for an
-already-established or derivable per-contributor identity in a real
-multi-user deployment.
+**Otherwise ask once** and reuse the answer for the session. With several
+active users the CLI refuses to guess (`--as` required), and neither
+`created_by` nor git configuration stands in for the answer.
 
 ## 6. Summary
 
 - Read: unrestricted, always, for everyone.
 - Write: advisory by default (INV-25) — proceeds and notes, never asks or
   blocks — except reconciliation resolution (INV-21) and the INV-16
-  active-user floor, which are real gates.
-- Signing identity: session-resolved once, reused thereafter; `created_by`
-  is a safe default only when the deployment has at most one plausible
-  signer (unrepoed, single-maintainer, or a single active user) — otherwise
-  resolve the actual contributor rather than defaulting to whoever created
-  the repo link.
+  active-user floor, which the agent enforces.
+- Shared deployments: branch protection, pull-request review and the
+  required `catalyst` check are the controls that do not rely on the agent.
+- Signing identity: session-resolved once, reused thereafter; asked when
+  more than one active user could be signing.

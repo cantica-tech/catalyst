@@ -19,8 +19,10 @@ one-line placeholder; numbers are never reused.
 
 - **INV-1 — Repo-scoped references.** Never mention a local drive, folder, or
   path when referring to catalyst. Only the git repository and repository name.
-- **INV-2 — Install on first load.** First load into a project ⇒ install
-  immediately via the instantiation procedure.
+- **INV-2 — Install only when asked.** Loading or reading catalyst never
+  installs it. Install into a project only on the user's explicit request
+  (`catalyst init`, `/project create`, or asking in plain words), via the
+  instantiation procedure; otherwise at most offer to.
 - **INV-3 — Name it "catalyst".** Always "catalyst" / "catalyst framework"
   thereafter, in guidance, memory, and discussion. The framework is the
   **kernel** (`framework/kernel/`, everything independent of process
@@ -65,28 +67,31 @@ one-line placeholder; numbers are never reused.
   exist otherwise, so the chain can't reach through it; without one
   active, the module's grounded artifacts chain directly to their
   grounding → domain. The module's own chain specifics live in its
-  `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4).
-- **INV-6 — Working copy in agent-owned space; one tracked pointer.** The
-  deployment's real working copy is a directory named `.criterion/`,
-  living in **agent-owned space** resolved per the running agent
-  (`BOOTSTRAP.md` §1) — never inside the developed project's own tree.
-  The target project tracks exactly one file for this: `<app-name>.catalyst`
-  (JSON, project root, committed — the only catalyst artifact the
-  project's own repo ever carries), whose `agent-source` field names
-  where the real working copy actually is. `.criterion/DEPLOYMENT.md`
-  stays the source of record for deployment/repo metadata, inside the
-  working copy wherever it's now rooted (unchanged in role — only its
-  location moved); `<app-name>.catalyst` mirrors the same `repoed`/
-  `catalyst_repo`/`catalyst_repo_url`/`created_by` fields for project-root
-  visibility without resolving `agent-source` first. Fallback for an agent with no
-  owned-space concept: keep `.criterion/` directly in the project
-  instead, gitignored, never committed. When switching agents, the newly active
-  agent updates `<app-name>.catalyst` (`agent`, `agent-source`, `updated`), mirrors
-  `.criterion/` into the new `agent-source` location (exact copy, overwriting the
-  destination — never a partial merge), updates `CRITERION_DIR` in `Taskfile.yml`,
-  and updates its persistent framework memory note. `/criterion` (INV-18) is the
-  opt-in, repo-backed persistence/sync layer on top of either shape —
-  never a commit into the product's own repo. `/project
+  `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4). At commit
+  granularity: every product commit cites an artifact or rule ID that
+  resolves in the deployment, or its subject starts `chore:`; merges are
+  not checked (`catalyst hook commit-msg`, `catalyst trace`, `CLI.md`).
+- **INV-6 — Working copy outside the product tree; one tracked pointer.**
+  The deployment's working copy is a directory named `.criterion/`, and
+  the project reaches it through one path, `<project root>/.criterion`.
+  **Local-only** (the default), it lives in **agent-owned space** —
+  computed per machine from the running agent's conventions
+  (`BOOTSTRAP.md` §1), never recorded in a tracked file — and
+  `.criterion` is a gitignored symlink to it, which the agent creates or
+  repairs at install, `/project import` and every session start.
+  **Shared** (INV-18), `.criterion` is a git submodule of the product
+  repository pointing at the criterion repository: the product tracks
+  only `.gitmodules` and the gitlink, never the working copy's content.
+  Either way the project tracks `<app-name>.catalyst` (JSON, project
+  root, committed), which holds no path. Fallback for an agent with no
+  owned-space concept, or a platform without symlinks: `.criterion/` is
+  a real directory in the project, gitignored, never committed. When
+  switching agents, the newly active agent mirrors a local-only
+  `.criterion/` into its own owned location (exact copy, overwriting the
+  destination — never a partial merge), repoints the symlink, updates
+  `<app-name>.catalyst`'s `agent` and `updated`, and updates its
+  persistent framework memory note. Pre-0.37.0 pointers may still carry
+  `agent-source`; tools honor it until migrated. `/project
   create`/`remove`/`export`/`import` (INV-19) manage the lifecycle;
   `Rules-of-Rules.md` §14 has the one-time migration off the pre-pointer
   model.
@@ -129,66 +134,28 @@ one-line placeholder; numbers are never reused.
   that point reconstructs the exact tree state then, via `/journal-restore`
   into a side directory — never overwriting the live tree outright.
   Entries are immutable once written: never edited, deleted, or reordered.
+  A product commit after the pointer's `journal_since` whose changes no
+  entry records was made outside catalyst: it is detected, and adopted
+  into the journal or reverted, never silently left (`/adopt`).
   Complements — does not duplicate — the `catalyst-git` plugin's
   continuous compliance auditing of a *deployed project*; this journal is
   core, applies to catalyst's own deployment too, and records history
   rather than flagging violations.
-- **INV-18 — Repoed deployments sync through a dedicated repo.** A
-  deployment with `repoed: true` (`.criterion/DEPLOYMENT.md` — the
-  source of record, wherever `.criterion/` is now rooted; mirrored
-  into `<app-name>.catalyst` at the project root per INV-6) mirrors
-  `.criterion/` through a dedicated repository. `/criterion create
-  <name> <git-info>` establishes it the first time (creates it if it
-  doesn't exist, registers it as-is if it does; pushes local
-  `.criterion/` as the `criterion` branch — the canonical, master
-  version). Run again against the same repo with a different `<name>`, it
-  doesn't refuse — it branches: a new branch named `<name>` off the
-  current `criterion`, without touching `criterion` itself or who's
-  recorded as `created_by`. `/criterion get <repo> <username>` is the
-  join path: download `criterion`'s current state and check out a new
-  branch for `<username>` from it, for a user who doesn't have a local
-  copy yet. Both `create`'s first call and `get` also resolve the
-  actor's `git_username` and rewrite every existing artifact's
-  `Signed-off-by` that named their old registered `name` to it — every
-  `Signed-off-by`/journal `actor` written for them from then on uses
-  `git_username`, never `name`; the journal itself is never rewritten
-  (INV-17), only appended with one new entry describing the migration.
-  **This never supersedes INV-6**: `.criterion/` stays the
-  real working copy (wherever it's rooted — agent-owned space or, on the
-  fallback, in-project); the dedicated repo is an additional, synced
-  backing store.
-
-  **`create`/`get` always ask which branch the current actor will push
-  to** — recorded as `criterion_branch` in `<app-name>.catalyst` so
-  later `push` calls don't ask again. The suggested default is the
-  actor's own fixed branch, `<branch-safe-name>.criterion` — **every
-  git ref name derived from a user's identity (this branch, and
-  `/criterion get`'s `<username>`) is that name's branch-safe form**
-  (lowercase, non-alphanumeric runs collapsed to a single `-`, trimmed),
-  since a registered display name like "Olivier Steck" is not itself a
-  valid git ref component; refuse rather than silently colliding if two
-  distinct names would collapse to the same form. Choosing `criterion`
-  itself instead is valid and changes what `push` does:
-
-  - **`criterion_branch` names a real contributor branch** (the
-    default case, for multi-contributor deployments): the push itself is
-    scoped to artifact files whose `Signed-off-by` names the current
-    actor — not their full local state — unless they hold the `Admin`
-    role (`IAM/roles/roles.json`), in which case everything pushes
-    unfiltered. Shared registries/indexes and the journal aren't signed
-    by one person and are never filtered; excluded files are reported,
-    never silently dropped. What's pushed is then vetted (`/check-rules`
-    plus a four-eyes sub-agent pass) and merged into `criterion`; both
-    branches are updated with the result, and the local
-    `.criterion/` is refreshed to match. `--force` skips vetting and
-    scoping and overwrites `criterion` directly anyway, refused for
-    anyone but the repo's recorded `created_by`.
-  - **`criterion_branch` is `criterion` itself** (single-maintainer
-    mode — e.g. catalyst's own self-dogfooding, where `/dogfood`'s own
-    audit already served as the vetting step): every `push` overwrites
-    `criterion` directly, no vetting, no merge — this is the normal
-    behavior in this mode, not something `--force` is needed for — still
-    refused for anyone but `created_by`.
+- **INV-18 — Shared deployments on git.** A deployment is shared
+  (`repoed: true`) once `catalyst criterion create <url>` publishes its
+  working copy to a criterion repository and makes `.criterion` a
+  submodule of the product repository; every product commit then pins
+  the rules in force. Contributors land changes only through pull
+  requests against the shared branch (`criterion_branch`):
+  `catalyst criterion push` commits, rebases (the journal and generated
+  indexes merge by union), runs `catalyst check` and
+  `catalyst criterion integrity`, and pushes a topic branch; the same
+  two checks run in the criterion repository's CI, and
+  `catalyst criterion protect` makes them required. A real conflict
+  stops the push with nothing pushed; the agent never applies a merge —
+  it may record a proposed resolution as a `RECON-` case for a human to
+  accept (INV-21). Identity is self-declared: branch protection and
+  pull-request review are the real controls. `Rules-of-Rules.md` §13.
 - **INV-19 — Project lifecycle commands.** `/project create <name>`
   installs a fresh deployment: a working copy in agent-owned space (or
   the in-project fallback) plus its `<app-name>.catalyst` pointer.
@@ -221,10 +188,9 @@ one-line placeholder; numbers are never reused.
 - **INV-21 — Reconciliation entity for diverging versions.** A
   `RECON-NNNNNN` (`reconciliations/`, top-level, full INV-20 template
   treatment) is the durable record of two entity versions that
-  `/criterion push`'s merge step (INV-18) couldn't cleanly reconcile —
-  a git-level conflict, a vetting-flagged semantic clash, or a
-  rights-mismatch against `IAM/roles/roles.json` — or a manually opened
-  one. Like `WORKFLOW-`, it is never itself work: no `Targets` rule
+  disagree — a conflict that stopped `/criterion push` (INV-18), a
+  rights-mismatch against `IAM/roles/roles.json`, or a manually opened
+  one — and of the human decision that settles it. Like `WORKFLOW-`, it is never itself work: no `Targets` rule
   field; its chain runs sideways via an `Entity` field naming the
   disputed artifact. Never file-versioned per round — each round of
   back-and-forth is a new row in the same file's `Revisions` section,
@@ -244,7 +210,7 @@ one-line placeholder; numbers are never reused.
   naming artifact-type folder(s) (full INV-20 treatment) and/or
   slash-command file(s) it deploys into the target project.
   `/catalyzer activate` materializes this content — the same mechanism
-  first-load instantiation uses to copy core templates in;
+  instantiation uses to copy core templates in;
   `/catalyzer deactivate` removes exactly what was added, never
   artifact instances the deployment already created with it. Two
   content-contributing plugins that would deploy the same artifact-type

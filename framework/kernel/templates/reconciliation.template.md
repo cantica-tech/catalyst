@@ -2,10 +2,10 @@
 
 > A reconciliation case: two diverging versions of an existing entity
 > that need resolving, never a unit of work with its own acceptance
-> criteria (`Rules-of-Rules.md` §16). Opened by `/criterion push`'s
-> vet+merge step when it can't cleanly reconcile two versions of the
-> same entity — a git-level conflict, a vetting-flagged semantic clash,
-> or a rights-mismatch (`Rules-of-Rules.md` §11) — or manually.
+> criteria (`Rules-of-Rules.md` §16). Opened when `/criterion push`
+> stops on a conflict and the agent proposes a resolution (never applying
+> it), for a rights-mismatch (`Rules-of-Rules.md` §11), for a contested
+> change committed outside catalyst (`/adopt`), or manually.
 
 | Field | Value |
 |---|---|
@@ -13,7 +13,7 @@
 | **Name** | short descriptive summary summarizing the reconciliation's purpose — follows Rules of Rules naming conventions |
 | **Entity** | type + ID/path of the artifact actually being reconciled |
 | **Workflow** | `WORKFLOW-NNNNNN` guiding this case's resolution, if any — optional, leave blank unless a documented procedure for this recurring kind of conflict exists (`Rules-of-Rules.md` §19) |
-| **Trigger** | `rights-mismatch` / `merge-conflict` / `manual` |
+| **Trigger** | `rights-mismatch` / `merge-conflict` / `unrecorded-change` / `manual` |
 | **Status** | `Open` / `Under Review` / `Resolved-Accepted` / `Resolved-Accepted-with-Edits` / `Resolved-Rejected` / `Closed` |
 | **Proposer** | name (role) — see `IAM/users/users.json` |
 | **Baseline** | content hash + short description of `criterion`'s version at open time |
@@ -43,9 +43,9 @@ other edit to this file:
 
 Final decision and rationale, filled in once `Status` moves to a
 `Resolved-*` state. `Resolved-Accepted` merges `Proposed` into
-`criterion` as-is; `Resolved-Accepted-with-Edits` merges the last
-revision's content instead; `Resolved-Rejected` leaves `criterion`
-unchanged and flags the proposer's local divergence for reverting.
+the shared branch as-is; `Resolved-Accepted-with-Edits` merges the last
+revision's content instead; `Resolved-Rejected` leaves the shared
+branch's version unchanged and the proposer drops or reworks their change.
 
 ## Related
 
