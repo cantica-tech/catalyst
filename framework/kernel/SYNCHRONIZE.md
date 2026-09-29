@@ -220,6 +220,10 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
      syncs past the version that introduced it — see "Version-specific
      one-time migrations" below.
    - `version.txt`
+   - `bin/catalyst.pyz`, the catalyst CLI (`CLI.md`) — always replaced
+     with the target kernel release's `bin/catalyst.pyz` (from catalyst's
+     own checkout: `task build:cli`), never project-owned. The template's
+     `catalyst` pass-through task is part of `Taskfile.common.yml` below.
    - every documented slash command from the composed `CODE-OF-CONDUCT.md`
      §4 — `rules-of-development.template.md` §4 plus the active module's
      §4 (item 6), the canonical list; this file must never re-enumerate a
@@ -240,7 +244,10 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
      project-specific tasks) is project-owned content, never overwritten by
      a sync.
 8. Update the deployed framework's `version.txt` to the latest released
-   version once synchronization is complete.
+   version once synchronization is complete, journal the sync with
+   `catalyst journal append --command /sync-framework --action sync`, and
+   run `catalyst check`: every error is resolved (or recorded for the user)
+   before the sync is reported complete.
 
 ## Version-specific one-time migrations
 
@@ -436,6 +443,61 @@ duplicated here. The kernel no longer carries any module entity; every
 module template, definition, meta-rule, invariant, command, task and
 migration comes from the active module and is composed per
 `MODULE-SPECIFICATION.md` §6. The pointer must name its module.
+
+### From `0.36.0`: computed working-copy location
+
+Target version `0.37.0`. Full procedure:
+`migrations/0.37.0/computed-working-copy-location.md` (this repository)
+— not duplicated here. The pointer drops `agent-source`: the agent-owned
+location is computed per machine and reached through a gitignored
+`.criterion` symlink at the project root, which the root `Taskfile.yml`
+includes as `.criterion/Taskfile.common.yml` (`optional: true`, no
+`CRITERION_DIR`).
+
+### From `0.37.0`: the catalyst CLI
+
+Target version `0.38.0`. Full procedure:
+`migrations/0.38.0/catalyst-cli.md` (this repository) — not duplicated
+here. The mechanical steps become the `catalyst` CLI (`CLI.md`), vendored
+at `.criterion/bin/catalyst.pyz`; journal paths become
+project-root-relative, CLI-written entries carry `writer`, and journaled
+blobs are pinned under `refs/catalyst/journal`. Old journal entries are
+never rewritten.
+
+### From `0.38.0`: shared deployments on git
+
+Target version `0.39.0`. Full procedure:
+`migrations/0.39.0/criterion-on-git.md` (this repository) — not
+duplicated here. A shared ("repoed") deployment's working copy becomes a
+git submodule of the product repository at `.criterion`, and
+contributors land changes through pull requests (`catalyst criterion`,
+`CLI.md`); the per-user `<name>.criterion` branches, AI-assisted merging
+and the identity migration are withdrawn. A local-only deployment only
+bumps its version.
+
+### From `0.39.0`: explicit install, ceremony tiers, command specs
+
+Target version `0.40.0`. Full procedure:
+`migrations/0.40.0/explicit-install-and-tiers.md` (this repository) —
+not duplicated here. Installing becomes an explicit request carried out
+by `catalyst init` (INV-2 revised); journal entries may carry a ceremony
+`tier` (`chore`/`fix`/`feature`); command files read their spec with
+`catalyst spec <name>`; ETDs may declare `location` and per-field
+`required_when_closed` (`closed-incomplete`). Recompose `CODE-OF-CONDUCT.md`
+and `Rules-of-Rules.md`, refresh the command files, the vendored CLI and
+the module, and list any `closed-incomplete` artifact for the user —
+never fabricate what it lacks.
+
+### From `0.40.0`: traced commits, the on-disk format version
+
+Target version `0.41.0`. Full procedure:
+`migrations/0.41.0/traced-commits-and-format.md` (this repository) — not
+duplicated here. Every product commit cites an artifact or rule ID, or is
+a `chore:` (INV-5 at commit granularity), enforced by
+`catalyst hook commit-msg` and `catalyst trace` in CI. The pointer gains
+`"format": "1.0-rc"` (`FORMAT.md`). Add the field, re-vendor the CLI,
+recompose the governing documents, offer `catalyst hook install` (with the
+user's assent) and a CI trace step; existing history is not checked.
 
 ## Expected outcome
 

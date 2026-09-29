@@ -35,6 +35,9 @@ from check_deployment import find_deploy_root, find_project_root
 ROOT = Path(__file__).resolve().parent.parent
 COMMANDS_DIR = ROOT / ".claude" / "commands"
 DOGFOOD_EXCEPTION = "dogfood"
+# Taskfile.common.yml utility tasks that are not slash commands: `catalyst`
+# passes its arguments to the vendored CLI (.criterion/bin/catalyst.pyz).
+UTILITY_TASKS = {"catalyst"}
 
 SECTION_HEADING_RE = re.compile(r"^## \d+\. ")
 SECTION4_RE = re.compile(r"^## 4\. ")
@@ -180,7 +183,7 @@ def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
             f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{name} but "
             f"{taskfile.name} has no matching task"
         )
-    for name in sorted(task_names - coc_names):
+    for name in sorted(task_names - coc_names - UTILITY_TASKS):
         errors.append(
             f"taskfile parity: {taskfile.name} has a '{name}' task but it is "
             f"not referenced in CODE-OF-CONDUCT.md §4"

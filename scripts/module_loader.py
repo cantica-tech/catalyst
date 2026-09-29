@@ -33,6 +33,9 @@ class FieldDefinition:
     allowed_values: list[str] = field(default_factory=list)
     target_type: str | None = None
     backref: str | None = None
+    # must be non-empty once the entity's Status is one of its workflow's
+    # closed states (e.g. a feature cannot close without its steps)
+    required_when_closed: bool = False
 
 
 @dataclass
@@ -60,6 +63,9 @@ class ETD:
     # "id-summary" (files named <id>-<short-summary>.md) or "free-form"
     # (files keyed by a free-form name, exempt from that naming check).
     naming: str = "id-summary"
+    # The folder's parent inside the working copy ("" = the working copy's
+    # root), e.g. "development" for development/<folder>/.
+    location: str = ""
     fields: list[FieldDefinition] = field(default_factory=list)
     workflow: WorkflowDefinition = field(
         default_factory=lambda: WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
@@ -230,19 +236,22 @@ def _read_pointer(project_root: Path) -> dict[str, Any]:
 
 
 def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
-    """The deployment root for `project_root`: the pointer's "agent-source"
-    when it names a real directory (same rule as
-    check_deployment.find_deploy_root), else an in-tree .criterion/."""
+    """The deployment root for `project_root` (same rule as
+    check_deployment.find_deploy_root): <project root>/.criterion — symlink
+    followed, or the in-project directory — else a pre-0.37.0 pointer's
+    legacy "agent-source" when it names a real directory."""
     if not project_root:
         return None
     root = Path(project_root).resolve()
+    local = root / DEPLOY_DIRNAME
+    if local.is_dir():
+        return local
     source = _read_pointer(root).get("agent-source")
     if source:
         candidate = Path(str(source)).expanduser()
         if candidate.is_dir():
             return candidate
-    legacy = root / DEPLOY_DIRNAME
-    return legacy if legacy.is_dir() else None
+    return None
 
 
 def resolve_module_id(project_root: Path | str | None) -> str | None:
@@ -279,6 +288,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
     grounding = d.get("grounding", "none")
     grounding_field = d.get("grounding_field")
     naming = str(d.get("naming") or "id-summary")
+    location = str(d.get("location") or "").strip("/")
 
     fields: list[FieldDefinition] = []
     for f in d.get("fields", []):
@@ -291,6 +301,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
                     allowed_values=f.get("allowed_values", []) or [],
                     target_type=f.get("target_type"),
                     backref=f.get("backref"),
+                    required_when_closed=bool(f.get("required_when_closed", False)),
                 )
             )
 
@@ -312,6 +323,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
         grounding=grounding,
         grounding_field=grounding_field,
         naming=naming,
+        location=location,
         fields=fields,
         workflow=wf,
     )
@@ -333,10 +345,28 @@ def load_kernel_entities(entities_dir: Path | None = None) -> dict[str, ETD]:
     base = entities_dir or KERNEL_ENTITIES_DIR
     etds: dict[str, ETD] = {}
     if not base.is_dir():
+        if entities_dir is None:
+            return _embedded_kernel_entities()
         return etds
     for path in sorted(base.glob("*.yaml")):
         etd = load_etd_file(path)
         if etd is not None:
+            etds[etd.id_prefix] = etd
+    return etds
+
+
+def _embedded_kernel_entities() -> dict[str, ETD]:
+    """The kernel's entity types as embedded in the `catalyst.pyz` zipapp by
+    scripts/package_release.py (no repository to read them from there)."""
+    try:
+        from kernel_entities_embedded import ENTITIES  # type: ignore
+    except ImportError:
+        return {}
+    etds: dict[str, ETD] = {}
+    for text in ENTITIES.values():
+        data = parse_simple_yaml(text)
+        if isinstance(data, dict) and data.get("id_prefix"):
+            etd = parse_etd_dict(data)
             etds[etd.id_prefix] = etd
     return etds
 
@@ -375,13 +405,19 @@ def find_module_dir(project_root: Path | str | None, module_id: str) -> Path | N
 
 
 def load_module(project_root: Path | str | None = None,
-                module_id: str | None = None) -> ModuleManifest | None:
+                module_id: str | None = None,
+                module_dir: Path | None = None) -> ModuleManifest | None:
     """Load the manifest of module `module_id` (or of the module declared for
-    `project_root`). None when no module is declared or it cannot be found."""
-    target_id = module_id or resolve_module_id(project_root)
-    if not target_id:
-        return None
-    mdir = find_module_dir(project_root, target_id)
+    `project_root`, or the one at `module_dir`). None when no module is
+    declared or it cannot be found."""
+    if module_dir is not None:
+        mdir = module_dir if (module_dir / "module.yaml").is_file() else None
+        target_id = module_dir.name
+    else:
+        target_id = module_id or resolve_module_id(project_root)
+        if not target_id:
+            return None
+        mdir = find_module_dir(project_root, target_id)
     if mdir is None:
         return None
     data = parse_simple_yaml((mdir / "module.yaml").read_text())

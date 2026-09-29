@@ -99,7 +99,7 @@ tasks:
       - '{{.AGENT_CMD}} "/catalyzer {{.CLI_ARGS}}"'
 
   criterion:
-    desc: "Bootstrap/join/sync a repoed .criterion/ deployment: <create|get|push> ..."
+    desc: "Share the working copy through a criterion repository: <create <url>|get|push <message>|sync|status>"
     cmds:
       - '{{.AGENT_CMD}} "/criterion {{.CLI_ARGS}}"'
 
@@ -107,6 +107,11 @@ tasks:
     desc: "Resolve an open reconciliation case: <RECON-id> <accept|accept-with-edits|reject|propose <text>>"
     cmds:
       - '{{.AGENT_CMD}} "/reconcile {{.CLI_ARGS}}"'
+
+  adopt:
+    desc: "List product changes committed outside catalyst and accept (journal) or reject each: [<commit>|<range>]"
+    cmds:
+      - '{{.AGENT_CMD}} "/adopt {{.CLI_ARGS}}"'
 
   project:
     desc: "Manage a catalyst deployment: <create|remove|export|import> ..."
@@ -162,3 +167,10 @@ tasks:
     desc: "Return help documentation for the framework or a specific command"
     cmds:
       - '{{.AGENT_CMD}} "/help {{.CLI_ARGS}}"'
+
+  # Not a slash command: a direct pass-through to the catalyst CLI
+  # (framework/kernel/CLI.md), vendored at .criterion/bin/catalyst.pyz.
+  catalyst:
+    desc: "Run the catalyst CLI: task catalyst -- <args>"
+    cmds:
+      - python3 .criterion/bin/catalyst.pyz {{.CLI_ARGS}}

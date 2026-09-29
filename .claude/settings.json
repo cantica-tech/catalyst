@@ -15,23 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 scripts/check_deployment.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 scripts/check_plugins.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 scripts/check_plugin_contracts.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 scripts/check_command_parity.py"
-          },
-          {
-            "type": "command",
-            "command": "python3 scripts/check_kernel_purity.py"
+            "command": "python3 scripts/stop_hook.py"
           }
         ]
       }

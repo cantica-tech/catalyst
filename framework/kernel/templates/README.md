@@ -21,8 +21,8 @@ This folder contains the reusable document templates that seed the deployed cata
   top-level sibling (domains exist only to group rules).
 - [`reconciliation.template.md`](reconciliation.template.md) — a
   top-level, non-rule-linked type for `RECON-NNNNNN` cases: two
-  diverging versions of some other entity that `/criterion push`'s
-  vet+merge step (or a manual open) couldn't cleanly reconcile. Never a
+  diverging versions of some other entity — such as a conflict that
+  stopped `/criterion push` — awaiting a human decision. Never a
   unit of work; see `Rules-of-Rules.md` §16.
 - [`workflow.template.md`](workflow.template.md) — a top-level,
   non-rule-linked type for `WORKFLOW-NNNNNN` process-definition
@@ -64,15 +64,17 @@ This folder contains the reusable document templates that seed the deployed cata
   copy to `<app-name>.catalyst` **at the target project's own root**
   (`INVARIANTS.md` INV-6), the one exception to "everything else deploys
   under `.criterion/`": this file is the only catalyst artifact the
-  target project's own repo ever tracks. Its `agent-source` field names
-  where the real working copy actually lives — agent-owned space if the
-  running agent has one, the in-project `.criterion/` (gitignored)
-  otherwise. Managed by `/project create`/`remove`/`export`/`import` and
-  kept in sync with `.criterion/DEPLOYMENT.md`'s `repoed`/
-  `catalyst_repo`/`catalyst_repo_url`/`created_by` — see
-  `Rules-of-Rules.md` §14. `criterion_branch` names the current actor's
-  chosen push branch once `/criterion create`/`get` asks for one (§13)
-  — `null` until then, or once repoed again after `/project remove`.
+  target project's own repo ever tracks. It holds no path: the real
+  working copy lives in agent-owned space, computed per machine by the
+  running agent and reached through the gitignored `.criterion` symlink
+  at the project root — or is the in-project `.criterion/` directory
+  (gitignored) when the agent has no owned space (INV-6). Pre-0.37.0
+  pointers may still carry `agent-source`; tools honor it until
+  migrated. Managed by `/project create`/`remove`/`export`/`import` — see
+  `Rules-of-Rules.md` §14. `catalyst criterion create` sets `repoed`,
+  `catalyst_repo_url` and `criterion_branch` (the shared branch, default
+  `criterion`) when the deployment becomes shared (§13); `catalyst_repo`
+  and `created_by` are informational.
 
 ## How to use this folder
 

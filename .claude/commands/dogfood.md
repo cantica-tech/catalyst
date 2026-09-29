@@ -46,14 +46,11 @@ verifying catalyst's own rules against catalyst's own actual state.
    findings alike. Never fix anything automatically — that's the user's
    or a follow-up command's call.
 7. If this run ends clean, or ends with fixes applied and reverified,
-   **offer** to sync — `/criterion push` if this deployment is already
-   repoed, `/criterion create` otherwise. Never run either
+   **offer** to share it — `/criterion push` if this deployment is
+   already shared, `/criterion create` otherwise. Never run either
    automatically; offer it and proceed only once the user says to.
 
-This is the same procedure `/criterion push` runs inline against an
-incoming branch before merging, in any repoed deployment
-(`framework/kernel/rules-of-rules.template.md` §13) — described
-there directly rather than depending on this command, since this command
-doesn't exist outside catalyst's own repo. Running `/dogfood` here
-standalone never touches `criterion` or any branch on its own — step 7
+This command exists only in catalyst's own repository
+(`framework/kernel/rules-of-rules.template.md` §13). Running it never
+touches the criterion repository or any branch on its own — step 7
 above only ever *offers* that as a next step, never triggers it.

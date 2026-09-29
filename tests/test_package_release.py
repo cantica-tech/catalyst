@@ -61,8 +61,9 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     root = make_workspace(tmp_path)
     mod_dir = tmp_path / "catalyst-example-process"
     calls: list[list[str]] = []
-    # Mock run_cmd to prevent git push in unit test
+    # Mock run_cmd to record, and never run, git commands
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: calls.append(cmd) or "")
+    (root / "LICENSE").write_text("Apache License\n")
 
     released = pr.package_modules(root)
     pr.package_kernel(root)
@@ -88,7 +89,8 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
         assert "manifest.json" in namelist
         assert "module.yaml" in namelist
         assert not any(n.startswith(".git") for n in namelist)
-    assert ["git", "add", "catalyst"] in calls
+    # Without push, nothing is committed or pushed (INV-4)
+    assert calls == []
 
     # 2. Verify kernel output
     kernel_release_dir = root / "catalyst" / "kernel" / "v0.33.0"
@@ -101,30 +103,50 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
         assert "manifest.json" in namelist
         assert "README.md" in namelist
         assert "INVARIANTS.md" in namelist
+        assert "LICENSE" in namelist
+        assert "bin/catalyst.pyz" in namelist
         assert not any(n.startswith("modules/") for n in namelist)
+    assert (kernel_release_dir / "catalyst.pyz").is_file()
 
-    # 3. Verify cantica-tech deployment
-    cantica_dir = tmp_path / "cantica-tech"
-    cantica_dir.mkdir()
-    calls.clear()
+    # 3. Verify publishing into a distribution repository checkout
+    publish_dir = tmp_path / "dist-repo"
+    publish_dir.mkdir()
     monkeypatch.setattr(pr, "run_cmd",
                         lambda cmd, cwd: calls.append(cmd) or ("M x" if "status" in cmd else ""))
-    pr.deploy_to_cantica_tech(root)
+    pr.publish_releases(root, publish_dir)
+    assert calls == []
 
-    cantica_kernel_dir = cantica_dir / "catalyst" / "kernel" / "v0.33.0"
-    assert (cantica_kernel_dir / "manifest.json").is_file()
-    assert (cantica_kernel_dir / "kernel-v0.33.0.zip").is_file()
+    kernel_dest = publish_dir / "catalyst" / "kernel" / "v0.33.0"
+    assert (kernel_dest / "manifest.json").is_file()
+    assert (kernel_dest / "kernel-v0.33.0.zip").is_file()
 
-    cantica_mod_dir = cantica_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
-    assert (cantica_mod_dir / "manifest.json").is_file()
-    assert (cantica_mod_dir / "example-process-v1.2.0.zip").is_file()
-    assert not (cantica_dir / "catalyst" / "modules" / "absent-process").exists()
+    mod_dest = publish_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
+    assert (mod_dest / "manifest.json").is_file()
+    assert (mod_dest / "example-process-v1.2.0.zip").is_file()
+    assert not (publish_dir / "catalyst" / "modules" / "absent-process").exists()
+    assert not (publish_dir / "README.md").exists()
 
-    commit = next(c for c in calls if c[:2] == ["git", "commit"])
-    assert commit[-1] == "Deploy release: kernel v0.33.0, example-process module v1.2.0"
-
-    readme = (cantica_dir / "catalyst" / "modules" / "README.md").read_text()
+    readme = (publish_dir / "catalyst" / "modules" / "README.md").read_text()
     assert "Example Process Module" in readme
+    assert "example/" not in (publish_dir / "catalyst" / "README.md").read_text()
+    (publish_dir / "catalyst" / "example").mkdir()
+    (publish_dir / "catalyst" / "example" / "README.md").write_text("# Example\n")
+    pr.publish_releases(root, publish_dir)
+    assert "[example/](example/README.md)" in (publish_dir / "catalyst" / "README.md").read_text()
+
+    # 4. With push, the module repositories and the publish directory are
+    # committed and pushed
+    pr.package_modules(root, push=True)
+    pr.publish_releases(root, publish_dir, push=True)
+    commits = [c for c in calls if c[:2] == ["git", "commit"]]
+    assert commits[0][-1] == "Release example-process module v1.2.0"
+    assert commits[1][-1] == "Deploy release: kernel v0.33.0, example-process module v1.2.0"
+    assert calls.count(["git", "push", "origin", "main"]) == 2
+
+
+def test_publish_releases_missing_dir(tmp_path: Path):
+    root = make_workspace(tmp_path)
+    assert pr.publish_releases(root, tmp_path / "absent") is None
 
 
 def test_package_modules_skips_when_not_checked_out(tmp_path: Path, monkeypatch):

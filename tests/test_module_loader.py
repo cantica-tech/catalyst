@@ -140,6 +140,19 @@ def test_load_module_from_deployment_modules_dir(tmp_path: Path):
     assert manifest.path == deploy / "modules" / "example-process"
 
 
+def test_resolve_deploy_root_prefers_criterion_symlink(tmp_path: Path):
+    project = tmp_path / "app"
+    project.mkdir()
+    deploy = tmp_path / "agent" / ".criterion"
+    write_example_module(deploy / "modules" / "example-process")
+    (project / "app.catalyst").write_text(json.dumps({"module": "example-process"}))
+    (project / ".criterion").symlink_to(deploy)
+    assert resolve_deploy_root(project).resolve() == deploy.resolve()
+    manifest = load_module(project)
+    assert manifest is not None
+    assert manifest.path.resolve() == (deploy / "modules" / "example-process").resolve()
+
+
 def test_resolve_command(tmp_path: Path):
     write_example_module(tmp_path / "framework" / "modules" / "example-process")
     manifest = load_module(tmp_path, "example-process")

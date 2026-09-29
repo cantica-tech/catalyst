@@ -209,6 +209,12 @@ def test_check_taskfile_parity_flags_undocumented_task(tmp_path: Path):
     assert any("'mystery-task' task but it is not referenced" in e for e in errors)
 
 
+def test_check_taskfile_parity_allows_the_catalyst_utility_task(tmp_path: Path):
+    coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
+    taskfile = make_taskfile(tmp_path, ["create-item", "catalyst"])
+    assert ccp.check_taskfile_parity(taskfile, coc) == []
+
+
 def test_check_taskfile_parity_missing_taskfile(tmp_path: Path):
     coc = make_coc(tmp_path, "- `/create-item` — create an item.\n")
     errors = ccp.check_taskfile_parity(tmp_path / "Taskfile.common.yml", coc)
