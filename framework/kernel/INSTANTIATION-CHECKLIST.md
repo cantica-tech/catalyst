@@ -108,5 +108,5 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] `catalyst check` reports no errors (warnings reported to the user)
 - [ ] Deployed tree presented to user; **no commit/push yet** (INV-4)
 - [ ] On the retrofit path, if no work items exist yet, offered to run
-      `ANALYSIS-PLAYBOOK.md` (not applicable on the greenfield path — it reads
-      an existing codebase)
+      `/run-analysis --bootstrap` (`.criterion/ANALYSIS-PLAYBOOK.md`; not
+      applicable on the greenfield path — it reads an existing codebase)

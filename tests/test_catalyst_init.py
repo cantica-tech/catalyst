@@ -67,6 +67,11 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     assert (root / "items" / "templates" / "TEMPLATE-ITEM-v1.md").is_file()
     assert (root / "definitions" / "item.md").read_text() == "# Item v2\n"  # latest definition
     assert (root / "bin" / "catalyst.pyz").is_file()
+    # the analysis process ships with the deployment (BUG-000002)
+    assert (root / "ANALYSIS-PLAYBOOK.md").read_text().startswith("# Analysis Playbook")
+    assert (root / "analyses" / "analyses.md").is_file()
+    assert (root / "analyses" / "templates" / "TEMPLATE-ANALYSIS-v1.md").is_file()
+    assert (root / "definitions" / "analysis.md").is_file()
     entries = (root / "development" / "journal.jsonl").read_text().splitlines()
     assert json.loads(entries[0])["command"] == "catalyst init"
 

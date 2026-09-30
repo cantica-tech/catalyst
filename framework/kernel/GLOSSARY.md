@@ -41,6 +41,11 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   already maintains outside the project's tree, computed per machine from
   the agent's own conventions and never written into a tracked file. A
   local-only working copy lives there (INV-6, `BOOTSTRAP.md` §1).
+- **ANALYSIS.** `ANALYSIS-NNNNNN`: the record of one four-eyes analysis of
+  existing code (`/run-analysis`, `catalyst analysis`) — its scope, mode
+  (`bootstrap` / `incremental`), the commit analysed, both passes, the
+  reconciled findings (domains, rules, defects) and the user's decision on
+  each, in `analyses/` (`ANALYSIS-PLAYBOOK.md`, `CLI.md`).
 - **`<app-name>.catalyst` (the pointer).** The one small JSON file the
   product repository tracks at its root: project name, format version,
   kernel version, active module, agent, sharing fields. It holds no path
@@ -85,7 +90,9 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   the multi-user trial needs no change); `catalyst check` verifies the CLI
   reads it. Distinct from the kernel version, which changes far more often.
 - **Four-eyes.** A check by a second, independent agent pass that has not
-  seen the first pass's reasoning (`ANALYSIS-PLAYBOOK.md`).
+  seen the first pass's reasoning (`ANALYSIS-PLAYBOOK.md`). In an analysis
+  it is enforced: two recorded blind passes, a reconciliation that
+  accounts for every finding, a human decision on each (`ANALYSIS`).
 - **Grounding, grounding type.** An artifact's link down the chain. The
   module's *grounding type* is what its artifacts ground to (the kernel
   rule); each ETD says whether its type grounds directly (`required`),

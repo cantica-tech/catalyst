@@ -119,6 +119,7 @@ repository. Paths in this section are relative to it.
 | `Taskfile.common.yml` | The composed common tasks. | — |
 | `composition.json` | The parameters the governing documents were composed with (§2.3). | — |
 | `bin/catalyst.pyz` | The vendored CLI. | — |
+| `ANALYSIS-PLAYBOOK.md` | The analysis process's phases, prompts and findings format, verbatim from the kernel (`/run-analysis`). | — |
 | `definitions/<type>.md` | One frozen definition per kernel and module entity type, plus `definitions/README.md` (INV-23). | Structure: one per type. |
 | `modules/<module-id>/` | The whole active module tree, as released. | — |
 | `.gitattributes` | Shared deployments: the union-merge block (§8). | — |
@@ -129,7 +130,7 @@ repository. Paths in this section are relative to it.
 ### 2.2 Entity folders
 
 Every entity type — the kernel's (`rules/`, `rules/domains/`,
-`reconciliations/`, `workflows/`, `development/meta-tags/`,
+`reconciliations/`, `workflows/`, `analyses/`, `development/meta-tags/`,
 `IAM/users/`, `IAM/roles/`) and each of the active module's — has one
 folder of this shape (INV-20):
 
