@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.42.2 — 2026-09-30
+
+- Release archives are reproducible: the module zip, the kernel zip and
+  `catalyst.pyz` use fixed entry timestamps, sorted entries and normalised
+  permissions, so rebuilding an unchanged release yields the same bytes and
+  `task release:publish` no longer re-commits an unchanged module archive.
+- No layout change, no migration.
+
 ## 0.42.1 — 2026-09-29
 
 - `task release:publish` commits a module's release archive onto the
