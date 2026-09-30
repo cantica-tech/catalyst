@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.44.1 — 2026-09-30
 
 - A process module declares the kernel versions it works with
   (`module.yaml` `kernel_version`, `MODULE-SPECIFICATION.md` §3.1). Its
@@ -16,6 +16,7 @@ messages.
   it needs. Without a declaration the packaging kernel is assumed, with a
   warning.
 - `/criterion`'s command file numbers its items 1–5 again.
+- No layout change, no migration.
 
 ## 0.44.0 — 2026-09-30
 
