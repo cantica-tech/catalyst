@@ -202,3 +202,29 @@ def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path
     assert git("log", "-1", "--format=%s", "main", cwd=origin) == "Release example-process module v1.2.0"
     assert "development" not in git("branch", cwd=origin)
     assert git("worktree", "list", "--porcelain", cwd=mod_dir).count("worktree ") == 1
+
+
+def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
+    """Rebuilding an unchanged release gives byte-identical archives, so
+    publishing it again commits nothing."""
+    import os
+    import time
+    root = make_workspace(tmp_path)
+    monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
+    (root / "LICENSE").write_text("Apache License\n")
+    mod_zip = (tmp_path / "catalyst-example-process" / "catalyst" / "modules"
+               / "example-process" / "v1.2.0" / "example-process-v1.2.0.zip")
+    kernel_dir = root / "catalyst" / "kernel" / "v0.33.0"
+
+    pr.package_modules(root)
+    pr.package_kernel(root)
+    first = {p: p.read_bytes() for p in (mod_zip, kernel_dir / "kernel-v0.33.0.zip",
+                                         kernel_dir / "catalyst.pyz")}
+    later = time.time() + 3600
+    for p in (root / "framework").rglob("*"):
+        os.utime(p, (later, later))
+    pr.package_modules(root)
+    pr.package_kernel(root)
+    for p, data in first.items():
+        assert p.read_bytes() == data, p.name
+    assert os.access(kernel_dir / "catalyst.pyz", os.X_OK)
