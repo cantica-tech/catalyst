@@ -1,0 +1,176 @@
+# Common Taskfile — deployed asset, not hand-edited per project.
+#
+# Copy this file into the deployment's real working copy, `.criterion/`
+# (agent-owned space per INV-6 — never inside the developed project's own
+# tree, the same way rules/, IAM/, etc. live there), once per
+# project (including this framework's own self-deployment), and refresh
+# it from here on `/sync-framework`. See `INSTANTIATION-GUIDE.md` §1 step
+# 5, `INSTANTIATION-CHECKLIST.md`'s Discoverability section, and
+# `SYNCHRONIZE.md`'s synchronization checklist — this template exists
+# because those require it, the same way `templates/slash-command.
+# template.md` backs `.claude/commands/*.md` (which stays project-root,
+# unlike this file — that's forced by Claude Code's own fixed discovery
+# path, an external constraint this file has none of).
+#
+# One task per kernel command in the deployed `CODE-OF-CONDUCT.md` §4; the
+# active module's own tasks (its `Taskfile.module.yml`, one per module
+# command) are appended to the `tasks:` block below on deployment and on
+# `/sync-framework` (`MODULE-SPECIFICATION.md` §6.5). The deployed §4 is the
+# canonical list — `scripts/check_command_parity.py` diffs this file
+# against it, the same drift check already applied to `.claude/commands/`.
+# Each task is a thin, non-interactive dispatch to the actual slash
+# command, so day-to-day catalyst operations are scriptable from a shell
+# or CI job without an interactive session.
+#
+# Usage: task <command-name> -- <arguments>
+#   e.g. task meta-tag -- <artifact-id>
+#        task user-add -- olivier admin
+#
+# Agent-generic dispatch: catalyst doesn't assume Claude Code — the
+# `*.catalyst` pointer's own "agent" field says which agent runs a given
+# deployment. This file deliberately carries no vars of its own: every
+# task consumes `{{.AGENT_CMD}}`, passed in from the project's own root
+# `Taskfile.yml` via `includes: common: {..., vars: {AGENT_CMD: ...}}`
+# (see `INSTANTIATION-GUIDE.md` §1 step 5 for that resolution logic) —
+# a var declared here instead would take precedence over the passed-in
+# one per Task's own `includes` semantics, silently defeating it.
+
+version: "3"
+
+tasks:
+  user-add:
+    desc: "Register a new user: <name> <role>"
+    cmds:
+      - '{{.AGENT_CMD}} "/user-add {{.CLI_ARGS}}"'
+
+  user-remove:
+    desc: "Deactivate a user: <name>"
+    cmds:
+      - '{{.AGENT_CMD}} "/user-remove {{.CLI_ARGS}}"'
+
+  user-modify:
+    desc: "Edit a user's notes or active field: <name> <field> <value>"
+    cmds:
+      - '{{.AGENT_CMD}} "/user-modify {{.CLI_ARGS}}"'
+
+  user-assign-role:
+    desc: "Add a role to an existing user: <name> <role>"
+    cmds:
+      - '{{.AGENT_CMD}} "/user-assign-role {{.CLI_ARGS}}"'
+
+  user-list:
+    desc: "List registered users [--role <role>] [--active-only]"
+    cmds:
+      - '{{.AGENT_CMD}} "/user-list {{.CLI_ARGS}}"'
+
+  role-add:
+    desc: "Add a new role: <role> <actions>"
+    cmds:
+      - '{{.AGENT_CMD}} "/role-add {{.CLI_ARGS}}"'
+
+  role-modify:
+    desc: "Replace an existing role's actions: <role> <actions>"
+    cmds:
+      - '{{.AGENT_CMD}} "/role-modify {{.CLI_ARGS}}"'
+
+  meta-tag:
+    desc: "Create a meta-tag artifact linked to an artifact: <artifact-id>"
+    cmds:
+      - '{{.AGENT_CMD}} "/meta-tag {{.CLI_ARGS}}"'
+
+  list:
+    desc: "List artifacts, work items, rules, or templates: <type> [--filter ...]"
+    cmds:
+      - '{{.AGENT_CMD}} "/list {{.CLI_ARGS}}"'
+
+  freeze:
+    desc: "Protect an item from /sync-framework: <item-id|item-path|type|template-name>"
+    cmds:
+      - '{{.AGENT_CMD}} "/freeze {{.CLI_ARGS}}"'
+
+  migrate-definition:
+    desc: "Update a deployed entity definition to a specific version, only if it exists: <entity-type> <version>"
+    cmds:
+      - '{{.AGENT_CMD}} "/migrate-definition {{.CLI_ARGS}}"'
+
+  catalyzer:
+    desc: "Manage plugin installation/activation: <list|activate|download|deactivate|upgrade|downgrade> ..."
+    cmds:
+      - '{{.AGENT_CMD}} "/catalyzer {{.CLI_ARGS}}"'
+
+  criterion:
+    desc: "Share the working copy through a criterion repository: <create [<url>]|get|push <message>|sync|status>"
+    cmds:
+      - '{{.AGENT_CMD}} "/criterion {{.CLI_ARGS}}"'
+
+  reconcile:
+    desc: "Resolve an open reconciliation case: <RECON-id> <accept|accept-with-edits|reject|propose <text>>"
+    cmds:
+      - '{{.AGENT_CMD}} "/reconcile {{.CLI_ARGS}}"'
+
+  adopt:
+    desc: "List product changes committed outside catalyst and accept (journal) or reject each: [<commit>|<range>]"
+    cmds:
+      - '{{.AGENT_CMD}} "/adopt {{.CLI_ARGS}}"'
+
+  project:
+    desc: "Manage a catalyst deployment: <create|remove|export|import> ..."
+    cmds:
+      - '{{.AGENT_CMD}} "/project {{.CLI_ARGS}}"'
+
+  switch-agent:
+    desc: "Force the agent-switch procedure to run now: [agent-id]"
+    cmds:
+      - '{{.AGENT_CMD}} "/switch-agent {{.CLI_ARGS}}"'
+
+  status:
+    desc: "Update an artifact or work item's Status field"
+    cmds:
+      - '{{.AGENT_CMD}} "/status {{.CLI_ARGS}}"'
+
+  audit:
+    desc: "Analyze the change-impact of a file: <file-name>"
+    cmds:
+      - '{{.AGENT_CMD}} "/audit {{.CLI_ARGS}}"'
+
+  run-analysis:
+    desc: "Four-eyes analysis of existing code (domains, rules, defects): [<path>...] [--bootstrap|--incremental]"
+    cmds:
+      - '{{.AGENT_CMD}} "/run-analysis {{.CLI_ARGS}}"'
+
+  sync-framework:
+    desc: "Synchronize the deployed framework: [latest|<version>]"
+    cmds:
+      - '{{.AGENT_CMD}} "/sync-framework {{.CLI_ARGS}}"'
+
+  check-rules:
+    desc: "Verify rules, domains, and artifact links remain consistent"
+    cmds:
+      - '{{.AGENT_CMD}} "/check-rules {{.CLI_ARGS}}"'
+
+  commands:
+    desc: "List every slash command available in this deployment"
+    cmds:
+      - '{{.AGENT_CMD}} "/commands {{.CLI_ARGS}}"'
+
+  journal:
+    desc: "Read-only filter/report over development/journal.jsonl"
+    cmds:
+      - '{{.AGENT_CMD}} "/journal {{.CLI_ARGS}}"'
+
+  journal-restore:
+    desc: "Reconstruct the tree as it stood at a timestamp into a side directory"
+    cmds:
+      - '{{.AGENT_CMD}} "/journal-restore {{.CLI_ARGS}}"'
+
+  help:
+    desc: "Return help documentation for the framework or a specific command"
+    cmds:
+      - '{{.AGENT_CMD}} "/help {{.CLI_ARGS}}"'
+
+  # Not a slash command: a direct pass-through to the catalyst CLI
+  # (framework/kernel/CLI.md), vendored at .criterion/bin/catalyst.pyz.
+  catalyst:
+    desc: "Run the catalyst CLI: task catalyst -- <args>"
+    cmds:
+      - python3 .criterion/bin/catalyst.pyz {{.CLI_ARGS}}
