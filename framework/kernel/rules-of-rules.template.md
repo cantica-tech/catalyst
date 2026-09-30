@@ -537,7 +537,10 @@ what stays judgment.
   working copy's history); creating it on a hosting service is an
   externally visible act that needs the user's assent. `create` stages
   the product repository's changes and commits nothing: the user
-  commits them (INV-4).
+  commits them (INV-4). **`create` without a URL** versions the working
+  copy strictly locally (a git repository on the shared branch, behind
+  the symlink); the first `push`, `sync` or `join` that needs the
+  criterion repository asks for its URL (`--url`) and publishes first.
 - **`join`**, in a fresh clone of the product repository, checks out
   the shared working copy (submodule init, shared branch).
 - **`push -m <message>`** is how a contributor lands work: commit,

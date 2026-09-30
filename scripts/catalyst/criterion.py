@@ -81,6 +81,15 @@ class CriterionError(Exception):
     pass
 
 
+class NeedsURL(CriterionError):
+    """The deployment has no criterion repository yet (local only), and the
+    command needs one: the caller asks for the URL, or passes --url."""
+
+    def __init__(self, what: str = "this deployment is local only"):
+        super().__init__(f"no criterion repository yet: {what} — pass --url <url> (the criterion "
+                         "repository: empty, or already holding this working copy's history)")
+
+
 class CriterionConflict(CriterionError):
     """A rebase hit a conflict git cannot resolve on its own."""
 
@@ -101,6 +110,25 @@ def run(repo: Path, *args: str, check: bool = True, input: str | None = None) ->
 
 def out(repo: Path, *args: str) -> str:
     return run(repo, *args).stdout.strip()
+
+
+def remote_url(wc: Path) -> str | None:
+    return run(wc, "remote", "get-url", "origin", check=False).stdout.strip() or None
+
+
+def ensure_remote(dep: Deployment, url: str | None) -> tuple[Deployment, list[str]]:
+    """The deployment, published to `url` first if it has no criterion
+    repository yet (as `create <url>` does). Raises NeedsURL when it has
+    none and no URL was given."""
+    if remote_url(dep.root):
+        return dep, []
+    if not url:
+        raise NeedsURL()
+    if dep.standalone:
+        raise CriterionError("a working copy opened on its own cannot be published — run from the product")
+    notes = create(dep, url, shared_branch(dep), CI_TEMPLATE)
+    from catalyst.deployment import load
+    return load(dep.project_root), notes
 
 
 def shared_branch(dep: Deployment) -> str:
@@ -331,6 +359,8 @@ def sync(dep: Deployment) -> str:
     """Fast-forward the working copy to the shared branch. Refuses while
     local work would be lost."""
     wc, branch = dep.root, shared_branch(dep)
+    if not remote_url(wc):
+        raise NeedsURL()
     changes = dirty(wc)
     if changes:
         raise CriterionError(f"{len(changes)} uncommitted change(s) in the working copy "
@@ -381,9 +411,9 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
     from catalyst.indexes import regenerate
 
     wc, branch = dep.root, shared_branch(dep)
-    if not run(wc, "remote", "get-url", "origin", check=False).stdout.strip():
-        raise CriterionError("the working copy has no remote — `catalyst criterion create <url>` first")
-    user = str(signer.get("git_username") or signer.get("name"))
+    if not remote_url(wc):
+        raise NeedsURL()
+    user =str(signer.get("git_username") or signer.get("name"))
     run(wc, "fetch", "-q", "--prune", "origin")
     try:
         share_pins(wc, publish=False)          # others' journal blobs, before anything is checked
@@ -496,9 +526,12 @@ def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
 
 
 # --- create / join ----------------------------------------------
-def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template: str | None = None) -> list[str]:
-    """Publish a local-only working copy to `url` and make it the product
-    repository's `.criterion` submodule. Stages the product changes; the
+def create(dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH,
+           ci_template: str | None = None) -> list[str]:
+    """Version a local-only working copy for sharing and, given `url`,
+    publish it there and make it the product repository's `.criterion`
+    submodule. Without a URL the deployment stays strictly local: the first
+    `push`, `sync` or `join` asks for one. Stages the product changes; the
     caller commits them."""
     project, wc = dep.project_root, dep.root
     link = project / ".criterion"
@@ -507,33 +540,109 @@ def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template:
     if not link.is_symlink():
         raise CriterionError(".criterion is not a symlink to an agent-owned working copy; "
                              "move an in-project working copy into agent-owned space first")
-    steps = []
+    if url is None and run(wc, "rev-parse", "--git-dir", check=False).returncode == 0 and remote_url(wc):
+        raise CriterionError(f"the working copy already has a criterion repository ({remote_url(wc)}) — "
+                             "`catalyst criterion create <url>` to make it the .criterion submodule")
+    notes = _prepare(dep, url, branch, ci_template)
+    if url is None:
+        return notes + _record_local(dep, branch)
+    return notes + _publish(dep, url, branch)
+
+
+def _actor(dep: Deployment) -> str:
+    user = next((u for u in _users(dep) if u.get("active", True)), {})
+    return str(user.get("git_username") or user.get("name") or "catalyst")
+
+
+def _prepare(dep: Deployment, url: str | None, branch: str, ci_template: str | None) -> list[str]:
+    """The local half of `create`: the working copy as a git repository on
+    the shared branch, its merge attributes and CI workflow, committed."""
+    wc = dep.root
+    notes = []
     if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
-        run(wc, "init", "-q")
-        steps.append("initialised the working copy as a git repository")
+        run(wc, "init", "-q", "-b", branch)
+        notes.append(f"initialised the working copy as a git repository (branch {branch})")
     dep.pointer["criterion_branch"] = branch
     written = []
     if write_attributes(dep):
         written.append(".gitattributes")
-        steps.append("wrote .gitattributes (journal and indexes merge by union)")
+        notes.append("wrote .gitattributes (journal and indexes merge by union)")
     if ci_template and write_ci(dep, ci_template):
         written.append(CI_WORKFLOW)
-        steps.append(f"wrote {CI_WORKFLOW} (catalyst check + integrity on pull requests)")
+        notes.append(f"wrote {CI_WORKFLOW} (catalyst check + integrity on pull requests)")
     if written:
         from catalyst import journal
-        user = next((u for u in _users(dep) if u.get("active", True)), {})
+        where = f"to {url}" if url else "locally, until a criterion repository is given"
         journal.append(dep, journal.AppendRequest(
             command="catalyst criterion create", action="create",
             artifact="shared deployment: merge attributes and CI", targets=[],
-            intent=[f"Publishing the working copy to {url} as a shared deployment: the journal and "
+            intent=[f"Versioning the working copy for sharing ({where}): the journal and "
                     "regenerated indexes merge by union, and the criterion repository's CI runs "
                     "catalyst check and the integrity check on every pull request."],
-            files=[str(wc / w) for w in written],
-            actor=str(user.get("git_username") or user.get("name") or "catalyst"),
-            allow_unchanged=True))
+            files=[str(wc / w) for w in written], actor=_actor(dep), allow_unchanged=True))
     if dirty(wc):
         run(wc, "add", "-A")
-        run(wc, "commit", "-q", "-m", "Publish the catalyst working copy")
+        run(wc, *_ident(wc, _actor(dep)), "commit", "-q", "-m", "Publish the catalyst working copy")
+    return notes
+
+
+def _record_local(dep: Deployment, branch: str) -> list[str]:
+    """A local-only create: the working copy sits on the shared branch, and
+    the pointer names that branch for the publication to come."""
+    project, wc = dep.project_root, dep.root
+    notes = []
+    if run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip() != branch:
+        run(wc, "checkout", "-q", "-B", branch)
+    pointer_path = next(project.glob("*.catalyst"))
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    if pointer.get("criterion_branch", DEFAULT_BRANCH) != branch or "criterion_branch" not in pointer:
+        pointer.update({"criterion_branch": branch, "updated": datetime.date.today().isoformat()})
+        pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+        run(project, "add", pointer_path.name, check=False)
+        from catalyst import journal
+        journal.append(dep, journal.AppendRequest(
+            command="catalyst criterion create", action="update", artifact="criterion branch", targets=[],
+            intent=[f"The pointer names the shared branch ({branch}) the working copy will be published on."],
+            files=[str(pointer_path)], actor=_actor(dep), allow_unchanged=True))
+        run(wc, "add", "-A")
+        run(wc, *_ident(wc, _actor(dep)), "commit", "-q", "-m", "Journal the criterion branch")
+        notes.append(f"recorded criterion_branch ({branch}) in {pointer_path.name} (staged, not committed)")
+    notes.append(f"the working copy is versioned locally on branch {branch}, with no criterion repository: "
+                 "`catalyst criterion push`, `sync` or `join` ask for its URL when first run (or take --url)")
+    return notes
+
+
+def _unignore(project: Path) -> str | None:
+    """Drop /.criterion from the product's .gitignore; returns the old text."""
+    gitignore = project / ".gitignore"
+    if not gitignore.is_file():
+        return None
+    old = gitignore.read_text(encoding="utf-8")
+    lines = [line for line in old.splitlines()
+             if line.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
+             and not line.startswith("# catalyst working copy:")]
+    gitignore.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    return old
+
+
+def _record_shared(project: Path, url: str, branch: str) -> Path:
+    """Record the sharing in the pointer and stage the product files."""
+    pointer_path = next(project.glob("*.catalyst"))
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
+                    "updated": datetime.date.today().isoformat()})
+    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+    run(project, "add", pointer_path.name, ".gitmodules",
+        *([".gitignore"] if (project / ".gitignore").is_file() else []))
+    return pointer_path
+
+
+def _publish(dep: Deployment, url: str, branch: str) -> list[str]:
+    """The remote half of `create`: push the working copy to `url` and make
+    it the product repository's `.criterion` submodule."""
+    project, wc = dep.project_root, dep.root
+    link = project / ".criterion"
+    notes = []
     if run(wc, "remote", "get-url", "origin", check=False).returncode == 0:
         run(wc, "remote", "set-url", "origin", url)
     else:
@@ -546,18 +655,13 @@ def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template:
     run(wc, "push", "-q", "-u", "origin", f"HEAD:refs/heads/{branch}")
     try:
         share_pins(wc)
-        steps.append(f"pushed the working copy and its journal pins to {url} ({branch})")
+        notes.append(f"pushed the working copy and its journal pins to {url} ({branch})")
     except CriterionError as exc:
-        steps.append(f"pushed the working copy to {url} ({branch}); journal pins not shared yet: {exc}")
+        notes.append(f"pushed the working copy to {url} ({branch}); journal pins not shared yet: {exc}")
     agent_owned = os.path.realpath(link)
     gitignore = project / ".gitignore"
-    old_gitignore = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else None
     link.unlink()
-    if gitignore.is_file():
-        lines = [line for line in gitignore.read_text(encoding="utf-8").splitlines()
-                 if line.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
-                 and not line.startswith("# catalyst working copy:")]
-        gitignore.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    old_gitignore = _unignore(project)
     try:
         run(project, "submodule", "add", "-b", branch, url, ".criterion")
     except CriterionError as exc:
@@ -575,33 +679,27 @@ def create(dep: Deployment, url: str, branch: str = DEFAULT_BRANCH, ci_template:
             gitignore.write_text(old_gitignore, encoding="utf-8")
         raise CriterionError(f"adding the submodule failed, so nothing changed in the project "
                              f"(the working copy is still at {agent_owned}, now also on {url}): {exc}") from exc
-    steps.append("added .criterion as a submodule of the product repository (staged, not committed)")
-    pointer_path = next(project.glob("*.catalyst"))
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
-    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
-                    "updated": datetime.date.today().isoformat()})
-    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
-    run(project, "add", pointer_path.name, ".gitmodules", *([".gitignore"] if gitignore.is_file() else []))
+    notes.append("added .criterion as a submodule of the product repository (staged, not committed)")
+    pointer_path = _record_shared(project, url, branch)
     from catalyst import journal
     from catalyst.deployment import load
     shared = load(project)
-    user = next((u for u in _users(shared) if u.get("active", True)), {})
+    actor = _actor(shared)
     journal.append(shared, journal.AppendRequest(
         command="catalyst criterion create", action="update", artifact="deployment shared", targets=[],
         intent=[f"The working copy is now the .criterion submodule of {url}; the pointer records the "
                 "sharing and .gitignore no longer ignores .criterion."],
         files=[str(project / p) for p in (pointer_path.name, ".gitmodules", ".gitignore")
                if (project / p).is_file()],
-        actor=str(user.get("git_username") or user.get("name") or "catalyst"), allow_unchanged=True))
+        actor=actor, allow_unchanged=True))
     run(wc, "add", "-A")
-    run(wc, *_ident(wc, str(user.get("git_username") or user.get("name") or "catalyst")),
-        "commit", "-q", "-m", "Journal the sharing of the deployment")
+    run(wc, *_ident(wc, actor), "commit", "-q", "-m", "Journal the sharing of the deployment")
     run(wc, "push", "-q", "origin", f"HEAD:refs/heads/{branch}")
-    steps.append("journaled the product files it changed (pointer, .gitmodules, .gitignore); share the "
+    notes.append("journaled the product files it changed (pointer, .gitmodules, .gitignore); share the "
                  "product repository's journal pins with `catalyst journal pin --share` when you push it")
-    steps.append(f"updated {pointer_path.name} (repoed, catalyst_repo_url, criterion_branch)")
-    steps.append(f"the old agent-owned copy at {agent_owned} is no longer used; remove it once satisfied")
-    return steps
+    notes.append(f"updated {pointer_path.name} (repoed, catalyst_repo_url, criterion_branch)")
+    notes.append(f"the old agent-owned copy at {agent_owned} is no longer used; remove it once satisfied")
+    return notes
 
 
 def _users(dep: Deployment) -> list[dict]:
@@ -612,10 +710,46 @@ def _users(dep: Deployment) -> list[dict]:
     return [u for u in data.get("users", []) if isinstance(u, dict)]
 
 
-def join(project_root: Path) -> str:
-    """Check out the shared working copy in a clone of the product repository."""
+def _add_submodule(project_root: Path, url: str) -> None:
+    """Add an existing criterion repository as the product's `.criterion`
+    submodule, on the pointer's shared branch (staged, not committed)."""
+    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    branch = str(pointer.get("criterion_branch") or DEFAULT_BRANCH)
+    link = project_root / ".criterion"
+    if link.is_symlink():
+        link.unlink()                          # a dangling link to another machine's working copy
+    elif link.exists():
+        raise CriterionError(".criterion exists and is not a submodule — move it out of the way first")
+    if not run(project_root, "ls-remote", "--heads", url, branch, check=False).stdout.strip():
+        raise CriterionError(f"{url} has no '{branch}' branch — publish a working copy there first "
+                             "(`catalyst criterion create <url>` where it lives)")
+    _unignore(project_root)
+    run(project_root, "submodule", "add", "-b", branch, url, ".criterion")
+    _record_shared(project_root, url, branch)
+
+
+def join(project_root: Path, url: str | None = None) -> str:
+    """Check out the shared working copy in a clone of the product
+    repository. A product with no `.criterion` submodule yet needs the
+    criterion repository's URL: a local working copy on this machine is
+    published there (as `create <url>`); otherwise the repository is added
+    as the submodule."""
+    added = False
     if not is_submodule(project_root):
-        raise CriterionError("this project has no .criterion submodule — nothing to join")
+        from catalyst.deployment import load
+        link = project_root / ".criterion"
+        if link.is_symlink() and link.exists():
+            dep = load(project_root)
+            if remote_url(dep.root):
+                raise CriterionError("this project has no .criterion submodule; its local working copy "
+                                     f"already has a criterion repository ({remote_url(dep.root)}) — "
+                                     "`catalyst criterion create <url>` to make it the submodule")
+            ensure_remote(dep, url)
+        else:
+            if not url:
+                raise NeedsURL("this project has no .criterion submodule")
+            _add_submodule(project_root, url)
+            added = True
     run(project_root, "submodule", "update", "--init", ".criterion")
     wc = project_root / ".criterion"
     pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
@@ -634,6 +768,20 @@ def join(project_root: Path) -> str:
             share_pins(project_root, publish=False)     # the product repository's journal blobs
         except CriterionError:
             pass
+    if added:
+        # the product files join changed, recorded in the working copy; they
+        # land with the next `catalyst criterion push`
+        from catalyst import journal
+        from catalyst.deployment import load
+        shared = load(project_root)
+        journal.append(shared, journal.AppendRequest(
+            command="catalyst criterion join", action="update", artifact="deployment shared", targets=[],
+            intent=[f"This product now checks out the criterion repository {pointer.get('catalyst_repo_url')} "
+                    "as its .criterion submodule; the pointer records the sharing."],
+            files=[str(project_root / p) for p in (next(project_root.glob("*.catalyst")).name,
+                                                   ".gitmodules", ".gitignore")
+                   if (project_root / p).is_file()],
+            actor=_actor(shared), allow_unchanged=True))
     return out(wc, "rev-parse", "--short", "HEAD")
 
 

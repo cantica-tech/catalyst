@@ -144,7 +144,9 @@ A deployment stays local by default, but can opt into being **shared**
 on plain git. `/criterion create` (`catalyst criterion create <url>`)
 publishes the working copy to a dedicated criterion repository and makes
 `.criterion` a submodule of the product repository, so every product
-commit pins the rules in force. Contributors check it out with
+commit pins the rules in force. Without a URL, `create` versions the
+working copy locally only; the first `push`, `sync` or `get` asks for
+the repository and publishes then. Contributors check it out with
 `/criterion get`, and land changes through pull requests against the
 shared branch with `/criterion push`: it rebases (the journal and the
 generated indexes merge by union), runs `catalyst check` and an integrity
