@@ -376,3 +376,109 @@ def test_sync_removes_merged_topic_branches(world):
     merge_topic(world, a.branch)
     cr.sync(load(world["ada"]))
     assert a.branch not in git(world["ada"] / ".criterion", "branch", "--format=%(refname:short)")
+
+
+# --- create without a URL: strictly local until push/sync/join is given one ---
+@pytest.fixture
+def solo(tmp_path, monkeypatch):
+    """Ada's project with a local working copy (symlink, not yet a git
+    repository) and a committed product repository."""
+    remote = tmp_path / "criterion.git"
+    product = tmp_path / "product.git"
+    for bare in (remote, product):
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+    project = make_project(tmp_path / "ada")
+    agent = tmp_path / "ada-agent" / ".criterion"
+    agent.parent.mkdir()
+    shutil.move(str(project / ".criterion"), str(agent))
+    (project / ".criterion").symlink_to(agent)
+    git_init(project)
+    git(project, "remote", "add", "origin", str(product))
+    monkeypatch.chdir(project)
+    return {"remote": remote, "product": product, "ada": project, "agent": agent, "tmp": tmp_path}
+
+
+def test_create_without_a_url_stays_local(solo):
+    project, agent = solo["ada"], solo["agent"]
+    steps = cr.create(load(project), None, "shared", cr.CI_TEMPLATE)
+    assert any("ask for its URL" in s for s in steps)
+    assert (project / ".criterion").is_symlink() and not cr.is_submodule(project)
+    assert git(agent, "symbolic-ref", "--short", "HEAD") == "shared"
+    assert cr.remote_url(agent) is None and not cr.dirty(agent)
+    assert (agent / ".gitattributes").is_file() and (agent / cr.CI_WORKFLOW).is_file()
+    pointer = json.loads(next(project.glob("*.catalyst")).read_text())
+    assert pointer["criterion_branch"] == "shared" and not pointer.get("repoed")
+    assert next(project.glob("*.catalyst")).name in git(project, "diff", "--cached", "--name-only")
+    st = cr.status(load(project))
+    assert (st.mode, st.remote, st.branch) == ("local", None, "shared")
+    with pytest.raises(cr.NeedsURL, match="--url"):
+        cr.sync(load(project))
+    signer = load_corpus(load(project)).user("Ada Lovelace")
+    with pytest.raises(cr.NeedsURL):
+        cr.push(load(project), signer, "x", open_pr=False, checker=NO_CHECK)
+    with pytest.raises(cr.CriterionError, match="already a symlink|already has"):
+        git(agent, "remote", "add", "origin", str(solo["remote"]))
+        cr.create(load(project), None, "shared")
+
+
+def test_the_first_push_with_a_url_publishes_then_pushes(solo):
+    project = solo["ada"]
+    cr.create(load(project), None, "shared", cr.CI_TEMPLATE)
+    with pytest.raises(cr.NeedsURL):
+        cr.ensure_remote(load(project), None)
+    dep, steps = cr.ensure_remote(load(project), str(solo["remote"]))
+    assert cr.is_submodule(project) and steps
+    assert git(solo["remote"], "rev-parse", "--verify", "refs/heads/shared")
+    signer = load_corpus(dep).user("Ada Lovelace")
+    add_item(project, "Ada Lovelace", "After publishing")
+    res = cr.push(dep, signer, "first shared change", open_pr=False, checker=NO_CHECK)
+    assert res.commits >= 1 and res.branch.startswith("ada/")
+    assert cr.ensure_remote(dep, "ignored")[1] == []          # already published: nothing asked
+
+
+def test_join_asks_for_the_url_when_the_product_has_no_submodule(solo):
+    project, tmp = solo["ada"], solo["tmp"]
+    cr.create(load(project), None, "criterion", cr.CI_TEMPLATE)
+    git(project, "commit", "-q", "-m", "version the working copy locally")
+    git(project, "push", "-q", "origin", "HEAD:refs/heads/main")
+    cr.ensure_remote(load(project), str(solo["remote"]))       # Ada publishes (her product change stays local)
+    bob = tmp / "bob" / "app"
+    subprocess.run(["git", "clone", "-q", "-b", "main", str(solo["product"]), str(bob)], check=True)
+    with pytest.raises(cr.NeedsURL, match="no .criterion submodule"):
+        cr.join(bob)
+    cr.join(bob, str(solo["remote"]))
+    assert cr.is_submodule(bob)
+    assert git(bob / ".criterion", "symbolic-ref", "--short", "HEAD") == "criterion"
+    pointer = json.loads(next(bob.glob("*.catalyst")).read_text())
+    assert pointer["repoed"] is True and pointer["catalyst_repo_url"] == str(solo["remote"])
+    staged = git(bob, "diff", "--cached", "--name-only").split()
+    assert ".gitmodules" in staged and ".criterion" in staged
+    assert "/.criterion" not in (bob / ".gitignore").read_text()
+    last = json.loads((bob / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()[-1])
+    assert last["command"] == "catalyst criterion join"
+
+
+def test_cli_names_url_when_it_cannot_ask(solo, capsys, monkeypatch):
+    from catalyst.__main__ import main
+    project = solo["ada"]
+    assert main(["criterion", "create", "--branch", "shared"]) == 0
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False, raising=False)
+    assert main(["criterion", "sync"]) == 1
+    assert "--url" in capsys.readouterr().err
+    assert main(["criterion", "sync", "--url", str(solo["remote"])]) == 0
+    assert cr.is_submodule(project)
+    assert "Published" in capsys.readouterr().out
+
+
+def test_cli_asks_for_the_url_on_a_terminal(solo, capsys, monkeypatch):
+    import sys as _sys
+    from catalyst.__main__ import main
+    project = solo["ada"]
+    assert main(["criterion", "create"]) == 0
+    monkeypatch.setattr(_sys.stdin, "isatty", lambda: True, raising=False)
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    assert main(["criterion", "sync"]) == 1                  # empty answer: nothing changes
+    assert "stays local" in capsys.readouterr().err and not cr.is_submodule(project)
+    monkeypatch.setattr("builtins.input", lambda prompt="": str(solo["remote"]))
+    assert main(["criterion", "sync"]) == 0
+    assert cr.is_submodule(project)

@@ -253,16 +253,20 @@ the seven currently exist anywhere.
   behavior. Each plugin must live in its own repository, with no exceptions,
   and during framework deployment or synchronization plugins must be pulled
   directly from that plugin repository rather than from this repository.
-- `/criterion create <url> | get | push <message> | sync | status` —
+- `/criterion create [<url>] | get | push <message> | sync | status` —
   share this deployment's working copy through a criterion repository
   (`Rules-of-Rules.md` §13, `INVARIANTS.md` INV-18). Each subcommand is
   the matching `catalyst criterion` command (`CLI.md`); the agent adds
   only the judgment around it.
-  - `create <url>` — turn a local-only deployment into a shared one: the
+  - `create [<url>]` — turn a local-only deployment into a shared one: the
     working copy is pushed to `<url>` and `.criterion` becomes a
-    submodule of the product repository.
+    submodule of the product repository. Without a URL, the working copy
+    is versioned strictly locally (a git repository on the shared
+    branch), and the first `push`, `sync` or `get` asks for the URL, then
+    publishes before carrying on.
   - `get` — in a fresh clone of the product repository, check out the
-    shared working copy (`catalyst criterion join`).
+    shared working copy (`catalyst criterion join`); a product with no
+    `.criterion` submodule yet asks for the criterion repository's URL.
   - `push <message>` — land the working copy's changes as a pull request
     against the shared branch. A conflict stops it with nothing pushed.
   - `sync` — fast-forward to the shared branch; refuses while local work
@@ -500,6 +504,20 @@ framework startup, the framework must scan the installed plugins and activate
 each one whose `active` metadata flag is true the same way `/catalyzer
 activate` loads a plugin into memory (see above). This is a hard rule.
 
+When the user enters `/criterion create` without a URL: run `catalyst
+criterion create` (`--branch <name>` only if the user wants a shared
+branch other than `criterion`). Nothing leaves the machine: report what
+it printed, offer to commit the staged pointer (INV-4), and say
+that the first `/criterion push`, `sync` or `get` will ask for the
+criterion repository's URL.
+
+Whenever `catalyst criterion push`, `sync` or `join` fails because the
+deployment has no criterion repository yet (its message names `--url`),
+ask the user for the repository's URL — with the same confirmations as
+`/criterion create <url>` below — and re-run the same command with
+`--url <url>`: it publishes the working copy first (as `create <url>`
+does), then carries on. Never invent or guess a URL.
+
 When the user enters `/criterion create <url>`: confirm the user wants
 this deployment shared, and that the criterion repository at `<url>`
 exists (empty, or holding this working copy's own history) — creating it
@@ -515,8 +533,11 @@ offer `catalyst criterion protect` (show its output, then `--yes` on
 assent).
 
 When the user enters `/criterion get`: in a clone of the product
-repository whose `.criterion` is a submodule, run
-`catalyst criterion join`. If the joining person is not yet in
+repository, run `catalyst criterion join`. When the product has no
+`.criterion` submodule yet it needs the criterion repository's URL (see
+above): with `--url` it adds that repository as the submodule and stages
+the product changes — offer to commit them (INV-4) — or, where this
+machine holds the local working copy, publishes it there. If the joining person is not yet in
 `IAM/users/users.json`, they register with `/user-add` (which draws their
 `userid`) before signing anything, and land that registration with
 `/criterion push` like any other change.
