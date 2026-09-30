@@ -228,3 +228,30 @@ def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
     for p, data in first.items():
         assert p.read_bytes() == data, p.name
     assert os.access(kernel_dir / "catalyst.pyz", os.X_OK)
+
+
+def test_a_module_release_states_its_own_kernel_requirement(tmp_path: Path, capsys):
+    """fw-STRUCTURE-000016: the manifest says what module.yaml declares, and
+    packaging an unchanged module with a newer kernel changes nothing."""
+    root = make_workspace(tmp_path)
+    mod_dir = tmp_path / "catalyst-example-process"
+    with (mod_dir / "module.yaml").open("a") as f:
+        f.write('kernel_version: ">=0.30.0"\n')
+    release = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
+
+    pr.package_modules(root)
+    manifest = json.loads((release / "manifest.json").read_text())
+    assert manifest["kernelVersion"] == manifest["frameworkVersion"] == ">=0.30.0"
+    first = {p.name: p.read_bytes() for p in release.iterdir()}
+    assert "declares no kernel_version" not in capsys.readouterr().out
+
+    (root / "version.txt").write_text("0.99.0\n")              # a newer kernel packages it again
+    pr.package_modules(root)
+    assert {p.name: p.read_bytes() for p in release.iterdir()} == first
+
+
+def test_a_module_without_a_declaration_falls_back_with_a_warning(tmp_path: Path, capsys):
+    root = make_workspace(tmp_path)
+    pr.package_modules(root)
+    out = capsys.readouterr().out
+    assert "example-process declares no kernel_version" in out and ">=0.33.0" in out
