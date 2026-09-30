@@ -54,6 +54,7 @@ class ModuleInfo:
     description: str
     version: str
     dir: Path
+    kernel_version: str | None = None      # module.yaml's declared requirement
 
 
 def module_repo_dir(root: Path, module_id: str) -> Path:
@@ -83,6 +84,7 @@ def read_module_info(root: Path, module_id: str) -> ModuleInfo | None:
         description=str(data.get("description") or ""),
         version=version,
         dir=module_dir,
+        kernel_version=str(data["kernel_version"]) if data.get("kernel_version") else None,
     )
 
 
@@ -125,7 +127,13 @@ def run_cmd(cmd: list[str], cwd: Path) -> str:
 
 def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
     module_dir = module.dir
-    kernel_version = read_kernel_version(root)
+    # The module's own declaration; the packaging kernel only when it has none
+    # (and then the release claims more than the module may need).
+    requires = module.kernel_version
+    if not requires:
+        requires = f">={read_kernel_version(root)}"
+        print(f"Warning: {module.id} declares no kernel_version in module.yaml — its manifest "
+              f"says {requires}, the kernel packaging it")
 
     dest_dir = module_dir / "catalyst" / "modules" / module.id / f"v{module.version}"
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -135,10 +143,10 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
         "name": module.name,
         "version": module.version,
         "description": module.description,
-        "kernelVersion": f">={kernel_version}",
+        "kernelVersion": requires,
         # Legacy name of kernelVersion. Host UIs that predate kernelVersion
         # only read this field and skip manifests without it.
-        "frameworkVersion": f">={kernel_version}",
+        "frameworkVersion": requires,
         "entry": "ui/index.js"
     }
 

@@ -107,6 +107,7 @@ class ModuleManifest:
     version: str
     description: str
     grounding_type: str  # e.g., "rule"
+    kernel_version: str | None = None  # the kernel versions it works with, e.g. ">=0.42.0"
     entity_types: dict[str, ETD] = field(default_factory=dict)
     commands: dict[str, CommandRegistration] = field(default_factory=dict)
     skills: list[SkillRegistration] = field(default_factory=list)
@@ -466,6 +467,7 @@ def load_module(project_root: Path | str | None = None,
         version=str(data.get("version", "1.0.0")),
         description=data.get("description", "") or "",
         grounding_type=data.get("grounding_type", "rule") or "rule",
+        kernel_version=str(data["kernel_version"]) if data.get("kernel_version") else None,
         entity_types=etds,
         commands=cmds,
         templates=templates,

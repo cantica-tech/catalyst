@@ -71,6 +71,7 @@ catalyst-<module-id>/
 | `version` | `string` | Yes | SemVer version. |
 | `description` | `string` | Yes | One-line summary of the process domain. |
 | `grounding_type` | `string` | Yes | The kernel entity the module's artifacts ground to (for example `rule`). |
+| `kernel_version` | `string` | No | The kernel versions the module works with, as a version specifier (for example `>=0.42.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. |
 | `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`, `spec_path`). |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
