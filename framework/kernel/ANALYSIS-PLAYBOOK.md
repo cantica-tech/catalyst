@@ -1,214 +1,215 @@
 # Analysis Playbook
 
-A recipe for bootstrapping this framework's rules, domains and first
-active-module artifacts against an
-**existing** codebase that has no prior rules documentation — the process
-used to build this project's own [`.criterion/rules/`](../../.criterion/rules/)
-directory. Reusable on any project once you've picked your rule
-document(s) and prefixes per
-[`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md).
+How `/run-analysis` infers **domains, rules and defects** from existing
+code, with a four-eyes process that `catalyst analysis` enforces and a
+human decision on every finding (`Rules-of-Rules.md`, the kernel's
+analysis rule; the `ANALYSIS-` entity). This file ships in every working
+copy as `.criterion/ANALYSIS-PLAYBOOK.md`; `/sync-framework` refreshes it.
+
+Two modes:
+
+- **bootstrap** — the project has no rules yet: find its domains and a
+  small set of rules, and the defects where the code breaks them.
+- **incremental** (the default) — rules exist: find what they miss, and
+  where the code breaks them (existing or new).
 
 ## The four-eyes principle
 
-Every extraction pass in this playbook is run **twice, independently**,
-by two agents that cannot see each other's output, followed by a
-**reconciliation pass** that diffs the two and produces the final
-document. Two independent full passes catch what a single pass misses
-(an agent that stops early, misreads a code path, or hallucinates a rule
-that doesn't exist in the code) far more reliably than one pass plus a
-self-review, because the second agent has no anchor bias from the first
-agent's framing. This is not the same as the internal "N passes" some of
-the individual prompts below already do (a single agent re-reading its
-own work) — four-eyes is a second, wholly separate agent.
+Every analysis runs **two independent extraction passes** over the same
+scope and code state, by two agents that cannot see each other's work,
+then a **reconciliation** that diffs them and verifies against the code
+whatever only one pass found or the two disagree on. Two blind passes
+catch what one pass misses — an agent that stops early, misreads a code
+path, or reports a rule the code does not have — far better than one pass
+plus a self-review, because the second agent carries none of the first
+one's framing.
 
-```
-Agent A (independent) ──┐
-                         ├──▶ Reconciliation pass ──▶ final document
-Agent B (independent) ──┘
+```text
+pass A (independent) ──┐
+                        ├──▶ diff ──▶ reconciliation ──▶ the user decides each finding
+pass B (independent) ──┘
 ```
 
-Use `Agent` tool calls with `run_in_background: true`, launched in the
-**same message** so they run in parallel, `subagent_type:
-general-purpose`, and (for this kind of long, careful reading task)
-`model: opus`. Give A and B the *same* prompt verbatim — the independence
-comes from them being separate agent instances with no shared context,
-not from varying the instructions.
+- A and B get the **same prompt, verbatim**; their independence comes
+  from being separate agent instances with no shared context. If the agent
+  can run sub-agents, launch both at once, in parallel, with a model
+  suited to long, careful reading. If it cannot, run each pass in a fresh
+  session that has not seen the other's output — never both in one
+  context.
+- **Research agents only read code and return findings.** No pass and no
+  reconciler writes an artifact: the orchestrating session writes them,
+  after the user's decision. Letting a research agent also merge is how a
+  disagreement gets silently resolved by whichever agent ran last.
+- **IDs are allocated after the decision**, by the CLI (`catalyst id next`,
+  `catalyst id next-rule`) — never by a pass, whose numbering would
+  collide.
+- **Delegation drift:** an agent that hands its reading to further
+  sub-agents instead of doing it wastes the pass. Tell it to read the code
+  itself.
 
----
+## The process
 
-## Recipe 1 — Extract a small set of artifact-shaping rules
+Each phase is a `catalyst analysis` command; it refuses to skip a phase,
+and `catalyst check` rejects a record whose reports do not support its
+phase. The record is `analyses/ANALYSIS-NNNNNN-<userid>-<name>.md`, its
+reports `analyses/reports/<ID>/`.
 
-Run once per **rule document** you are bootstrapping, not per every
-implementation category. For this framework, keep the scope intentionally
-small: create only a limited number of high-level rules that help define
-the active module's development artifacts, especially for:
+1. **Start.** `catalyst analysis start <paths...> [--mode bootstrap|incremental]
+   [--name <name>] --as <signer>` records the scope, the product commit
+   analysed, and `inventory.json`: every tracked file in scope with its
+   blob hash and, for `incremental`, the rules, domains and rule-grounded
+   artifacts that already exist.
+2. **Two passes.** Send the [pass prompt](#the-pass-prompt) to agent A and
+   agent B, filled in identically. Save each answer as a findings file
+   ([format](#findings-format)) and record it:
+   `catalyst analysis record <ID> --pass A <file>`, then `--pass B`. A
+   file that fails validation is returned to its agent to fix — never
+   edited to pass.
+3. **Diff.** `catalyst analysis diff <ID>` pairs the findings and writes
+   `diff.json`: *agreed*, *conflicting* (paired, but a different rule
+   status or a different broken rule), *A-only*, *B-only*.
+4. **Reconcile.** Send the [reconciliation prompt](#the-reconciliation-prompt)
+   with both passes and the diff to a third agent (or do it yourself).
+   Record its answer: `catalyst analysis reconcile <ID> <file>`. It is
+   accepted only if every finding of both passes is kept (a final
+   finding's `sources`) or dropped with a reason, exactly once, and every
+   final finding that is not a plain agreement says how it was verified.
+5. **Decide.** Present the reconciled findings to the user — domains
+   first, then rules, then defects, each with its statement, evidence and
+   verification. For each one, the user accepts, edits then accepts, or
+   rejects; never decide for them. On acceptance, write the artifact:
+   - a **domain**: `rules/domains/<prefix>-<CODE>-<short-description>.md`
+     per `Rules-of-Rules.md` §6, registered in `domains.md`;
+   - a **rule**: its ID from `catalyst id next-rule <prefix> <DOMAIN>`,
+     written into the rule document and `rules/rules.md` per
+     `Rules-of-Rules.md` (status ✅ / ⚠️ / ❌ from the finding: `holds` /
+     `partial` / `missing`);
+   - a **defect**: the artifact a fix requires (`CODE-OF-CONDUCT.md` §3,
+     fix tier), targeting the rule it breaks — the existing rule, or the
+     rule accepted from the finding it names.
+   Then `catalyst index regen`, `catalyst journal append`, and record the
+   decision: `catalyst analysis decide <ID> <finding> accept --artifact
+   <the domain code, rule ID or artifact ID>` (or `reject --reason
+   "<why>"`). A defect whose rule was rejected is rejected too, or waits
+   for a rule the user writes. A finding the user and the reconciler
+   still disagree on can become a `RECON-` case (`Rules-of-Rules.md` §16).
+6. **Close.** `catalyst analysis close <ID>` once every finding is decided;
+   it refuses while an accepted finding's artifact does not exist. Then
+   `catalyst check`, and report the summary. `catalyst analysis abandon <ID>
+   --reason "<why>"` stops an analysis that should not go on.
 
-- **Rules of Rules:** what counts as a valid rule, how it is named, how it
-  is structured, and how conflicts are resolved.
-- **Business Rules:** the domain constraints and workflow expectations that
-  should inform development artifacts.
-- **UI Rules:** the interaction, validation, presentation, and
-  initialization definitions that shape the user-facing behavior.
+## The pass prompt
 
-These should be treated as definitions and scaffolding for development
-artifacts, not as a full catalog of implementation behavior. Keep each rule
-concise, high-level, and directly useful when drafting artifacts.
+Send identically to A and B, filling the `{{…}}` placeholders from the
+record and `inventory.json`:
 
-**Prompt template** (send identically to both agents of each pair):
+```text
+You are one of two independent auditors of this codebase; you will not see
+the other's work, and yours will be compared with it. Read the code
+yourself — do not delegate the reading.
 
-```
-Audit this codebase for the {{RULE_DOCUMENT}} document and extract only a
-small set of artifact-shaping rules — high-level definitions that help
-describe expected behavior, not detailed implementation policies.
+Scope: {{paths}}, at commit {{code state}}.
+Mode: {{bootstrap | incremental}}.
+{{incremental: the rules and domains already recorded, with their text —
+  do not report them again; do report where the code breaks them}}
 
-Do THREE separate passes over the code, in this order, then reconcile
-them into one list before reporting back:
-  1. A keyword/pattern sweep (grep-style) across {{relevant source dirs}}
-     for the kinds of rules or definitions that describe expected behavior.
-  2. A manual walkthrough of the relevant modules, reading the actual
-     logic rather than trusting names/comments.
-  3. A cross-check against the project's automated checks ({{check
-     paths}}) — does a check exist for each rule you found? Note ones that
-     don't.
+Do three passes over the code, then merge them into one list:
+  1. A sweep (search) of the scope for the behaviour the code enforces:
+     validations, invariants, workflows, permissions, error handling,
+     configuration limits.
+  2. A walkthrough of the main modules, reading the logic rather than
+     trusting names and comments.
+  3. A cross-check against the project's automated tests or checks: is
+     each rule exercised? Say so in the finding's notes.
 
-For every rule found, report:
-  - A short bold name for the rule
-  - A one-line description of the rule as an artifact-shaping definition
-  - Status: ✅ working as intended / ⚠️ buggy or incomplete / ❌ documented
-    intent but not actually implemented
-  - Which functional area of the app it belongs to (e.g. "Gateway
-    Management", "Recording") — group your final report by this
+Report three kinds of finding:
+  - domain: a functional area of the product, with a 3–7 letter code and a
+    one-sentence scope. Bootstrap mode mostly; in incremental mode only for
+    an area no existing domain covers.
+  - rule: a concise, high-level statement of behaviour the product must
+    have — useful for writing work items and the defects raised against
+    them, not an implementation detail. Status: holds (implemented as
+    stated), partial (implemented but buggy or incomplete), missing (clearly
+    intended — documented, half-built, referenced — but not implemented).
+  - defect: code that breaks a rule — an existing rule (its ID) or a rule
+    finding of yours (its id). A problem that breaks no rule you can state is
+    not reported as a defect: report the rule instead.
 
-Only report concise, high-level rules that are useful when describing
-expected behavior. Keep them tied to concrete application areas, user
-flows, components, or domain behaviors rather than abstract definitions.
-These rules should support verifiable work items and the defects that will
-later be raised when behavior is wrong. Flag anything you're unsure about explicitly
-rather than guessing.
-```
-
-Launch A and B for each category in one message (background, parallel).
-When both return, run **Recipe 3 (reconciliation)** on the pair before
-moving to the next category.
-
-## Recipe 2 — Extract business-rule definitions
-
-Use the same shape as Recipe 1, but focus only on the domain constraints
-and workflow expectations that help define expected behavior. Keep the output
-limited to a small set of high-level business-rule definitions, grouped by
-functional area rather than by implementation detail (for example:
-connectivity/security, data/persistence, orchestration/lifecycle). Everything
-else — three passes, four-eyes pairing, and per-rule reporting fields —
-is identical to Recipe 1.
-
-## Recipe 3 — Reconciliation pass (four-eyes merge)
-
-Run as a single foreground agent (or do it yourself) once both of a
-pair's independent reports are in hand.
-
-**Prompt template:**
-
-```
-Two independent audits of {{scope}} were run separately; their raw
-reports are below. Reconcile them into one final list:
-
-  - A rule both agents found: keep it, merge the best citation/wording
-    from each.
-  - A rule only one agent found: include it, but verify it yourself
-    against the actual code before keeping it — don't take either
-    agent's word alone. If you can't verify it, mark it explicitly as
-    unverified rather than dropping it silently.
-  - A rule where the two agents *disagree* on status (✅ vs ⚠️/❌) or
-    on the actual behavior: this is the most important case to catch —
-    resolve it by reading the code yourself, and note in the final
-    entry that this was a disagreement worth double-checking again
-    later.
-
-Output the reconciled list in the target document's existing format
-(see {{path to doc if one exists, else the format spec above}}).
-
---- AGENT A REPORT ---
-{{paste}}
-
---- AGENT B REPORT ---
-{{paste}}
-```
-
-Repeat Recipe 1/2 + Recipe 3 for each category/area, then merge all
-reconciled category lists into the final document, grouped by
-functional area (§ per area, not per rule category) — do this merge
-yourself; it's editorial work (matching this project's format,
-resolving cross-category overlaps), not another audit pass.
-
-## Recipe 4 — Derive domains from a reconciled rule list
-
-Once a document's rules are reconciled and grouped by functional area,
-turn each group into a formal domain per
-[`rules-of-rules.template.md` §6](rules-of-rules.template.md):
-
-```
-For each functional-area group in this reconciled rule list, propose:
-  - A `##` domain heading (the area name)
-  - A short DOMAIN code (3-7 uppercase chars, unique in this document)
-  - A one-two sentence Scope statement
-  - Whether it plausibly overlaps/conflicts with any other proposed
-    domain in this same list — if so, say which and why, so a human
-    can decide whether to merge them before finalizing.
+Every rule and defect cites evidence: a file in the scope and a line.
+Flag anything you are unsure of with confidence low; never guess.
+Answer with the findings JSON only, in the format below.
 ```
 
-Then mechanically assign IDs (`<prefix>-<CODE>-<NNN>`, in document
-order) and create each domain's `rules/domains/<prefix>-<CODE>-<short-description>.md`
-file per §6 — this step is deterministic, not another agent pass; a short
-script or careful manual edit is more reliable than delegating it.
+Append the [findings format](#findings-format) to the prompt.
 
-## Recipe 5 — Cross-reference known defects to rule IDs
+## Findings format
 
-Once rules have IDs, existing known-issue material (or defects discovered
-during Recipe 1/2's audits — an ⚠️/❌ rule *is* a defect) gets linked back:
+A pass answers with one JSON object:
 
+```json
+{"findings": [
+  {"id": "A1", "kind": "domain", "title": "Session management", "code": "SESSION",
+   "statement": "Login sessions: creation, expiry, revocation.", "area": "SESSION",
+   "confidence": "high", "evidence": []},
+  {"id": "A2", "kind": "rule", "title": "Sessions expire", "area": "SESSION",
+   "statement": "An idle session expires after the configured timeout.",
+   "status": "partial", "confidence": "medium",
+   "evidence": [{"path": "src/session.py", "line": 12}],
+   "notes": "no test covers expiry"},
+  {"id": "A3", "kind": "defect", "title": "Timeout of zero never expires", "area": "SESSION",
+   "statement": "TIMEOUT defaults to 0, which the expiry check treats as never.",
+   "breaks": "A2", "confidence": "high",
+   "evidence": [{"path": "src/session.py", "line": 3}]}
+]}
 ```
-For each defect in this list, find the rule bullet in {{rules doc}} that it
-violates (its description should match the ⚠️/❌ rule's behavior almost
-exactly, since that's where it came from). Report the defect number and the
-matching rule ID. If no matching rule bullet exists, say so explicitly —
-that means the rule was never written down and needs to be added first.
+
+- `id` unique in the file; `kind` is `domain`, `rule` or `defect`;
+  `title` and `statement` are required; `confidence` is `high`, `medium`
+  or `low`.
+- A `rule` has a `status` (`holds`, `partial`, `missing`). A `domain`
+  may have a `code` (3–7 capital letters).
+- A `rule` or `defect` has at least one `evidence` entry: a `path` from the
+  inventory and, where it applies, a positive `line`.
+- A `defect` names what it `breaks`: an existing rule ID or a rule finding's
+  `id` in the same file.
+
+## The reconciliation prompt
+
+```text
+Two independent audits of {{paths}} at {{code state}} were run separately.
+Their findings and the mechanical pairing of them are below. Produce the
+final list:
+
+  - agreed pair: keep one finding, merging the best wording and evidence of
+    both; sources ["A:<id>", "B:<id>"]; verification "both passes".
+  - conflicting pair (different status, or a different broken rule): read
+    the code yourself and decide; say what you read in `verification`.
+    These are the most important to get right.
+  - A-only or B-only: verify it against the code yourself. Keep it (with
+    what you checked in `verification`) or drop it with a reason — never
+    drop one silently. If you cannot verify it, keep it with confidence low
+    and say so.
+  - a pairing the diff got wrong: split or merge it, and say so.
+
+Every finding of both passes appears exactly once: in a final finding's
+`sources`, or in `dropped`. A defect's `breaks` names an existing rule ID or
+a final rule finding's id. Answer with JSON only:
+{"findings": [ ...findings format, plus "sources" and "verification" ... ],
+ "dropped": [{"source": "A:<id>", "reason": "..."}]}
+
+--- PASS A ---
+{{A.json}}
+--- PASS B ---
+{{B.json}}
+--- DIFF ---
+{{diff.json}}
 ```
 
-Then open the active module's defect-type artifacts for them, per the
-composed `CODE-OF-CONDUCT.md`
-([`rules-of-development.template.md`](rules-of-development.template.md)
-plus the module's §3/§4), citing the matched rule ID in `Targets`.
+## What is not a four-eyes analysis
 
-## Recipe 6 — Meta-rule / process changes
-
-Changes to the process itself (new ID scheme, retirement policy, domain
-standard — the kind of thing that becomes an `rr-META-NNN`) are
-**not** run through four-eyes agent audits — they're a direct design
-conversation with whoever owns the process, then written once. Four-eyes
-is for *extracting what already exists in code*, where independent
-verification catches misreadings; it isn't useful for *deciding what the
-process should be*, which has no ground truth to independently verify
-against.
-
----
-
-## Why this shape (lessons from actually running it)
-
-- **Background + parallel, not sequential**: launching a full category's
-  A/B pair sequentially wastes the wall-clock four-eyes is supposed to
-  buy you for free — always launch both in the same message.
-- **Research agents only, never edit agents**: every agent in Recipes
-  1/2/4/5 only reads code and returns a report; none of them write files
-  directly. Direct file edits (creating the actual `.md` docs, inserting
-  IDs, writing domain files) are done by the orchestrating
-  session/agent after reconciliation, because letting research agents
-  also own the merge step is how disagreements get silently
-  auto-resolved in whichever agent happened to run last, defeating the
-  point of four-eyes.
-- **Three-digit `NNN` sequencing must happen after full reconciliation**,
-  never per-agent — two independent agents numbering rules `001, 002, …`
-  in parallel will collide the moment you merge.
-- **Delegation drift**: watch for an agent re-delegating to further
-  sub-agents instead of doing the audit itself — this wastes significant
-  time with no findings landing. If it happens, tell it directly to stop
-  delegating and do the reading itself.
+Changes to the process itself — the ID scheme, retirement policy, the
+domain standard, anything that becomes a meta-rule — are a design
+conversation with whoever owns the process, written once. Four-eyes is
+for *extracting what already exists in code*, where an independent second
+reading catches misreadings; it has nothing to verify against when the
+question is *what the process should be*.

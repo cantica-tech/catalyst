@@ -77,19 +77,19 @@ JOURNAL_REQUIRED_FIELDS = (
 INDEX_NAMES = {
     "rules.md", "domains.md", "meta-tags.md", "epics.md", "stories.md",
     "tasks.md", "spikes.md", "sprints.md", "boards.md", "workflows.md",
-    "tickets.md", "reconciliations.md",
+    "tickets.md", "reconciliations.md", "analyses.md", "ANALYSIS-PLAYBOOK.md",
     "README.md", "CODE-OF-CONDUCT.md", "version.txt",
     "Rules-of-Rules.md", "rules-of-work-items.md", "DEPLOYMENT.md",
 }
 # Kernel directories walked by the INV-7 naming check. Entity folders (kernel
 # and active module) are added by DeploymentModel.
-KERNEL_CHECKED_DIRS = ("rules", "reconciliations", "workflows", "IAM",
+KERNEL_CHECKED_DIRS = ("rules", "reconciliations", "workflows", "analyses", "IAM",
                        "development", "work-items")
 # Kernel entity types that must each have a definitions/<type>.md (INV-23).
 KERNEL_ENTITY_TYPES = (
     "rule", "domain", "user", "role", "reconciliation", "meta-tag",
     "journal", "ledger", "slash-command", "templates-catalog", "workflow",
-    "entity",
+    "entity", "analysis",
 )
 
 

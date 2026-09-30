@@ -14,6 +14,7 @@ from catalyst import __version__
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
+from catalyst.analysis import AnalysisError
 from catalyst.criterion import CriterionError
 
 
@@ -342,6 +343,90 @@ def _ask_url(exc) -> str:
     return url
 
 
+def cmd_analysis(args) -> int:
+    from catalyst import analysis as an
+    from catalyst import journal
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    sub = args.analysis_command
+
+    def signer():
+        return resolve_signer(dep, corpus, getattr(args, "as_user", None))
+
+    def journaled(ctx, action: str, intent: str, who: dict) -> None:
+        journal.append(dep, journal.AppendRequest(
+            command=f"catalyst analysis {sub}", action=action, artifact=ctx.art.id,
+            targets=[], intent=[intent], files=[str(f) for f in an.files_of(ctx)],
+            actor=str(who.get("git_username") or who.get("name")), allow_unchanged=True))
+
+    def read_json(path: str):
+        try:
+            return json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise an.AnalysisError(f"cannot read {path}: {exc}") from exc
+
+    if sub == "start":
+        who = signer()
+        ctx = an.start(dep, args.scope, args.mode, who, args.name)
+        journaled(ctx, "create", f"{args.mode} analysis of {' '.join(ctx.load('inventory.json')['scope'])}", who)
+        inv = ctx.load("inventory.json")
+        print(f"{ctx.art.id}: {len(inv['files'])} file(s) at {inv['code_state'][:10]}; "
+              f"record two independent passes with `catalyst analysis record {ctx.art.id} --pass A|B <file>`")
+        return 0
+    ctx = an.context(dep, args.id, corpus)
+    if sub == "status":
+        d, r = ctx.load("diff.json"), ctx.load("reconciled.json")
+        decided = (ctx.load("decisions.json") or {}).get("decisions", {})
+        print(f"{ctx.art.id}: {an.phase(ctx.art)} ({ctx.art.get('Mode')}; {ctx.art.get('Scope')})")
+        print(f"passes:    A {'recorded' if ctx.load('A.json') else '—'}, B {'recorded' if ctx.load('B.json') else '—'}")
+        if d:
+            print(f"diff:      {len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, "
+                  f"{len(d['a_only'])} A-only, {len(d['b_only'])} B-only")
+        if r:
+            print(f"decisions: {len(decided)}/{len(r['findings'])} findings decided")
+        for problem in an.problems(ctx):
+            print(f"PROBLEM   {problem}")
+        return 0
+    who = signer()
+    if sub == "record":
+        for w in an.record(ctx, args.which, read_json(args.file), replace=args.replace):
+            print(f"WARNING   {w}")
+        journaled(ctx, "update", f"pass {args.which.upper()} recorded", who)
+        print(f"pass {args.which.upper()} recorded for {ctx.art.id}")
+        return 0
+    if sub == "diff":
+        d = an.run_diff(ctx)
+        journaled(an.context(dep, ctx.art.id), "update", "passes matched for reconciliation", who)
+        print(f"{len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, {len(d['a_only'])} A-only, "
+              f"{len(d['b_only'])} B-only — reconcile every one (`catalyst analysis reconcile`)")
+        return 0
+    if sub == "reconcile":
+        an.reconcile(ctx, read_json(args.file))
+        journaled(an.context(dep, ctx.art.id), "update", "reconciled list accepted: every finding accounted for", who)
+        n = len(an.context(dep, ctx.art.id).load("reconciled.json")["findings"])
+        print(f"{n} reconciled finding(s): each needs the user's decision (`catalyst analysis decide`)")
+        return 0
+    if sub == "decide":
+        an.decide(ctx, args.finding, args.verdict, who, args.artifact, args.reason)
+        journaled(ctx, "update", f"finding {args.finding}: {args.verdict}"
+                  + (f" as {args.artifact}" if args.artifact else ""), who)
+        print(f"{args.finding}: {args.verdict}" + (f" → {args.artifact}" if args.artifact else ""))
+        return 0
+    if sub == "close":
+        counts = an.close(ctx)
+        journaled(an.context(dep, ctx.art.id), "close", "every finding decided; accepted ones exist", who)
+        print(f"{ctx.art.id} closed: " + (", ".join(f"{k} {c['accept']}/{c['accept'] + c['reject']} accepted"
+                                                   for k, c in sorted(counts.items())) or "no findings"))
+        return 0
+    an.abandon(ctx, args.reason)
+    journaled(an.context(dep, ctx.art.id), "close", f"abandoned: {args.reason}", who)
+    print(f"{ctx.art.id} abandoned")
+    return 0
+
+
 def cmd_criterion(args) -> int:
     from catalyst import criterion as cr
 
@@ -633,6 +718,52 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--diff", action="store_true", help="with --check, show what would change")
     q.set_defaults(func=cmd_index)
 
+    p = sub.add_parser("analysis", help="four-eyes analysis of existing code (ANALYSIS-PLAYBOOK.md)")
+    an_sub = p.add_subparsers(dest="analysis_command", required=True)
+    q = an_sub.add_parser("start", help="open an analysis: scope, mode, code state, inventory")
+    q.add_argument("scope", nargs="*", default=["."], help="paths to analyse (default: the whole project)")
+    q.add_argument("--mode", choices=["bootstrap", "incremental"], default="incremental",
+                   help="bootstrap: no rules yet; incremental: find what the rules miss (default)")
+    q.add_argument("--name", help="a short name for the record")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("record", help="store one independent pass's findings (JSON)")
+    q.add_argument("id")
+    q.add_argument("--pass", dest="which", required=True, choices=["A", "B", "a", "b"])
+    q.add_argument("file", help="the pass's findings file")
+    q.add_argument("--replace", action="store_true", help="replace a pass recorded by mistake")
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("diff", help="match the two passes: agreed, conflicting, A-only, B-only")
+    q.add_argument("id")
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("reconcile", help="store the reconciler's list (every finding accounted for)")
+    q.add_argument("id")
+    q.add_argument("file")
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("decide", help="record the user's decision on one reconciled finding")
+    q.add_argument("id")
+    q.add_argument("finding")
+    q.add_argument("verdict", choices=["accept", "reject"])
+    q.add_argument("--artifact", help="the domain code, rule ID or artifact ID an accepted finding became")
+    q.add_argument("--reason")
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("close", help="close once every finding is decided and accepted ones exist")
+    q.add_argument("id")
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("abandon", help="stop an analysis, with the reason")
+    q.add_argument("id")
+    q.add_argument("--reason", required=True)
+    q.add_argument("--as", dest="as_user")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
+    q.add_argument("id")
+    q.set_defaults(func=cmd_analysis)
+
     p = sub.add_parser("criterion", help="shared deployments on git: submodule, pull requests")
     cs = p.add_subparsers(dest="criterion_command", required=True)
     q = cs.add_parser("status", help="the working copy against the shared branch")
@@ -676,7 +807,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (IdError, JournalError, CriterionError) as exc:
+    except (IdError, JournalError, CriterionError, AnalysisError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     except DeploymentNotFound as exc:
