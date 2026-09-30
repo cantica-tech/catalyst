@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.43.0 — 2026-09-30
 
 - `catalyst criterion create` takes the criterion repository's URL as
   optional. Without it the working copy is versioned strictly locally (a
@@ -16,6 +16,8 @@ messages.
   needs the repository takes `--url <url>`, or asks for it on a terminal,
   publishes as `create <url>` does, then carries on; `join` in a product
   with no submodule yet adds the given repository as the submodule.
+- No layout change, no migration: `/sync-framework` recomposes the
+  `/criterion` text and re-vendors the CLI.
 
 ## 0.42.2 — 2026-09-30
 

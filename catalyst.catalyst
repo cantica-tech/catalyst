@@ -2,7 +2,7 @@
   "project_name": "catalyst",
   "format": "1.0-rc",
   "journal_since": "34265fa16f4e7b29193768d0b51316324a624dac",
-  "kernel_version": "0.42.2",
+  "kernel_version": "0.43.0",
   "module": "software-engineering",
   "agent": "claude-code",
   "repoed": false,
