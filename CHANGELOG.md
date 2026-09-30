@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.44.0 — 2026-09-30
 
 Four-eyes analysis of existing code (migration `0.44.0/four-eyes-analysis.md`).
 
