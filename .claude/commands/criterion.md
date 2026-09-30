@@ -26,7 +26,7 @@ Input: $ARGUMENTS
 4. If `push` stops on a conflict, nothing was pushed. Never apply a
    resolution yourself: report the files, and at most propose one as a
    `RECON-` case for a human to accept with `/reconcile`.
-4. Report the result. Do not commit the product repository's staged
+5. Report the result. Do not commit the product repository's staged
    changes or moved gitlink, and do not run `catalyst criterion protect
    --yes`, without the user's assent (INV-4).
 
