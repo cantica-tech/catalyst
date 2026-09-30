@@ -36,7 +36,6 @@ import json
 import os
 import shutil
 import tempfile
-import zipapp
 import subprocess
 import zipfile
 from dataclasses import dataclass
@@ -101,6 +100,24 @@ def catalogued_modules(root: Path) -> list[ModuleInfo]:
     return found
 
 
+
+# Archives are reproducible: fixed entry timestamps, sorted entries and
+# normalised permissions, so rebuilding an unchanged release yields the same
+# bytes (and publishing it again commits nothing).
+ZIP_TIME = (1980, 1, 1, 0, 0, 0)
+
+
+def zip_bytes(zf: zipfile.ZipFile, arcname: str, data: bytes, executable: bool = False) -> None:
+    info = zipfile.ZipInfo(arcname, ZIP_TIME)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    info.external_attr = (0o100755 if executable else 0o100644) << 16
+    zf.writestr(info, data)
+
+
+def zip_file(zf: zipfile.ZipFile, path: Path, arcname: str) -> None:
+    zip_bytes(zf, arcname, path.read_bytes(), executable=os.access(path, os.X_OK))
+
+
 def run_cmd(cmd: list[str], cwd: Path) -> str:
     res = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=True)
     return res.stdout.strip()
@@ -136,17 +153,17 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         # Add manifest.json to zip
-        zf.writestr("manifest.json", manifest_json_bytes)
+        zip_bytes(zf, "manifest.json", manifest_json_bytes)
 
         # Add module contents
-        for file in module_dir.rglob("*"):
+        for file in sorted(module_dir.rglob("*")):
             if not file.is_file():
                 continue
             rel_path = file.relative_to(module_dir)
             parts = rel_path.parts
             if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in parts):
                 continue
-            zf.write(file, arcname=str(rel_path))
+            zip_file(zf, file, rel_path.as_posix())
 
     # Remove legacy unversioned zip if present
     canonical_zip_path = dest_dir / f"{module.id}.zip"
@@ -235,7 +252,14 @@ def build_cli(root: Path, dest: Path) -> Path:
             "import sys\n\nfrom catalyst.__main__ import main\n\nsys.exit(main())\n",
             encoding="utf-8")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        zipapp.create_archive(stage, dest, interpreter="/usr/bin/env python3")
+        # What zipapp.create_archive writes, minus the build-time timestamps.
+        with dest.open("wb") as fh:
+            fh.write(b"#!/usr/bin/env python3\n")
+            with zipfile.ZipFile(fh, "w", zipfile.ZIP_DEFLATED) as zf:
+                for path in sorted(stage.rglob("*")):
+                    if path.is_file():
+                        zip_file(zf, path, path.relative_to(stage).as_posix())
+        dest.chmod(0o755)
     return dest
 
 
@@ -264,27 +288,27 @@ def package_kernel(root: Path) -> Path:
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         # Add manifest.json to zip
-        zf.writestr("manifest.json", manifest_json_bytes)
+        zip_bytes(zf, "manifest.json", manifest_json_bytes)
 
         # Add kernel contents
-        for file in kernel_dir.rglob("*"):
+        for file in sorted(kernel_dir.rglob("*")):
             if not file.is_file():
                 continue
             rel_path = file.relative_to(kernel_dir)
             parts = rel_path.parts
             if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in parts):
                 continue
-            zf.write(file, arcname=str(rel_path))
+            zip_file(zf, file, rel_path.as_posix())
 
         # The CLI, vendored by install and /sync-framework into
         # .criterion/bin/catalyst.pyz.
         cli = build_cli(root, dest_dir / "catalyst.pyz")
-        zf.write(cli, arcname="bin/catalyst.pyz")
+        zip_file(zf, cli, "bin/catalyst.pyz")
 
         # The kernel ships under catalyst's own license.
         license_file = root / "LICENSE"
         if license_file.is_file():
-            zf.write(license_file, arcname="LICENSE")
+            zip_file(zf, license_file, "LICENSE")
 
     # Remove legacy unversioned zip if present
     canonical_zip_path = dest_dir / "kernel.zip"
