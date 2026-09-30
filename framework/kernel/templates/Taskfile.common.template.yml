@@ -134,7 +134,7 @@ tasks:
       - '{{.AGENT_CMD}} "/audit {{.CLI_ARGS}}"'
 
   run-analysis:
-    desc: "Open and execute the analysis playbook"
+    desc: "Four-eyes analysis of existing code (domains, rules, defects): [<path>...] [--bootstrap|--incremental]"
     cmds:
       - '{{.AGENT_CMD}} "/run-analysis {{.CLI_ARGS}}"'
 

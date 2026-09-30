@@ -159,7 +159,7 @@ work against). Then:
    `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
    stack, tooling, dev environment and CI decided as the first rules, §3) or
    **retrofit** (existing code: rules gathered incrementally, optionally
-   bootstrapped with `framework/kernel/ANALYSIS-PLAYBOOK.md`, §4) — and
+   bootstrapped with `/run-analysis --bootstrap`, §4) — and
    `catalyst check`.
 5. Tick each ledger item as you complete it. If an item is blocked, mark it
    `[!] blocked: <reason>` and surface it — never silently skip.

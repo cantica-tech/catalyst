@@ -33,6 +33,7 @@ KERNEL_TYPES = {  # kernel entity folders, their template source and index
     "rules/domains": ("DOMAIN", "domain.template.md"),
     "reconciliations": ("RECONCILIATION", "reconciliation.template.md"),
     "workflows": ("WORKFLOW", "workflow.template.md"),
+    "analyses": ("ANALYSIS", "analysis.template.md"),
     "development/meta-tags": ("META-TAG", "meta-tag.template.md"),
 }
 
@@ -314,7 +315,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
            "project root. Folders: `rules/`, `definitions/`, `IAM/`, `development/` (journal), and one "
            "folder per entity type (see each folder's README).\n")
     _vendor_cli(root / "bin" / "catalyst.pyz")
-    steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md; vendored bin/catalyst.pyz")
+    # the analysis process's prompts and findings format (/run-analysis)
+    shutil.copyfile(kernel / "ANALYSIS-PLAYBOOK.md", root / "ANALYSIS-PLAYBOOK.md")
+    steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md, ANALYSIS-PLAYBOOK.md; "
+                 "vendored bin/catalyst.pyz")
 
     # --- the project side ---------------------------------------------------
     from catalyst.check import FORMAT

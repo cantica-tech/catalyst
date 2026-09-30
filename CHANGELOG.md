@@ -6,6 +6,25 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+Four-eyes analysis of existing code (migration `0.44.0/four-eyes-analysis.md`).
+
+- `/run-analysis [<path>...] [--bootstrap|--incremental]` infers domains,
+  rules and the defects where the code breaks a rule. Two independent,
+  blind passes over the same scope and commit; a reconciliation that
+  accounts for every finding of both, verifying against the code whatever
+  only one pass found or the two disagree on; then the user's decision on
+  each finding before any artifact is written.
+- The `ANALYSIS-` kernel entity (`analyses/`) records each run and its
+  reports; `catalyst analysis start|record|diff|reconcile|decide|close|
+  abandon|status` moves it phase by phase and refuses to skip one, and
+  `catalyst check` rejects a record whose reports do not support its phase.
+- `ANALYSIS-PLAYBOOK.md` is rewritten as the deployed playbook (phases,
+  pass and reconciliation prompts, findings format) and deployed at
+  `.criterion/ANALYSIS-PLAYBOOK.md` by `catalyst init` and `/sync-framework`;
+  before, no deployment had it, so `/run-analysis` could not run.
+
 ## 0.43.0 — 2026-09-30
 
 - `catalyst criterion create` takes the criterion repository's URL as

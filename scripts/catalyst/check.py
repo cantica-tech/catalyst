@@ -85,6 +85,10 @@ def run(dep: Deployment) -> Report:
             sink = report.errors if unrecorded.level(dep) == "error" else report.warnings
             for c in manual:
                 sink.append(f"unrecorded-change: {unrecorded.describe(c)}")
+    from catalyst import analysis
+    for art in corpus.by_prefix.get(analysis.PREFIX, []):
+        for problem in analysis.problems(analysis.Context(dep, corpus, art, analysis.reports(dep, art.id))):
+            report.errors.append(f"analysis: {art.id}: {problem}")
     for c in regenerate(dep, corpus, write=False):
         report.warnings.append(f"index: .criterion/{c.path.relative_to(dep.root)} is out of date "
                                "(`catalyst index regen`)")

@@ -332,9 +332,13 @@ the seven currently exist anywhere.
   checking the current repository state, the file's role in the framework,
   and the rules or artifacts that depend on it, then return a concise impact
   summary.
-- `/run-analysis` — open and execute the analysis playbook from
-  `ANALYSIS-PLAYBOOK.md` in the project root, following its steps and
-  returning the resulting analysis summary.
+- `/run-analysis [<path>...] [--bootstrap|--incremental]` — analyse
+  existing code to infer domains, rules and the defects where the code
+  breaks a rule, with a four-eyes process: two independent blind passes,
+  a reconciliation that accounts for every finding of both, and the
+  user's decision on each finding (`ANALYSIS-PLAYBOOK.md`, an `ANALYSIS-`
+  record, `catalyst analysis`). `--bootstrap` for a project with no rules
+  yet; `--incremental` (the default) finds what existing rules miss.
 - `/sync-framework [latest|<version>]` — synchronize the deployed framework
   with the requested kernel version. If the argument is `latest`, use the
   newest kernel version available from the framework source. If no argument
@@ -662,10 +666,22 @@ every reference mechanically); and return a concise summary of likely
 impact, affected areas, and any blocking concerns. If the file cannot be
 resolved, report that it was not found and do not invent a result.
 
-When the user enters `/run-analysis`, open and execute the analysis playbook
-from `ANALYSIS-PLAYBOOK.md` in the project root, following its steps and
-returning the resulting analysis summary. If the playbook is missing, report
-that it is unavailable and do not invent missing content.
+When the user enters `/run-analysis [<path>...] [--bootstrap|--incremental]`,
+follow `.criterion/ANALYSIS-PLAYBOOK.md` (the deployed playbook) phase by
+phase: `catalyst analysis start <path>... --mode <mode> --as <signer>`
+(the whole project when no path is given), two independent passes with the
+playbook's pass prompt recorded with `catalyst analysis record --pass A|B`,
+`catalyst analysis diff`, a reconciliation recorded with `catalyst analysis
+reconcile`, then each reconciled finding presented to the user — accept,
+edit then accept, or reject; never decided for them. Only after acceptance,
+write the domain, the rule (`catalyst id next-rule`) or the artifact a fix
+requires (§3) targeting its rule, and record the decision with `catalyst
+analysis decide --artifact <ID>`; research agents never write artifacts.
+Close with `catalyst analysis close` and `catalyst check`, and report the
+summary. Never skip a phase or hand-edit a report to get past the CLI: a
+refused pass goes back to its agent. If the playbook is missing, report that
+it is unavailable (`/sync-framework` restores it) and do not invent missing
+content.
 
 When the user enters `/sync-framework [latest|<version>] [--force <scope>]`,
 inspect the requested kernel version, compare it with the deployed

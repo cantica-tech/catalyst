@@ -1,0 +1,43 @@
+id_prefix: ANALYSIS
+name: Analysis
+plural_name: Analyses
+folder: analyses
+grounding: none
+
+fields:
+  - name: ID
+    kind: text
+    required: true
+  - name: Status
+    kind: enum
+    required: true
+    allowed_values:
+      - Extracting
+      - Reconciling
+      - Deciding
+      - Closed
+      - Abandoned
+  - name: Mode
+    kind: enum
+    required: true
+    allowed_values:
+      - bootstrap
+      - incremental
+  - name: Scope
+    kind: text
+    required: true
+  - name: Code state
+    kind: text
+    required: true
+
+workflow:
+  initial: Extracting
+  states:
+    - Extracting
+    - Reconciling
+    - Deciding
+    - Closed
+    - Abandoned
+  closed_states:
+    - Closed
+    - Abandoned

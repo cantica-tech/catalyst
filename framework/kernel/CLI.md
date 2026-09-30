@@ -492,6 +492,53 @@ Free-form types whose items are rows of a hand-edited table (the ETD's
 `naming: free-form`) have no generated index; their rows stay prose-edited
 per the owning command.
 
+### `catalyst analysis <subcommand>`
+
+The four-eyes analysis of existing code (`ANALYSIS-PLAYBOOK.md`,
+`/run-analysis`): an `ANALYSIS-` record in `analyses/`, its reports in
+`analyses/reports/<ID>/`. Each subcommand moves one phase, refuses to skip
+one, and journals the record and its reports. Every subcommand fails with
+exit `1` and a reason on stderr when a precondition does not hold.
+
+- **`start [<path>...] [--mode bootstrap|incremental] [--name <name>] [--as <user>]`**
+  — allocates the record (Status `Extracting`) and writes
+  `inventory.json`: every tracked file under the paths (default: the whole
+  project, never `.criterion`) with its blob hash, and the product's `HEAD`
+  as the code state. `incremental` (the default) also lists the rules,
+  domains and rule-grounded artifacts already recorded; `bootstrap`
+  refuses when rules exist.
+- **`record <ID> --pass A|B <file> [--replace]`** — validates one pass's
+  findings (`ANALYSIS-PLAYBOOK.md`, "Findings format": kind, title,
+  statement, confidence; a rule's status; in-scope file and line evidence;
+  a defect's `breaks`, an existing rule or a rule finding of the same
+  pass) and stores it once as `A.json` or `B.json`. Warns when both passes
+  are identical.
+- **`diff <ID>`** — needs both passes: pairs findings (same kind; wording
+  and shared evidence) and writes `diff.json` — `agreed`, `conflicting`
+  (paired, but a different rule status or broken rule), `a_only`,
+  `b_only`. Status `Reconciling`.
+- **`reconcile <ID> <file>`** — accepts the reconciler's `{"findings",
+  "dropped"}` only if every finding of both passes is in exactly one final
+  finding's `sources` (`A:<id>`, `B:<id>`) or dropped with a reason, and
+  every final finding that is not a plain agreement has a `verification`
+  other than `both passes`. Writes `reconciled.json`; Status `Deciding`.
+- **`decide <ID> <finding> accept|reject [--artifact <ID>] [--reason <text>] [--as <user>]`**
+  — records the user's decision in `decisions.json`. `accept` needs the
+  artifact the finding became, and it must exist: a registered DOMAIN code,
+  a rule ID, or an artifact ID. A later decision on the same finding
+  replaces the earlier one.
+- **`close <ID>`** — refuses while a finding is undecided or an accepted
+  finding's artifact is missing; sets Status `Closed` and the date, and
+  writes the summary.
+- **`abandon <ID> --reason <text>`** — Status `Abandoned`, with the reason.
+- **`status <ID>`** — the phase, the passes, the diff counts, how many
+  findings are decided, and anything keeping the record from its phase.
+
+`catalyst check` applies the same rules to every record: a record in
+`Reconciling` or later without both passes and the diff, in `Deciding` or
+later without a complete reconciliation, or `Closed` with an undecided
+finding or a missing artifact, is an error.
+
 ### `catalyst criterion <subcommand>`
 
 Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). A shared
