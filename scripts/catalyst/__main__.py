@@ -329,6 +329,19 @@ def cmd_hook(args) -> int:
     return hook_stop(dep, strict=args.strict)
 
 
+def _ask_url(exc) -> str:
+    """Ask for the criterion repository's URL on an interactive terminal;
+    elsewhere (an agent, CI) the error stands and names --url."""
+    if not sys.stdin.isatty():
+        raise exc
+    print(f"catalyst: {exc}", file=sys.stderr)
+    url = input("criterion repository URL (empty to stay local): ").strip()
+    if not url:
+        from catalyst.criterion import CriterionError
+        raise CriterionError("no URL given: nothing changed, the deployment stays local")
+    return url
+
+
 def cmd_criterion(args) -> int:
     from catalyst import criterion as cr
 
@@ -338,7 +351,13 @@ def cmd_criterion(args) -> int:
         project = next((d for d in (start, *start.parents) if any(d.glob("*.catalyst"))), None)
         if project is None:
             raise DeploymentNotFound(f"no *.catalyst pointer at or above {start}")
-        print(f"joined: .criterion at {cr.join(project)}")
+        try:
+            head = cr.join(project, args.url)
+        except cr.NeedsURL as exc:
+            head = cr.join(project, _ask_url(exc))
+        print(f"joined: .criterion at {head}")
+        if cr.is_submodule(project):
+            print("Commit the product repository's staged changes (if any) when ready.")
         return 0
     dep = open_deployment(args)
     if sub == "status":
@@ -349,10 +368,23 @@ def cmd_criterion(args) -> int:
             print(f"vs shared: {st.ahead} ahead, {st.behind} behind")
         return 0
     if sub == "create":
-        for step in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE):
-            print(f"- {step}")
+        for note in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE):
+            print(f"- {note}")
         print("Commit the product repository's staged changes when ready.")
         return 0
+    if sub in ("push", "sync"):
+        # a local-only deployment is published first, to the URL given or asked for
+        url = args.url
+        while True:
+            try:
+                dep, published = cr.ensure_remote(dep, url)
+                break
+            except cr.NeedsURL as exc:
+                url = _ask_url(exc)
+        for note in published:
+            print(f"- {note}")
+        if published:
+            print("Published: commit the product repository's staged changes when ready.")
     if sub == "push":
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
@@ -606,18 +638,23 @@ def build_parser() -> argparse.ArgumentParser:
     q = cs.add_parser("status", help="the working copy against the shared branch")
     q.add_argument("--fetch", action="store_true")
     q.set_defaults(func=cmd_criterion)
-    q = cs.add_parser("create", help="publish a local-only working copy as the .criterion submodule")
-    q.add_argument("url", help="the criterion repository (empty, or already holding this history)")
+    q = cs.add_parser("create", help="version the working copy for sharing; with a URL, publish it as the .criterion submodule")
+    q.add_argument("url", nargs="?", default=None,
+                   help="the criterion repository (empty, or already holding this history); without it "
+                        "the working copy is versioned strictly locally, and push/sync/join ask for it")
     q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("join", help="check out a shared deployment in a clone of the product")
+    q.add_argument("--url", help="the criterion repository, when the product has no .criterion submodule yet")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("push", help="commit, rebase, check, push a topic branch, open a pull request")
     q.add_argument("-m", "--message", required=True, help="commit message / pull request title")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--no-pr", action="store_true", help="push the branch without opening a pull request")
+    q.add_argument("--url", help="the criterion repository, when the deployment is still local only")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("sync", help="fast-forward to the shared branch (refuses with local work)")
+    q.add_argument("--url", help="the criterion repository, when the deployment is still local only")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("integrity", help="fail if a merge lost any ID, index row or journal line")
     q.add_argument("--head", default="HEAD")

@@ -505,11 +505,23 @@ Every subcommand fails with exit `1` and a reason on stderr when git
 fails or a precondition does not hold; nothing is half-applied in the
 product repository.
 
-#### `catalyst criterion create <url> [--branch <name>]`
+#### `catalyst criterion create [<url>] [--branch <name>]`
 
 Turns a local-only deployment into a shared one. `<url>` is the
 criterion repository: empty, or already holding this working copy's
-history on `<name>` (default `criterion`). In order:
+history on `<name>` (default `criterion`).
+
+Without `<url>`, only items 1–3 below run: the working copy becomes a git
+repository on the shared branch, with its `.gitattributes` and CI
+workflow committed, and stays behind the `.criterion` symlink with no
+remote. The pointer records `criterion_branch` (staged, journaled).
+Nothing leaves the machine. The first `push`, `sync` or `join` then
+needs the criterion repository: it takes `--url <url>`, or asks for it
+on an interactive terminal, and runs items 4–6 before carrying on;
+elsewhere it fails with exit `1`, naming `--url`. It refuses when the
+working copy already has a remote.
+
+With `<url>`, in order:
 
 1. Refuses if `.criterion` is already a submodule, or is not a symlink
    to an agent-owned working copy (move an in-project fallback directory
@@ -533,12 +545,22 @@ The old agent-owned copy is left in place, unused; remove it once
 satisfied. Creating the remote repository itself happens on the hosting
 service, beforehand.
 
-#### `catalyst criterion join`
+#### `catalyst criterion join [--url <url>]`
 
 In a fresh clone of the product repository: initialises the `.criterion`
 submodule and checks out the shared branch, so the working copy is on a
-branch rather than a detached gitlink. Fails if the project has no
-`.criterion` submodule. Prints the checked-out commit.
+branch rather than a detached gitlink. Prints the checked-out commit.
+
+A product with no `.criterion` submodule yet needs the criterion
+repository (`--url`, or asked for on an interactive terminal). Where this
+machine holds the local working copy (the symlink), it is published there
+as by `create <url>`. Otherwise the repository — which must already have
+the shared branch — is added as the submodule, `/.criterion` leaves
+`.gitignore`, the pointer records `repoed`, `catalyst_repo_url` and
+`criterion_branch`, and those product files are staged and journaled in
+the working copy (land the entry with the next `push`). A local working
+copy that already has a remote is not converted: `create <url>` does
+that.
 
 #### `catalyst criterion status [--fetch]`
 
@@ -547,7 +569,7 @@ the current branch, the count of uncommitted changes and, when the
 remote has the shared branch, how far the working copy is ahead of and
 behind it. `--fetch` fetches first. Always exits `0`.
 
-#### `catalyst criterion push -m <message> [--as <user>] [--no-pr]`
+#### `catalyst criterion push -m <message> [--as <user>] [--no-pr] [--url <url>]`
 
 Lands the working copy's changes as a pull request against the shared
 branch. `<message>` is the commit message and pull request title; the
@@ -555,7 +577,9 @@ signer is resolved as in [Signer](#signer), and its `git_username` (else
 `name`) is the commit author name and the topic branch's prefix. In
 order:
 
-1. Refuses if the working copy has no remote (`create` first). Fetches.
+1. With no remote (a local-only deployment), publishes first to `--url`
+   (asked for on a terminal; otherwise it fails naming `--url`), as
+   `create <url>` does. Fetches.
 2. Switches to a topic branch, `<user>/<UTC timestamp>`, unless one is
    already checked out (any branch other than the shared one) whose pull
    request is still open — a topic whose branch was merged or deleted is
@@ -588,9 +612,11 @@ order:
 
 Once the pull request is merged, `sync` brings the result back.
 
-#### `catalyst criterion sync`
+#### `catalyst criterion sync [--url <url>]`
 
-Fast-forwards the working copy to the shared branch. Refuses while the
+Fast-forwards the working copy to the shared branch; a local-only
+deployment is published first, to `--url` (or the URL asked for), as by
+`push`. Refuses while the
 working copy has uncommitted changes, or commits that no remote branch
 contains — at HEAD or on the local shared branch, even with HEAD
 detached (`push` them first) — so it never loses local work. `join`
