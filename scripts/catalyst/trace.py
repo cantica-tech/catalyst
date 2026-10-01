@@ -28,7 +28,7 @@ CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
 HOOK = """#!/usr/bin/env python3
 # Installed by `catalyst hook install`: every commit cites an artifact or rule ID,
 # or is marked `chore:` (catalyst trace) — checked by each deployment whose files
-# it changes (fw-STRUCTURE-000017). Bypass once with `git commit --no-verify`.
+# it changes. Bypass once with `git commit --no-verify`.
 import os
 import subprocess
 import sys
