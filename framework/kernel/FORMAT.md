@@ -478,6 +478,14 @@ CLI reads any type an ETD declares.
 - Commits whose product changes the journal records (§7), after the
   pointer's `journal_since`; a change made outside catalyst is adopted
   or reverted.
+- Optionally, `.catalystignore` files, in any directory: what is not
+  governed by catalyst. Empty (blank lines and `#` comments aside): that
+  directory and everything below it. Otherwise one path per line,
+  relative to the file's directory — a file, or a directory and
+  everything below it; `/`-separated, no wildcards, a leading `/` or
+  `./` ignored. A directory with its own `<app-name>.catalyst` is a
+  separate, nested deployment, outside its parent's scope (`CLI.md`,
+  "What a deployment governs").
 
 ## Related docs
 

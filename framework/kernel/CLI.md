@@ -219,7 +219,22 @@ already blocked this stop, it reports the failures without blocking
 again, so an unfixable failure cannot loop a session. Without a
 deployment it exits `0`. See [Hooks](#hooks).
 
-### `catalyst hook commit-msg <message-file>`
+### What a deployment governs
+
+A deployment — the directory holding its `*.catalyst` pointer — governs
+the files under it, except those under a nested directory with a pointer
+of its own (another deployment, isolated: the inner one wins) and those a
+`.catalystignore` opts out (`FORMAT.md` §11). An empty `.catalystignore`
+(blank lines and `#` comments aside) opts its directory and everything
+below out of catalyst; one with lines opts out those paths, relative to
+its directory — a file, or a directory and everything below it;
+`/`-separated, no wildcards. Changes outside catalyst (`unrecorded`,
+`journal adopt`, the hook's staged files), `trace` and `analysis start`
+read only what the deployment governs; `init` refuses an opted-out
+directory, and `check` reports a pointer in one. The working tree's
+current layout decides.
+
+### `catalyst hook commit-msg <message-file> [--route]`
 
 A git `commit-msg` hook: every product commit traces to the chain (INV-5
 at commit granularity). It exits `0` when the message
@@ -239,6 +254,14 @@ ignored. A merge commit (git is concluding a merge) is let through, as
 unreachable, it lets the commit through. `git commit --no-verify`
 bypasses it once; `catalyst trace` in CI still catches the commit.
 
+`--route` (what the installed hook calls, from the repository top): each
+staged file goes to the deployment that owns it (nearest pointer above
+it, unless opted out), and each owning deployment checks the message and
+its own staged files with its own vendored CLI; the commit passes only if
+all of them pass. With no owned file staged, the repository top's
+deployment checks the message, if there is one; otherwise the commit
+passes. So a commit spanning two projects must trace in both.
+
 A traced message is then checked for staged product files whose content
 no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---json)):
 a warning on stderr during the beta, a refusal (exit `1`) from format
@@ -250,9 +273,11 @@ the pointer: not checked.
 
 Writes the `commit-msg` hook above, executable, into the project
 repository's `hooks/commit-msg` under its git directory
-(`.git/hooks/commit-msg`). The hook runs
-`python3 .criterion/bin/catalyst.pyz hook commit-msg` from the repository
-root, so it follows every re-vendored CLI. It refuses (exit `1`) when a
+(`.git/hooks/commit-msg`) — one hook for every deployment the repository
+holds. The hook, a short Python script, runs the installing deployment's
+vendored CLI (its path from the repository top is written into the hook;
+the nearest vendored CLI to a staged file when that one is gone) with
+`hook commit-msg --route`, so it follows every re-vendored CLI. It refuses (exit `1`) when a
 `commit-msg` hook already exists that catalyst did not write — merge the
 two by hand — and rewrites its own. It writes into `.git/`, so it runs
 only with the user's assent; it is offered after install
@@ -265,7 +290,9 @@ Checks that every commit in a git revision range traces, by the same rule
 as `hook commit-msg`: `<range>` is anything `git log` accepts
 (`main..HEAD`, `<sha>~1..<sha>`, `HEAD` for the whole history; default
 `HEAD~1..HEAD`). Merge commits are skipped: they carry their parents'
-trace. Prints one `ERROR <sha> '<subject>': <reason>` line per commit
+trace. With a working copy, a commit that changes files but none the
+deployment governs is skipped too — another project's commit in a shared
+repository; a commit that changes no file at all is checked. Prints one `ERROR <sha> '<subject>': <reason>` line per commit
 without a trace, then a summary; exits `1` if any, and on a bad range.
 
 With a working copy (not `--pattern-only`) and a `journal_since` in the

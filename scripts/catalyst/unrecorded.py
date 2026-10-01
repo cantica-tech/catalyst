@@ -29,6 +29,7 @@ from pathlib import Path
 from catalyst import __version__
 from catalyst import journal
 from catalyst.deployment import Deployment
+from catalyst.scope import governs
 
 ZERO = "0" * 40
 GITLINK = "160000"
@@ -147,8 +148,8 @@ def commits(repo: Path, revs: list[str]) -> list[Commit]:
         sha, author, when, subject = parts[0], parts[1], parts[2], parts[3]
         # whatever follows the subject on the header line, then the raw tokens
         tokens = [t.lstrip("\n") for t in ("\x00".join(parts[4:]) + "\x00" + raw).split("\x00")]
-        out.append(Commit(sha, author, subject, _parse_raw([t for t in tokens if t]),
-                          float(when) if when.isdigit() else 0.0))
+        changes = [c for c in _parse_raw([t for t in tokens if t]) if governs(repo, c[0])]
+        out.append(Commit(sha, author, subject, changes, float(when) if when.isdigit() else 0.0))
     return out
 
 
@@ -207,6 +208,8 @@ def staged(dep: Deployment) -> list[tuple[str, str | None, str | None]]:
     journaled = recorded(dep)
     out = []
     for c in _parse_raw([t for t in res.stdout.split("\x00") if t]):
+        if not governs(dep.project_root, c[0]):
+            continue                                 # a nested deployment's, or opted out
         state = journaled.latest(c[0])               # as of now: the commit being made
         if state is None or state[1] != c[2]:
             out.append(c)

@@ -216,7 +216,7 @@ def cmd_trace(args) -> int:
         dep = open_deployment(args)
         corpus, repo = load_corpus(dep), dep.project_root
     try:
-        checked, failures = trace(repo, args.range, corpus)
+        checked, failures = trace(repo, args.range, corpus, scoped=dep is not None and not dep.standalone)
         manual, lvl = [], "warning"
         if corpus is not None and not dep.standalone and unrecorded.baseline_missing(dep):
             print(f"WARNING unrecorded-change: {unrecorded.MISSING_BASELINE}")
@@ -279,6 +279,10 @@ def cmd_unrecorded(args) -> int:
 def cmd_hook(args) -> int:
     from catalyst.check import hook_stop
 
+    if args.hook_command == "commit-msg" and args.route:
+        from catalyst.trace import route
+        top = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+        return route(top, Path(os.path.abspath(args.message_file)), [sys.executable, sys.argv[0]])
     if args.hook_command == "commit-msg":
         from catalyst.corpus import load_corpus
         from catalyst.trace import check_message
@@ -623,6 +627,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("commit-msg", help="git commit-msg hook: the message must trace to the chain")
     q.add_argument("message_file")
+    q.add_argument("--route", action="store_true",
+                   help="from the repository top: hand the message to each deployment owning a staged file")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
