@@ -46,6 +46,9 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   (`bootstrap` / `incremental`), the commit analysed, both passes, the
   reconciled findings (domains, rules, defects) and the user's decision on
   each, in `analyses/` (`ANALYSIS-PLAYBOOK.md`, `CLI.md`).
+- **`.catalystignore`.** A committed file in any product directory that
+  opts paths out of catalyst: empty, its whole directory; with lines,
+  those paths. No deployment governs what it opts out (`FORMAT.md` §11).
 - **`<app-name>.catalyst` (the pointer).** The one small JSON file the
   product repository tracks at its root: project name, format version,
   kernel version, active module, agent, sharing fields. It holds no path

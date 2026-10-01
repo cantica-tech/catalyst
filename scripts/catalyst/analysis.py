@@ -27,6 +27,7 @@ from pathlib import Path
 
 from catalyst.corpus import Artifact, Corpus, load_corpus
 from catalyst.deployment import Deployment
+from catalyst.scope import governs
 
 PREFIX = "ANALYSIS"
 KINDS = ("domain", "rule", "defect")
@@ -289,8 +290,8 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
     files = {}
     for line in listed:
         meta, path = line.split("\t", 1)
-        if path == ".criterion" or path.startswith(".criterion/"):
-            continue
+        if not governs(project, path):
+            continue                          # the working copy, a nested deployment, opted out
         files[path] = meta.split()[1]
     if not files:
         raise AnalysisError(f"no tracked file in {' '.join(scope)}")

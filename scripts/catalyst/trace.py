@@ -25,10 +25,37 @@ from catalyst.corpus import Corpus
 TOKEN_RE = re.compile(r"\b([A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{3,6}(?:-[A-Za-z0-9]{8})?)\b")
 FULL_SHAPE = re.compile(r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?)$")
 CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
-HOOK = """#!/bin/sh
+HOOK = """#!/usr/bin/env python3
 # Installed by `catalyst hook install`: every commit cites an artifact or rule ID,
-# or is marked `chore:` (catalyst trace). Bypass once with `git commit --no-verify`.
-exec python3 "$(git rev-parse --show-toplevel)/.criterion/bin/catalyst.pyz" hook commit-msg "$1"
+# or is marked `chore:` (catalyst trace) — checked by each deployment whose files
+# it changes (fw-STRUCTURE-000017). Bypass once with `git commit --no-verify`.
+import os
+import subprocess
+import sys
+
+git = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True).stdout
+top = git("rev-parse", "--show-toplevel").strip()
+staged = [p for p in git("-C", top, "diff", "--cached", "--name-only", "-z").split("\\0") if p]
+ROUTER = "{router}"  # the CLI that installed this hook, relative to the repository top
+
+
+def cli_near(rel):
+    d = os.path.dirname(rel)
+    while True:
+        cli = os.path.join(top, d, ".criterion", "bin", "catalyst.pyz")
+        if os.path.isfile(cli):
+            return cli
+        if not d:
+            return None
+        d = os.path.dirname(d)
+
+
+router = os.path.join(top, ROUTER)
+cli = router if os.path.isfile(router) else next((c for c in map(cli_near, staged + [""]) if c), None)
+if cli is None:
+    sys.exit(0)
+sys.exit(subprocess.run([sys.executable, cli, "--project", top, "hook", "commit-msg", "--route",
+                         os.path.abspath(sys.argv[1])]).returncode)
 """
 
 
@@ -92,11 +119,43 @@ def commits(repo: Path, rev_range: str | list[str]) -> list[tuple[str, list[str]
     return out
 
 
-def trace(repo: Path, rev_range: str, corpus: Corpus | None) -> tuple[int, list[Failure]]:
+def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]]:
+    """Each commit's changed files, relative to the repository top."""
+    revs = [rev_range] if isinstance(rev_range, str) else rev_range
+    res = subprocess.run(["git", "-C", str(repo), "log", "--no-renames", "--name-only", "-z",
+                          "--format=%x1e%H", *revs], capture_output=True, text=True)
+    if res.returncode != 0:
+        raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
+    out: dict[str, list[str]] = {}
+    for record in res.stdout.split("\x1e"):
+        fields = [f.strip("\n") for f in record.split("\x00")]
+        fields = [f for f in fields if f]
+        if fields:
+            out[fields[0]] = fields[1:]
+    return out
+
+
+def trace(repo: Path, rev_range: str, corpus: Corpus | None,
+          scoped: bool = False) -> tuple[int, list[Failure]]:
+    """Check each non-merge commit's message. `scoped`: only commits that
+    change a file this deployment governs, or no file at all
+    (fw-STRUCTURE-000017) — another project's commits in a shared
+    repository are that project's to check."""
     checked, failures = 0, []
+    files: dict[str, list[str]] = {}
+    prefix = ""
+    if scoped:
+        from catalyst.scope import governs
+        files = changed_files(repo, rev_range)
+        prefix = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-prefix"],
+                                capture_output=True, text=True).stdout.strip()
     for sha, parents, body in commits(repo, rev_range):
         if len(parents) > 1:
             continue                                  # merges carry their parents' trace
+        if scoped and files.get(sha):
+            mine = [f[len(prefix):] for f in files[sha] if f.startswith(prefix)]
+            if not any(governs(repo, f) for f in mine):
+                continue                              # changes only other projects' files
         checked += 1
         reason = check_message(body, corpus)
         if reason:
@@ -112,7 +171,32 @@ def install_hook(project_root: Path) -> Path:
     hook = Path(git_dir.stdout.strip()) / "hooks" / "commit-msg"
     if hook.exists() and "catalyst hook install" not in hook.read_text(encoding="utf-8", errors="ignore"):
         raise ValueError(f"{hook} exists and was not written by catalyst — merge it by hand")
+    prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
+                            capture_output=True, text=True).stdout.strip()
     hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text(HOOK, encoding="utf-8")
+    hook.write_text(HOOK.replace("{router}", f"{prefix}.criterion/bin/catalyst.pyz"), encoding="utf-8")
     hook.chmod(0o755)
     return hook
+
+
+def route(top: Path, message_file: Path, cli: list[str]) -> int:
+    """The commit-msg hook's router (fw-STRUCTURE-000017): every deployment
+    owning a staged file checks the message and its own staged files with
+    its own vendored CLI; with no owned file staged, the repository top's
+    deployment does, if there is one. Fails if any of them refuses."""
+    import sys
+
+    from catalyst.scope import owner
+    res = subprocess.run(["git", "-C", str(top), "diff", "--cached", "--name-only", "-z"],
+                         capture_output=True, text=True)
+    staged = [p for p in res.stdout.split("\0") if p]
+    owners = sorted({o for o in (owner(top, p) for p in staged) if o is not None})
+    if not owners and any(Path(top).glob("*.catalyst")):
+        owners = [Path(top).absolute()]
+    status = 0
+    for o in owners:
+        vendored = o / ".criterion" / "bin" / "catalyst.pyz"
+        command = [sys.executable, str(vendored)] if vendored.is_file() else cli
+        done = subprocess.run([*command, "--project", str(o), "hook", "commit-msg", str(message_file)])
+        status = max(status, done.returncode)
+    return status

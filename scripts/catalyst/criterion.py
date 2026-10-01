@@ -135,13 +135,27 @@ def shared_branch(dep: Deployment) -> str:
     return str(dep.pointer.get("criterion_branch") or DEFAULT_BRANCH)
 
 
+def repo_place(project_root: Path) -> tuple[Path, str]:
+    """The repository top holding the project, and the project's prefix in it
+    (`""` at the top, else `sub/dir/`): `.gitmodules` lives at the top and
+    names the working copy `<prefix>.criterion` (fw-STRUCTURE-000017)."""
+    top = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
+                         capture_output=True, text=True).stdout.strip()
+    if not top:
+        return Path(project_root), ""
+    prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
+                            capture_output=True, text=True).stdout.strip()
+    return Path(top), prefix
+
+
 def is_submodule(project_root: Path) -> bool:
-    gm = project_root / ".gitmodules"
+    top, prefix = repo_place(project_root)
+    gm = top / ".gitmodules"
     if not gm.is_file():
         return False
     res = subprocess.run(["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
                          capture_output=True, text=True)
-    return any(line.split()[-1] == ".criterion" for line in res.stdout.splitlines())
+    return any(line.split()[-1] == f"{prefix}.criterion" for line in res.stdout.splitlines())
 
 
 def dirty(wc: Path) -> list[str]:
@@ -632,7 +646,7 @@ def _record_shared(project: Path, url: str, branch: str) -> Path:
     pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
                     "updated": datetime.date.today().isoformat()})
     pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
-    run(project, "add", pointer_path.name, ".gitmodules",
+    run(project, "add", pointer_path.name, str(repo_place(project)[0] / ".gitmodules"),
         *([".gitignore"] if (project / ".gitignore").is_file() else []))
     return pointer_path
 
@@ -669,11 +683,12 @@ def _publish(dep: Deployment, url: str, branch: str) -> list[str]:
         run(project, "rm", "-q", "--cached", "-r", "--ignore-unmatch", ".criterion", check=False)
         shutil.rmtree(project / ".criterion", ignore_errors=True)
         git_dir = Path(out(project, "rev-parse", "--absolute-git-dir"))
-        shutil.rmtree(git_dir / "modules" / ".criterion", ignore_errors=True)
-        gm = project / ".gitmodules"
+        top, prefix = repo_place(project)
+        shutil.rmtree(git_dir / "modules" / f"{prefix}.criterion", ignore_errors=True)
+        gm = top / ".gitmodules"
         if gm.is_file() and not gm.read_text(encoding="utf-8").strip():
             gm.unlink()
-            run(project, "rm", "-q", "--cached", "--ignore-unmatch", ".gitmodules", check=False)
+            run(top, "rm", "-q", "--cached", "--ignore-unmatch", ".gitmodules", check=False)
         link.symlink_to(agent_owned)
         if old_gitignore is not None:
             gitignore.write_text(old_gitignore, encoding="utf-8")

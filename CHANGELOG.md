@@ -6,6 +6,23 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+What a deployment governs (migration `0.45.0/workspace-scope.md`).
+
+- A deployment governs the files under it, minus nested directories with
+  their own pointer — separate, isolated deployments; the inner one wins —
+  and minus what a `.catalystignore` opts out: empty, its whole directory;
+  with lines, those paths. Changes outside catalyst, `journal adopt`,
+  `trace` and `analysis start` read only those files; `catalyst init`
+  refuses an opted-out directory, `catalyst check` reports a pointer in one.
+- The commit-msg hook routes: every deployment owning a staged file checks
+  the message and its staged files with its own CLI, so projects sharing a
+  repository stay apart. Reinstall it (`catalyst hook install`) after
+  re-vendoring the CLI.
+- `criterion create`, `join` and the submodule detection work for a
+  project in a repository subfolder.
+
 ## 0.44.1 — 2026-09-30
 
 - A process module declares the kernel versions it works with
