@@ -59,7 +59,10 @@ def test_commit_msg_hook_and_install(project, capsys):
     msg.write_text("chore: fine\n")
     assert main(["hook", "commit-msg", str(msg)]) == 0
     hook = install_hook(project)
-    assert hook.name == "commit-msg" and "hook commit-msg" in hook.read_text()
+    text = hook.read_text()
+    # the routing hook (fw-STRUCTURE-000017): each owning deployment's CLI checks the message
+    assert hook.name == "commit-msg" and '"commit-msg", "--route"' in text
+    assert "catalyst hook install" in text and text.startswith("#!/usr/bin/env python3")
     install_hook(project)                                     # idempotent
     hook.write_text("#!/bin/sh\necho mine\n")
     with pytest.raises(ValueError, match="not written by catalyst"):

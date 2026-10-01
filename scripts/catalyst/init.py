@@ -170,6 +170,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         raise InitError(f"{project} already has a *.catalyst pointer — catalyst is installed")
     if (project / ".criterion").exists() or (project / ".criterion").is_symlink():
         raise InitError(f"{project}/.criterion already exists")
+    from catalyst.scope import IGNORE_FILE, opted_out
+    if opted_out(project):
+        raise InitError(f"{project} is opted out of catalyst by a {IGNORE_FILE} (there, or in a "
+                        "directory above it) — remove that opt-out first")
     kernel = req.kernel.resolve()
     if not (kernel / "rules-of-rules.template.md").is_file():
         raise InitError(f"{kernel} is not a catalyst kernel (no rules-of-rules.template.md)")

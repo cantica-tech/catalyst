@@ -46,6 +46,11 @@ def run(dep: Deployment) -> Report:
         elif declared not in SUPPORTED_FORMATS:
             report.errors.append(f"format: the deployment is format {declared}; this catalyst reads "
                                  f"{', '.join(sorted(SUPPORTED_FORMATS))} — sync the CLI or the deployment")
+    if not dep.standalone:
+        from catalyst.scope import IGNORE_FILE, opted_out
+        if opted_out(dep.project_root):
+            report.errors.append(f"scope: {dep.project_root.name} has a pointer but is opted out of catalyst "
+                                 f"by a {IGNORE_FILE} — remove one or the other")
     structure, report.scope = structural_errors(
         dep.root, None if dep.standalone else dep.project_root, dep.module)
     report.errors += [f"structure: {e}" for e in structure]
