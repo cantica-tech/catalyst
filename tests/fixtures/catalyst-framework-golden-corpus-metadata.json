@@ -1,0 +1,19 @@
+{
+  "capture_epoch": "2026-10-07T15:55:26.433850+00:00",
+  "deployment_name": "catalyst",
+  "kernel_version": "0.45.0",
+  "module": "`software-engineering`",
+  "git_sha": "8fbf7f07af171a6637d5922760929b5bfe0feb7f",
+  "rules_total": 16,
+  "users": 1,
+  "roles": 8,
+  "requirements": 11,
+  "workflows": 6,
+  "journal_entries": 173,
+  "artifacts": {
+    "rules": 16,
+    "requirements": 11,
+    "workflows": 6,
+    "domains": 5
+  }
+}
