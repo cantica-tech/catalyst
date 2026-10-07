@@ -15,7 +15,8 @@ are declared in its module.yaml `required_paths:`. When no module resolves,
 only the kernel checks run.
 
 Exit 0 = clean, exit 1 = violations found (fails CI; scripts/stop_hook.py
-turns it into a blocking Claude Code Stop hook).
+turns it into a blocking Claude Code Stop hook). No reachable deployment is
+skipped (exit 0) unless `--require` is passed, as CI does: then it fails.
 
 Scope note: only checks the structural invariants that are machine-verifiable
 from the tree. Behavioural rules (INV-1..INV-4) are not checkable here and remain
@@ -606,9 +607,24 @@ def structural_errors(root: Path, project_root: Path | None,
     return errors, scope
 
 
-def main() -> int:
+REQUIRE_FLAG = "--require"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`--require` (CI): no deployment to validate is a failure, so a gate
+    can never pass by checking nothing. Without it (local development) a
+    project without a reachable deployment is skipped."""
+    argv = list(argv or [])
+    unknown = [a for a in argv if a != REQUIRE_FLAG]
+    if unknown:
+        print(f"usage: check_deployment.py [{REQUIRE_FLAG}] (unknown: {' '.join(unknown)})")
+        return 2
     root = find_deploy_root(Path.cwd())
     if root is None:
+        if REQUIRE_FLAG in argv:
+            print(f"catalyst deployment validation FAILED: no *{POINTER_SUFFIX} pointer with a reachable "
+                  f"working copy or {DEPLOY_DIRNAME}/ found from {Path.cwd()} ({REQUIRE_FLAG})")
+            return 1
         # No deployment in this repo — nothing to validate, not a failure.
         print(
             f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; "
@@ -627,4 +643,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

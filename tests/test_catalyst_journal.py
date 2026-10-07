@@ -290,3 +290,22 @@ def test_check_warns_about_new_unjournaled_product_files(project):
     assert unrecorded_changes(dep) == ["src/new.py"]
     j.append(dep, req(["src/new.py"], action="create", tier="feature"))
     assert unrecorded_changes(dep) == []
+
+
+def test_creating_the_pin_ref_is_announced_once(project, capsys):
+    dep = load(project)
+    write(project / "src" / "a.py", "a\n")
+    j.append(dep, req(["src/a.py"], action="create"))
+    err = capsys.readouterr().err
+    assert f"created {j.PIN_REF} in {project}" in err
+    write(project / "src" / "a.py", "b\n")
+    j.append(dep, req(["src/a.py"]))
+    assert j.PIN_REF not in capsys.readouterr().err
+
+
+def test_revisions_and_object_ids_never_reach_git_as_options():
+    with pytest.raises(ValueError):
+        j.revisions(["HEAD", "--output=x"])
+    assert j.revisions(["A..B", "^c"]) == ["A..B", "^c"]
+    assert j.object_id("a" * 40) and not j.object_id("--batch") and not j.object_id("A" * 40)
+    assert not j.blob_exists(Path("."), "-p")

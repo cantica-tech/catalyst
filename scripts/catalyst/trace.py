@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from catalyst.corpus import Corpus
+from catalyst.journal import revisions
 
 # an entity ID (ITEM-000001[-userid]) or a rule ID (br-AUTH-000001[-userid]);
 # nothing else that merely looks like word-digits (paths, versions)
@@ -103,9 +104,12 @@ def check_message(message: str, corpus: Corpus | None) -> str | None:
     return "cites no artifact or rule ID (or mark it `chore:`)"
 
 
-def commits(repo: Path, rev_range: str | list[str]) -> list[tuple[str, list[str], str]]:
-    revs = [rev_range] if isinstance(rev_range, str) else rev_range
-    res = subprocess.run(["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", *revs],
+def commits(repo: Path, rev_range: str | list[str],
+            options: tuple[str, ...] = ()) -> list[tuple[str, list[str], str]]:
+    """`rev_range`: user-supplied revisions, never options (`revisions`);
+    `options`: the caller's own `git log` options (e.g. `--since=`)."""
+    revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
+    res = subprocess.run(["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", *options, *revs],
                          capture_output=True, text=True)
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
@@ -121,7 +125,7 @@ def commits(repo: Path, rev_range: str | list[str]) -> list[tuple[str, list[str]
 
 def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]]:
     """Each commit's changed files, relative to the repository top."""
-    revs = [rev_range] if isinstance(rev_range, str) else rev_range
+    revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
     res = subprocess.run(["git", "-C", str(repo), "log", "--no-renames", "--name-only", "-z",
                           "--format=%x1e%H", *revs], capture_output=True, text=True)
     if res.returncode != 0:

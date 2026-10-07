@@ -215,3 +215,130 @@ def test_init_after_a_first_commit_sets_the_baseline_there(tmp_path):
     head = subprocess.check_output(["git", "-C", str(req.project), "rev-parse", "HEAD"], text=True).strip()
     init(req)
     assert json.loads((req.project / "app.catalyst").read_text())["journal_since"] == head
+
+
+# --- install order, --at, rollback, grounding (BOOTSTRAP §2, INV-6) -------------
+def _ledger(where: Path) -> Path:
+    return write(where / ".ledger" / "install.todo.md", "- [ ] install\n")
+
+
+def test_a_ledger_only_in_project_criterion_is_adopted_and_moved_to_the_working_copy(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    init(req)
+    assert (req.project / ".criterion").is_symlink()
+    assert (req.at / ".ledger" / "install.todo.md").read_text() == "- [ ] install\n"
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_a_ledger_only_in_project_criterion_is_kept_without_at(tmp_path):
+    req = request(tmp_path, at=None)
+    _ledger(req.project / ".criterion")
+    init(req)
+    assert (req.project / ".criterion" / ".ledger" / "install.todo.md").is_file()
+    assert (req.project / ".criterion" / "CODE-OF-CONDUCT.md").is_file()
+
+
+def test_a_ledger_only_target_is_adopted(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.at)
+    init(req)
+    assert (req.at / ".ledger" / "install.todo.md").is_file() and (req.at / "CODE-OF-CONDUCT.md").is_file()
+
+
+def test_at_names_the_working_copy_or_its_parent(tmp_path):
+    """`--at <dir>/.criterion` is the working copy; any other `--at` is the
+    directory that holds it (INV-6: the working copy is always `.criterion`)."""
+    agent_space = tmp_path / "agent-space"
+    write(agent_space / "memory" / "MEMORY.md", "notes\n")
+    req = request(tmp_path, at=agent_space)
+    init(req)
+    assert (agent_space / ".criterion" / "CODE-OF-CONDUCT.md").is_file()
+    assert (agent_space / "memory" / "MEMORY.md").read_text() == "notes\n"
+    assert Path(__import__("os").path.realpath(req.project / ".criterion")) == (agent_space / ".criterion").resolve()
+
+
+def test_a_non_empty_target_is_refused_untouched(tmp_path):
+    req = request(tmp_path)
+    write(req.at / "stray.md", "x\n")
+    with pytest.raises(InitError, match="not empty"):
+        init(req)
+    assert sorted(p.name for p in req.at.iterdir()) == ["stray.md"]
+    assert not (req.project / ".criterion").exists()
+
+
+def test_an_in_project_criterion_with_more_than_a_ledger_is_refused(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    write(req.project / ".criterion" / "other.md", "x\n")
+    with pytest.raises(InitError, match="already exists"):
+        init(req)
+
+
+def test_rollback_leaves_an_existing_empty_target_empty(tmp_path, monkeypatch):
+    import catalyst.init as ci
+    req = request(tmp_path)
+    req.at.mkdir(parents=True)
+    monkeypatch.setattr(ci, "_git", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
+    with pytest.raises(InitError, match="rolled back"):
+        init(req)
+    assert req.at.is_dir() and list(req.at.iterdir()) == []
+    monkeypatch.undo()
+    init(req)
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_rollback_puts_an_adopted_ledger_back(tmp_path, monkeypatch):
+    import catalyst.init as ci
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    monkeypatch.setattr(ci, "_git", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
+    with pytest.raises(InitError, match="rolled back"):
+        init(req)
+    assert not (req.project / ".criterion").is_symlink()
+    assert (req.project / ".criterion" / ".ledger" / "install.todo.md").read_text() == "- [ ] install\n"
+    assert not req.at.exists()
+
+
+def test_init_deploys_the_invariants_and_the_session_start_hook_prints_them(tmp_path, capsys):
+    from catalyst.__main__ import main
+    req = request(tmp_path)
+    write(req.module / "INVARIANTS.module.md", "# Module invariants\n\nM-1.\n")
+    init(req)
+    root = load(req.project).root
+    assert (root / "INVARIANTS.md").read_text() == (KERNEL / "INVARIANTS.md").read_text()
+    assert (root / "INVARIANTS.module.md").read_text().startswith("# Module invariants")
+    capsys.readouterr()
+    assert main(["--project", str(req.project), "hook", "start"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith((KERNEL / "INVARIANTS.md").read_text().splitlines()[0]) and "M-1." in out
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_session_start_hook_is_silent_outside_a_deployment(tmp_path, capsys):
+    from catalyst.__main__ import main
+    assert main(["--project", str(tmp_path), "hook", "start"]) == 0
+
+
+def test_settings_template_has_session_start_and_stop_hooks():
+    settings = json.loads((REPO / "agents" / "claude-code" / "settings.template.json").read_text())
+    start = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert start == "python3 .criterion/bin/catalyst.pyz hook start"
+    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == "python3 .criterion/bin/catalyst.pyz hook stop"
+
+
+def test_init_announces_its_writes_into_the_product_repository(tmp_path):
+    req = request(tmp_path)
+    steps = init(req)
+    assert any("refs/catalyst/journal" in s and "product repository" in s for s in steps)
+    ref = subprocess.run(["git", "-C", str(req.project), "rev-parse", "--verify", "-q", "refs/catalyst/journal"],
+                         capture_output=True, text=True)
+    assert ref.returncode == 0
+
+
+def test_iam_template_catalogs_are_named_after_the_singular_type(tmp_path):
+    req = request(tmp_path)
+    init(req)
+    root = load(req.project).root
+    assert (root / "IAM" / "users" / "templates" / "templates-user.md").is_file()
+    assert (root / "IAM" / "roles" / "templates" / "templates-role.md").is_file()

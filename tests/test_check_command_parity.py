@@ -311,3 +311,23 @@ def test_check_module_manifest_parity_accepts_command_file_or_spec(tmp_path: Pat
     other = tmp_path / "other"
     write_example_module(other, with_spec=False)
     assert ccp.check_module_manifest_parity(other, make_commands(other, ["create-item"])) == []
+
+
+def test_require_fails_when_no_deployment(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert ccp.main(["--require"]) == 1
+    assert "--require" in capsys.readouterr().out
+    assert ccp.main([]) == 0
+
+
+def test_require_still_fails_broken_parity(tmp_path: Path, monkeypatch):
+    deploy_root = tmp_path / ".criterion"
+    deploy_root.mkdir()
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
+    make_taskfile(deploy_root, ["create-item"])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
+    assert ccp.main(["--require"]) == 0
+    (commands_dir / "create-item.md").unlink()
+    assert ccp.main(["--require"]) == 1

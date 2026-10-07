@@ -814,3 +814,20 @@ def test_version_drift_kernel_repo_behind(tmp_path: Path):
     assert errors == ["version drift: the kernel is 0.38.0 but this repository's "
                       "own deployment is 0.37.0 — run /sync-framework"]
 
+
+
+def test_require_fails_when_no_deployment(tmp_path: Path, monkeypatch, capsys):
+    """CI passes --require: a gate that finds nothing to check must fail, not
+    skip (local development without a deployment still skips)."""
+    monkeypatch.chdir(tmp_path)
+    assert cd.main(["--require"]) == 1
+    assert "--require" in capsys.readouterr().out
+    assert cd.main([]) == 0
+
+
+def test_require_still_fails_a_broken_deployment(tmp_path: Path, monkeypatch):
+    root = make_valid_deployment(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert cd.main(["--require"]) == 0
+    (root / "rules" / "templates" / "TEMPLATE-RULE-v1.md").unlink()
+    assert cd.main(["--require"]) == 1

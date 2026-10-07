@@ -10,6 +10,15 @@ Every blob a CLI-written entry references is pinned under
 `refs/catalyst/journal` in its repository — a commit chain whose tree holds
 each blob under its own hash — so `git gc` can never prune it and
 point-in-time restore keeps working.
+
+This writes into the repositories' own `.git` — the product's included:
+`journal append` (and `init`, which journals the install) stores each
+product file's blob (`git hash-object -w`) and creates or moves
+`refs/catalyst/journal` there. The ref is local: it is pushed to `origin`
+only by `catalyst journal pin --share`. Creating it is announced once per
+repository on stderr; `git update-ref -d refs/catalyst/journal` removes it
+(blobs it no longer reaches are then left to `git gc`, which breaks
+point-in-time restore of those states).
 """
 from __future__ import annotations
 
@@ -17,6 +26,7 @@ import datetime
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -41,6 +51,21 @@ def git(repo: Path, *args: str, input: str | None = None, check: bool = True) ->
     if check and res.returncode != 0:
         raise JournalError(f"git {' '.join(args)} failed in {repo}: {res.stderr.strip()}")
     return res.stdout.strip() if res.returncode == 0 else ""
+
+
+def revisions(revs: list[str]) -> list[str]:
+    """User-supplied git revisions/ranges, refused when one could be read as
+    an option (`--output=F` makes `git log` write a file): every revision a
+    user names reaches git through here."""
+    for rev in revs:
+        if not rev or rev.startswith("-") or "\0" in rev:
+            raise ValueError(f"'{rev}' is not a revision or range")
+    return list(revs)
+
+
+def object_id(sha: str) -> bool:
+    """A full hexadecimal git object id (what the journal records)."""
+    return isinstance(sha, str) and len(sha) in (40, 64) and all(c in "0123456789abcdef" for c in sha)
 
 
 def now() -> str:
@@ -201,6 +226,8 @@ def prefetch(repo: Path, shas) -> None:
 
 def blob_exists(repo: Path, sha: str) -> bool:
     key = (str(repo), sha)
+    if not object_id(sha):
+        return False                         # never hand a (merged, third-party) value to git as is
     if key not in _EXISTS:
         res = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}^{{blob}}"],
                              capture_output=True)
@@ -239,6 +266,9 @@ def pin(repo: Path, shas: set[str]) -> int:
         res = subprocess.run(["git", "-C", str(repo), "update-ref", PIN_REF, commit,
                               parent or "0" * 40], capture_output=True, text=True)
         if res.returncode == 0:
+            if not parent:                   # never silent: this writes into the repository's .git
+                print(f"catalyst: created {PIN_REF} in {repo} (pins the blobs the journal records so "
+                      f"`git gc` keeps them; local only unless `journal pin --share`)", file=sys.stderr)
             return len(new)
     raise JournalError(f"could not update {PIN_REF} in {repo} (concurrent writers)")
 
@@ -464,6 +494,9 @@ def restore(dep: Deployment, timestamp: str, out: Path) -> tuple[list[str], list
         if sha is None or where is None:
             continue
         repo = where[0]
+        if not object_id(sha):
+            missing.append(path)
+            continue
         res = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", sha], capture_output=True)
         if res.returncode != 0:
             missing.append(path)

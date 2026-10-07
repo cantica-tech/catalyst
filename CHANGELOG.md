@@ -6,6 +6,39 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.46.0 — 2026-10-07
+
+Grounded sessions and safe gates (migration
+`0.46.0/grounded-sessions-and-safe-gates.md`).
+
+- Deployed sessions start grounded: `init` copies `INVARIANTS.md` (and the
+  module's `INVARIANTS.module.md`) into the working copy, and
+  `catalyst hook start` prints them from the agent's session-start hook.
+- Gates hold: `catalyst hook stop` fails closed (exit `2`) on any error;
+  the criterion repository's CI runs the base branch's checker, verified
+  by `bin/catalyst.pyz.sha256`, on the pull request as data; this
+  repository's CI checks fail when there is nothing to check (`--require`)
+  and run against freshly installed deployments; Python 3.9–3.13 on Linux,
+  macOS and (provisionally) Windows.
+- Install: `--at` takes the `.criterion` directory or its parent; a
+  `.criterion` holding only `.ledger/` is adopted; a failed `init` restores
+  a pre-existing target.
+- IDs: `id next` and `id next-rule` reserve under a cross-platform lock;
+  `next-rule` never reuses a number cited in prose or the journal.
+- Commands: `/user-*` and `/role-*` journal their writes; roles carry
+  `reconciliation` (`/role-add` defaults to `propose`); `/status` refuses
+  `RECON-` cases; `/reconcile <id> close` is the only way to `Closed`.
+- `catalyst spec` keeps module procedures written `/name: ...`.
+- `check` honours `.catalystignore` and nested deployments for uncommitted
+  files and never reports `.DS_Store`, `Thumbs.db`, `desktop.ini`.
+- Security: revisions, URLs and branches that look like git options are
+  refused; `criterion sync`/`push` fetch the product's journal pins;
+  `init` and `journal append` announce the `refs/catalyst/journal` they
+  write into the product repository.
+- `catalyst --version` carries the build (`X.Y.Z+g<sha>[.dirty]`).
+- Documentation: one `--at` meaning everywhere, `SYNCHRONIZE.md` lists the
+  0.42.0–0.46.0 migrations, stale references and contradictions fixed.
+
 ## 0.45.0 — 2026-10-01
 
 What a deployment governs (migration `0.45.0/workspace-scope.md`).

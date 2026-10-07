@@ -9,8 +9,8 @@ own repositories. The kernel is versioned by the repository's root
 A project-agnostic specification for how any codebase organizes
 its rules, its development work, its agile process, its planning, its
 accountability, and its own change history — extrapolated from the
-concrete system built in this repo's own [`.criterion/`](../../.criterion/)
-deployment. That folder is **one instantiation** of this framework, for
+concrete system built in this repo's own `.criterion/` deployment (a
+local, gitignored working copy — not part of this repository). That folder is **one instantiation** of this framework, for
 this project, built via the retrofit path (§4 below); this folder is the
 generic template for standing the same system up in any project so it
 can create rules that fit that project's reality.
@@ -148,7 +148,7 @@ governed after the fact.
 ## Retrofitting an existing project
 
 See [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) §4. This repo's own
-[`.criterion/`](../../.criterion/) was retrofitted this way — its
+`.criterion/` (local, not in this repository) was retrofitted this way — its
 `Rules-of-Rules.md` and `CODE-OF-CONDUCT.md`
 each carry a header noting they are this project's instantiation of the
 corresponding template here, so the two stay traceable to each other as

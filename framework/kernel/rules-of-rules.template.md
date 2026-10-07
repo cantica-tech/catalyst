@@ -105,8 +105,7 @@ resolving.
   appended). Prefer this over inventing a new top-level rule when the
   sub-items are only meaningful in the context of the parent bullet.
 - **`(userid)`** — always the final segment, after any `[-parent-id]`.
-  See rr-META-020 for the full mechanism and the rule/domain
-  authorship limitation.
+  See rr-META-020 for the full mechanism.
 
 Rules with no sub-items or parent never have that trailing segment —
 it's absent, not empty. The `userid` segment, by contrast, is never
@@ -133,8 +132,8 @@ absent once rr-META-020 applies.
 ### Adding a new rule
 
 1. Pick (or confirm) the `DOMAIN` it belongs to.
-2. Take the next unused `NNN` in that domain — check both the domain's
-   existing bullets and the Linked Artifacts quick index.
+2. Take the next `NNNNNN` in that domain from `catalyst id next-rule
+   <doc-prefix> <DOMAIN> --as <signer>` — never by hand.
 3. Only add `[-parent-id]` if the rule is a numbered sub-case of one
    existing bullet, or an explicit specialization of another rule.
 
@@ -149,7 +148,7 @@ trace of why. Instead, retire it in place:
    that's a *new* rule with a *new* ID) and append a one-line reason plus
 the date, e.g. `🗑 retired {{DATE}} — superseded by \`{{new-id}}\``.
 3. If something replaces it, the replacement is a normal new rule (next
-   `NNN` in its domain) — retirement does not imply the new rule
+   `NNNNNN` in its domain) — retirement does not imply the new rule
    inherits the old number, even via `[-parent-id]`.
 4. Never repurpose a retired rule's ID for an unrelated rule later, even
    in the same domain.
@@ -190,7 +189,7 @@ never renumbered. It is unique within its type and signer: the trailing
 concurrently in a shared deployment (§13) may legitimately hold the same
 number under different userids. Every rule-linked member
 carries its own `Targets`/`Domain` and is subject to
-`rules-of-development.md` §1 ("no development without a targeted
+`CODE-OF-CONDUCT.md` §1 ("no development without a targeted
 rule"). Which prefixes belong to this format, and any separate,
 non-rule-linked schemes the module also defines, are the active
 module's meta-rules (`MODULE-SPECIFICATION.md` §6.1).
@@ -213,7 +212,7 @@ gets one file at
 for artifact and work-item filenames (see `INSTANTIATION-GUIDE.md` §1): the
 bare `{{DOC_PREFIX}}-{{CODE}}.md` is not a valid filename, the file must carry
 a short description of what the domain covers as part of its name. The
-`{{CODE}}` used inside rule IDs (`{{DOC_PREFIX}}-{{CODE}}-{{NNN}}`) is
+`{{CODE}}` used inside rule IDs (`{{DOC_PREFIX}}-{{CODE}}-NNNNNN-<userid>`) is
 unaffected by this — only the on-disk filename gains the description suffix.
 See [`templates/domain.template.md`](templates/domain.template.md) → the
 current `{{RULES_DIR}}/domains/templates/TEMPLATE-DOMAIN-vN.md`, for the
@@ -230,8 +229,8 @@ domain file shorter.
 - **Code**: `{{PARENT}}.{{SUB}}` — parent code, a literal `.`, then a
   short sub-mnemonic (e.g. `GATE.DOCKER`). This is still one `DOMAIN`
   value for ID purposes: a rule under it is
-  `{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-{{NNN}}` (e.g. `ui-GATE.DOCKER-004`),
-  with `NNN` scoped to the sub-domain, not the parent.
+  `{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-NNNNNN-<userid>` (e.g.
+  `ui-GATE.DOCKER-000004-Ab3xR9pQ`), with `NNNNNN` scoped to the sub-domain, not the parent.
 - **File**: `domains/{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-{{short-description}}.md`,
   alongside (not nested under) the parent's own
   `domains/{{DOC_PREFIX}}-{{PARENT}}-{{short-description}}.md` — the
@@ -277,8 +276,8 @@ list. Extend the existing domain instead of duplicating it.
 declaring either no conflict or the specific supersede/amend/
 contradict relationship to named existing rule IDs.
 5. Add the one-line pointer under the `##` heading in the rule document.
-6. Only then add the domain's first rule bullet(s), `NNN` starting at
-   `001`.
+6. Only then add the domain's first rule bullet(s), `NNNNNN` starting at
+   `000001`.
 
 A domain's code is permanent, same as a rule ID — never reused for an
 unrelated domain even if the original is later emptied out or retired
@@ -334,14 +333,14 @@ carries no prescribed semantics — its actual population and lifecycle
 ## 11. `rr-META-011` Users and roles are advisory, not access control
 
 `IAM/users/users.json` (`templates/users.template.json`) is the registry
-of people who can sign work — a JSON array of `{name, roles, registered,
-active, notes, userid}` objects, kept as data rather than a hand-edited
+of people who can sign work — a JSON object whose `users` array holds
+`{name, roles, registered, active, notes, userid}` objects, kept as data rather than a hand-edited
 document because it is managed exclusively by commands:
 `/user-add`/`/user-remove`/`/user-modify`/`/user-assign-role`/`/user-list`
-— see `rules-of-development.md` §4. `IAM/roles/roles.json`
+— see `CODE-OF-CONDUCT.md` §4. `IAM/roles/roles.json`
 (`templates/roles.template.json`) maps each role to the actions/commands
-it typically performs — a JSON array of `{name, actions, reconciliation}`
-objects (`reconciliation` is `full`/`propose`/`none` — see §16, the one
+it typically performs — a JSON object whose `roles` array holds
+`{name, actions, reconciliation}` objects (`reconciliation` is `full`/`propose`/`none` — see §16, the one
 field in this file that's genuinely enforced rather than advisory), seeded
 with a default agile-role mapping and then extended via `/role-add`
 (new role) and `/role-modify` (change an existing role's actions).
@@ -375,11 +374,12 @@ Catalyst has no way to verify who is actually typing, so beyond that one
 hard existence requirement, this scheme is **advisory**: before an
 artifact-creating or status-changing command completes, the agent
 resolves who is signing it, checks their role(s) against `roles.json`,
-and — if the action isn't one their role covers, or they aren't
-registered at all — proceeds anyway (INV-25), noting the mismatch rather
-than pausing for confirmation or refusing outright. Every entity of the
+and — if the action isn't one their role covers — proceeds anyway
+(INV-25), noting the mismatch rather than pausing for confirmation or
+refusing outright. An unregistered signer is registered first
+(`/user-add`): the CLI refuses to sign for one (`CLI.md`, "Signer"). Every entity of the
 active module's entity types, and every work item, carries a `Signed-off-by`
-field recording the outcome (`rules-of-development.md` §2); at the same
+field recording the outcome (`CODE-OF-CONDUCT.md` §2); at the same
 moment, that resolved signer's `userid` is appended as the entity's own
 id suffix (INV-26, rr-META-020) — never resolved separately or later.
 
@@ -705,7 +705,7 @@ courtesy as `/criterion create`:
    content hash) — this is exactly what the journal (§12) exists to
    record, and its immutability means the pre-migration history stays
    readable at its old hashes regardless of where the tree now lives.
-6. Report the result. Per hard rule 4, nothing is committed
+6. Report the result. Per INV-4, nothing is committed
    automatically — but note explicitly that `<app-name>.catalyst` is now
    something the user will want tracked, unlike anything that came before
    it.
@@ -845,7 +845,7 @@ the same shape for its own `rules-of-work-items.md` (§8, INV-22).
   `templates/` treatment. `TEMPLATE-USERS-v1.json`/`TEMPLATE-ROLES-v1.json`
   version the registry's *seed shape* (the array a fresh deployment
   starts from), not a per-instance document — `users.json`/`roles.json`
-  are each one JSON array, not one-file-per-instance, so there is
+  are each one JSON registry, not one-file-per-instance, so there is
   exactly one live instance per type, versioned the same way any other
   type's template is.
 - `plugins/` — unchanged (INV-10..13): `<type>/<name>/`, each activated
@@ -919,7 +919,10 @@ instead; `reject` leaves the shared branch's version unchanged and the
 proposer drops or reworks their change; `propose <text>`
 appends `<text>` as a new `## Revisions` row without resolving anything.
 `Status` moves `Open` → `Under Review` → one of `Resolved-Accepted` /
-`Resolved-Accepted-with-Edits` / `Resolved-Rejected` → `Closed`.
+`Resolved-Accepted-with-Edits` / `Resolved-Rejected` → `Closed`; only
+`/reconcile <id> close` (a `full`-level actor, once any accepted change
+has landed in the `Entity`) closes a case, and `/status` never changes a
+`RECON-` case's `Status`. A `Closed` case is final.
 
 **Who can do what is genuinely gated by role — the one deliberate
 exception to `rr-META-011`'s advisory-only principle.** Each role in
@@ -1141,19 +1144,14 @@ proceed.
 
 **For a type with a resolvable signer** (every type above except
 rules): the `userid` is exactly that resolved signer's — the same
-person `rules-of-development.md` §2's signer-resolution procedure names
+person `CODE-OF-CONDUCT.md` §2's signer-resolution procedure names
 in `Signed-off-by`. No separate lookup, no separate decision.
 
-**For a rule** (and, by extension, a domain's own code, which is
-never suffixed — see below): no rule or domain template carries an
-authorship field of any kind, so there is nothing today recording who
-added a given rule. Until a dedicated field is designed, use the sole
-registered active user; if more than one is active, use whichever was
-most recently registered. **This is a known, documented limitation**,
-not a permanent design choice — a deployment with real multi-author
-rule authorship will get an inaccurate attribution under this fallback,
-and should treat adding a real per-rule authorship field as its own
-future tracked maintenance item once that limitation actually bites.
+**For a rule** (a domain's own code is never suffixed — see below):
+the signer is resolved the same way (`CODE-OF-CONDUCT.md` §2) and named
+with `catalyst id next-rule --as <signer>` (`CLI.md`); the suffix is the
+rule's only authorship record, since no rule or domain template carries
+an authorship field.
 
 **Domains are out of scope.** A domain has no numeric sequence — it's
 identified by its `CODE` alone (§7), embedded as a substring inside

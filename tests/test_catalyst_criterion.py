@@ -482,3 +482,102 @@ def test_cli_asks_for_the_url_on_a_terminal(solo, capsys, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt="": str(solo["remote"]))
     assert main(["criterion", "sync"]) == 0
     assert cr.is_submodule(project)
+
+
+# --- the product repository's journal pins travel with sync and push ---------
+def _has_blob(repo: Path, sha: str) -> bool:
+    return subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}^{{blob}}"],
+                          capture_output=True).returncode == 0
+
+
+def _journal_product_file(world, name: str, text: str) -> str:
+    """Ada journals a product file (never committed) and shares the product
+    repository's pins; returns the blob only her clone has."""
+    ada = world["ada"]
+    write(ada / "src" / name, text)
+    entry = j.append(load(ada), j.AppendRequest(
+        command="/status", action="update", artifact=f"product file {name}", targets=[],
+        intent=["a product change"], files=[str(ada / "src" / name)], actor="ada"))
+    sha = next(f["after"] for f in entry["files"] if f["path"].endswith(name))
+    cr.share_pins(ada)                        # `catalyst journal pin --share`
+    return sha
+
+
+def test_sync_fetches_the_product_repositorys_pins(world):
+    sha = _journal_product_file(world, "a.txt", "product content A\n")
+    bob = world["bob"]
+    assert not _has_blob(bob, sha)
+    cr.sync(load(bob))
+    assert _has_blob(bob, sha)
+
+
+def test_push_fetches_the_product_repositorys_pins(world):
+    sha = _journal_product_file(world, "b.txt", "product content B\n")
+    bob = world["bob"]
+    add_item(bob, "bob", "Bob thing")
+    push(world, "bob", "Bob adds an item")
+    assert _has_blob(bob, sha)
+
+
+# --- the CI gate runs the base branch's checker, verified by hash -------------
+def test_ci_gate_runs_the_checker_from_the_base_branch():
+    ci = cr.CI_TEMPLATE
+    assert "pull_request_target:" in ci                      # the workflow itself comes from the base
+    assert "ref: ${{ github.event.pull_request.base.sha || github.sha }}" in ci
+    assert "path: gate" in ci and "path: change" in ci
+    assert "persist-credentials: false" in ci and "contents: read" in ci
+    assert "sha256sum --check --strict bin/catalyst.pyz.sha256" in ci
+    run_lines = [line.strip() for line in ci.splitlines() if "--working-copy" in line]
+    assert run_lines and all('"$GITHUB_WORKSPACE/gate/bin/catalyst.pyz"' in line for line in run_lines)
+    assert "python3 bin/catalyst.pyz" not in ci              # never the copy under review
+    assert "refs/pull/" in ci                                # the merge result, as integrity needs
+
+
+def test_create_and_push_record_the_checker_hash(solo):
+    import hashlib
+    project, agent = solo["ada"], solo["agent"]
+    write(agent / "bin" / "catalyst.pyz", "pyz v1\n")
+    cr.create(load(project), None, "criterion", cr.CI_TEMPLATE)
+    recorded = (agent / cr.GATE_HASH).read_text()
+    assert recorded == hashlib.sha256(b"pyz v1\n").hexdigest() + "  bin/catalyst.pyz\n"
+    assert not cr.dirty(agent)
+    dep, _ = cr.ensure_remote(load(project), str(solo["remote"]))
+    wc = project / ".criterion"
+    write(wc / "bin" / "catalyst.pyz", "pyz v2\n")
+    j.append(dep, j.AppendRequest(command="/sync-framework", action="update", artifact="CLI", targets=[],
+                                  intent=["upgrade"], files=[str(wc / "bin" / "catalyst.pyz")], actor="ada"))
+    signer = load_corpus(dep).user("Ada Lovelace")
+    cr.push(dep, signer, "upgrade the CLI", open_pr=False, checker=NO_CHECK)
+    assert (wc / cr.GATE_HASH).read_text().startswith(hashlib.sha256(b"pyz v2\n").hexdigest())
+    assert not cr.dirty(wc)
+
+
+# --- git option injection ------------------------------------------------------
+@pytest.mark.parametrize("url", ["--upload-pack=touch pwned", "-u", "ext::sh -c touch% pwned", "",
+                                 "https://example.com/a\nb"])
+def test_hostile_urls_are_refused(solo, url):
+    project = solo["ada"]
+    with pytest.raises(cr.CriterionError, match="URL"):
+        cr.create(load(project), url, "criterion", cr.CI_TEMPLATE)
+    with pytest.raises(cr.CriterionError, match="URL"):
+        cr.join(project, url) if url else cr.check_url(url)
+    assert not (project / "pwned").exists() and not (solo["tmp"] / "pwned").exists()
+
+
+@pytest.mark.parametrize("branch", ["--upload-pack=x", "-b", "a..b", "a b", ""])
+def test_hostile_branches_are_refused(solo, branch):
+    project = solo["ada"]
+    with pytest.raises(cr.CriterionError, match="branch"):
+        cr.create(load(project), None, branch, cr.CI_TEMPLATE)
+    pointer = next(project.glob("*.catalyst"))
+    data = json.loads(pointer.read_text())
+    data["criterion_branch"] = branch or "-"
+    pointer.write_text(json.dumps(data))
+    with pytest.raises(cr.CriterionError, match="branch"):
+        cr.shared_branch(load(project))
+
+
+def test_ordinary_urls_are_accepted():
+    for url in ("https://github.com/o/r.git", "ssh://git@host/o/r.git", "git@github.com:o/r.git",
+                "file:///srv/r.git", "/srv/r.git", "../r.git", "C:\\repos\\r.git"):
+        assert cr.check_url(url) == url

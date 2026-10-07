@@ -75,8 +75,9 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
    `<prefix>-<PARENT>.<SUB>-<short-summary>.md`), using the domain's own
    `Scope` field as the source for the summary, then every reference to the
    old filename updated accordingly.
-10. Check `## Version-specific one-time migrations` below — and the
-    active module's own `migrations/migrations.md`
+10. Check `## Version-specific one-time migrations` below (indexed in
+    the kernel's `migrations/migrations.md`, which wins if the two ever
+    differ) — and the active module's own `migrations/migrations.md`
     (`MODULE-SPECIFICATION.md` §6.6) — for any entry whose "From" version
     is at or above the project's own `version.txt` value *before* this
     synchronization run started. Run each such entry exactly once, as part
@@ -139,7 +140,10 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
    §6). The `<app-name>.catalyst` pointer must name it in its `module`
    field — there is no default module; if the field is missing, stop and
    ask the user which catalogued module (`framework/modules/catalog.md`)
-   the deployment uses before going further. Then:
+   the deployment uses before going further. Then (the three
+   recompositions below are one `catalyst recompose` run, `CLI.md`, which
+   merges the new templates into the deployed documents without losing
+   their local edits):
    - refresh `.criterion/modules/<module-id>/` from the module's
      catalogued repository, at the release matching the target kernel
      version (whole tree, never cherry-picked files), creating it if
@@ -498,6 +502,38 @@ a `chore:` (INV-5 at commit granularity), enforced by
 `"format": "1.0-rc"` (`FORMAT.md`). Add the field, re-vendor the CLI,
 recompose the governing documents, offer `catalyst hook install` (with the
 user's assent) and a CI trace step; existing history is not checked.
+
+### From `0.41.0`: changes made outside catalyst
+
+Target version `0.42.0`. Full procedure:
+`migrations/0.42.0/changes-outside-catalyst.md` (this repository) — not
+duplicated here. The pointer gains `journal_since`, the baseline after
+which a product commit no journal entry records is an unrecorded change
+(`catalyst unrecorded`, `/adopt`); re-vendor the CLI.
+
+### From `0.43.0`: four-eyes analysis
+
+Target version `0.44.0`. Full procedure:
+`migrations/0.44.0/four-eyes-analysis.md` (this repository) — not
+duplicated here. Adds the `ANALYSIS-` kernel entity (`analyses/`),
+`/run-analysis` and `catalyst analysis`, and deploys
+`.criterion/ANALYSIS-PLAYBOOK.md`.
+
+### From `0.44.1`: workspace scope
+
+Target version `0.45.0`. Full procedure:
+`migrations/0.45.0/workspace-scope.md` (this repository) — not
+duplicated here. A deployment governs its tree minus nested deployments
+and `.catalystignore` opt-outs; reinstall the commit-msg hook after
+re-vendoring the CLI. No layout change.
+
+### From `0.45.x`: grounded sessions and safe gates
+
+Target version `0.46.0`. Full procedure:
+`migrations/0.46.0/grounded-sessions-and-safe-gates.md` (this repository)
+— not duplicated here. Copy the invariants into the working copy, register
+the session-start hook, recompose, and have the user set each role's
+`reconciliation` level. Layout change: `.criterion/INVARIANTS.md`.
 
 ## Expected outcome
 

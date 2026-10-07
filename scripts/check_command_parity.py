@@ -20,7 +20,8 @@ catalyst-development-only, deliberately absent from §4 (Rules-of-Rules.md
 §13). Its Taskfile counterpart lives in the project's own root `Taskfile.yml`,
 never in the deployed `Taskfile.common.yml`, so no exception is needed there.
 
-Exit 0 = clean (including when no deployment resolves), exit 1 = drift found.
+Exit 0 = clean (including when no deployment resolves, unless `--require`,
+as CI passes), exit 1 = drift found (or nothing to check under `--require`).
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ from pathlib import Path
 
 from module_loader import load_module
 
-from check_deployment import find_deploy_root, find_project_root
+from check_deployment import REQUIRE_FLAG, find_deploy_root, find_project_root
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMANDS_DIR = ROOT / ".claude" / "commands"
@@ -191,9 +192,20 @@ def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
     return errors
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    """`--require` (CI): no deployment to compare with is a failure, not a
+    skip, so the gate can never pass by checking nothing."""
+    argv = list(argv or [])
+    unknown = [a for a in argv if a != REQUIRE_FLAG]
+    if unknown:
+        print(f"usage: check_command_parity.py [{REQUIRE_FLAG}] (unknown: {' '.join(unknown)})")
+        return 2
     root = find_deploy_root(Path.cwd())
     if root is None:
+        if REQUIRE_FLAG in argv:
+            print("command parity validation FAILED: no *.catalyst pointer with a reachable working "
+                  f"copy or .criterion/ found from {Path.cwd()} ({REQUIRE_FLAG})")
+            return 1
         print("no *.catalyst pointer or .criterion/ found; skipping command "
               "parity validation")
         return 0
@@ -218,4 +230,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

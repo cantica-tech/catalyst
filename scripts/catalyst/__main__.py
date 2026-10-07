@@ -10,7 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from catalyst import __version__
+from catalyst import version_string
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
@@ -54,10 +54,11 @@ def cmd_id(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     signer = resolve_signer(dep, corpus, args.as_user)
+    # reserved under the ID lock: parallel callers never get the same ID
     if args.id_command == "next":
-        print(next_entity_id(dep, corpus, args.prefix, signer))
+        print(next_entity_id(dep, corpus, args.prefix, signer, reserve=True))
     else:
-        print(next_rule_id(dep, corpus, args.doc_prefix, args.domain, signer))
+        print(next_rule_id(dep, corpus, args.doc_prefix, args.domain, signer, reserve=True))
     return 0
 
 
@@ -137,7 +138,7 @@ def cmd_journal(args) -> int:
         repos = [dep.root] + ([] if dep.standalone else [dep.project_root])
         for repo in repos:
             if subprocess.run(["git", "-C", str(repo), "remote", "get-url", "origin"],
-                              capture_output=True).returncode != 0:
+                              check=False, capture_output=True).returncode != 0:
                 continue
             try:
                 print(f"{repo.name}: {share_pins(repo)} blob(s) pinned on the remote")
@@ -290,7 +291,7 @@ def cmd_hook(args) -> int:
             corpus = load_corpus(open_deployment(args))
         except DeploymentNotFound:
             return 0
-        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], capture_output=True, text=True)
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], check=False, capture_output=True, text=True)
         if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
             return 0                         # a merge carries its parents' trace (as in `trace`)
         reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
@@ -324,14 +325,20 @@ def cmd_hook(args) -> int:
             return 1
         return 0
 
+    # Fail closed: Claude Code ignores every exit but 2, so a crash here must
+    # block the stop (with its reason) instead of switching enforcement off.
     try:
-        dep = open_deployment(args)
-    except WorkingCopyMissing as exc:
-        print(f"catalyst: {exc}", file=sys.stderr)
+        try:
+            dep = open_deployment(args)
+        except WorkingCopyMissing as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 2
+        except DeploymentNotFound:
+            return 0
+        return hook_stop(dep, strict=args.strict)
+    except Exception as exc:  # noqa: BLE001
+        print(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
-    except DeploymentNotFound:
-        return 0
-    return hook_stop(dep, strict=args.strict)
 
 
 def _ask_url(exc) -> str:
@@ -504,8 +511,9 @@ def cmd_criterion(args) -> int:
 
 
 def cmd_init(args) -> int:
-    from catalyst.init import InitError, InitRequest, init
     from module_loader import REPO_ROOT
+
+    from catalyst.init import InitError, InitRequest, init
 
     kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
     if not (kernel / "rules-of-rules.template.md").is_file():
@@ -529,6 +537,23 @@ def cmd_init(args) -> int:
         print(f"- {step}")
     print("Next: write the first rules (catalyst id next-rule), then `catalyst check`. Nothing was committed "
           "in the project repository.")
+    return 0
+
+
+def cmd_hook_start(args) -> int:
+    """SessionStart hook: print the deployment's invariants (kernel, then
+    module) so every session starts grounded. Never blocks a session."""
+    try:
+        dep = open_deployment(args)
+    except WorkingCopyMissing as exc:
+        print(f"catalyst: {exc}")
+        return 0
+    except DeploymentNotFound:
+        return 0
+    for name in ("INVARIANTS.md", "INVARIANTS.module.md"):
+        path = dep.root / name
+        if path.is_file():
+            print(path.read_text(encoding="utf-8", errors="replace"))
     return 0
 
 
@@ -585,7 +610,7 @@ def cmd_recompose(args) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
-    parser.add_argument("--version", action="version", version=f"catalyst {__version__}")
+    parser.add_argument("--version", action="version", version=f"catalyst {version_string()}")
     parser.add_argument("--project", type=Path, default=None,
                         help="a directory inside the project (default: current directory)")
     parser.add_argument("--working-copy", type=Path, default=None,
@@ -632,6 +657,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
+    q = hk.add_parser("start", help="session-start hook: print the deployment's invariants")
+    q.set_defaults(func=cmd_hook_start)
 
     p = sub.add_parser("report", help="usage report: actors, tiers, traced commits, open artifacts")
     p.add_argument("--since", help="only history from this date/time on (ISO 8601)")

@@ -185,3 +185,12 @@ def test_validate_plugin_catalog_release_allows_v_prefix(tmp_path: Path):
     )
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert errors == []
+
+
+def test_require_fails_when_no_plugin_is_checked_out(tmp_path: Path, monkeypatch, capsys):
+    """CI passes --require (submodules checked out): finding no plugin to
+    check fails instead of skipping; locally it still skips."""
+    monkeypatch.setattr(cpc, "PLUGINS_DIR", tmp_path / "plugins")
+    assert cpc.main([]) == 0
+    assert cpc.main(["--require"]) == 1
+    assert "--require" in capsys.readouterr().out

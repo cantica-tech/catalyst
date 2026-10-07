@@ -132,3 +132,16 @@ def test_commit_msg_hook_lets_merges_through(project):
     msg = project / "MSG"
     msg.write_text("Merge branch 'main' of /some/path\n")
     assert main(["hook", "commit-msg", str(msg)]) == 0
+
+
+@pytest.mark.parametrize("argv", [
+    ["trace", "--", "--output=pwned.txt"],
+    ["trace", "--pattern-only", "--", "--output=pwned.txt"],
+    ["unrecorded", "--", "--output=pwned.txt"],
+    ["journal", "adopt", "--intent", "x", "--", "--output=pwned.txt"],
+])
+def test_a_revision_that_is_an_option_is_refused(project, capsys, argv):
+    commit(project, "chore: a")
+    assert main(argv) == 1
+    assert not (project / "pwned.txt").exists()
+    assert "not a revision" in capsys.readouterr().err

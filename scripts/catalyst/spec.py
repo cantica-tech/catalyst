@@ -15,7 +15,8 @@ from dataclasses import dataclass, field
 from catalyst.deployment import Deployment
 
 BULLET_START = re.compile(r"^- `/([a-z][a-z0-9-]*)")
-MENTION = re.compile(r"`/([a-z][a-z0-9-]*)(?=[`\s])")
+# `/name`, `/name <args>` and the colon form `/name: ...` all name a command.
+MENTION = re.compile(r"`/([a-z][a-z0-9-]*)(?=[`\s:])")
 PREAMBLE = (
     "Tier first: a chore (no rule's behaviour changes) is one `catalyst journal append --tier chore` "
     "entry with no target; a fix restores a rule (--tier fix); a feature adds or changes behaviour "
@@ -81,6 +82,8 @@ def parse(text: str) -> Section4:
     for kind, body in blocks:
         if kind == "bullet":
             names = MENTION.findall(body.split("—", 1)[0] + " ")
+            if not names:  # e.g. `/x|y`: names no command; never crash the parse
+                continue
             s.bullets.setdefault(names[0], []).append(body)
             for alias in names[1:]:
                 s.aliases.setdefault(alias, names[0])

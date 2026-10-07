@@ -10,9 +10,16 @@
 """
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import json
+import os
 import re
 import secrets
 import string
+import subprocess
+import tempfile
+import time
 from pathlib import Path
 
 from catalyst.corpus import Corpus
@@ -73,18 +80,121 @@ def highest_number(dep: Deployment, corpus: Corpus, prefix: str) -> int:
     return max(numbers)
 
 
-def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict) -> str:
+def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict,
+                   reserve: bool = False) -> str:
+    """The next ID of an entity type. With `reserve`, the number is handed
+    out once under the working copy's ID lock, so parallel callers (several
+    sub-agents in one session) never get the same one."""
     if prefix not in dep.etds:
         known = ", ".join(sorted(dep.etds))
         raise IdError(f"unknown entity type '{prefix}' (known: {known})")
-    return f"{prefix}-{highest_number(dep, corpus, prefix) + 1:06d}-{_signer_userid(signer)}"
+    userid = _signer_userid(signer)
+    if not reserve:
+        return f"{prefix}-{highest_number(dep, corpus, prefix) + 1:06d}-{userid}"
+    with id_lock(dep):
+        number = _reserve(dep, prefix, highest_number(dep, corpus, prefix))
+    return f"{prefix}-{number:06d}-{userid}"
 
 
-def next_rule_id(dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str,
-                 signer: dict) -> str:
-    if domain not in corpus.domains and domain != "META":
-        raise IdError(f"domain '{domain}' is not registered in rules/domains/domains.md")
+def highest_rule_number(dep: Deployment, corpus: Corpus, domain: str) -> int:
+    """The highest rule number ever used in `domain`, under any document
+    prefix: defined, indexed, cited anywhere in a rule document (a retired
+    or removed rule keeps its number) or remembered by the journal."""
     pattern = re.compile(rf"^[a-z]+-{re.escape(domain)}-(\d{{3,6}})")
     ever = set(corpus.rules) | corpus.indexed_rules      # defined or merely indexed
     numbers = [0] + [int(m.group(1)) for r in ever if (m := pattern.match(r))]
-    return f"{doc_prefix}-{domain}-{max(numbers) + 1:06d}-{_signer_userid(signer)}"
+    cited = re.compile(rf"(?<![A-Za-z0-9-])[a-z]+-{re.escape(domain)}-(\d{{3,6}})(?![0-9])")
+    rules_dir = dep.root / "rules"
+    texts = [f for f in rules_dir.rglob("*.md") if "templates" not in f.relative_to(rules_dir).parts] \
+        if rules_dir.is_dir() else []
+    journal = dep.root / "development" / "journal.jsonl"
+    for f in texts + ([journal] if journal.is_file() else []):
+        numbers += [int(n) for n in cited.findall(f.read_text(encoding="utf-8", errors="ignore"))]
+    return max(numbers)
+
+
+def next_rule_id(dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str,
+                 signer: dict, reserve: bool = False) -> str:
+    """The next rule ID in `domain` (numbers are unique within the DOMAIN,
+    never reused). `reserve` as for next_entity_id."""
+    if domain not in corpus.domains and domain != "META":
+        raise IdError(f"domain '{domain}' is not registered in rules/domains/domains.md")
+    userid = _signer_userid(signer)
+    if not reserve:
+        return f"{doc_prefix}-{domain}-{highest_rule_number(dep, corpus, domain) + 1:06d}-{userid}"
+    with id_lock(dep):
+        number = _reserve(dep, f"rule:{domain}", highest_rule_number(dep, corpus, domain))
+    return f"{doc_prefix}-{domain}-{number:06d}-{userid}"
+
+
+# --- allocation across processes ---------------------------------------------
+# Reservations and their lock live outside the tracked tree: in the working
+# copy's git directory (never committed, never pushed), else in the system's
+# temporary directory. The lock is a file created with O_CREAT|O_EXCL, which
+# is atomic on every OS (no fcntl, so it works on Windows too); a lock older
+# than LOCK_STALE seconds belongs to a crashed caller and is broken.
+LOCK_STALE = 30.0
+LOCK_WAIT = 60.0
+
+
+def state_dir(dep: Deployment) -> Path:
+    res = subprocess.run(["git", "-C", str(dep.root), "rev-parse", "--git-path", "catalyst"],
+                         capture_output=True, text=True)
+    if res.returncode == 0 and res.stdout.strip():
+        path = Path(res.stdout.strip())
+        return path if path.is_absolute() else (dep.root / path).resolve()
+    digest = hashlib.sha256(str(dep.root.resolve()).encode()).hexdigest()[:16]
+    return Path(tempfile.gettempdir()) / f"catalyst-{digest}"
+
+
+@contextlib.contextmanager
+def id_lock(dep: Deployment, wait: float = LOCK_WAIT, stale: float = LOCK_STALE):
+    folder = state_dir(dep)
+    folder.mkdir(parents=True, exist_ok=True)
+    lock = folder / "ids.lock"
+    deadline = time.monotonic() + wait
+    while True:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            try:
+                if time.time() - lock.stat().st_mtime > stale:
+                    lock.unlink()            # a crashed holder: break its lock
+                    continue
+            except FileNotFoundError:
+                continue                     # released meanwhile
+            if time.monotonic() > deadline:
+                raise IdError(f"the ID lock {lock} is held by another process — retry, or remove it "
+                              "if no catalyst command is running") from None
+            time.sleep(0.02)
+            continue
+        try:
+            os.write(fd, f"{os.getpid()}\n".encode())
+        finally:
+            os.close(fd)
+        break
+    try:
+        yield
+    finally:
+        try:
+            lock.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def _reserve(dep: Deployment, key: str, highest_seen: int) -> int:
+    """One above everything seen or already handed out for `key`; records it.
+    Call with the ID lock held."""
+    store = state_dir(dep) / "ids.json"
+    try:
+        reserved = json.loads(store.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        reserved = {}
+    if not isinstance(reserved, dict):
+        reserved = {}
+    number = max(highest_seen, int(reserved.get(key, 0) or 0)) + 1
+    reserved[key] = number
+    tmp = store.with_name(f"ids.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(reserved, indent=2, sort_keys=True), encoding="utf-8")
+    os.replace(tmp, store)
+    return number

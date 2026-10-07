@@ -1,5 +1,13 @@
 # Catalyst — Claude Code entry
 
+> **Self-governance of this repository is suspended** (owner decision,
+> 2026-10-07) while the framework is refactored. Changes to this repository
+> are not journaled: do not run `catalyst journal append` for them, and do
+> not try to clear the `unjournaled` / `unrecorded-change` errors
+> `catalyst check` reports here — they are expected. The Stop hook is
+> removed from `.claude/settings.json` for the same reason. Git history and
+> commit messages are the record until self-governance is restored.
+
 You are running catalyst as **Claude Code**. Load `BOOTSTRAP.md` from this
 repository and follow it top to bottom. It is the single source of truth; this
 file only records what Claude Code adds on top.
@@ -23,11 +31,13 @@ python3 <catalyst>/dist/catalyst.pyz init --kernel <catalyst>/framework/kernel \
 `~/.claude/projects/<project-slug>/` is the directory Claude Code already
 keeps for the target project — the parent of its auto-memory `memory/`
 directory — so the working copy lives in agent-owned space and the project
-reaches it through the gitignored `.criterion` symlink `init` creates. Add
+reaches it through the gitignored `.criterion` symlink `init` creates.
+`--at` is always the `.criterion` directory itself, never that parent; a
+`.criterion` holding only the deployment ledger (`.ledger/`) is adopted. Add
 `--module-dir <dir>` when the module is not checked out next to the project
 or catalyst as `catalyst-<module-id>`, and one `--rule-doc` per rule
 document. Then merge `agents/claude-code/settings.template.json` into the
-project's `.claude/settings.json` (the `Stop` hook), and carry on with the
+project's `.claude/settings.json` (its hooks), and carry on with the
 judgment steps of `BOOTSTRAP.md` §2.
 
 Capabilities you have (use them per `BOOTSTRAP.md §1`):

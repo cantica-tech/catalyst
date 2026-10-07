@@ -62,3 +62,12 @@ def test_second_block_lets_stop_through(monkeypatch, capsys):
 def test_malformed_hook_input_is_treated_as_empty():
     assert sh.read_hook_input(io.StringIO("not json")) == {}
     assert sh.read_hook_input(io.StringIO("")) == {}
+
+
+def test_a_crash_blocks_the_stop(monkeypatch, capsys):
+    def boom(root=None):
+        raise OSError("python3 vanished")
+    monkeypatch.setattr(sh, "run_checks", boom)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+    assert sh.main() == 2
+    assert "python3 vanished" in capsys.readouterr().err

@@ -11,6 +11,9 @@ When the hook input says a Stop hook already blocked this stop
 (`stop_hook_active`), the failures are still reported but the stop is let
 through (exit 0), so an unfixable failure can't loop the session forever.
 
+A crash of the hook itself is a failure (fail closed): Claude Code ignores
+every exit but 2.
+
 Exit 0 = all checks passed (or second consecutive block), exit 2 = block.
 """
 from __future__ import annotations
@@ -54,14 +57,17 @@ def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
 def read_hook_input(stream=None) -> dict:
     try:
         data = json.loads((stream or sys.stdin).read() or "{}")
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return {}
     return data if isinstance(data, dict) else {}
 
 
 def main() -> int:
     hook_input = read_hook_input()
-    failures = run_checks()
+    try:
+        failures = run_checks()
+    except Exception as exc:  # noqa: BLE001 — fail closed: only exit 2 blocks the stop
+        failures = [("stop hook", f"crashed: {type(exc).__name__}: {exc}")]
     if not failures:
         return 0
     report = "\n\n".join(f"{check} FAILED:\n{output}" for check, output in failures)

@@ -19,3 +19,13 @@ except ImportError:  # running from catalyst's own repository
     _version_file = Path(__file__).resolve().parents[2] / "version.txt"
     __version__ = (_version_file.read_text().strip()
                    if _version_file.is_file() else "0.0.0")
+try:  # the commit a zipapp was built from (`g<sha>[.dirty]`), "" outside git
+    from catalyst._build import BUILD as __build__  # type: ignore
+except ImportError:  # from source, or a zipapp built before builds carried it
+    __build__ = ""
+
+
+def version_string() -> str:
+    """`catalyst --version`: the kernel version, plus the build's commit
+    when it has one, so two builds of one version can be told apart."""
+    return f"{__version__}+{__build__}" if __build__ else __version__

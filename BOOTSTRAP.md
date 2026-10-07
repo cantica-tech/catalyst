@@ -87,7 +87,7 @@ consistent.
 | **Parallel sub-agents** (background workers) | Use them for the four-eyes analysis passes and audits. | Run each pass sequentially as separate, context-isolated turns; do not let one pass see the other's output before reconciliation. |
 | **Agent-owned per-project storage** (a data directory this agent already maintains per project, outside the project's own tree — e.g. Claude Code's per-project config space) | Build `.criterion/` there — the location is computed per machine from this agent's own conventions (its shim, e.g. `CLAUDE.md`, says how), never recorded in `<app-name>.catalyst` — and link it into the project as a `.criterion` symlink at the project root, with `/.criterion` in the project's `.gitignore` (hard rule 6). | Build `.criterion/` directly inside the target project instead (also the fallback on a platform without symlinks), and add `/.criterion` to that project's own `.gitignore` — never committed. |
 | **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved working-copy location, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `<app-name>.catalyst` (project root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the working copy) are read fresh each session regardless; sharing is recorded in the pointer (`repoed`, `catalyst_repo_url`, `criterion_branch`) and `.gitmodules` (`Rules-of-Rules.md` §13). |
-| **Slash commands** (the kernel's `/check-rules`, `/list`, `/audit`, `/freeze`, `/reconcile`, `/migrate-definition`, `/sync-framework`, `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/journal`, `/journal-restore`, `/criterion create`, `/criterion get`, `/criterion push`, `/criterion sync`, `/criterion status`, `/project create`, `/project remove`, `/project export`, `/project import`, `/switch-agent`, `/commands`, `/meta-tag`, `/status`, `/run-analysis`, `/help`, `/catalyzer`; those an activated plugin contributes, e.g. `/create-board`, `/create-workflow`; plus the commands the active module adds, from its `code-of-conduct.module.md` §4 — `CODE-OF-CONDUCT.md` §4 of the deployment is the complete list) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
+| **Slash commands** (every command in the deployment's `CODE-OF-CONDUCT.md` §4 — kernel, active module and activated plugins; `catalyst spec` lists them. Never keep a copy of that list here or anywhere else) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
 | **`/dogfood`** — not part of the set above | Only ever exposed when working on catalyst's own repository (`framework/` present), never materialized into a deployed project. See `Rules-of-Rules.md` §13. | Same — this one has no deployed fallback, because it has nothing to run against outside catalyst's own repo. |
 | **Repo file read/write** | — | This is the baseline requirement. If you cannot read and write files in the target repo, stop: catalyst cannot be installed. |
 
@@ -133,7 +133,8 @@ and `framework/kernel/INSTANTIATION-CHECKLIST.md` (the tickable version you
 work against). Then:
 
 1. **Ledger.** Create the deployment ledger from the checklist (§3), every
-   item `[ ] pending`.
+   item `[ ] pending`. `catalyst init` adopts a `.criterion` that holds
+   only that `.ledger/`.
 2. **Resolve the inputs** — judgment, asked of the user when not evident:
    - the project name: from a project-local `dev-instructions.yaml`'s `name`
      if present (deleted after a successful install), else ask, defaulting
@@ -143,16 +144,21 @@ work against). Then:
    - the rule document(s) and a short lowercase prefix for each, one per
      natural seam of the project (`INSTANTIATION-GUIDE.md` §1);
    - the first user (name and git username), who becomes Admin;
-   - the agent-owned location for the working copy (§1; the agent's shim
-     says how to compute it), or none for the in-project fallback.
+   - the working-copy directory in agent-owned space (§1; the agent's shim
+     says how to compute it) — the `.criterion` directory itself, e.g.
+     `<agent project dir>/.criterion`, never its parent — or none for the
+     in-project fallback.
 3. **Run `catalyst init`** from the project root with those inputs
    (`--name`, `--module`, `--user`, `--git-username`, `--rule-doc
-   <file>:<prefix>` per document, `--at <location>`, `--agent <id>`, and
+   <file>:<prefix>` per document, `--at <working-copy dir>`, `--agent <id>`, and
    `--commands-dir <dir>` if the agent has command files). It builds the
    whole skeleton: composed governing documents, the seeded module, every
    entity folder with its index and templates catalog, frozen definitions,
    the first user with a userid, the journal, the vendored CLI, the
    `<app-name>.catalyst` pointer and the gitignored `.criterion` symlink.
+   It also copies `INVARIANTS.md` into the working copy and installs a
+   session-start hook (where the agent supports one) that re-injects it,
+   so later sessions in the project are grounded without this repository.
    It refuses if catalyst is already installed.
 4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
    end-of-turn hook if the agent has one, add the project's root
@@ -182,7 +188,8 @@ record you can self-correct against.
 
 **Re-ground cadence.** After every 5 completed ledger items, **or** immediately
 after any context compaction/summarization, re-read
-`framework/kernel/INVARIANTS.md` and the active checklist before continuing.
+`framework/kernel/INVARIANTS.md` (in a deployed project,
+`.criterion/INVARIANTS.md`) and the active checklist before continuing.
 The invariants file is deliberately short so this is cheap.
 
 Before declaring any task done: re-read the checklist and confirm every item is

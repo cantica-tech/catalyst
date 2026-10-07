@@ -129,12 +129,14 @@ def _parse_raw(tokens: list[str]) -> list[tuple[str, str | None, str | None]]:
     return out
 
 
-def commits(repo: Path, revs: list[str]) -> list[Commit]:
-    """Non-merge commits in `revs` (git log arguments), oldest first, with
-    the product files each one changes."""
+def commits(repo: Path, revs: list[str], walk: bool = True) -> list[Commit]:
+    """Non-merge commits in `revs` (revisions or ranges, never options),
+    oldest first, with the product files each one changes; `walk=False`:
+    only the named commits."""
     # --relative: paths from the project's own directory, as the journal records them
     res = _git(repo, "log", "--reverse", "--no-merges", "--no-renames", "--relative", "--raw",
-               "--no-abbrev", "-z", "--format=%x1e%H%x00%an%x00%ct%x00%s", *revs)
+               "--no-abbrev", "-z", "--format=%x1e%H%x00%an%x00%ct%x00%s",
+               *([] if walk else ["--no-walk"]), *journal.revisions(revs))
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {' '.join(revs)}")
     out = []
@@ -171,6 +173,8 @@ def baseline_missing(dep: Deployment) -> bool:
     checkout, rewritten history): history cannot be scoped, so it is not
     checked."""
     base = baseline(dep)
+    if base and base.startswith("-"):
+        return True                                  # never handed to git as an option
     return bool(base) and _git(dep.project_root, "cat-file", "-e", f"{base}^{{commit}}").returncode != 0
 
 
@@ -244,7 +248,7 @@ def adopt(dep: Deployment, revs: list[str], intent: list[str], tier: str | None 
     journaled = recorded(dep)
     written = []
     single = not any(".." in r for r in revs)          # named commits, not ranges: just those
-    found = commits(dep.project_root, revs + (["--no-walk"] if single else []))
+    found = commits(dep.project_root, revs, walk=not single)
     for c in sorted(found, key=lambda c: c.time) if single else found:
         missing = unrecorded_in(c, journaled)
         if not missing:

@@ -32,7 +32,7 @@ Refuses if a `<app-name>.catalyst` pointer or an in-project
 4. Create the `.criterion` symlink at the project root pointing at the
    working copy (skip on the in-project fallback), and add `/.criterion`
    to the project's `.gitignore` if absent.
-5. Report the result. Nothing is committed automatically (hard rule 4).
+5. Report the result. Nothing is committed automatically (INV-4).
 
 ## `remove <project name> [force]`
 

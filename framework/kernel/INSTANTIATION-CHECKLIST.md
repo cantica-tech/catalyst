@@ -29,7 +29,7 @@ from drifting. The guide holds the rationale; this holds the checks.
 
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
 - [ ] `catalyst init --name <name> --module <id> --user <name>
-      --git-username <u> --rule-doc <file>:<prefix> ... [--at <location>]
+      --git-username <u> --rule-doc <file>:<prefix> ... [--at <dir>/.criterion]
       --agent <id> [--commands-dir <dir>] [--test-locations <where>]
       [--kernel <dir>] [--module-dir <dir>]` run from the project root and
       exited `0`; its report shows each of:
