@@ -9,6 +9,11 @@ artifacts and meta-tags — gets proposed, tracked, and closed. Subordinate to
 that file governs the rules themselves; this file governs the work items
 that reference those rules.
 
+Documents cited by name that are not in this working copy — `CLI.md`,
+`MODULE-SPECIFICATION.md`, `SYNCHRONIZE.md`, `INSTANTIATION-GUIDE.md`,
+`FORMAT.md` and the like — are the catalyst kernel's, under
+`framework/kernel/` in the `catalyst` repository.
+
 ---
 
 ## 1. No development without a targeted rule
@@ -322,7 +327,7 @@ the seven currently exist anywhere.
   check is skipped or only partially completes (e.g. the working copy
   already mirrored but the pointer's `agent` field never updated to
   match). Resolves the owned location of `<agent-id>` (defaulting to the
-  running agent's own identifier if omitted) per `BOOTSTRAP.md` §1,
+  running agent's own identifier if omitted) per `Rules-of-Rules.md` §14,
   mirrors `.criterion/` into it if it existed elsewhere (exact copy,
   overwriting the destination — never a partial merge), repoints the
   `.criterion` symlink, updates `<app-name>.catalyst` (`agent`,
@@ -598,7 +603,7 @@ When the user enters `/project create <project name>: ...`, refuse if a
 exists at this project's root — point to `/project import ... force`
 instead. Otherwise run the instantiation procedure
 (`INSTANTIATION-GUIDE.md` §1): resolve the module, rule documents, first
-user and agent-owned location (`BOOTSTRAP.md` §1), then run
+user and agent-owned location (`Rules-of-Rules.md` §14), then run
 `catalyst init --name <project name> ...`, which builds the working copy,
 writes `<app-name>.catalyst` (no path in it), links `.criterion` (or keeps
 the in-project fallback directory) and gitignores `/.criterion`; then the

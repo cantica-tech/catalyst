@@ -10,6 +10,11 @@ apply to the *process* of maintaining those documents and the code they
 describe, not to the app's behavior itself. Binding on anyone (human or
 agent) adding to any of them, at any point after this file exists.
 
+Documents cited by name that are not in this working copy — `CLI.md`,
+`MODULE-SPECIFICATION.md`, `SYNCHRONIZE.md`, `INSTANTIATION-GUIDE.md`,
+`FORMAT.md` and the like — are the catalyst kernel's, under
+`framework/kernel/` in the `catalyst` repository.
+
 Each rule must belong to a rule type directory under `{{RULES_DIR}}/`, be
 stored as its own markdown file in that directory, be listed in the
 corresponding type index, and be referenced from the global index
@@ -628,8 +633,8 @@ takes one of two shapes:
 - **Local-only** (the default): it builds in **agent-owned space**, a
   per-project data location the running agent already maintains,
   outside the project being governed. Its location is computed per
-  machine by the running agent from its own conventions (`BOOTSTRAP.md`
-  §1; each agent's shim says how) and is never written into a tracked
+  machine by the running agent from its own conventions (each agent's
+  shim says how) and is never written into a tracked
   file.
 - **Shared** (§13): it is a **git submodule** of the product repository
   at `.criterion`, checked out from the criterion repository. The
@@ -647,7 +652,7 @@ agents, tools, the project's own `Taskfile.yml` — reaches the working
 copy. Local-only, it is a **symlink** to the agent-owned `.criterion/`,
 always gitignored (`/.criterion` in the project's `.gitignore`); the
 agent creates or repairs it at install, at `/project import`, and at
-every session start (`BOOTSTRAP.md` §1.1). Shared, it is the submodule
+every session start (the agent switching procedure below). Shared, it is the submodule
 checkout, which `catalyst criterion join` initialises in a fresh clone;
 the agent never replaces it with a symlink. Every document path written
 `.criterion/...` therefore means the same thing on every machine and for
@@ -685,7 +690,7 @@ anywhere. Detect this (a `.criterion/` dir at the project root and no
 structural change, so confirm with the user before proceeding, the same
 courtesy as `/criterion create`:
 
-1. Resolve the agent-owned location per `BOOTSTRAP.md` §1. If the
+1. Resolve the agent-owned location (local-only, above). If the
    running agent has no owned-space concept, there is nothing to move —
    stop here; the in-project fallback shape already **is** the target
    shape, it just still needs its `<app-name>.catalyst` pointer written
@@ -713,7 +718,7 @@ courtesy as `/criterion create`:
 ### Agent switching procedure
 
 When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
-1. Resolve the running agent's own owned location per `BOOTSTRAP.md` §1 (or the in-project fallback `.criterion/`).
+1. Resolve the running agent's own owned location (local-only, above) (or the in-project fallback `.criterion/`).
 2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
 3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`. A shared deployment's `.criterion` is a submodule inside the project (§13): skip steps 2–3 for it.
 4. Update `<app-name>.catalyst`: set `agent` to the current agent's identifier and `updated` to the current date string (`YYYY-MM-DD`) — nothing else; the pointer holds no path, and the project's `Taskfile.yml` needs no edit.

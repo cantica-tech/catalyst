@@ -2,8 +2,8 @@
 
 The non-negotiable rules of the catalyst framework, extracted into one lean file
 so they can be re-read cheaply and survive context compaction. This is the
-**canonical** copy; `BOOTSTRAP.md §0` mirrors it and `INSTANTIATION-GUIDE.md §1`
-is the prose origin. If those disagree with this file, this file wins and the
+**canonical** copy; in the `catalyst` repository, `BOOTSTRAP.md` §0 mirrors it and
+`INSTANTIATION-GUIDE.md` §1 is the prose origin. If those disagree with this file, this file wins and the
 others should be corrected.
 
 Keep this file short. Anything that needs explanation, examples, or rationale
@@ -76,7 +76,7 @@ one-line placeholder; numbers are never reused.
   the project reaches it through one path, `<project root>/.criterion`.
   **Local-only** (the default), it lives in **agent-owned space** —
   computed per machine from the running agent's conventions
-  (`BOOTSTRAP.md` §1), never recorded in a tracked file — and
+  (`Rules-of-Rules.md` §14), never recorded in a tracked file — and
   `.criterion` is a gitignored symlink to it, which the agent creates or
   repairs at install, `/project import` and every session start.
   **Shared** (INV-18), `.criterion` is a git submodule of the product
