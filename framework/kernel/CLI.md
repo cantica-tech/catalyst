@@ -375,6 +375,25 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
+### Writing verbs: `new`, `status set`, `link`
+
+The mechanical half of creating and changing artifacts, from the entity type
+definitions. Each signs (`--as`, else the only active user), keeps
+back-references, regenerates the indexes and writes one journal entry
+(`--intent` repeatable, `--command` names the slash command it runs for,
+`--tier`). Each takes `--json` and exits `1`, changing nothing, on a refusal.
+
+- `catalyst new <type> --title <t> [--field NAME=VALUE ...]`: the next ID,
+  the type's latest template with its fields filled (ID, name, file name,
+  initial status, dates, signer, the given fields; references as
+  comma-separated IDs, checked to exist). Refuses a missing required field.
+  The sections below the field table stay for the agent to write.
+- `catalyst status set <ID> <status> [--force]`: a status the type allows
+  and, when the ETD declares transitions, one it can reach; `--force` writes
+  any value. A `RECON-` case is refused: only `/reconcile` changes one.
+- `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
+  when the field declares a back-reference, cite this artifact back.
+
 ### Read-only views: `list`, `view`, `backlog`, `journal show`
 
 Computed from the working copy and the entity type definitions; none of them

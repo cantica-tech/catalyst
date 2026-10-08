@@ -225,6 +225,43 @@ def cmd_view(args) -> int:
     return 0
 
 
+def cmd_edit(args) -> int:
+    """Writing verbs (R2 W2): new, status set, link."""
+    from catalyst import edit
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    try:
+        signer = resolve_signer(dep, corpus, args.as_user)
+        if args.edit == "new":
+            values = {}
+            for spec in args.field or []:
+                key, sep, value = spec.partition("=")
+                if not sep:
+                    raise edit.EditError(f"--field '{spec}' is not NAME=VALUE")
+                values[key.strip()] = value.strip()
+            res = edit.new(dep, corpus, args.type, args.title, values, signer, args.intent or [],
+                           command=args.cmd or "catalyst new", tier=args.tier)
+        elif args.edit == "status":
+            res = edit.set_status(dep, corpus, args.id, args.status, signer, args.intent or [],
+                                  force=args.force, command=args.cmd or "/status", tier=args.tier)
+        else:
+            res = edit.link(dep, corpus, args.id, args.field_name, args.ids, signer, args.intent or [],
+                            command=args.cmd or "catalyst link", tier=args.tier)
+    except (edit.EditError, IdError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({"id": res.id, "file": str(res.file), "touched": [str(p) for p in res.touched]}))
+    else:
+        print(f"{res.id}  {res.file}")
+        for p in res.touched[1:]:
+            print(f"  also updated {p}")
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -810,6 +847,42 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("backlog", help="read-only: open work by type and status, missing links, idle rules")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="backlog")
+
+    p = sub.add_parser("new", help="create an artifact from its type's latest template, signed, indexed, journaled")
+    p.add_argument("type", help="an entity type (prefix, name or folder)")
+    p.add_argument("--title", required=True)
+    p.add_argument("--field", action="append", metavar="NAME=VALUE",
+                   help="a field value; references as comma-separated IDs (repeatable)")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="new")
+
+    p = sub.add_parser("status", help="change an artifact's Status")
+    st = p.add_subparsers(dest="status_command", required=True)
+    q = st.add_parser("set", help="set Status, checked against the type's statuses and transitions")
+    q.add_argument("id")
+    q.add_argument("status")
+    q.add_argument("--force", action="store_true", help="write a status outside the type's statuses")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    q.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_edit, edit="status")
+
+    p = sub.add_parser("link", help="cite IDs in a reference field, keeping the back-reference")
+    p.add_argument("id")
+    p.add_argument("field_name", metavar="field")
+    p.add_argument("ids", nargs="+")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="link")
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

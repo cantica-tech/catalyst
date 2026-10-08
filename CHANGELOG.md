@@ -15,6 +15,12 @@ messages.
   open work targets) and `catalyst journal show` (filtered entries), each
   with `--json`. `/list`, `/user-list` and `/journal` now run them instead
   of having the agent read the files.
+- Writing verbs (roadmap R2 W2): `catalyst new <type> --title … --field …`
+  (next ID, latest template filled and signed, references checked,
+  back-references kept), `catalyst status set <ID> <status> [--force]`
+  (statuses and transitions from the ETD; a `RECON-` case is refused) and
+  `catalyst link <ID> <field> <ID>…`; each regenerates the indexes and
+  journals. `/status` runs `catalyst status set`.
 
 ## 0.46.1 — 2026-10-08
 

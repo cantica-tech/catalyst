@@ -643,21 +643,12 @@ carrying the bundle's pointer fields over as-is (`repoed`,
 the import with `catalyst journal append --command /project --action sync`
 covering the pointer and `.gitignore`, then report the result.
 
-When the user enters `/status <artefact-id> <status> [force]`, update the
-artifact's `Status` field. If the supplied status is one of the valid statuses
-for that artifact type, change it normally. If the status is invalid and the
-command includes the word `force`, change it to that invalid value anyway. If
-the status is invalid and `force` is not supplied, respond that the status
-change is impossible and do not modify the artifact. If the artifact ID does
-not resolve to an existing artifact, state that the artifact cannot be found.
-If it is a `RECON-` case, refuse even with `force` and point to `/reconcile`:
-its role gate (`Rules-of-Rules.md` §16) is the only way a reconciliation's
-`Status` changes. The valid statuses are the `Status` values the type's entity type
-definition allows (a forced value outside them is reported by
-`catalyst validate` as an `enum-value` warning). After the edit, run
-`catalyst index regen` and
-`catalyst journal append --command /status --action status-change ...`
-(§4's common ending).
+When the user enters `/status <artefact-id> <status> [force]`, run
+`catalyst status set <artefact-id> <status> [--force] --intent "<why>"` and
+report what it prints. It checks the type's statuses and transitions,
+refuses a `RECON-` case even with `--force` (only `/reconcile` changes one,
+`Rules-of-Rules.md` §16), regenerates the indexes and journals the change;
+on a refusal, change nothing by hand.
 
 Each plugin must be defined by the following minimum metadata fields: `name`,
 `description`, `uuid`, `version`, `active`, and `type`. The plugin definition
