@@ -21,7 +21,7 @@ from catalyst_fixtures import USER, make_project, write
 
 def git(repo: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
-                          text=True).stdout.strip()
+                          text=True, encoding="utf-8").stdout.strip()
 
 
 @pytest.fixture(autouse=True)
@@ -51,9 +51,9 @@ def monorepo(tmp_path, monkeypatch):
     base = git(root, "rev-parse", "HEAD")
     for project in (root, inner):
         pointer = project / "app.catalyst"
-        data = json.loads(pointer.read_text())
+        data = json.loads(pointer.read_text(encoding="utf-8"))
         data["journal_since"] = base
-        pointer.write_text(json.dumps(data))
+        pointer.write_text(json.dumps(data), encoding="utf-8")
     git(root, "commit", "-q", "-am", "chore: baselines")
     monkeypatch.chdir(root)
     return {"root": root, "inner": inner}
@@ -128,12 +128,12 @@ def test_the_hook_routes_each_staged_file_to_its_deployment(monorepo, tmp_path):
     fake_cli = [sys.executable, "-c",
                 "import sys; a = sys.argv; p = a[a.index('--project') + 1]; "
                 f"open({str(record)!r}, 'a').write(p + '\\n'); "
-                "sys.exit(1 if p.endswith('inner/app') else 0)"]
+                "sys.exit(1 if p.replace(chr(92), '/').endswith('inner/app') else 0)"]
     msg = tmp_path / "MSG"
-    msg.write_text("chore: x\n")
+    msg.write_text("chore: x\n", encoding="utf-8")
 
     def calls():
-        found = record.read_text().splitlines() if record.exists() else []
+        found = record.read_text(encoding="utf-8").splitlines() if record.exists() else []
         record.unlink(missing_ok=True)
         return found
 
@@ -172,7 +172,7 @@ def test_criterion_create_for_a_project_in_a_subfolder(tmp_path, monkeypatch):
     monkeypatch.chdir(project)
     cr.create(load(project), str(remote), "criterion", cr.CI_TEMPLATE)
     assert cr.is_submodule(project) and not cr.is_submodule(top)
-    gitmodules = (top / ".gitmodules").read_text()
+    gitmodules = (top / ".gitmodules").read_text(encoding="utf-8")
     assert "path = app/.criterion" in gitmodules
     assert ".gitmodules" in git(top, "diff", "--cached", "--name-only").split()
 
@@ -186,11 +186,11 @@ def test_the_installed_hook_routes_real_commits(monorepo):
     (inner / ".criterion" / "bin").mkdir(parents=True, exist_ok=True)
     shutil.copy(cli, inner / ".criterion" / "bin" / "catalyst.pyz")
     hook = install_hook(root)
-    assert 'ROUTER = ".criterion/bin/catalyst.pyz"' in hook.read_text()
+    assert 'ROUTER = ".criterion/bin/catalyst.pyz"' in hook.read_text(encoding="utf-8")
 
     def commit(message: str) -> subprocess.CompletedProcess:
         return subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", message],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, encoding="utf-8")
 
     write(root / "inner" / "app" / "src" / "b.py", "# inner change\n")
     git(root, "add", "-A")

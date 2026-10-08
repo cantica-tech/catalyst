@@ -48,7 +48,7 @@ change. Nothing here to retroactively backfill.
 ## Rollback
 
 Pure documentation addition — safe to revert `Rules-of-Rules.md`/
-`INVARIANTS.md`/`rules-of-development.md` to their prior content if this
+`INVARIANTS.md`/`CODE-OF-CONDUCT.md` to their prior content if this
 needs undoing. Nothing else was touched.
 
 Past migration docs and their rows in `migrations.md` describe shapes as

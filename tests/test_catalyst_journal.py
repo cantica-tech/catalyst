@@ -39,7 +39,7 @@ def item(project: Path) -> Path:
 def test_append_records_real_hashes_and_pins(project):
     dep = load(project)
     before = j.head_blob(dep.root, "items/ITEM-000001-first-item.md")
-    item(project).write_text(item(project).read_text().replace("| Open |", "| Done |"))
+    item(project).write_text(item(project).read_text(encoding="utf-8").replace("| Open |", "| Done |"), encoding="utf-8")
     entry = j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
     f = entry["files"][0]
     assert f["path"] == ".criterion/items/ITEM-000001-first-item.md"
@@ -53,9 +53,9 @@ def test_append_records_real_hashes_and_pins(project):
 def test_before_chains_from_the_previous_entry(project):
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"
-    item(project).write_text(item(project).read_text() + "\nmore\n")
+    item(project).write_text(item(project).read_text(encoding="utf-8") + "\nmore\n", encoding="utf-8")
     first = j.append(dep, req([path]))
-    item(project).write_text(item(project).read_text() + "\nand more\n")
+    item(project).write_text(item(project).read_text(encoding="utf-8") + "\nand more\n", encoding="utf-8")
     second = j.append(dep, req([path]))
     assert second["files"][0]["before"] == first["files"][0]["after"]
     assert [i for i in j.verify(dep) if not i.legacy] == []
@@ -104,9 +104,9 @@ def test_pins_survive_gc(project):
 def test_verify_flags_unjournaled_edits_and_chain_breaks(project):
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"
-    item(project).write_text("v2\n")
+    item(project).write_text("v2\n", encoding="utf-8")
     j.append(dep, req([path]))
-    item(project).write_text("v3, not journaled\n")
+    item(project).write_text("v3, not journaled\n", encoding="utf-8")
     assert [(i.level, i.code) for i in j.verify(dep)] == [("error", "unjournaled")]
     # a hand-written CLI-looking entry that breaks the chain
     bad = {"timestamp": j.now(), "actor": "ada", "command": "x", "action": "update",
@@ -123,7 +123,7 @@ def test_legacy_entries_only_warn(project):
     legacy = {"timestamp": "2026-01-01T00:00:00Z", "actor": "Ada", "command": "x", "action": "update",
               "artifact": "x", "targets": [], "intent": ["x"],
               "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}]}
-    j.journal_path(dep).write_text(json.dumps(legacy) + "\n")
+    j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
     issues = j.verify(dep)
     assert issues and all(i.level == "warning" and i.legacy for i in issues)
 
@@ -154,13 +154,13 @@ def test_canonical_path_through_symlink(tmp_path, monkeypatch):
 def test_restore_materialises_state_at_a_time(project, tmp_path):
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"
-    item(project).write_text("version one\n")
+    item(project).write_text("version one\n", encoding="utf-8")
     t1 = j.append(dep, req([path], timestamp="2026-05-01T00:00:00Z"))["timestamp"]
-    item(project).write_text("version two\n")
+    item(project).write_text("version two\n", encoding="utf-8")
     j.append(dep, req([path], timestamp="2026-06-01T00:00:00Z"))
     restored, missing = j.restore(dep, t1, tmp_path / "side")
     assert missing == [] and restored == [path]
-    assert (tmp_path / "side" / path).read_text() == "version one\n"
+    assert (tmp_path / "side" / path).read_text(encoding="utf-8") == "version one\n"
     with pytest.raises(j.JournalError, match="not an empty directory"):
         j.restore(dep, t1, tmp_path / "side")
 
@@ -170,17 +170,17 @@ def test_restore_before_a_files_first_entry_uses_its_before(project, tmp_path):
     entry's `before`: the content it had until that change."""
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"
-    original = item(project).read_text()
-    item(project).write_text("changed later\n")
+    original = item(project).read_text(encoding="utf-8")
+    item(project).write_text("changed later\n", encoding="utf-8")
     entry = j.append(dep, req([path], timestamp="2026-06-01T00:00:00Z"))
     assert entry["files"][0]["before"]
     restored, missing = j.restore(dep, "2026-05-01T00:00:00Z", tmp_path / "side")
     assert missing == [] and restored == [path]
-    assert (tmp_path / "side" / path).read_text() == original
+    assert (tmp_path / "side" / path).read_text(encoding="utf-8") == original
 
 
 def test_cli_append_verify_pin(project, capsys):
-    item(project).write_text("changed\n")
+    item(project).write_text("changed\n", encoding="utf-8")
     assert main(["journal", "append", "--command", "/status", "--action", "status-change",
                  "--artifact", f"ITEM-000001-{USERID}", "--intent", "mark done",
                  "--file", ".criterion/items/ITEM-000001-first-item.md", "--json"]) == 0
@@ -206,7 +206,7 @@ def test_cli_entries_keep_their_canonical_paths(project):
 
 def test_duplicate_file_is_recorded_once(project):
     dep = load(project)
-    item(project).write_text("changed\n")
+    item(project).write_text("changed\n", encoding="utf-8")
     entry = j.append(dep, req([".criterion/items/ITEM-000001-first-item.md",
                                str(item(project))]))
     assert len(entry["files"]) == 1
@@ -216,13 +216,13 @@ def test_duplicate_file_is_recorded_once(project):
 def test_timestamps_compare_as_times_not_strings(project, tmp_path):
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"
-    item(project).write_text("at ten\n")
+    item(project).write_text("at ten\n", encoding="utf-8")
     j.append(dep, req([path], timestamp="2026-09-27T10:00:00Z"))
-    item(project).write_text("half a second later\n")
+    item(project).write_text("half a second later\n", encoding="utf-8")
     j.append(dep, req([path], timestamp="2026-09-27T10:00:00.500Z"))
     assert [i.code for i in j.verify(dep) if not i.legacy] == []
     j.restore(dep, "2026-09-27T12:00:00+02:00", tmp_path / "side")    # == 10:00:00Z
-    assert (tmp_path / "side" / path).read_text() == "at ten\n"
+    assert (tmp_path / "side" / path).read_text(encoding="utf-8") == "at ten\n"
     with pytest.raises(j.JournalError, match="ISO 8601"):
         j.restore(dep, "yesterday", tmp_path / "other")
 
@@ -249,7 +249,7 @@ def test_before_hash_in_a_subdirectory_project(tmp_path, monkeypatch):
     monkeypatch.chdir(project)
     dep = load(project)
     committed = j.git(mono, "rev-parse", "HEAD:app/app.catalyst")
-    (project / "app.catalyst").write_text((project / "app.catalyst").read_text() + " ")
+    (project / "app.catalyst").write_text((project / "app.catalyst").read_text(encoding="utf-8") + " ", encoding="utf-8")
     assert j.append(dep, req(["app.catalyst"]))["files"][0]["before"] == committed
 
 
@@ -277,8 +277,8 @@ def test_missing_before_inherited_from_a_legacy_entry_only_warns(project):
     legacy = {"timestamp": "2026-01-01T00:00:00Z", "actor": "x", "command": "x", "action": "update",
               "artifact": "x", "targets": [], "intent": ["x"],
               "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}]}
-    j.journal_path(dep).write_text(json.dumps(legacy) + "\n")
-    item(project).write_text("current\n")
+    j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    item(project).write_text("current\n", encoding="utf-8")
     j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
     assert [i for i in j.verify(dep) if i.level == "error"] == []
 
@@ -290,3 +290,22 @@ def test_check_warns_about_new_unjournaled_product_files(project):
     assert unrecorded_changes(dep) == ["src/new.py"]
     j.append(dep, req(["src/new.py"], action="create", tier="feature"))
     assert unrecorded_changes(dep) == []
+
+
+def test_creating_the_pin_ref_is_announced_once(project, capsys):
+    dep = load(project)
+    write(project / "src" / "a.py", "a\n")
+    j.append(dep, req(["src/a.py"], action="create"))
+    err = capsys.readouterr().err
+    assert f"created {j.PIN_REF} in {project}" in err
+    write(project / "src" / "a.py", "b\n")
+    j.append(dep, req(["src/a.py"]))
+    assert j.PIN_REF not in capsys.readouterr().err
+
+
+def test_revisions_and_object_ids_never_reach_git_as_options():
+    with pytest.raises(ValueError):
+        j.revisions(["HEAD", "--output=x"])
+    assert j.revisions(["A..B", "^c"]) == ["A..B", "^c"]
+    assert j.object_id("a" * 40) and not j.object_id("--batch") and not j.object_id("A" * 40)
+    assert not j.blob_exists(Path("."), "-p")

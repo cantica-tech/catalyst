@@ -68,7 +68,7 @@ def test_start_records_scope_code_state_and_inventory(project):
     inv = ctx.load("inventory.json")
     assert set(inv["files"]) == {"src/login.py", "src/session.py"}
     assert inv["code_state"] == subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"],
-                                               capture_output=True, text=True).stdout.strip()
+                                               capture_output=True, text=True, encoding="utf-8").stdout.strip()
     assert RULE in inv["existing"]["rules"] and ITEM in inv["existing"]["grounded"]
     assert an.phase(ctx.art) == "Extracting"
     with pytest.raises(an.AnalysisError, match="already has 1 rule"):
@@ -163,7 +163,7 @@ def test_decisions_need_real_artifacts_and_close_needs_them_all(project):
     assert counts == {"defect": {"accept": 1, "reject": 0}, "rule": {"accept": 1, "reject": 1}}
     art = an.context(load(project), ctx.art.id).art
     assert an.phase(art) == "Closed" and art.get("Closed")
-    assert f"`{RULE}`" in art.file.read_text()
+    assert f"`{RULE}`" in art.file.read_text(encoding="utf-8")
     assert not [e for e in run_check(load(project)).errors if e.startswith("analysis:")]
 
 
@@ -179,7 +179,7 @@ def test_abandon(project):
     ctx = started(project)
     an.abandon(ctx, "scope too wide")
     art = an.context(load(project), ctx.art.id).art
-    assert an.phase(art) == "Abandoned" and "scope too wide" in art.file.read_text()
+    assert an.phase(art) == "Abandoned" and "scope too wide" in art.file.read_text(encoding="utf-8")
     with pytest.raises(an.AnalysisError, match="already Abandoned"):
         an.abandon(an.context(load(project), ctx.art.id), "again")
 
@@ -200,7 +200,7 @@ def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
     assert main(["analysis", "close", aid]) == 0
     assert main(["analysis", "status", aid]) == 0
     assert "Closed" in capsys.readouterr().out
-    lines = (project / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()
+    lines = (project / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
     commands = [c for c in (json.loads(line)["command"] for line in lines) if c.startswith("catalyst analysis")]
     assert commands == ["catalyst analysis start"] + ["catalyst analysis record"] * 2 + [
         "catalyst analysis diff", "catalyst analysis reconcile"] + ["catalyst analysis decide"] * 3 + [
@@ -212,7 +212,7 @@ def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
 def test_the_playbooks_findings_example_is_valid():
     """The documented format is the one the CLI accepts."""
     import re
-    text = (Path(__file__).resolve().parents[1] / "framework" / "kernel" / "ANALYSIS-PLAYBOOK.md").read_text()
+    text = (Path(__file__).resolve().parents[1] / "framework" / "kernel" / "ANALYSIS-PLAYBOOK.md").read_text(encoding="utf-8")
     example = json.loads(re.search(r"```json\n(.*?)```", text, re.S).group(1))
     assert an.validate_findings(example["findings"], inventory={"src/session.py"}, rules=set(),
                                 domains=set()) == []

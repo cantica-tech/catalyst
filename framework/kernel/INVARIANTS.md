@@ -2,8 +2,8 @@
 
 The non-negotiable rules of the catalyst framework, extracted into one lean file
 so they can be re-read cheaply and survive context compaction. This is the
-**canonical** copy; `BOOTSTRAP.md §0` mirrors it and `INSTANTIATION-GUIDE.md §1`
-is the prose origin. If those disagree with this file, this file wins and the
+**canonical** copy; in the `catalyst` repository, `BOOTSTRAP.md` §0 mirrors it and
+`INSTANTIATION-GUIDE.md` §1 is the prose origin. If those disagree with this file, this file wins and the
 others should be corrected.
 
 Keep this file short. Anything that needs explanation, examples, or rationale
@@ -76,7 +76,7 @@ one-line placeholder; numbers are never reused.
   the project reaches it through one path, `<project root>/.criterion`.
   **Local-only** (the default), it lives in **agent-owned space** —
   computed per machine from the running agent's conventions
-  (`BOOTSTRAP.md` §1), never recorded in a tracked file — and
+  (`Rules-of-Rules.md` §14), never recorded in a tracked file — and
   `.criterion` is a gitignored symlink to it, which the agent creates or
   repairs at install, `/project import` and every session start.
   **Shared** (INV-18), `.criterion` is a git submodule of the product
@@ -183,7 +183,8 @@ one-line placeholder; numbers are never reused.
   replace bare `development/users.json`/`roles.json`, and carry the same `templates/`
   treatment as every other type — `TEMPLATE-USERS-vN.json`/
   `TEMPLATE-ROLES-vN.json` version the registry's seed shape, since each
-  registry is one JSON array rather than one-file-per-instance.
+  registry is one JSON file (`{"users": [...]}`, `{"roles": [...]}`)
+  rather than one-file-per-instance.
   `work-items/` is not part of this core set — see INV-22.
 - **INV-21 — Reconciliation entity for diverging versions.** A
   `RECON-NNNNNN` (`reconciliations/`, top-level, full INV-20 template
@@ -195,7 +196,7 @@ one-line placeholder; numbers are never reused.
   disputed artifact. Never file-versioned per round — each round of
   back-and-forth is a new row in the same file's `Revisions` section,
   edited in place and journaled like any other artifact (INV-17). Resolved via
-  `/reconcile <id> accept|accept-with-edits|reject|propose <text>`,
+  `/reconcile <id> accept|accept-with-edits|reject|propose <text>|close`,
   moving `Status` through `Open`/`Under Review`/`Resolved-*`/`Closed` —
   who can resolve one is genuinely gated by the actor's role
   (`reconciliation: full|propose|none` in `IAM/roles/roles.json`), the
@@ -254,11 +255,10 @@ one-line placeholder; numbers are never reused.
   thereafter
   (`Rules-of-Rules.md` rr-META-020). A rule ID's sequence number is
   6-digit, not 3 (`Rules-of-Rules.md` rr-META-003) — zero-padded
-  before the suffix is appended, never after. Rules and domains carry
-  no dedicated authorship field: until one exists, the sole or
-  most-recently-active registered user is used for a rule's suffix
-  (`rr-META-020`'s documented limitation); domains have no numeric ID
-  and are out of scope for this suffix entirely. A user must have a
+  before the suffix is appended, never after. A rule's suffix is its
+  signer's, named like any other with `catalyst id next-rule --as
+  <signer>` (`CLI.md`); domains have no numeric ID and are out of scope
+  for this suffix entirely. A user must have a
   `userid` before any entity it signs can be assigned its suffix —
   this ordering is not optional.
 - **INV-27** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);

@@ -29,7 +29,7 @@ from drifting. The guide holds the rationale; this holds the checks.
 
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
 - [ ] `catalyst init --name <name> --module <id> --user <name>
-      --git-username <u> --rule-doc <file>:<prefix> ... [--at <location>]
+      --git-username <u> --rule-doc <file>:<prefix> ... [--at <dir>/.criterion]
       --agent <id> [--commands-dir <dir>] [--test-locations <where>]
       [--kernel <dir>] [--module-dir <dir>]` run from the project root and
       exited `0`; its report shows each of:
@@ -58,9 +58,10 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Module's `INVARIANTS.module.md` read together with `INVARIANTS.md` (§6.4)
 
 ## Wire up (`INSTANTIATION-GUIDE.md` §1 steps 5–8)
-- [ ] If the agent supports end-of-turn hooks: `catalyst hook stop`
-      registered per its shim (Claude Code: `agents/claude-code/settings.template.json`
-      merged into the project's `.claude/settings.json`)
+- [ ] Where the agent supports them: `catalyst hook start` (session start)
+      and `catalyst hook stop` (end of turn) registered per its shim
+      (Claude Code: `agents/claude-code/settings.template.json` merged into
+      the project's `.claude/settings.json`)
 - [ ] No command files (other agents): each command of the composed
       `CODE-OF-CONDUCT.md` §4 exposed as a named procedure and listed in
       the deployed `README.md` (`BOOTSTRAP.md §1`)

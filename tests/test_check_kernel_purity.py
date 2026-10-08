@@ -22,10 +22,10 @@ def _write_module(base: Path) -> Path:
         "templates:\n"
         "  - entity_type: ITEM\n"
         "    template_path: templates/item.template.md\n"
-    )
+    , encoding="utf-8")
     (mod / "schemas" / "item.yaml").write_text(
         "id_prefix: ITEM\nname: Item\nplural_name: Items\nfolder: items\n"
-    )
+    , encoding="utf-8")
     return mod
 
 
@@ -36,8 +36,8 @@ def _repo(tmp_path: Path, kernel_text: str) -> Path:
     (root / "framework" / "modules" / "catalog.md").write_text(
         "| Id | Repository | Default branch |\n|---|---|---|\n"
         "| `example-process` | `git@example.com:x/catalyst-example-process.git` | `main` |\n"
-    )
-    (root / "framework" / "kernel" / "GUIDE.md").write_text(kernel_text)
+    , encoding="utf-8")
+    (root / "framework" / "kernel" / "GUIDE.md").write_text(kernel_text, encoding="utf-8")
     return root
 
 

@@ -37,14 +37,15 @@ same way any other type's template is.
 
 1. **`IAM/users/templates/`**: create it. Copy the framework's
    `templates/users.template.json` in as `TEMPLATE-USERS-v1.json`
-   (content unchanged — `{"users": []}`). Write `templates-users.md`
+   (content unchanged — `{"users": []}`). Write `templates-user.md`
    seeded with one `v1` row (today's date, "carried over from the
    pre-0.13.0 layout, where this registry had no `templates/`"). Write
    `IAM/users/templates/README.md`.
 2. **`IAM/roles/templates/`**: same treatment. Copy
    `templates/roles.template.json` in as `TEMPLATE-ROLES-v1.json`
    (content unchanged — the default agile-role mapping). Seed
-   `templates-roles.md` the same way. Write
+   `templates-role.md` the same way (a deployment that already has the
+   plural `templates-users.md`/`templates-roles.md` keeps them: both are read). Write
    `IAM/roles/templates/README.md`.
 3. **Existing registries untouched**: `IAM/users/users.json` and
    `IAM/roles/roles.json` keep their current content exactly — this

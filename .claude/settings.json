@@ -9,16 +9,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 scripts/stop_hook.py"
-          }
-        ]
-      }
     ]
   }
 }

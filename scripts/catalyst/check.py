@@ -21,6 +21,10 @@ from catalyst.validate import ERROR, validate
 FORMAT = "1.0-rc"
 SUPPORTED_FORMATS = {"1.0-rc"}
 
+# Files operating systems drop into any directory: never product work, so never
+# an unrecorded change (anything else is opted out with .catalystignore).
+NOISE = frozenset({".DS_Store", "Thumbs.db", "desktop.ini"})
+
 
 @dataclass
 class Report:
@@ -115,16 +119,32 @@ def unrecorded_changes(dep: Deployment) -> list[str]:
     what the journal last recorded — work that has not been journaled yet
     (edits to already-journaled files are journal-verify errors instead)."""
     import subprocess
+    from catalyst.scope import governs
     if dep.standalone:
         return []
-    res = subprocess.run(["git", "-C", str(dep.project_root), "status", "--porcelain", "-uall", "-z"],
-                         capture_output=True, text=True)
-    if res.returncode != 0:
+    root = str(dep.project_root)
+    prefix = subprocess.run(["git", "-C", root, "rev-parse", "--show-prefix"],
+                            capture_output=True, text=True, encoding="utf-8")
+    # porcelain paths are relative to the repository top: keep the project's own
+    # (`-- .`) and make them relative to the project, as the journal records them
+    res = subprocess.run(["git", "-C", root, "status", "--porcelain", "-uall", "-z", "--", "."],
+                         capture_output=True, text=True, encoding="utf-8")
+    if prefix.returncode != 0 or res.returncode != 0:
         return []
+    top = prefix.stdout.strip()
     paths = []
-    for item in res.stdout.split("\0"):
-        if len(item) > 3 and not item[3:].startswith(".criterion"):
-            paths.append(item[3:])
+    items = iter(res.stdout.split("\0"))
+    for item in items:
+        if len(item) <= 3:
+            continue
+        if item[0] in "RC":
+            next(items, None)                 # `-z` rename/copy: the source path follows
+        path = item[3:]
+        if top and path.startswith(top):
+            path = path[len(top):]
+        if path.rsplit("/", 1)[-1] in NOISE or not governs(dep.project_root, path):
+            continue
+        paths.append(path)
     if not paths:
         return []
     last = journal.last_after(dep)
@@ -136,12 +156,16 @@ def unrecorded_changes(dep: Deployment) -> list[str]:
 def hook_stop(dep: Deployment, stdin=None, strict: bool = False) -> int:
     """Exit 2 with the failures on stderr so the agent keeps working; let
     the stop through when a Stop hook already blocked this stop, so an
-    unfixable failure can't loop the session."""
+    unfixable failure can't loop the session. A check that crashes is a
+    failure too (fail closed): Claude Code ignores any exit but 2."""
     try:
         hook_input = json.loads((stdin or sys.stdin).read() or "{}")
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         hook_input = {}
-    report = run(dep)
+    try:
+        report = run(dep)
+    except Exception as exc:  # noqa: BLE001 — any crash must block, not switch enforcement off
+        report = Report(errors=[f"check crashed: {type(exc).__name__}: {exc}"])
     if not report.failing(strict):
         return 0
     body = report.text() if strict else "\n".join(f"ERROR   {e}" for e in report.errors)

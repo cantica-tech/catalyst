@@ -17,14 +17,14 @@ from catalyst_fixtures import USERID, make_project, write
 
 def git(repo, *args) -> str:
     return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
-                          text=True).stdout.strip()
+                          text=True, encoding="utf-8").stdout.strip()
 
 
 def set_pointer(project, **fields):
     p = project / "app.catalyst"
-    data = json.loads(p.read_text())
+    data = json.loads(p.read_text(encoding="utf-8"))
     data.update(fields)
-    p.write_text(json.dumps(data))
+    p.write_text(json.dumps(data), encoding="utf-8")
 
 
 def manual_commit(project, path="src/app.py", text="print('hi')\n", msg="Hand edit ITEM-000001"):
@@ -97,9 +97,9 @@ def test_history_before_the_baseline_and_merges_are_not_checked(proj):
 def test_no_baseline_means_history_is_not_checked(proj):
     manual_commit(proj)
     set_pointer(proj, journal_since=None)
-    data = json.loads((proj / "app.catalyst").read_text())
+    data = json.loads((proj / "app.catalyst").read_text(encoding="utf-8"))
     del data["journal_since"]
-    (proj / "app.catalyst").write_text(json.dumps(data))
+    (proj / "app.catalyst").write_text(json.dumps(data), encoding="utf-8")
     dep = load(proj)
     assert u.baseline(dep) is None and u.since_baseline(dep) == []
     assert any("declares no `journal_since`" in w for w in check_run(dep).warnings)
@@ -159,7 +159,7 @@ def test_commit_msg_hook_warns_in_the_beta_and_refuses_after(proj, capsys):
     write(proj / "src" / "hand.py", "x\n")
     git(proj, "add", "src/hand.py")
     msg = proj / "MSG"
-    msg.write_text("chore: by hand\n")
+    msg.write_text("chore: by hand\n", encoding="utf-8")
     assert main(["hook", "commit-msg", str(msg)]) == 0
     assert "warning" in capsys.readouterr().err
     set_pointer(proj, strict_journal=True)

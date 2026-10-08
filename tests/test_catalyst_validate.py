@@ -26,9 +26,9 @@ def item_file(project: Path) -> Path:
 
 
 def edit(path: Path, old: str, new: str) -> None:
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     assert old in text
-    path.write_text(text.replace(old, new))
+    path.write_text(text.replace(old, new), encoding="utf-8")
 
 
 def test_valid_fixture_is_clean(tmp_path):
@@ -108,7 +108,7 @@ def test_reference_to_wrong_type_is_a_warning(tmp_path):
 
 def test_duplicate_artifact_id(tmp_path):
     project = make_project(tmp_path)
-    write(project / ".criterion" / "items" / "ITEM-000001-copy.md", item_file(project).read_text())
+    write(project / ".criterion" / "items" / "ITEM-000001-copy.md", item_file(project).read_text(encoding="utf-8"))
     assert "duplicate-id" in codes(project, ERROR)
 
 
@@ -199,9 +199,9 @@ def test_pointer_without_working_copy_fails_check(tmp_path):
 def test_closed_entity_needs_its_required_when_closed_fields(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
-    schema.write_text(schema.read_text().replace(
+    schema.write_text(schema.read_text(encoding="utf-8").replace(
         "  - name: Subs\n    kind: ref-list\n    required: false",
-        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"))
+        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"), encoding="utf-8")
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
     assert "closed-incomplete" not in codes(project)          # still Open: fine
     edit(item_file(project), "| **Status** | Open |", "| **Status** | Done |")
@@ -211,7 +211,7 @@ def test_closed_entity_needs_its_required_when_closed_fields(tmp_path):
 def test_target_type_may_list_alternatives(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "sub.yaml"
-    schema.write_text(schema.read_text().replace("target_type: ITEM", "target_type: ITEM|rule"))
+    schema.write_text(schema.read_text(encoding="utf-8").replace("target_type: ITEM", "target_type: ITEM|rule"), encoding="utf-8")
     sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
     edit(sub, f"| **Item** | `ITEM-000001-{USERID}` |", f"| **Item** | `br-AUTH-000001-{USERID}` |")
     assert "ref-type" not in codes(project)
@@ -220,9 +220,9 @@ def test_target_type_may_list_alternatives(tmp_path):
 def test_decorated_closed_status_counts_as_closed(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
-    schema.write_text(schema.read_text().replace(
+    schema.write_text(schema.read_text(encoding="utf-8").replace(
         "  - name: Subs\n    kind: ref-list\n    required: false",
-        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"))
+        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"), encoding="utf-8")
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
     edit(item_file(project), "| **Status** | Open |", "| **Status** | **Done** ✅ |")
     assert "closed-incomplete" in codes(project, ERROR)

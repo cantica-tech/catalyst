@@ -5,7 +5,7 @@ Use this template to define the working contract for a plugin.
 ## Metadata
 
 Every plugin must carry these six fields — this is the minimum metadata
-`rules-of-development.md` requires, and the framework reads the `Active`
+`CODE-OF-CONDUCT.md` §4 requires, and the framework reads the `Active`
 field at startup to decide which plugins to load into memory. Generate the
 UUID once, when the plugin is first defined, and never change it afterward.
 

@@ -17,10 +17,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Validate catalyst deployment structure
-        run: python3 scripts/check_deployment.py
-      - name: Validate command parity with CODE-OF-CONDUCT.md §4
-        run: python3 scripts/check_command_parity.py
       - name: Check out catalogued process modules
         run: |
           mkdir -p "$RUNNER_TEMP/modules"
@@ -28,6 +24,33 @@ jobs:
             id=$(echo "$id" | tr -d ' `'); repo=$(echo "$repo" | tr -d ' `'); branch=$(echo "$branch" | tr -d ' `')
             url=$(echo "$repo" | sed -E 's#^git@github.com:#https://github.com/#')
             git clone --depth=1 -b "$branch" "$url" "$RUNNER_TEMP/modules/$id"
+          done
+      # A clean checkout has no working copy (.criterion is gitignored, in
+      # agent-owned space), so the checks run against a deployment installed
+      # from this checkout's kernel and each catalogued module, with --require:
+      # finding nothing to check fails the job instead of skipping.
+      - name: Install a scratch deployment per module and validate it
+        env:
+          PYTHONPATH: ${{ github.workspace }}/scripts
+        run: |
+          set -e
+          git config --global user.name "catalyst-ci"
+          git config --global user.email "catalyst-ci@localhost"
+          ls "$RUNNER_TEMP/modules" | grep -q . || { echo "no catalogued module checked out"; exit 1; }
+          for dir in "$RUNNER_TEMP"/modules/*/; do
+            id=$(basename "$dir")
+            proj="$RUNNER_TEMP/deployments/$id/project"
+            mkdir -p "$proj"
+            git -C "$proj" init -q
+            git -C "$proj" commit -q --allow-empty -m "scratch project"
+            (cd "$proj" && python3 -m catalyst init --kernel "$GITHUB_WORKSPACE/framework/kernel" \
+              --name ci --module "$id" --module-dir "$dir" --user "CI" --git-username catalyst-ci \
+              --at "$RUNNER_TEMP/deployments/$id/wc" --agent claude-code --commands-dir .claude/commands)
+            echo "::group::$id"
+            (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_deployment.py" --require)
+            (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_command_parity.py" --require)
+            (cd "$proj" && python3 -m catalyst check)
+            echo "::endgroup::"
           done
       - name: Validate the kernel is module-agnostic (INV-30)
         env:

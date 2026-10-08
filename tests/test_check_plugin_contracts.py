@@ -29,9 +29,9 @@ def make_contract(
         "- Type: repository\n"
         f"{extra_metadata}"
         "\n## Operation\n\n- Name: not-metadata-here\n"
-    )
+    , encoding="utf-8")
     if write_version_txt:
-        (plugin_dir / "version.txt").write_text(f"{version}\n")
+        (plugin_dir / "version.txt").write_text(f"{version}\n", encoding="utf-8")
     return plugin_dir
 
 
@@ -70,7 +70,7 @@ def test_parse_catalog_pins_skips_header_and_separator(tmp_path: Path):
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
         "| [catalyst-git](https://github.com/x/catalyst-git) | repository | 1.2.3 | 1.2.3 |\n"
-    )
+    , encoding="utf-8")
     pins = cpc.parse_catalog_pins(type_dir)
     assert pins == {"catalyst-git": {"release": "1.2.3", "tag": "1.2.3"}}
 
@@ -100,7 +100,7 @@ def test_find_plugins_discovers_and_filters(tmp_path: Path):
     # a dot-dir must be skipped even if it somehow had a contract
     dotdir = tmp_path / "plugins" / "repository" / ".hidden"
     dotdir.mkdir(parents=True)
-    (dotdir / "working-contract.md").write_text("# hidden\n")
+    (dotdir / "working-contract.md").write_text("# hidden\n", encoding="utf-8")
 
     # find_plugins() reads the module-level PLUGINS_DIR, so point it at our tmp tree
     original = cpc.PLUGINS_DIR
@@ -124,8 +124,8 @@ def test_validate_plugin_missing_field(tmp_path: Path):
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "working-contract.md").write_text(
         "## Metadata\n\n- Name: bad\n- Version: 1.0.0\n"
-    )
-    (plugin_dir / "version.txt").write_text("1.0.0\n")
+    , encoding="utf-8")
+    (plugin_dir / "version.txt").write_text("1.0.0\n", encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("missing metadata field 'UUID'" in e for e in errors)
     assert any("missing metadata field 'Active'" in e for e in errors)
@@ -134,8 +134,8 @@ def test_validate_plugin_missing_field(tmp_path: Path):
 def test_validate_plugin_leftover_placeholder(tmp_path: Path):
     plugin_dir = make_contract(tmp_path, extra_metadata="")
     contract = plugin_dir / "working-contract.md"
-    text = contract.read_text().replace("A plugin", "<describe the plugin>")
-    contract.write_text(text)
+    text = contract.read_text(encoding="utf-8").replace("A plugin", "<describe the plugin>")
+    contract.write_text(text, encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("placeholder left in 'Description'" in e for e in errors)
 
@@ -160,7 +160,7 @@ def test_validate_plugin_missing_version_txt(tmp_path: Path):
 
 def test_validate_plugin_version_mismatch(tmp_path: Path):
     plugin_dir = make_contract(tmp_path, version="1.2.3")
-    (plugin_dir / "version.txt").write_text("1.2.4\n")
+    (plugin_dir / "version.txt").write_text("1.2.4\n", encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("Version '1.2.3' != version.txt '1.2.4'" in e for e in errors)
 
@@ -171,7 +171,7 @@ def test_validate_plugin_catalog_tag_mismatch(tmp_path: Path):
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
         "| [catalyst-git](https://x) | repository | 1.2.3 | 1.9.9 |\n"
-    )
+    , encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("catalog Tag '1.9.9' != version.txt '1.2.3'" in e for e in errors)
 
@@ -182,6 +182,15 @@ def test_validate_plugin_catalog_release_allows_v_prefix(tmp_path: Path):
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
         "| [catalyst-git](https://x) | repository | v1.2.3 | 1.2.3 |\n"
-    )
+    , encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert errors == []
+
+
+def test_require_fails_when_no_plugin_is_checked_out(tmp_path: Path, monkeypatch, capsys):
+    """CI passes --require (submodules checked out): finding no plugin to
+    check fails instead of skipping; locally it still skips."""
+    monkeypatch.setattr(cpc, "PLUGINS_DIR", tmp_path / "plugins")
+    assert cpc.main([]) == 0
+    assert cpc.main(["--require"]) == 1
+    assert "--require" in capsys.readouterr().out

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def run_git(args: list[str], cwd: Path) -> str:
-    return subprocess.check_output(['git', *args], cwd=cwd, text=True)
+    return subprocess.check_output(['git', *args], cwd=cwd, text=True, encoding="utf-8")
 
 
 def load_submodule_entries(root: Path) -> list[tuple[str, str]]:
@@ -19,7 +19,7 @@ def load_submodule_entries(root: Path) -> list[tuple[str, str]]:
         return []
     entries: list[tuple[str, str]] = []
     current = None
-    for raw in gitmodules.read_text().splitlines():
+    for raw in gitmodules.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if line.startswith('[') and line.endswith(']'):
             current = line[1:-1]

@@ -44,7 +44,7 @@ def test_pattern_only_mode():
 
 def test_trace_a_range_skips_merges(project):
     commit(project, "chore: first")
-    base = subprocess.check_output(["git", "-C", str(project), "rev-parse", "HEAD"], text=True).strip()
+    base = subprocess.check_output(["git", "-C", str(project), "rev-parse", "HEAD"], text=True, encoding="utf-8").strip()
     commit(project, f"Work on ITEM-000001-{USERID}", "a.txt")
     commit(project, "Untraced change", "b.txt")
     checked, failures = trace(project, f"{base}..HEAD", load_corpus(load(project)))
@@ -53,18 +53,18 @@ def test_trace_a_range_skips_merges(project):
 
 def test_commit_msg_hook_and_install(project, capsys):
     msg = project / "MSG"
-    msg.write_text("Untraced\n")
+    msg.write_text("Untraced\n", encoding="utf-8")
     assert main(["hook", "commit-msg", str(msg)]) == 1
     assert "commit refused" in capsys.readouterr().err
-    msg.write_text("chore: fine\n")
+    msg.write_text("chore: fine\n", encoding="utf-8")
     assert main(["hook", "commit-msg", str(msg)]) == 0
     hook = install_hook(project)
-    text = hook.read_text()
+    text = hook.read_text(encoding="utf-8")
     # the routing hook (fw-STRUCTURE-000017): each owning deployment's CLI checks the message
     assert hook.name == "commit-msg" and '"commit-msg", "--route"' in text
     assert "catalyst hook install" in text and text.startswith("#!/usr/bin/env python3")
     install_hook(project)                                     # idempotent
-    hook.write_text("#!/bin/sh\necho mine\n")
+    hook.write_text("#!/bin/sh\necho mine\n", encoding="utf-8")
     with pytest.raises(ValueError, match="not written by catalyst"):
         install_hook(project)
 
@@ -95,12 +95,12 @@ def test_format_is_declared_and_checked(project):
     from catalyst.check import run as run_checks
     pointer = project / "app.catalyst"
     assert any("declares no `format`" in w for w in run_checks(load(project)).warnings)
-    data = json.loads(pointer.read_text())
+    data = json.loads(pointer.read_text(encoding="utf-8"))
     data["format"] = "9.0"
-    pointer.write_text(json.dumps(data))
+    pointer.write_text(json.dumps(data), encoding="utf-8")
     assert any("format 9.0" in e for e in run_checks(load(project)).errors)
     data["format"] = "1.0-rc"
-    pointer.write_text(json.dumps(data))
+    pointer.write_text(json.dumps(data), encoding="utf-8")
     report = run_checks(load(project))
     assert not any("format" in m for m in report.errors + report.warnings)
 
@@ -116,10 +116,10 @@ def test_ambiguous_short_id_must_be_written_in_full(project):
     dep = load(project)
     users = project / ".criterion" / "IAM" / "users" / "users.json"
     import json
-    data = json.loads(users.read_text())
+    data = json.loads(users.read_text(encoding="utf-8"))
     data["users"].append({"name": "Bob", "active": True, "userid": "Bb4xR9pQ"})
-    users.write_text(json.dumps(data))
-    other = (project / ".criterion" / "items" / "ITEM-000001-first-item.md").read_text().replace(USERID, "Bb4xR9pQ")
+    users.write_text(json.dumps(data), encoding="utf-8")
+    other = (project / ".criterion" / "items" / "ITEM-000001-first-item.md").read_text(encoding="utf-8").replace(USERID, "Bb4xR9pQ")
     write(project / ".criterion" / "items" / "ITEM-000001-bobs-item.md", other)
     reason = check_message("Fix ITEM-000001", lc(dep))
     assert reason and "ambiguous" in reason
@@ -128,7 +128,20 @@ def test_ambiguous_short_id_must_be_written_in_full(project):
 
 def test_commit_msg_hook_lets_merges_through(project):
     git_dir = project / ".git"
-    (git_dir / "MERGE_HEAD").write_text("0" * 40 + "\n")
+    (git_dir / "MERGE_HEAD").write_text("0" * 40 + "\n", encoding="utf-8")
     msg = project / "MSG"
-    msg.write_text("Merge branch 'main' of /some/path\n")
+    msg.write_text("Merge branch 'main' of /some/path\n", encoding="utf-8")
     assert main(["hook", "commit-msg", str(msg)]) == 0
+
+
+@pytest.mark.parametrize("argv", [
+    ["trace", "--", "--output=pwned.txt"],
+    ["trace", "--pattern-only", "--", "--output=pwned.txt"],
+    ["unrecorded", "--", "--output=pwned.txt"],
+    ["journal", "adopt", "--intent", "x", "--", "--output=pwned.txt"],
+])
+def test_a_revision_that_is_an_option_is_refused(project, capsys, argv):
+    commit(project, "chore: a")
+    assert main(argv) == 1
+    assert not (project / "pwned.txt").exists()
+    assert "not a revision" in capsys.readouterr().err

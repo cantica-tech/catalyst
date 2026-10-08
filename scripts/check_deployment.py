@@ -15,7 +15,8 @@ are declared in its module.yaml `required_paths:`. When no module resolves,
 only the kernel checks run.
 
 Exit 0 = clean, exit 1 = violations found (fails CI; scripts/stop_hook.py
-turns it into a blocking Claude Code Stop hook).
+turns it into a blocking Claude Code Stop hook). No reachable deployment is
+skipped (exit 0) unless `--require` is passed, as CI does: then it fails.
 
 Scope note: only checks the structural invariants that are machine-verifiable
 from the tree. Behavioural rules (INV-1..INV-4) are not checkable here and remain
@@ -160,7 +161,7 @@ def _resolve_pointer(pointer_path: Path) -> Path | None:
     field and return it as a Path if it names a real directory, else None
     (no such field, malformed or stale pointer)."""
     try:
-        data = json.loads(pointer_path.read_text())
+        data = json.loads(pointer_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     source = data.get("agent-source")
@@ -395,7 +396,7 @@ def check_module_indexes(root: Path, model: DeploymentModel) -> list[str]:
     for folder in model.module_folders:
         d = _locate_folder(root, folder)
         if d is not None and not (d / f"{folder}.md").is_file():
-            errors.append(f"module index: {d.relative_to(root)}/{folder}.md "
+            errors.append(f"module index: {d.relative_to(root).as_posix()}/{folder}.md "
                           f"is missing (module {model.module_id})")
     return errors
 
@@ -540,7 +541,7 @@ def check_definitions_exist(root: Path, model: DeploymentModel | None = None) ->
 def _read_pointer_data(project_root: Path) -> dict:
     for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
         try:
-            data = json.loads(pointer.read_text())
+            data = json.loads(pointer.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(data, dict):
@@ -557,7 +558,7 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     deployed_file = root / "version.txt"
     if not deployed_file.is_file():
         return [f"{DEPLOY_DIRNAME}/version.txt is missing"]
-    deployed = deployed_file.read_text().strip()
+    deployed = deployed_file.read_text(encoding="utf-8").strip()
     if project_root is None:
         return errors
     pointer = _read_pointer_data(project_root)
@@ -570,7 +571,7 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
         )
     kernel_file = project_root / "version.txt"
     if (project_root / "framework" / "kernel").is_dir() and kernel_file.is_file():
-        kernel = kernel_file.read_text().strip()
+        kernel = kernel_file.read_text(encoding="utf-8").strip()
         if kernel != deployed:
             errors.append(
                 f"version drift: the kernel is {kernel} but this repository's "
@@ -606,9 +607,24 @@ def structural_errors(root: Path, project_root: Path | None,
     return errors, scope
 
 
-def main() -> int:
+REQUIRE_FLAG = "--require"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """`--require` (CI): no deployment to validate is a failure, so a gate
+    can never pass by checking nothing. Without it (local development) a
+    project without a reachable deployment is skipped."""
+    argv = list(argv or [])
+    unknown = [a for a in argv if a != REQUIRE_FLAG]
+    if unknown:
+        print(f"usage: check_deployment.py [{REQUIRE_FLAG}] (unknown: {' '.join(unknown)})")
+        return 2
     root = find_deploy_root(Path.cwd())
     if root is None:
+        if REQUIRE_FLAG in argv:
+            print(f"catalyst deployment validation FAILED: no *{POINTER_SUFFIX} pointer with a reachable "
+                  f"working copy or {DEPLOY_DIRNAME}/ found from {Path.cwd()} ({REQUIRE_FLAG})")
+            return 1
         # No deployment in this repo — nothing to validate, not a failure.
         print(
             f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; "
@@ -627,4 +643,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

@@ -139,20 +139,55 @@ def _vendor_cli(dest: Path) -> None:
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
+LEDGER = ".ledger"
+WORKING_COPY = ".criterion"        # INV-6: the working copy is always named .criterion
+
+
+def _ledger_only(folder: Path) -> bool:
+    """A directory holding nothing but the deployment ledger (`.ledger/`),
+    which BOOTSTRAP §2 creates before the install runs."""
+    entries = list(folder.iterdir())
+    return len(entries) == 1 and entries[0].name == LEDGER and entries[0].is_dir() \
+        and not entries[0].is_symlink()
+
+
+def working_copy_root(project: Path, at: Path | None) -> Path:
+    """Where the working copy goes. `--at` may name the working copy itself
+    (`<dir>/.criterion`) or the agent-owned directory that holds it (any
+    other name): the working copy is `<dir>/.criterion` either way."""
+    if at is None:
+        return project / WORKING_COPY
+    at = Path(os.path.abspath(at.expanduser()))
+    root = at if at.name == WORKING_COPY else at / WORKING_COPY
+    return root.resolve()
+
+
+def _remove(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink(missing_ok=True)
+    elif path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
+
+
 def init(req: InitRequest) -> list[str]:
     """Install, all or nothing: on any failure every path this created is
-    removed and .gitignore restored, so the install can simply be re-run."""
-    created: list[Path] = []
+    removed (a directory that existed before is emptied back to what it
+    held, never deleted), an adopted ledger is put back and .gitignore
+    restored, so the install can simply be re-run."""
+    created: list = []           # paths this created, or undo callables, in order
     gitignore = req.project.resolve() / ".gitignore"
     old_gitignore = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else None
     try:
         return _install(req, created)
     except BaseException as exc:
-        for path in reversed(created):
-            if path.is_symlink() or path.is_file():
-                path.unlink(missing_ok=True)
-            elif path.is_dir():
-                shutil.rmtree(path, ignore_errors=True)
+        for item in reversed(created):
+            if callable(item):
+                try:
+                    item()
+                except Exception:  # noqa: BLE001 — keep undoing the rest
+                    pass
+            else:
+                _remove(item)
         if old_gitignore is None:
             gitignore.unlink(missing_ok=True) if gitignore in created else None
         else:
@@ -168,8 +203,13 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     project = req.project.resolve()
     if any(project.glob("*.catalyst")):
         raise InitError(f"{project} already has a *.catalyst pointer — catalyst is installed")
-    if (project / ".criterion").exists() or (project / ".criterion").is_symlink():
-        raise InitError(f"{project}/.criterion already exists")
+    link = project / WORKING_COPY
+    # BOOTSTRAP §2 starts the deployment ledger before the install: a
+    # .criterion holding only .ledger/ is adopted, anything else refused
+    project_ledger = link.is_dir() and not link.is_symlink() and _ledger_only(link)
+    if (link.exists() or link.is_symlink()) and not project_ledger:
+        raise InitError(f"{link} already exists (only a .criterion holding nothing but the "
+                        f"{LEDGER}/ deployment ledger is adopted)")
     from catalyst.scope import IGNORE_FILE, opted_out
     if opted_out(project):
         raise InitError(f"{project} is opted out of catalyst by a {IGNORE_FILE} (there, or in a "
@@ -182,23 +222,33 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if manifest is None:
         raise InitError(f"{module_src} has no readable module.yaml")
     if (kernel / "manifest.json").is_file():                      # a kernel release
-        version = json.loads((kernel / "manifest.json").read_text())["version"]
+        version = json.loads((kernel / "manifest.json").read_text(encoding="utf-8"))["version"]
     elif (kernel.parent.parent / "version.txt").is_file():       # catalyst's checkout
-        version = (kernel.parent.parent / "version.txt").read_text().strip()
+        version = (kernel.parent.parent / "version.txt").read_text(encoding="utf-8").strip()
     else:
         raise InitError(f"cannot tell the kernel version of {kernel}")
     stamp = today()
-    if req.at:
-        root = req.at.expanduser().resolve()
-        if root == project or project in root.parents:
-            raise InitError("--at must be outside the project (it is the agent-owned location); "
-                            "omit it for an in-project working copy")
+    root = working_copy_root(project, req.at)
+    if req.at and (root == project or project in root.parents):
+        raise InitError("--at must be outside the project (it is the agent-owned location); "
+                        "omit it for an in-project working copy")
+    if req.at and root.exists() and not root.is_dir():
+        raise InitError(f"{root} exists and is not a directory")
+    if root.is_dir() and any(root.iterdir()) and not _ledger_only(root):
+        raise InitError(f"{root} exists and is not empty (only an empty directory, or one holding "
+                        f"nothing but the {LEDGER}/ deployment ledger, is adopted)")
+    if req.at and project_ledger and (root / LEDGER).exists():
+        raise InitError(f"two deployment ledgers: {link / LEDGER} and {root / LEDGER} — keep one")
+    if root.is_dir():
+        # existing (empty or ledger-only): a rollback empties it back, never deletes it
+        before = {p.name for p in root.iterdir()}
+        created.append(lambda: [_remove(p) for p in root.iterdir() if p.name not in before])
     else:
-        root = project / ".criterion"
-    if root.exists() and any(root.iterdir()):
-        raise InitError(f"{root} exists and is not empty")
-    if not root.exists():
-        created.append(root)
+        missing = root
+        while not missing.parent.exists():       # the highest folder this creates
+            missing = missing.parent
+        created.append(missing)
+        root.mkdir(parents=True)
     steps: list[str] = []
 
     # --- the first user and the composed documents ------------------------
@@ -321,8 +371,14 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     _vendor_cli(root / "bin" / "catalyst.pyz")
     # the analysis process's prompts and findings format (/run-analysis)
     shutil.copyfile(kernel / "ANALYSIS-PLAYBOOK.md", root / "ANALYSIS-PLAYBOOK.md")
-    steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md, ANALYSIS-PLAYBOOK.md; "
-                 "vendored bin/catalyst.pyz")
+    # the invariants, printed at every session start (`catalyst hook start`)
+    shutil.copyfile(kernel / "INVARIANTS.md", root / "INVARIANTS.md")
+    grounding = ["INVARIANTS.md"]
+    if (module_src / "INVARIANTS.module.md").is_file():
+        shutil.copyfile(module_src / "INVARIANTS.module.md", root / "INVARIANTS.module.md")
+        grounding.append("INVARIANTS.module.md")
+    steps.append("wrote the journal, version.txt, DEPLOYMENT.md, README.md, ANALYSIS-PLAYBOOK.md, "
+                 f"{', '.join(grounding)}; vendored bin/catalyst.pyz")
 
     # --- the project side ---------------------------------------------------
     from catalyst.check import FORMAT
@@ -331,14 +387,25 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
                "created_by": req.user, "criterion_branch": None, "created": stamp, "updated": stamp}
     # changes committed after this point must be journaled (unrecorded.py); "" = the whole history
     head = subprocess.run(["git", "-C", str(project), "rev-parse", "--verify", "-q", "HEAD"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
     pointer["journal_since"] = head.stdout.strip() if head.returncode == 0 else ""
     pointer_path = project / f"{req.name}.catalyst"
     created.append(pointer_path)
     _write(pointer_path, json.dumps(pointer, indent=2))
     if req.at:
-        created.append(project / ".criterion")
-        (project / ".criterion").symlink_to(root)
+        if project_ledger:                       # the ledger moves into the working copy
+            shutil.move(str(link / LEDGER), str(root / LEDGER))
+            link.rmdir()
+
+            def put_ledger_back() -> None:
+                link.mkdir(exist_ok=True)
+                shutil.move(str(root / LEDGER), str(link / LEDGER))
+            created.append(put_ledger_back)
+            steps.append(f"adopted the deployment ledger: moved {LEDGER}/ into the working copy")
+        created.append(link)
+        link.symlink_to(root)
+    elif project_ledger:
+        steps.append(f"adopted the deployment ledger ({LEDGER}/) already in .criterion")
     gitignore = project / ".gitignore"
     if not gitignore.exists():
         created.append(gitignore)
@@ -371,7 +438,15 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
                str(root / "IAM" / "users" / "users.json")],
         actor=req.git_username or req.user, allow_unchanged=True))
     steps.append("initialised the working copy's git history and journaled the install")
+    if _is_repo(project):
+        steps.append(PRODUCT_GIT_NOTICE)
     return steps
+
+
+# INV-17 needs every journaled version retrievable: the product files' blobs
+# go into the product repository's object store, kept by a ref of their own.
+PRODUCT_GIT_NOTICE = ("note: wrote the journaled product files' blobs into the product repository's .git, "
+                      "kept by the ref refs/catalyst/journal (no commit, no branch, nothing pushed)")
 
 
 def _write_commands(req: InitRequest, module_src: Path, root: Path, created: list[Path]) -> str:
@@ -419,6 +494,6 @@ def _is_repo(path: Path) -> bool:
 
 
 def _git(repo: Path, *args: str) -> None:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise InitError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
