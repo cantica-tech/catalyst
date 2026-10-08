@@ -7,4 +7,4 @@ __pycache__/
 /dist/
 
 # golden corpus captures: private governance data, local only
-tests/fixtures/*-golden-corpus.tar.gz
+tests/fixtures/*-golden-corpus.*
