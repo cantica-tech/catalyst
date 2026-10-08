@@ -416,11 +416,9 @@ to `/user-add`). If `<role>` isn't one of the roles listed in
 contains `<role>`, say so and make no change. Otherwise append `<role>` to
 that array, journal it (`catalyst journal append --command /user-assign-role --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the result.
 
-When the user enters `/user-list [--role <role>] [--active-only]`, read
-`IAM/users/users.json`. If it doesn't exist, say so rather than
-inventing users. Apply `--role`/`--active-only` filters if given, and
-report the matching entries. If none match, say so rather than inventing
-matches.
+When the user enters `/user-list [--role <role>] [--active-only]`, run
+`catalyst list user` (`--filter roles=<role>`, `--filter active=true`) and
+report what it prints; never add users it does not list.
 
 When the user enters `/role-add <role> <actions>: ...`, refuse with a
 clear message if `<role>` already has an entry in
@@ -452,12 +450,9 @@ is not an entity index, so its row is added here rather than by
 `catalyst index regen`. Then journal the change with
 `catalyst journal append --command /meta-tag --action create ...`.
 
-When the user enters `/list <type> [--filter ...]`, inspect the relevant
-catalogs and return the matching items. If `type` is `all`, inspect every
-supported collection and apply the same filters there. If `type` is
-`template`, require `--type <template-type>` and list the matching templates
-for that family. If no items match, return an empty result rather than
-inventing matches.
+When the user enters `/list <type> [--filter ...]`, run `catalyst list
+<type> [--filter ...]` (`--type <family>` for templates) and report what it
+prints; an empty result stays empty.
 
 When the user enters `/freeze <item-id|item-path|type|template-name>`, resolve
 the item to its backing file path, append that path to the root-level
@@ -762,17 +757,9 @@ this deployed set — `/dogfood` (see that repo's own `.claude/commands/`)
 is the current example.
 
 When the user enters `/journal [--since <date>] [--artifact <id>]
-[--actor <name>] [--rule <id>]`, read `development/journal.jsonl` (one
-JSON object per line) and apply whichever filters were given — `--since`
-on `timestamp`, `--artifact` on `artifact`, `--actor` on `actor`,
-`--rule` on membership in `targets`. Report the matching entries in
-timestamp order: what changed, who, which command, which rule(s), and
-each entry's `intent`. Paths in older entries may be bare
-(working-copy relative), `<repo>:path` or absolute; read them as their
-project-root-relative form (`Rules-of-Rules.md` §12). To report the
-journal's integrity as well, run `catalyst journal verify`. If the journal
-doesn't exist or is empty, say so rather than inventing history. This
-command never appends to the journal itself.
+[--actor <name>] [--rule <id>]`, run `catalyst journal show` with the same
+filters and report what it prints, in its order; for integrity too, run
+`catalyst journal verify`. Never append to the journal.
 
 When the user enters `/journal-restore <timestamp>`, run
 `catalyst journal restore <timestamp> <side-dir>` with a new, empty side

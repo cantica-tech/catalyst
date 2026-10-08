@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- Read-only views (roadmap R2 W1): `catalyst list <type|all>` (artifacts of
+  any entity type, rules, users, roles, templates; `--filter KEY=VALUE`),
+  `catalyst view <ID>` (fields, links both ways, journal history),
+  `catalyst backlog` (open work by type and status, missing links, rules no
+  open work targets) and `catalyst journal show` (filtered entries), each
+  with `--json`. `/list`, `/user-list` and `/journal` now run them instead
+  of having the agent read the files.
+
 ## 0.46.1 — 2026-10-08
 
 - `init` asks less: `--user` defaults to the project's `git config user.name`,

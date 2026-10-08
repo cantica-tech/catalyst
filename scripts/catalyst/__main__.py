@@ -195,6 +195,36 @@ def cmd_check(args) -> int:
     return 1 if failing else 0
 
 
+def cmd_view(args) -> int:
+    """Read-only views (R2 W1): list, journal show, view, backlog."""
+    from catalyst import views as v
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    try:
+        if args.view == "journal":
+            data = v.journal_entries(dep, args.since, args.artifact, args.actor, args.rule)
+            text = v.render_journal
+        else:
+            corpus = load_corpus(dep)
+            if args.view == "list":
+                data = v.list_items(dep, corpus, args.type, v.parse_filters(args.filter), args.template_type)
+                text = v.render_list
+            elif args.view == "view":
+                data, text = v.view(dep, corpus, args.id), v.render_view
+            else:
+                data, text = v.backlog(dep, corpus), v.render_backlog
+    except (v.ViewError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        json.dump(data, sys.stdout, indent=2, ensure_ascii=False, default=str)
+        print()
+    else:
+        sys.stdout.write(text(data))
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -752,10 +782,34 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("timestamp", help="ISO 8601 UTC, e.g. 2026-09-27T18:00:00Z")
     q.add_argument("out", type=Path, help="side directory (must be empty or absent)")
     q.set_defaults(func=cmd_journal)
+    q = js.add_parser("show", help="read-only: journal entries, filtered, in time order")
+    q.add_argument("--since", help="only entries from this date/time on (ISO 8601)")
+    q.add_argument("--artifact", help="only entries for this artifact")
+    q.add_argument("--actor", help="only entries by this actor (name or part of it)")
+    q.add_argument("--rule", help="only entries targeting this rule or artifact ID")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_view, view="journal")
     q = js.add_parser("pin", help="pin every referenced blob so git gc keeps it")
     q.add_argument("--share", action="store_true",
                    help="also merge with and push the remote's pins (working copy and product repository)")
     q.set_defaults(func=cmd_journal)
+
+    p = sub.add_parser("list", help="read-only: artifacts of a type, rules, users, roles or templates")
+    p.add_argument("type", help="an entity type (prefix, name or folder), rule, user, role, template, or all")
+    p.add_argument("--filter", action="append", metavar="KEY=VALUE",
+                   help="keep items whose KEY matches VALUE (* and ? wildcards; repeatable)")
+    p.add_argument("--type", dest="template_type", help="with `template`: one template family")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_view, view="list")
+
+    p = sub.add_parser("view", help="read-only: one artifact or rule, its links both ways and its history")
+    p.add_argument("id")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_view, view="view")
+
+    p = sub.add_parser("backlog", help="read-only: open work by type and status, missing links, idle rules")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_view, view="backlog")
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

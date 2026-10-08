@@ -375,6 +375,24 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
+### Read-only views: `list`, `view`, `backlog`, `journal show`
+
+Computed from the working copy and the entity type definitions; none of them
+writes. Each takes `--json`.
+
+- `catalyst list <type> [--filter KEY=VALUE ...] [--type <family>]`:
+  artifacts of an entity type (its prefix, name or folder), or `rule`,
+  `user`, `role`, `template` (`--type` narrows to one family), or `all`.
+  A filter keeps items whose field matches, with `*`/`?` wildcards. An
+  unknown type exits `1` and names the known ones.
+- `catalyst view <ID>`: one artifact or rule, its fields, the IDs it links
+  to, the artifacts linking to it and its journal entries.
+- `catalyst backlog`: open items per type and status ("open" is any status
+  outside the ETD's closed states), open items missing a required link, and
+  rules no open item targets.
+- `catalyst journal show [--since <date>] [--artifact <id>] [--actor <name>]
+  [--rule <id>]`: journal entries in time order, filtered.
+
 ### `catalyst unrecorded [<range>] [--json]`
 
 Lists the **unrecorded changes**: non-merge product commits that change a
