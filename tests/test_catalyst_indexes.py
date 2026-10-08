@@ -27,7 +27,7 @@ def test_new_artifact_is_added_in_id_order_with_its_columns(tmp_path):
          "Signed-off-by": "ada"}))
     changes = regen(project)
     assert [c.path.name for c in changes] == ["subs.md"]
-    rows = (project / ".criterion" / "subs" / "subs.md").read_text().splitlines()
+    rows = (project / ".criterion" / "subs" / "subs.md").read_text(encoding="utf-8").splitlines()
     assert rows[-1] == (f"| [SUB-000002-{USERID}](SUB-000002-second.md) | Second sub | "
                         f"{item2} | Done |")
     assert rows[-2].startswith(f"| [SUB-000001-{USERID}]")
@@ -38,10 +38,10 @@ def test_removed_file_keeps_its_row_and_prose_is_kept(tmp_path):
     reports the orphan instead."""
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text() + "\nSee also the roadmap.\n")
+    index.write_text(index.read_text(encoding="utf-8") + "\nSee also the roadmap.\n", encoding="utf-8")
     (project / ".criterion" / "items" / "ITEM-000001-first-item.md").unlink()
     regen(project)
-    text = index.read_text()
+    text = index.read_text(encoding="utf-8")
     assert f"| [ITEM-000001-{USERID}](ITEM-000001-first-item.md) | First item | Open |" in text
     assert text.startswith("# Items index")
     assert text.rstrip().endswith("See also the roadmap.")
@@ -51,7 +51,7 @@ def test_orphan_row_keeps_its_id_from_being_reused(tmp_path):
     from catalyst.ids import next_entity_id
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text() + f"| [ITEM-000009-{USERID}](ITEM-000009-gone.md) | Gone | Done |\n")
+    index.write_text(index.read_text(encoding="utf-8") + f"| [ITEM-000009-{USERID}](ITEM-000009-gone.md) | Gone | Done |\n", encoding="utf-8")
     regen(project)
     dep = load(project)
     corpus = load_corpus(dep)
@@ -61,20 +61,20 @@ def test_orphan_row_keeps_its_id_from_being_reused(tmp_path):
 def test_hand_written_cells_without_a_field_are_kept(tmp_path):
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text().replace("| ID | Title | Status |\n|---|---|---|",
+    index.write_text(index.read_text(encoding="utf-8").replace("| ID | Title | Status |\n|---|---|---|",
                                                "| ID | Title | Status | Notes |\n|---|---|---|---|")
-                     .replace("| First item | Open |", "| First item | Open | keep me |"))
+                     .replace("| First item | Open |", "| First item | Open | keep me |"), encoding="utf-8")
     regen(project)
-    assert "| First item | Open | keep me |" in index.read_text()
+    assert "| First item | Open | keep me |" in index.read_text(encoding="utf-8")
 
 
 def test_only_the_id_table_is_regenerated(tmp_path):
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
     legend = "| Status | Meaning |\n|---|---|\n| Open | not started |\n"
-    index.write_text(index.read_text().replace("# Items index\n", "# Items index\n\n" + legend))
+    index.write_text(index.read_text(encoding="utf-8").replace("# Items index\n", "# Items index\n\n" + legend), encoding="utf-8")
     assert regen(project) == []
-    assert legend in index.read_text()
+    assert legend in index.read_text(encoding="utf-8")
 
 
 def test_placeholder_line_removed_once_rows_exist():
@@ -91,18 +91,18 @@ def test_missing_index_is_created_with_default_columns(tmp_path):
     project = make_project(tmp_path)
     (project / ".criterion" / "items" / "items.md").unlink()
     regen(project)
-    text = (project / ".criterion" / "items" / "items.md").read_text()
+    text = (project / ".criterion" / "items" / "items.md").read_text(encoding="utf-8")
     assert text.startswith("# Items index") and "| ID | Title | Status |" in text
 
 
 def test_cli_check_mode_changes_nothing(tmp_path, capsys):
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text().replace("| Open |", "| Stale |"))
-    stale = index.read_text()
+    index.write_text(index.read_text(encoding="utf-8").replace("| Open |", "| Stale |"), encoding="utf-8")
+    stale = index.read_text(encoding="utf-8")
     assert main(["--project", str(project), "index", "regen", "--check", "--diff"]) == 1
     assert "out of date" in capsys.readouterr().out
-    assert index.read_text() == stale
+    assert index.read_text(encoding="utf-8") == stale
     assert main(["--project", str(project), "index", "regen"]) == 0
     assert main(["--project", str(project), "index", "regen", "--check"]) == 0
 

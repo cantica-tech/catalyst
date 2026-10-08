@@ -30,6 +30,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from catalyst import proc
 from catalyst import __version__
 from catalyst.deployment import Deployment
 
@@ -46,8 +47,7 @@ class JournalError(Exception):
 
 
 def git(repo: Path, *args: str, input: str | None = None, check: bool = True) -> str:
-    res = subprocess.run(["git", "-C", str(repo), *args], input=input,
-                         capture_output=True, text=True)
+    res = proc.run(["git", "-C", str(repo), *args], input=input)
     if check and res.returncode != 0:
         raise JournalError(f"git {' '.join(args)} failed in {repo}: {res.stderr.strip()}")
     return res.stdout.strip() if res.returncode == 0 else ""
@@ -216,8 +216,8 @@ def prefetch(repo: Path, shas) -> None:
     todo = sorted({s for s in shas if s and (str(repo), s) not in _EXISTS})
     if not todo:
         return
-    res = subprocess.run(["git", "-C", str(repo), "cat-file", "--batch-check"],
-                         input="".join(f"{s}\n" for s in todo), capture_output=True, text=True)
+    res = proc.run(["git", "-C", str(repo), "cat-file", "--batch-check"],
+                   input="".join(f"{s}\n" for s in todo))
     if res.returncode != 0:
         return
     for sha, line in zip(todo, res.stdout.splitlines()):
@@ -240,8 +240,8 @@ def current_hashes(repo: Path, rels: list[str]) -> dict[str, str | None]:
     present = [r for r in rels if (repo / r).is_file()]
     out: dict[str, str | None] = {r: None for r in rels}
     if present:
-        res = subprocess.run(["git", "-C", str(repo), "hash-object", "--stdin-paths"],
-                             input="".join(f"{r}\n" for r in present), capture_output=True, text=True)
+        res = proc.run(["git", "-C", str(repo), "hash-object", "--stdin-paths"],
+                       input="".join(f"{r}\n" for r in present))
         if res.returncode == 0:
             out.update(zip(present, res.stdout.split()))
     return out
@@ -264,7 +264,7 @@ def pin(repo: Path, shas: set[str]) -> int:
             cmd += ["-p", parent]
         commit = git(repo, *cmd, "-m", f"catalyst journal: pin {len(new)} blob(s)")
         res = subprocess.run(["git", "-C", str(repo), "update-ref", PIN_REF, commit,
-                              parent or "0" * 40], capture_output=True, text=True)
+                              parent or "0" * 40], capture_output=True, text=True, encoding="utf-8")
         if res.returncode == 0:
             if not parent:                   # never silent: this writes into the repository's .git
                 print(f"catalyst: created {PIN_REF} in {repo} (pins the blobs the journal records so "

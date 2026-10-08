@@ -98,7 +98,7 @@ def normalize_url(url: str) -> str:
 def origin_url() -> str | None:
     try:
         out = subprocess.check_output(
-            ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True
+            ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True, encoding="utf-8"
         )
         return normalize_url(out)
     except Exception:

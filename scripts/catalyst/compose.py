@@ -222,7 +222,7 @@ def recompose(root: Path, params: Params, base: tuple[Path, Path | None],
             (Path(tmp) / "theirs").write_text(fresh, encoding="utf-8")
             res = subprocess.run(["git", "merge-file", "-L", "deployed", "-L", "old template",
                                   "-L", "new template", str(ours), str(Path(tmp) / "base"),
-                                  str(Path(tmp) / "theirs")], capture_output=True, text=True)
+                                  str(Path(tmp) / "theirs")], capture_output=True, text=True, encoding="utf-8")
             merged = ours.read_text(encoding="utf-8")
         if res.returncode > 127:
             raise RuntimeError(f"git merge-file failed on {rel}: {res.stderr.strip()}")

@@ -84,7 +84,7 @@ def level(dep: Deployment) -> str:
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
 
 
 def recorded(dep: Deployment) -> Journaled:

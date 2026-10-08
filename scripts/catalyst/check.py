@@ -124,11 +124,11 @@ def unrecorded_changes(dep: Deployment) -> list[str]:
         return []
     root = str(dep.project_root)
     prefix = subprocess.run(["git", "-C", root, "rev-parse", "--show-prefix"],
-                            capture_output=True, text=True)
+                            capture_output=True, text=True, encoding="utf-8")
     # porcelain paths are relative to the repository top: keep the project's own
     # (`-- .`) and make them relative to the project, as the journal records them
     res = subprocess.run(["git", "-C", root, "status", "--porcelain", "-uall", "-z", "--", "."],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     if prefix.returncode != 0 or res.returncode != 0:
         return []
     top = prefix.stdout.strip()

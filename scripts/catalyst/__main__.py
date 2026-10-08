@@ -291,7 +291,7 @@ def cmd_hook(args) -> int:
             corpus = load_corpus(open_deployment(args))
         except DeploymentNotFound:
             return 0
-        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], check=False, capture_output=True, text=True)
+        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], check=False, capture_output=True, text=True, encoding="utf-8")
         if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
             return 0                         # a merge carries its parents' trace (as in `trace`)
         reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
@@ -837,6 +837,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):       # a console code page (cp1252) cannot print every
+        if hasattr(stream, "reconfigure"):        # character a deployment holds: degrade, never crash
+            stream.reconfigure(errors="backslashreplace")
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)

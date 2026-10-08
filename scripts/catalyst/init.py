@@ -222,9 +222,9 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if manifest is None:
         raise InitError(f"{module_src} has no readable module.yaml")
     if (kernel / "manifest.json").is_file():                      # a kernel release
-        version = json.loads((kernel / "manifest.json").read_text())["version"]
+        version = json.loads((kernel / "manifest.json").read_text(encoding="utf-8"))["version"]
     elif (kernel.parent.parent / "version.txt").is_file():       # catalyst's checkout
-        version = (kernel.parent.parent / "version.txt").read_text().strip()
+        version = (kernel.parent.parent / "version.txt").read_text(encoding="utf-8").strip()
     else:
         raise InitError(f"cannot tell the kernel version of {kernel}")
     stamp = today()
@@ -387,7 +387,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
                "created_by": req.user, "criterion_branch": None, "created": stamp, "updated": stamp}
     # changes committed after this point must be journaled (unrecorded.py); "" = the whole history
     head = subprocess.run(["git", "-C", str(project), "rev-parse", "--verify", "-q", "HEAD"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
     pointer["journal_since"] = head.stdout.strip() if head.returncode == 0 else ""
     pointer_path = project / f"{req.name}.catalyst"
     created.append(pointer_path)
@@ -494,6 +494,6 @@ def _is_repo(path: Path) -> bool:
 
 
 def _git(repo: Path, *args: str) -> None:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise InitError(f"git {' '.join(args)} failed: {res.stderr.strip()}")

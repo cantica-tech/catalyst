@@ -34,7 +34,7 @@ import os
 import subprocess
 import sys
 
-git = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True).stdout
+git = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True, encoding="utf-8").stdout
 top = git("rev-parse", "--show-toplevel").strip()
 staged = [p for p in git("-C", top, "diff", "--cached", "--name-only", "-z").split("\\0") if p]
 ROUTER = "{router}"  # the CLI that installed this hook, relative to the repository top
@@ -110,7 +110,7 @@ def commits(repo: Path, rev_range: str | list[str],
     `options`: the caller's own `git log` options (e.g. `--since=`)."""
     revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
     res = subprocess.run(["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", *options, *revs],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
     out = []
@@ -127,7 +127,7 @@ def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]
     """Each commit's changed files, relative to the repository top."""
     revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
     res = subprocess.run(["git", "-C", str(repo), "log", "--no-renames", "--name-only", "-z",
-                          "--format=%x1e%H", *revs], capture_output=True, text=True)
+                          "--format=%x1e%H", *revs], capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
     out: dict[str, list[str]] = {}
@@ -152,7 +152,7 @@ def trace(repo: Path, rev_range: str, corpus: Corpus | None,
         from catalyst.scope import governs
         files = changed_files(repo, rev_range)
         prefix = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-prefix"],
-                                capture_output=True, text=True).stdout.strip()
+                                capture_output=True, text=True, encoding="utf-8").stdout.strip()
     for sha, parents, body in commits(repo, rev_range):
         if len(parents) > 1:
             continue                                  # merges carry their parents' trace
@@ -169,14 +169,14 @@ def trace(repo: Path, rev_range: str, corpus: Corpus | None,
 
 def install_hook(project_root: Path) -> Path:
     git_dir = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir"],
-                             capture_output=True, text=True)
+                             capture_output=True, text=True, encoding="utf-8")
     if git_dir.returncode != 0:
         raise ValueError(f"{project_root} is not a git repository")
     hook = Path(git_dir.stdout.strip()) / "hooks" / "commit-msg"
     if hook.exists() and "catalyst hook install" not in hook.read_text(encoding="utf-8", errors="ignore"):
         raise ValueError(f"{hook} exists and was not written by catalyst — merge it by hand")
     prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8").stdout.strip()
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(HOOK.replace("{router}", f"{prefix}.criterion/bin/catalyst.pyz"), encoding="utf-8")
     hook.chmod(0o755)
@@ -192,7 +192,7 @@ def route(top: Path, message_file: Path, cli: list[str]) -> int:
 
     from catalyst.scope import owner
     res = subprocess.run(["git", "-C", str(top), "diff", "--cached", "--name-only", "-z"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     staged = [p for p in res.stdout.split("\0") if p]
     owners = sorted({o for o in (owner(top, p) for p in staged) if o is not None})
     if not owners and any(Path(top).glob("*.catalyst")):

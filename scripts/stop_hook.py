@@ -48,7 +48,7 @@ def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
                                               str(SPEC_BUDGET)]))
     env = {**os.environ, "PYTHONPATH": str(root / "scripts")}
     for name, cmd in commands:
-        res = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True)
+        res = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True, encoding="utf-8")
         if res.returncode != 0:
             failures.append((name, (res.stdout + res.stderr).strip()))
     return failures

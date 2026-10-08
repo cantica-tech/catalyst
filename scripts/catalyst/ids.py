@@ -139,7 +139,7 @@ LOCK_WAIT = 60.0
 
 def state_dir(dep: Deployment) -> Path:
     res = subprocess.run(["git", "-C", str(dep.root), "rev-parse", "--git-path", "catalyst"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     if res.returncode == 0 and res.stdout.strip():
         path = Path(res.stdout.strip())
         return path if path.is_absolute() else (dep.root / path).resolve()
