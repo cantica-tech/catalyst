@@ -85,11 +85,10 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ### `catalyst init`
 
 ```
-catalyst init --name <name> --user <name> [--git-username <u>]
-              [--module <module-id>] [--rule-doc <file>:<prefix> ...]
-              [--test-locations <where>] [--at <dir>] [--agent <id>]
-              [--commands-dir <dir>] [--kernel <framework/kernel>]
-              [--module-dir <dir>]
+catalyst init --name <name> --module <module-id> --user <name> [--git-username <u>]
+              [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
+              [--at <dir>] [--agent <id>] [--commands-dir <dir>]
+              [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
 
 Installs catalyst into the project (the current directory, or
@@ -99,37 +98,27 @@ request (INV-2); nothing runs it on load. It is the mechanical half of
 decides its inputs and does the judgment steps after it.
 
 - `--name` names the project; the pointer is `<name>.catalyst`.
-- `--user` registers the first user, as Admin, with a fresh userid (INV-16, INV-26).
-  If `--git-username` is not provided, it defaults to `--user` (simplified R1.2+).
-  Catalyst never probes git config for this value; the agent resolves it (BOOTSTRAP §2).
-- `--module` is the active module's id (default: `software-engineering`, R1.2+).
-  The module is found in a sibling checkout named `catalyst-<id>` (next to the
-  project or to catalyst), or given with `--module-dir`. Multi-module support
-  and user choice return in R3/R5.
-- `--git-username` (optional) is separate from `--user` only when the first
-  user's git identity differs from their display name. If omitted, defaults
-  to `--user` (simplified R1.2+).
-- `--rule-doc <file>:<prefix>` (repeatable, optional) seeds a rule document
-  and its ID prefix, e.g. `business-rules:br` (`.md` is added).
-  Default (R1.2+): one document, `<name>-rules.md`, prefix `br`.
+- `--module` is the active module's id. The module is found in a sibling
+  checkout named `catalyst-<id>` (next to the project or to catalyst), or
+  given with `--module-dir`.
+- `--user` and `--git-username` register the first user, as Admin, with a
+  fresh userid (INV-16, INV-26). `--git-username` defaults to `--user`.
+- `--rule-doc <file>:<prefix>` (repeatable) seeds a rule document and its
+  ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
+  document, `<name>-rules.md`, prefix `br`.
 - `--test-locations` fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2.
 - `--at <dir>` builds the working copy in agent-owned space and links
   `<project root>/.criterion` to it. `<dir>` is the `.criterion` directory
   itself (`<agent's per-project directory>/.criterion`), never its parent.
-  When omitted (R1.2+), catalyst auto-detects the agent's owned-space location
-  from the agent config. Without agent support, `.criterion/` is a real
-  directory in the project. Either way `/.criterion` is gitignored (INV-6).
-- `--agent` is recorded in the pointer's `agent` field. When provided, enables
-  auto-detection of `--at` and `--commands-dir` from the agent's configuration.
-- `--commands-dir <dir>` (optional, relative to the project) receives one
-  command file per command of the composed `CODE-OF-CONDUCT.md` §4 when the
-  agent supports command files. When omitted (R1.2+), catalyst auto-detects
-  the agent's command-dir location from the agent config (e.g. `.claude/commands`
-  for Claude Code).
+  Without it, `.criterion/` is a real directory in the project. Either way `/.criterion` is gitignored (INV-6).
+- `--agent` is recorded in the pointer's `agent` field.
+- `--commands-dir <dir>` (relative to the project) receives one command
+  file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
+  from the catalyst checkout's own command files (never `/dogfood`), then
+  the module's `commands/`.
 - `--kernel` is the `framework/kernel` directory of a catalyst checkout or
   kernel release. It defaults to the checkout the CLI runs from, so it is
   required when running a vendored `catalyst.pyz`.
-
 
 It refuses (exit `1`, nothing written) if the project already has a
 `*.catalyst` pointer or a `.criterion` — one holding only the install

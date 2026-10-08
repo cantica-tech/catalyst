@@ -48,6 +48,6 @@ Only exit 2 (block) if new failures emerged during the session. If failures were
 
 ## Related
 
-- Source: `framework/kernel/migrations/0.46.0/r0-decisions-session-scope-and-rule-storage.md` (R0.5 decision)
+- Source: `docs/plans/r0-decisions-session-scope-and-rule-storage.md` (R0.5 decision)
 - Implementation: `catalyst hook stop` (session-aware baseline tracking)
 - Related INVs: INV-6 (Working copy outside product tree), INV-17 (Append-only journal)

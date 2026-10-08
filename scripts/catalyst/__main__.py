@@ -519,42 +519,17 @@ def cmd_init(args) -> int:
     if not (kernel / "rules-of-rules.template.md").is_file():
         print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
         return 2
-    
-    # R1.2: Apply defaults
-    # Default git_username to user if not provided
-    git_username = args.git_username or args.user
-    
-    # Default rule docs to <name>-rules:br if not provided
     docs = []
-    if args.rule_doc:
-        for spec in args.rule_doc:
-            doc, _, prefix = spec.partition(":")
-            docs.append((doc if doc.endswith(".md") else doc + ".md", prefix or "br"))
-    else:
-        # R1.2 default: single rule document <name>-rules.md with prefix br
-        docs.append((f"{args.name}-rules.md", "br"))
-    
-    # R1.2: Auto-detect --at and --commands-dir from agent config if not provided
-    at = args.at
-    commands_dir = args.commands_dir
-    if args.agent != "unknown":
-        # Agent-specific location inference
-        # For known agents, compute standard locations if not explicitly provided
-        if at is None and args.agent == "claude-code":
-            # Claude Code keeps per-project state in ~/.claude/projects/<slug>/.criterion
-            # This is handled by the agent's shim in BOOTSTRAP.md; we validate here
-            pass  # The agent will pass --at explicitly if needed
-        if commands_dir is None and args.agent == "claude-code":
-            # Claude Code command files go in .claude/commands
-            commands_dir = Path(".claude/commands")
-    
+    for spec in args.rule_doc or []:
+        doc, _, prefix = spec.partition(":")
+        docs.append((doc if doc.endswith(".md") else doc + ".md", prefix or "br"))
     project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
     try:
         steps = init(InitRequest(
             project=project, name=args.name, module_id=args.module, user=args.user, kernel=kernel,
-            module=args.module_dir, git_username=git_username, rule_docs=docs,
-            test_locations=args.test_locations, at=at, agent=args.agent,
-            commands_dir=commands_dir, userid=args.userid))
+            module=args.module_dir, git_username=args.git_username or args.user, rule_docs=docs,
+            test_locations=args.test_locations, at=args.at, agent=args.agent,
+            commands_dir=args.commands_dir, userid=args.userid))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -649,16 +624,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init", help="install catalyst into this project (explicit only, INV-2)")
     p.add_argument("--name", required=True, help="the project name (the pointer is <name>.catalyst)")
-    p.add_argument("--module", default="software-engineering", help="the active process module id (default: software-engineering, R1.2+)")
+    p.add_argument("--module", required=True, help="the active process module id")
     p.add_argument("--user", required=True, help="the first user's name (becomes Admin)")
-    p.add_argument("--git-username", help="the first user's git username (default: --user if not provided, R1.2+)")
+    p.add_argument("--git-username", help="the first user's git username (default: --user)")
     p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
-                   help="a rule document and its ID prefix, e.g. business-rules:br (repeatable; default: <name>-rules:br, R1.2+)")
+                   help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
     p.add_argument("--test-locations", help="where the project's tests live (Rules-of-Rules §2)")
     p.add_argument("--at", type=Path, help="agent-owned location for the working copy "
-                   "(auto-detected from --agent if not provided, R1.2+; default: .criterion in the project)")
+                   "(the agent's shim says where); default: .criterion in the project")
     p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
-    p.add_argument("--commands-dir", type=Path, help="write command files here; auto-detected from --agent if not provided, R1.2+ (e.g. .claude/commands)")
+    p.add_argument("--commands-dir", type=Path, help="write command files here, e.g. .claude/commands")
     p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
                    "(default: this checkout's)")
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")

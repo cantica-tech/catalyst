@@ -3,7 +3,7 @@
 **Date:** YYYY-MM-DD  
 **Status:** Accepted | Pending | Superseded by ADR-MM | Rejected  
 **Author:** <name>  
-**Affected scope:** [kernel|SE module|plugins|catalyst-ui|infra]
+**Affected scope:** [kernel|SE module|plugins|UI|infra]
 
 ## Context
 

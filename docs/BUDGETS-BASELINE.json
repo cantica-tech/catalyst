@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "/proc/self/cwd",
+  "timestamp": "2026-10-08T08:41:18+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -13,6 +13,90 @@
       "bytes": 14856,
       "tokens": 3714,
       "category": "grounding"
+    },
+    {
+      "name": "spec: /catalyzer",
+      "bytes": 6116,
+      "tokens": 1529,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /check-rules",
+      "bytes": 1383,
+      "tokens": 345,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /help",
+      "bytes": 1185,
+      "tokens": 296,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /list",
+      "bytes": 1436,
+      "tokens": 359,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /meta-tag",
+      "bytes": 1355,
+      "tokens": 338,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /reconcile",
+      "bytes": 1801,
+      "tokens": 450,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /role-add",
+      "bytes": 1178,
+      "tokens": 294,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /role-modify",
+      "bytes": 1099,
+      "tokens": 274,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /status",
+      "bytes": 1600,
+      "tokens": 400,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /sync-framework",
+      "bytes": 3787,
+      "tokens": 946,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /user-add",
+      "bytes": 1778,
+      "tokens": 444,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /user-assign-role",
+      "bytes": 1220,
+      "tokens": 305,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /user-modify",
+      "bytes": 1317,
+      "tokens": 329,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /user-remove",
+      "bytes": 1388,
+      "tokens": 347,
+      "category": "command-spec"
     },
     {
       "name": "command-file: adopt.md",

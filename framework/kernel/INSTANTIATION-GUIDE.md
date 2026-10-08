@@ -35,9 +35,8 @@ lives, and, afterwards, its first rules.
    actual structure (e.g. one document per natural seam in the system — UI
    vs. backend, or per-service in a multi-service repo). Pick a short
    lowercase prefix per document. Each becomes one `--rule-doc
-   <file>:<prefix>` (e.g. `business-rules:br`). **R1.2+: If you have one
-   simple rule document, omit this step; `catalyst init` defaults to
-   `<name>-rules.md` with prefix `br`.**
+   <file>:<prefix>` (e.g. `business-rules:br`); with none, `catalyst init`
+   creates `<name>-rules.md` with prefix `br`.
 2. Resolve the project name. Look for a project-local `dev-instructions.yaml`
    in the project where this guide is being run. If it exists, read its
    `name` value; if it does not, ask the user for the project name and use
@@ -47,21 +46,21 @@ lives, and, afterwards, its first rules.
    ```
    The `name` must be a simple project identifier, not a full path or a
    nested object; the pointer becomes `<name>.catalyst`. `catalyst init`
-   builds the standard layout (step 4); an optional `layout` key left in an
+   builds the standard layout (step 3); an optional `layout` key left in an
    older bootstrap file is not applied — tell the user if one is present.
    After the install completes successfully, remove `dev-instructions.yaml`:
    it was only bootstrap metadata.
 3. Resolve the rest of `catalyst init`'s inputs:
-   - **The active module** (`--module <id>`). **R1.2+: Defaults to
-     `software-engineering` (SE module). Multi-module support and module
-     choice return in R3/R5.** If the project needs a different module,
-     pass `--module <id>` explicitly.
-   - **The first user** (`--user <name>`). Who will be the first Admin user?
-     `catalyst init` auto-detects `--git-username` from git config
-     (`git config user.name` and `git config user.email`), falling back to
-     prompting if not found. A deployment is not valid without one active
-     user (INV-16). **R1.2+ typically eliminates this prompt entirely** by
-     using git config; only ask if git config is not found on the machine.
+   - **The active module** (`--module <id>`). There is no default module; if
+     the user has not said which one, list the production modules in
+     `framework/modules/catalog.md` and ask. `catalyst init` finds a module
+     checked out next to the project or to catalyst as `catalyst-<id>`;
+     otherwise pass `--module-dir <dir>` (a checkout of the module's
+     repository at the release matching this kernel version). Like plugins,
+     a module is never sourced from this framework repository.
+   - **The first user** (`--user <name>`, `--git-username <name>`), who is
+     registered as Admin — a deployment is not valid without one active user
+     (INV-16). Ask who it should be if it isn't obvious from context.
    - **The working-copy directory** (`--at <dir>`). It is always named
      `.criterion/`, but it is not built inside the target project's own
      tree: it goes in a location this agent owns (a per-project data
@@ -69,16 +68,13 @@ lives, and, afterwards, its first rules.
      from the agent's own conventions — its shim says how — and never
      written into a tracked file (INV-6). `<dir>` is the `.criterion`
      directory itself (`<agent's per-project directory>/.criterion`), not
-     its parent. **R1.2+: If the agent is known** (e.g. `claude-code`),
-     `catalyst init` auto-detects `--at` from agent config (passed via
-     `--agent`). Without auto-detection (an agent with no owned-space
-     concept, or a platform without symlinks), the working copy is a real
-     `.criterion/` directory in the project, gitignored the same way.
+     its parent. Without `--at`
+     (an agent with no owned-space concept, or a platform without
+     symlinks), the working copy is a real `.criterion/` directory in the
+     project, gitignored the same way.
    - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
-     pointer's `agent` field. **R1.2+: When provided, enables auto-detection
-     of `--at` and `--commands-dir`.** For an agent with command files,
-     `--commands-dir <dir>` is auto-detected from agent config if not
-     explicitly passed (e.g. `.claude/commands` for Claude Code).
+     pointer's `agent` field, and, for an agent with command files, where
+     they go (`--commands-dir <dir>`).
    - Optionally, **where the project's tests live** (`--test-locations`),
      which fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2 — on the
      greenfield path this comes out of the testing decision (§3).

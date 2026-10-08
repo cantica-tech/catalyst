@@ -237,6 +237,6 @@ Related:
 
 ## References
 
-- **R1.4 Design**: `framework/kernel/migrations/0.46.0/r1-4-golden-corpus.md`
+- **R1.4 Design**: `docs/plans/r1-4-golden-corpus.md`
 - **R3 Migration**: `framework/kernel/migrations/0.46.0/r3-*.md` (pending)
 - **R5 UI Parity**: `framework/kernel/migrations/0.46.0/r5-*.md` (pending)

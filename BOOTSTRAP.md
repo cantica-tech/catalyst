@@ -135,63 +135,31 @@ work against). Then:
 1. **Ledger.** Create the deployment ledger from the checklist (§3), every
    item `[ ] pending`. `catalyst init` adopts a `.criterion` that holds
    only that `.ledger/`.
-2. **Resolve the inputs** — judgment, asked of the user only when needed.
-   R1.2+ simplifies this to **≤3 questions** for the common case:
-   
-   - **the project name** — from a project-local `dev-instructions.yaml`'s 
-     `name` if present (deleted after install), else ask, defaulting to the 
-     repository name. **[1 question; common default]**
-   
-   - **rule documents** — one judgment: "Simple (one default document) or 
-     Advanced (customize)?" If simple, use `<name>-rules.md` with prefix `br`; 
-     if advanced, ask for list and prefixes per natural seam 
-     (`INSTANTIATION-GUIDE.md` §1). **[1 question]**
-   
-   - **git user** — auto-detect from `git config user.name` or `git config 
-     user.email` (extract local part before `@`). If not found on the machine, 
-     ask once: "Git user? (name and/or email)". Both `--user` and 
-     `--git-username` resolve from this single answer. **[0–1 question]**
-   
-   The following are auto-detected or use defaults and **require no judgment**:
-   
-   - **the active module** — defaults to `software-engineering` (SE module). 
-     Multi-module support and module choice return in R3/R5 when the locator 
-     replaces the pointer. Pass `--module <id>` to override if needed.
-   
-   - **working-copy directory** — computed from the running agent's conventions 
-     (agent-owned space per §1). Agent shim (e.g. `CLAUDE.md`) documents the 
-     location. For agents without owned-space, `.criterion/` builds in-project 
-     (also fallback on platforms without symlinks).
-   
-   - **commands directory** — computed from the running agent's config 
-     (e.g. `.claude/commands` for Claude Code). For agents not supporting 
-     command files, skipped.
-3. **Run `catalyst init`** from the project root with the resolved inputs.
-   The command line varies by judgment outcome:
-   
-   **Minimal case (all defaults):**
-   ```
-   catalyst init --name <project-name> --user <git-user> --agent <agent-id> \
-                 --kernel <framework/kernel>
-   ```
-   (Uses `--module software-engineering`, `--rule-doc <name>-rules:br`, 
-   auto-detected `--at` and `--commands-dir`.)
-   
-   **Advanced rules:**
-   ```
-   catalyst init --name <project-name> --user <git-user> --agent <agent-id> \
-                 --rule-doc <file1>:<prefix1> --rule-doc <file2>:<prefix2> ... \
-                 --kernel <framework/kernel>
-   ```
-   
-   Catalyst init builds the whole skeleton: composed governing documents,
-   the seeded module, every entity folder with its index and templates 
-   catalog, frozen definitions, the first user with a userid, the journal, 
-   the vendored CLI, the `<app-name>.catalyst` pointer and the gitignored 
-   `.criterion` symlink. It also copies `INVARIANTS.md` into the working copy 
-   and installs a session-start hook (where the agent supports one) that 
-   re-injects it, so later sessions in the project are grounded without this 
-   repository. It refuses if catalyst is already installed.
+2. **Resolve the inputs** — judgment, asked of the user when not evident:
+   - the project name: from a project-local `dev-instructions.yaml`'s `name`
+     if present (deleted after a successful install), else ask, defaulting
+     to the repository name;
+   - the active module: no default; list the production modules in
+     `framework/modules/catalog.md` and ask;
+   - the rule document(s) and a short lowercase prefix for each, one per
+     natural seam of the project (`INSTANTIATION-GUIDE.md` §1);
+   - the first user (name and git username), who becomes Admin;
+   - the working-copy directory in agent-owned space (§1; the agent's shim
+     says how to compute it) — the `.criterion` directory itself, e.g.
+     `<agent project dir>/.criterion`, never its parent — or none for the
+     in-project fallback.
+3. **Run `catalyst init`** from the project root with those inputs
+   (`--name`, `--module`, `--user`, `--git-username`, `--rule-doc
+   <file>:<prefix>` per document, `--at <working-copy dir>`, `--agent <id>`, and
+   `--commands-dir <dir>` if the agent has command files). It builds the
+   whole skeleton: composed governing documents, the seeded module, every
+   entity folder with its index and templates catalog, frozen definitions,
+   the first user with a userid, the journal, the vendored CLI, the
+   `<app-name>.catalyst` pointer and the gitignored `.criterion` symlink.
+   It also copies `INVARIANTS.md` into the working copy and installs a
+   session-start hook (where the agent supports one) that re-injects it,
+   so later sessions in the project are grounded without this repository.
+   It refuses if catalyst is already installed.
 4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
    end-of-turn hook if the agent has one, add the project's root
    `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:

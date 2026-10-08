@@ -44,6 +44,6 @@ The existing practice already used one file per rule document, but this decision
 
 ## Related
 
-- Source: `framework/kernel/migrations/0.46.0/r0-decisions-session-scope-and-rule-storage.md`
+- Source: `docs/plans/r0-decisions-session-scope-and-rule-storage.md`
 - Enforced by: `catalyst validate` (checks rule-document structure, ID uniqueness, and domain grouping)
 - Related: INV-8 (No orphan rules)
