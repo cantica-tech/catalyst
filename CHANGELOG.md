@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## 0.46.0 — 2026-10-07
+## 0.46.0 — 2026-10-08
 
 Grounded sessions and safe gates (migration
 `0.46.0/grounded-sessions-and-safe-gates.md`).
@@ -19,7 +19,7 @@ Grounded sessions and safe gates (migration
   by `bin/catalyst.pyz.sha256`, on the pull request as data; this
   repository's CI checks fail when there is nothing to check (`--require`)
   and run against freshly installed deployments; Python 3.9–3.13 on Linux,
-  macOS and (provisionally) Windows.
+  macOS and Windows, all enforced.
 - Install: `--at` takes the `.criterion` directory or its parent; a
   `.criterion` holding only `.ledger/` is adopted; a failed `init` restores
   a pre-existing target.
@@ -36,6 +36,10 @@ Grounded sessions and safe gates (migration
   `init` and `journal append` announce the `refs/catalyst/journal` they
   write into the product repository.
 - `catalyst --version` carries the build (`X.Y.Z+g<sha>[.dirty]`).
+- Windows: git's standard input is fed as bytes (no `\r\n` in `mktree`,
+  `hash-object`, `cat-file`); every file and subprocess is read and written
+  as UTF-8; the CLI writes UTF-8 whatever the console code page; reported
+  paths use `/`.
 - Documentation: one `--at` meaning everywhere, `SYNCHRONIZE.md` lists the
   0.42.0–0.46.0 migrations, stale references and contradictions fixed.
 
