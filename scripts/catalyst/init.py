@@ -478,6 +478,15 @@ PRODUCT_GIT_NOTICE = ("note: wrote the journaled product files' blobs into the p
                       "kept by the ref refs/catalyst/journal (no commit, no branch, nothing pushed)")
 
 
+def kernel_command_files(kernel: Path) -> list[Path]:
+    """The kernel's command files: `commands/` of a kernel release, else the
+    catalyst checkout's `.claude/commands/` — never `/dogfood`."""
+    for folder in (kernel / "commands", kernel.parent.parent / ".claude" / "commands"):
+        if folder.is_dir():
+            return sorted(p for p in folder.glob("*.md") if p.stem != "dogfood")
+    return []
+
+
 def _write_commands(req: InitRequest, module_src: Path, root: Path, created: list[Path]) -> str:
     """One command file per command in the composed CODE-OF-CONDUCT §4
     (aliases included): the module's own files, the kernel's from a catalyst
@@ -493,8 +502,7 @@ def _write_commands(req: InitRequest, module_src: Path, root: Path, created: lis
     s = parse((root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8"))
     names = sorted(set(s.bullets) | set(s.aliases))
     module_cmds = {p.stem: p for p in (module_src / "commands").glob("*.md")}
-    kernel_cmds_dir = req.kernel.parent.parent / ".claude" / "commands"
-    kernel_cmds = {p.stem: p for p in kernel_cmds_dir.glob("*.md")} if kernel_cmds_dir.is_dir() else {}
+    kernel_cmds = {p.stem: p for p in kernel_command_files(req.kernel)}
     copied = generated = 0
     for name in names:
         target = dest / f"{name}.md"

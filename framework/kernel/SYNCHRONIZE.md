@@ -117,6 +117,11 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
 
 ## Synchronization checklist
 
+`catalyst sync plan` lists, and `catalyst sync apply` performs, the
+mechanical items below (3, 4's command files, 6, 7's definitions, CLI and
+version, 8's journal entry); what remains is the confirmation (2), each
+migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
+
 1. Check the framework repository on the `release` branch for the latest
    version and changes.
 2. Ask for exactly one confirmation before beginning the synchronization.

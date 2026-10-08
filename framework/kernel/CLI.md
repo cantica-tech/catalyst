@@ -375,6 +375,24 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
+### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip>]`
+
+The mechanical half of `/sync-framework`. `--kernel` is a catalyst
+checkout's `framework/kernel` or a `kernel-vX.Y.Z.zip`; `--module` the
+module's checkout (reduced to what its release ships) or zip. The base the
+deployment was composed from is found next to a release zip
+(`…/v<deployed>/kernel-v<deployed>.zip`), or from the checkout's git tag of
+the deployed version; `--base-kernel` names it otherwise.
+
+- `plan` lists what would change — CLI, invariants, module tree, governing
+  documents (recompose), command files (`--commands-dir`, default the
+  agent's), definitions of new types, versions — and the kernel and module
+  migrations between the two versions, in order. It writes nothing.
+- `apply` does it and journals one `/sync-framework` entry. A command file
+  edited locally is reported, never overwritten; a recompose conflict stops
+  the sync before anything is written; a plugin catalog is never touched.
+  The migrations' judgment steps stay with the agent.
+
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 
 Each refuses what its slash command refuses, writes, and journals one entry

@@ -66,7 +66,11 @@ def module_repo_dir(root: Path, module_id: str) -> Path:
 def read_module_info(root: Path, module_id: str) -> ModuleInfo | None:
     """The module's identity from its sibling checkout's module.yaml and
     version.txt, or None if it is not checked out."""
-    module_dir = module_repo_dir(root, module_id)
+    return module_info_at(module_repo_dir(root, module_id), module_id)
+
+
+def module_info_at(module_dir: Path, module_id: str | None = None) -> ModuleInfo | None:
+    """A module checkout's identity, wherever it is."""
     manifest = module_dir / "module.yaml"
     if not manifest.is_file():
         return None
@@ -77,7 +81,7 @@ def read_module_info(root: Path, module_id: str) -> ModuleInfo | None:
         version = version_file.read_text(encoding="utf-8").strip()
     else:
         version = str(data.get("version") or "1.0.0")
-    mid = str(data.get("id") or module_id)
+    mid = str(data.get("id") or module_id or module_dir.name)
     return ModuleInfo(
         id=mid,
         name=str(data.get("name") or mid),
@@ -125,6 +129,32 @@ def run_cmd(cmd: list[str], cwd: Path) -> str:
     return res.stdout.strip()
 
 
+def shipped_files(src: Path):
+    """(file, archive name) for what a release ships from `src`: no hidden
+    files, no node_modules, dist or packaged releases (`catalyst/`)."""
+    for file in sorted(src.rglob("*")):
+        if not file.is_file():
+            continue
+        rel_path = file.relative_to(src)
+        if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in rel_path.parts):
+            continue
+        yield file, rel_path.as_posix()
+
+
+def module_manifest(module: ModuleInfo, requires: str) -> dict:
+    return {
+        "id": module.id,
+        "name": module.name,
+        "version": module.version,
+        "description": module.description,
+        "kernelVersion": requires,
+        # Legacy name of kernelVersion. Host UIs that predate kernelVersion
+        # only read this field and skip manifests without it.
+        "frameworkVersion": requires,
+        "entry": "ui/index.js"
+    }
+
+
 def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
     module_dir = module.dir
     # The module's own declaration; the packaging kernel only when it has none
@@ -138,17 +168,7 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
     dest_dir = module_dir / "catalyst" / "modules" / module.id / f"v{module.version}"
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    manifest_data = {
-        "id": module.id,
-        "name": module.name,
-        "version": module.version,
-        "description": module.description,
-        "kernelVersion": requires,
-        # Legacy name of kernelVersion. Host UIs that predate kernelVersion
-        # only read this field and skip manifests without it.
-        "frameworkVersion": requires,
-        "entry": "ui/index.js"
-    }
+    manifest_data = module_manifest(module, requires)
 
     manifest_json_bytes = json.dumps(manifest_data, indent=2).encode("utf-8")
 
@@ -164,14 +184,8 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
         zip_bytes(zf, "manifest.json", manifest_json_bytes)
 
         # Add module contents
-        for file in sorted(module_dir.rglob("*")):
-            if not file.is_file():
-                continue
-            rel_path = file.relative_to(module_dir)
-            parts = rel_path.parts
-            if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in parts):
-                continue
-            zip_file(zf, file, rel_path.as_posix())
+        for file, arcname in shipped_files(module_dir):
+            zip_file(zf, file, arcname)
 
     # Remove legacy unversioned zip if present
     canonical_zip_path = dest_dir / f"{module.id}.zip"
@@ -322,6 +336,15 @@ def package_kernel(root: Path) -> Path:
             if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in parts):
                 continue
             zip_file(zf, file, rel_path.as_posix())
+
+        # The kernel's command files (never /dogfood) and the agent
+        # templates, so an install or a sync from a release has them.
+        for file in sorted((root / ".claude" / "commands").glob("*.md")):
+            if file.stem != "dogfood":
+                zip_file(zf, file, f"commands/{file.name}")
+        for file in sorted((root / "agents").rglob("*")):
+            if file.is_file() and not any(p.startswith(".") for p in file.relative_to(root).parts):
+                zip_file(zf, file, file.relative_to(root).as_posix())
 
         # The CLI, vendored by install and /sync-framework into
         # .criterion/bin/catalyst.pyz.

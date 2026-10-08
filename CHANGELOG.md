@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst sync plan|apply` (roadmap R2 W4): the mechanical half of
+  `/sync-framework` from a checkout or a release zip — CLI, invariants,
+  module tree, recompose, changed command files (local edits reported, never
+  overwritten), definitions of new types, versions, one journal entry — and
+  the migrations to run, in order. `/sync-framework` runs it.
+- Kernel release archives carry the command files and `agents/`, so an
+  install or sync from a release has them.
+
 ## 0.47.0 — 2026-10-08
 
 Verbs replace procedures (migration `0.47.0/verbs-replace-procedures.md`).

@@ -304,6 +304,40 @@ def cmd_admin(args) -> int:
     return 0
 
 
+def cmd_sync(args) -> int:
+    """`sync plan|apply` (R2 W4): the mechanical half of /sync-framework."""
+    from catalyst import sync
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    try:
+        src = sync.Sources(dep, args.kernel, args.module, args.base_kernel, args.cli)
+    except sync.SyncError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    try:
+        commands = sync.commands_dir(dep, args.commands_dir)
+        if args.sync_command == "plan":
+            p = sync.plan(dep, src, commands)
+            print(json.dumps(p.as_dict(), indent=2) if args.json else sync.render(p), end="" if not args.json else "\n")
+            return 0
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        p, touched = sync.apply(dep, src, commands, str(signer.get("git_username") or signer.get("name")),
+                                args.intent or [])
+    except (sync.SyncError, IdError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        src.close()
+    if args.json:
+        print(json.dumps({**p.as_dict(), "touched": [str(t) for t in touched]}, indent=2))
+    else:
+        sys.stdout.write(sync.render(p, applied=True))
+        print("Next: the migrations' judgment steps above, a DEPLOYMENT.md history line, then `catalyst check`.")
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -995,6 +1029,23 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="definition")
+
+    p = sub.add_parser("sync", help="synchronize the deployment with a kernel (and module) release")
+    sy = p.add_subparsers(dest="sync_command", required=True)
+    for verb, text in (("plan", "list what a sync would change, and the migrations to run"),
+                       ("apply", "do the mechanical half of /sync-framework, then journal it")):
+        q = sy.add_parser(verb, help=text)
+        q.add_argument("--kernel", type=Path, required=True,
+                       help="the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip")
+        q.add_argument("--module", type=Path, help="the target module: its directory or release zip")
+        q.add_argument("--base-kernel", type=Path,
+                       help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)")
+        q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
+        q.add_argument("--commands-dir", type=Path, help="the project's command files (default: the agent's)")
+        q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+        q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+        q.add_argument("--json", action="store_true")
+        q.set_defaults(func=cmd_sync)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)
