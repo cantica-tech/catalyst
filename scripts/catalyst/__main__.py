@@ -513,23 +513,34 @@ def cmd_criterion(args) -> int:
 def cmd_init(args) -> int:
     from module_loader import REPO_ROOT
 
-    from catalyst.init import InitError, InitRequest, init
+    from catalyst.init import (InitError, InitRequest, default_commands_dir, git_user_name, init,
+                               local_modules)
 
     kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
     if not (kernel / "rules-of-rules.template.md").is_file():
         print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
         return 2
+    project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+    if not args.module:                      # never chosen for the user: list what is here
+        found = local_modules(project)
+        listing = "; ".join(f"{m} ({d})" for m, d in found.items()) or "none next to the project or catalyst"
+        print(f"catalyst: pass --module <id> (and --module-dir if it is elsewhere). Found: {listing}",
+              file=sys.stderr)
+        return 2
+    user = args.user or git_user_name(project)
+    if not user:
+        print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
+        return 2
     docs = []
     for spec in args.rule_doc or []:
         doc, _, prefix = spec.partition(":")
         docs.append((doc if doc.endswith(".md") else doc + ".md", prefix or "br"))
-    project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
     try:
         steps = init(InitRequest(
-            project=project, name=args.name, module_id=args.module, user=args.user, kernel=kernel,
-            module=args.module_dir, git_username=args.git_username or args.user, rule_docs=docs,
+            project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
+            module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
             test_locations=args.test_locations, at=args.at, agent=args.agent,
-            commands_dir=args.commands_dir, userid=args.userid))
+            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -624,8 +635,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init", help="install catalyst into this project (explicit only, INV-2)")
     p.add_argument("--name", required=True, help="the project name (the pointer is <name>.catalyst)")
-    p.add_argument("--module", required=True, help="the active process module id")
-    p.add_argument("--user", required=True, help="the first user's name (becomes Admin)")
+    p.add_argument("--module", help="the active process module id (no default: without it, init lists "
+                   "the modules it finds)")
+    p.add_argument("--user", help="the first user's name, who becomes Admin (default: git config user.name)")
     p.add_argument("--git-username", help="the first user's git username (default: --user)")
     p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
                    help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
@@ -633,7 +645,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--at", type=Path, help="agent-owned location for the working copy "
                    "(the agent's shim says where); default: .criterion in the project")
     p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
-    p.add_argument("--commands-dir", type=Path, help="write command files here, e.g. .claude/commands")
+    p.add_argument("--commands-dir", type=Path, help="write command files here (default: the agent's, "
+                   "e.g. .claude/commands for claude-code)")
     p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
                    "(default: this checkout's)")
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")

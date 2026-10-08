@@ -85,7 +85,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ### `catalyst init`
 
 ```
-catalyst init --name <name> --module <module-id> --user <name> [--git-username <u>]
+catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
               [--at <dir>] [--agent <id>] [--commands-dir <dir>]
               [--kernel <framework/kernel>] [--module-dir <dir>]
@@ -98,11 +98,13 @@ request (INV-2); nothing runs it on load. It is the mechanical half of
 decides its inputs and does the judgment steps after it.
 
 - `--name` names the project; the pointer is `<name>.catalyst`.
-- `--module` is the active module's id. The module is found in a sibling
-  checkout named `catalyst-<id>` (next to the project or to catalyst), or
-  given with `--module-dir`.
+- `--module` is the active module's id; there is no default. Without it,
+  `init` installs nothing and lists the modules it finds in sibling
+  checkouts named `catalyst-<id>` (next to the project or to catalyst);
+  one elsewhere is given with `--module-dir`.
 - `--user` and `--git-username` register the first user, as Admin, with a
-  fresh userid (INV-16, INV-26). `--git-username` defaults to `--user`.
+  fresh userid (INV-16, INV-26). `--user` defaults to the project's
+  `git config user.name`, `--git-username` to `--user`.
 - `--rule-doc <file>:<prefix>` (repeatable) seeds a rule document and its
   ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
   document, `<name>-rules.md`, prefix `br`.
@@ -112,7 +114,8 @@ decides its inputs and does the judgment steps after it.
   itself (`<agent's per-project directory>/.criterion`), never its parent.
   Without it, `.criterion/` is a real directory in the project. Either way `/.criterion` is gitignored (INV-6).
 - `--agent` is recorded in the pointer's `agent` field.
-- `--commands-dir <dir>` (relative to the project) receives one command
+- `--commands-dir <dir>` (relative to the project; default: the agent's,
+  `.claude/commands` for `claude-code`) receives one command
   file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
   from the catalyst checkout's own command files (never `/dogfood`), then
   the module's `commands/`.

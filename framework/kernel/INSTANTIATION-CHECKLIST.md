@@ -22,13 +22,14 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Active module chosen — no default; ask the user, listing
       `framework/modules/catalog.md`; its checkout located (`--module-dir`
       unless it sits next to the project or catalyst as `catalyst-<id>`)
-- [ ] First user's name and git username confirmed (registered as Admin, INV-16)
+- [ ] First user's git username confirmed, name from `git config user.name`
+      (registered as Admin, INV-16)
 - [ ] Agent-owned location resolved (`BOOTSTRAP.md §1`, the agent's shim) —
       computed per machine and never recorded in a tracked file — or the
       in-project fallback chosen (INV-6)
 
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
-- [ ] `catalyst init --name <name> --module <id> --user <name>
+- [ ] `catalyst init --name <name> --module <id> [--user <name>]
       --git-username <u> --rule-doc <file>:<prefix> ... [--at <dir>/.criterion]
       --agent <id> [--commands-dir <dir>] [--test-locations <where>]
       [--kernel <dir>] [--module-dir <dir>]` run from the project root and

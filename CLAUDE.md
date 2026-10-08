@@ -20,10 +20,9 @@ root:
 
 ```
 python3 <catalyst>/dist/catalyst.pyz init --kernel <catalyst>/framework/kernel \
-    --name <name> --module <module-id> --user "<name>" --git-username <u> \
+    --name <name> --module <module-id> --git-username <u> \
     --rule-doc <file>:<prefix> \
-    --at ~/.claude/projects/<project-slug>/.criterion \
-    --agent claude-code --commands-dir .claude/commands
+    --at ~/.claude/projects/<project-slug>/.criterion --agent claude-code
 ```
 
 (from a catalyst checkout, `task catalyst -- --project <target root> init
@@ -51,7 +50,7 @@ Capabilities you have (use them per `BOOTSTRAP.md §1`):
   module's `code-of-conduct.module.md` §4 inserted at its end — that's the
   canonical, complete list; never hand-maintain a shortlist elsewhere, it
   drifts out of sync with the real command set). `catalyst init
-  --commands-dir .claude/commands` writes them: the kernel's from this
+  --agent claude-code` writes them into `.claude/commands/`: the kernel's from this
   repository's `.claude/commands/` (never `/dogfood`), the module's from its
   `commands/`. For each command:
   - Path: `.claude/commands/<name>.md`, in the **target project's** root
