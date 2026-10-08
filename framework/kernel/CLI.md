@@ -375,6 +375,62 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
+### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
+
+Each refuses what its slash command refuses, writes, and journals one entry
+(`--as`, `--intent`, `--json`; exit `1` and no change on a refusal).
+
+- `catalyst user add <name> <role> [--git-username <u>]`, `user remove
+  <name>` (deactivates; never the last active user), `user modify <name>
+  <field> <value>` (not `name`, `registered`, `userid`, `roles`), `user
+  assign-role <name> <role>`. A new user gets a drawn userid (INV-26).
+- `catalyst role add <role> --action <a>... [--reconciliation
+  full|propose|none]` (default `propose`), `role modify <role> --action <a>...`.
+- `catalyst freeze <item>` / `unfreeze <item>`: an artifact ID, entity type,
+  template name or working-copy path, listed in (or removed from) the
+  working copy's `.frozen`.
+- `catalyst definition migrate <type> <version> [--kernel <dir>]`: overwrite
+  `definitions/<type>.md` with that version from the kernel's or the
+  deployed module's `definitions/<type>/`; refuses a version that does not
+  exist (INV-23).
+
+### Writing verbs: `new`, `status set`, `link`
+
+The mechanical half of creating and changing artifacts, from the entity type
+definitions. Each signs (`--as`, else the only active user), keeps
+back-references, regenerates the indexes and writes one journal entry
+(`--intent` repeatable, `--command` names the slash command it runs for,
+`--tier`). Each takes `--json` and exits `1`, changing nothing, on a refusal.
+
+- `catalyst new <type> --title <t> [--field NAME=VALUE ...]`: the next ID,
+  the type's latest template with its fields filled (ID, name, file name,
+  initial status, dates, signer, the given fields; references as
+  comma-separated IDs, checked to exist). Refuses a missing required field.
+  The sections below the field table stay for the agent to write.
+- `catalyst status set <ID> <status> [--force]`: a status the type allows
+  and, when the ETD declares transitions, one it can reach; `--force` writes
+  any value. A `RECON-` case is refused: only `/reconcile` changes one.
+- `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
+  when the field declares a back-reference, cite this artifact back.
+
+### Read-only views: `list`, `view`, `backlog`, `journal show`
+
+Computed from the working copy and the entity type definitions; none of them
+writes. Each takes `--json`.
+
+- `catalyst list <type> [--filter KEY=VALUE ...] [--type <family>]`:
+  artifacts of an entity type (its prefix, name or folder), or `rule`,
+  `user`, `role`, `template` (`--type` narrows to one family), or `all`.
+  A filter keeps items whose field matches, with `*`/`?` wildcards. An
+  unknown type exits `1` and names the known ones.
+- `catalyst view <ID>`: one artifact or rule, its fields, the IDs it links
+  to, the artifacts linking to it and its journal entries.
+- `catalyst backlog`: open items per type and status ("open" is any status
+  outside the ETD's closed states), open items missing a required link, and
+  rules no open item targets.
+- `catalyst journal show [--since <date>] [--artifact <id>] [--actor <name>]
+  [--rule <id>]`: journal entries in time order, filtered.
+
 ### `catalyst unrecorded [<range>] [--json]`
 
 Lists the **unrecorded changes**: non-merge product commits that change a

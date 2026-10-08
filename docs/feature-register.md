@@ -49,12 +49,12 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 
 | Table | Inventory entries | Register rows | Keep | Merge | Drop | Park |
 |---|---:|---:|---:|---:|---:|---:|
-| Kernel (01a) | 73 | 73 | 45 | 24 | 2 | 2 |
+| Kernel (01a) | 73 | 73 | 46 | 23 | 2 | 2 |
 | Processes (01b §3) | 71 | 71 | 42 | 24 | 1 | 4 |
 | Commands (01b §4) | 38 | 38 | 15 | 20 | 2 | 1 |
 | Software engineering (02 §1.3) | 46 | 46 | 23 | 22 | 1 | 0 |
 | Plugins (02 §3.1) | 10 | 10 | 3 | 3 | 0 | 4 |
-| **All** | **238** | **238** | **128** | **93** | **6** | **11** |
+| **All** | **238** | **238** | **129** | **92** | **6** | **11** |
 
 ---
 
@@ -80,8 +80,8 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-16 | Document composition | 01a §1.1 K-16 | kernel CLI | Merge | Merges into the generated Handbook per module (07 §8, §9); Taskfile/command list from the `commands.yaml` registry | R4.2 |
 | K-17 | Module catalog | 01a §1.1 K-17 | kernel CLI | Merge | Merges into `modules/` folders in the core repo + `catalyst module install` (07 §10; plan `docs/plans/r4-9-module-install.md`, *owner, 2026-10-08*) | R4.9 |
 | K-18 | Kernel purity check | 01a §1.1 K-18 | kernel CLI | Keep | Law L8, purity check in CI (07 §7); repo-only checks under `catalyst dev …` | R3.8 |
-| K-19 | Pointer file | 01a §1.1 K-19 | kernel CLI | Merge | Merges into the locator `.catalyst/catalyst.toml` + `catalyst where` (07 §8, ADR-010, *owner, 2026-10-08*); old pointers read-only for one minor (ADR-009) | R3.1, R3.4 |
-| K-20 | Working copy in agent-owned space | 01a §1.1 K-20 | kernel CLI | Merge | Merges into the locator `.catalyst/catalyst.toml` + store driver (07 §8, ADR-010, *owner, 2026-10-08*); legacy read-only | R3.1, R3.2, R3.4 |
+| K-19 | Pointer file | 01a §1.1 K-19 | kernel CLI | Keep | Kept as the only tracked file, renamed `catalyst.toml` (Python floor 3.11): it names the project, resolved by `catalyst where` to `$HOME/.catalyst/projects/<name>/criterion` (ADR-010 revised, *owner, 2026-10-08*); old pointers read-only for one minor (ADR-009) | R3.1, R3.4 |
+| K-20 | Working copy in agent-owned space | 01a §1.1 K-20 | kernel CLI | Merge | Moves to `$HOME/.catalyst/projects/<name>/criterion` (the `home` store driver), agent-neutral, no symlink (ADR-010 revised, *owner, 2026-10-08*); legacy read-only | R3.1, R3.2, R3.4 |
 | K-21 | In-project fallback | 01a §1.1 K-21 | kernel CLI | Merge | Merges into the default `in-repo` store driver (07 §3 L1; decision A1) | R3.2 |
 | K-22 | Shared deployment ("repoed") | 01a §1.1 K-22 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12); R3.6 required, not optional (*owner, 2026-10-08*) | R3.6 |
 | K-23 | `/criterion` lifecycle | 01a §1.1 K-23 | kernel CLI | Merge | Merges into `git-remote` driver + `publish` (07 §12); `integrity` becomes a `catalyst check` rule, `protect` a `publish` option (*owner, 2026-10-08*) | R3.6 |
@@ -334,7 +334,7 @@ None. The 2026-10-08 answers are below.
 - **Sync four-eyes (PR-55):** stays for now.
 - **Ledger (K-07):** survives the ≤ 3k-token install.
 - **R1.2** is install simplification; the prose feature freeze is R1.6 (ADR-017).
-- **Locator (K-19, K-20):** `.catalyst/catalyst.toml` (ADR-010 accepted with this path).
+- **Locator (K-19, K-20):** revised the same day: the tracked `catalyst.toml` (renamed from `<name>.catalyst`) names the project; the criterion lives at `$HOME/.catalyst/projects/<name>/criterion` (ADR-010).
 - **`/project` and agent switch (K-05, K-24, PR-45, PR-47, CMD-15, CMD-16):** follow 07: `catalyst move` added to R2 W5; `agent switch` only until `move` exists.
 - **Sharing (K-22, K-23, PR-48, CMD-13):** R3.6 required; `integrity` becomes a `catalyst check` rule, `protect` a `publish` option.
 - **Workflow (K-50, PR-40):** a declared state machine (07 §4.1); ADR-008 rejected.
