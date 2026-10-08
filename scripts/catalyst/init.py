@@ -38,8 +38,37 @@ KERNEL_TYPES = {  # kernel entity folders, their template source and index
 }
 
 
+AGENT_COMMANDS_DIRS = {"claude-code": ".claude/commands"}   # where an agent reads command files
+
+
 class InitError(Exception):
     pass
+
+
+def default_commands_dir(agent: str) -> Path | None:
+    """The command-file directory the agent reads, or None when it has none we know of."""
+    rel = AGENT_COMMANDS_DIRS.get(agent)
+    return Path(rel) if rel else None
+
+
+def git_user_name(project: Path) -> str | None:
+    """`git config user.name` as the project's repository sees it, or None."""
+    res = subprocess.run(["git", "-C", str(project), "config", "user.name"],
+                         capture_output=True, text=True, encoding="utf-8")
+    return (res.stdout.strip() or None) if res.returncode == 0 else None
+
+
+def local_modules(project: Path) -> dict[str, Path]:
+    """Process modules checked out where `init` looks for them (next to the
+    project or to catalyst, as `catalyst-<id>/`): id -> directory. Listed
+    when `--module` is missing so the user can choose; never chosen here."""
+    from module_loader import REPO_ROOT
+    found: dict[str, Path] = {}
+    for base in dict.fromkeys([project.resolve().parent, REPO_ROOT.parent]):
+        for mdir in sorted(base.glob("catalyst-*")):
+            if (mdir / "module.yaml").is_file():
+                found.setdefault(mdir.name[len("catalyst-"):], mdir)
+    return found
 
 
 @dataclass

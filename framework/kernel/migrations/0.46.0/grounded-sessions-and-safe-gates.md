@@ -55,8 +55,11 @@ Layout change: `.criterion/INVARIANTS.md` (and `INVARIANTS.module.md`).
    silently.
 6. **Shared deployments.** Nothing to do by hand: the next
    `catalyst criterion push` rewrites `.github/workflows/catalyst.yml` and
-   writes `bin/catalyst.pyz.sha256`. The first pull request after that is
-   still checked by the previous workflow.
+   writes `bin/catalyst.pyz.sha256`. The pull request carrying that rewrite
+   gets **no check**: its own workflow now triggers on
+   `pull_request_target`, which the old base does not define. Run
+   `catalyst check` locally before merging it; the run on the shared
+   branch after the merge, and every later pull request, are checked.
 7. **Version.** Set `.criterion/version.txt` and the pointer's
    `kernel_version`.
 8. **Journal and check.** One `catalyst journal append --command

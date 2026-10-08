@@ -139,19 +139,19 @@ work against). Then:
    - the project name: from a project-local `dev-instructions.yaml`'s `name`
      if present (deleted after a successful install), else ask, defaulting
      to the repository name;
-   - the active module: no default; list the production modules in
-     `framework/modules/catalog.md` and ask;
+   - the active module: no default; `catalyst init` without `--module`
+     lists the ones it finds — propose one and ask;
    - the rule document(s) and a short lowercase prefix for each, one per
      natural seam of the project (`INSTANTIATION-GUIDE.md` §1);
-   - the first user (name and git username), who becomes Admin;
+   - the first user's git username (the name defaults to `git config
+     user.name`), who becomes Admin;
    - the working-copy directory in agent-owned space (§1; the agent's shim
      says how to compute it) — the `.criterion` directory itself, e.g.
      `<agent project dir>/.criterion`, never its parent — or none for the
      in-project fallback.
 3. **Run `catalyst init`** from the project root with those inputs
-   (`--name`, `--module`, `--user`, `--git-username`, `--rule-doc
-   <file>:<prefix>` per document, `--at <working-copy dir>`, `--agent <id>`, and
-   `--commands-dir <dir>` if the agent has command files). It builds the
+   (`--name`, `--module`, `--git-username`, `--rule-doc <file>:<prefix>`
+   per document, `--at <working-copy dir>`, `--agent <id>`). It builds the
    whole skeleton: composed governing documents, the seeded module, every
    entity folder with its index and templates catalog, frozen definitions,
    the first user with a userid, the journal, the vendored CLI, the

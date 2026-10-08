@@ -342,3 +342,38 @@ def test_iam_template_catalogs_are_named_after_the_singular_type(tmp_path):
     root = load(req.project).root
     assert (root / "IAM" / "users" / "templates" / "templates-user.md").is_file()
     assert (root / "IAM" / "roles" / "templates" / "templates-role.md").is_file()
+
+
+def _cli_init(tmp: Path, *extra: str) -> tuple[int, Path]:
+    from catalyst.__main__ import main
+    project = tmp / "app"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    subprocess.run(["git", "-C", str(project), "config", "user.name", "Grace Hopper"], check=True)
+    code = main(["--project", str(project), "init", "--name", "app", "--kernel", str(KERNEL),
+                 "--rule-doc", "business-rules:br", "--at", str(tmp / "agent" / ".criterion"), *extra])
+    return code, project
+
+
+def test_init_takes_the_user_from_git_config_and_the_command_dir_from_the_agent(tmp_path):
+    mod = example_module(tmp_path)
+    code, project = _cli_init(tmp_path, "--module", "example-process", "--module-dir", str(mod),
+                              "--agent", "claude-code")
+    assert code == 0
+    users = json.loads((project / ".criterion" / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
+    assert [(u["name"], u["git_username"]) for u in users["users"]] == [("Grace Hopper", "Grace Hopper")]
+    assert (project / ".claude" / "commands" / "check-rules.md").is_file()
+
+
+def test_init_without_a_module_lists_the_ones_it_finds_and_installs_nothing(tmp_path, capsys):
+    write(tmp_path / "catalyst-example-process" / "module.yaml", MODULE_YAML)
+    code, project = _cli_init(tmp_path)
+    err = capsys.readouterr().err
+    assert code == 2 and "pass --module" in err and "example-process" in err
+    assert not (project / "app.catalyst").exists() and not (tmp_path / "agent").exists()
+
+
+def test_an_unknown_agent_gets_no_command_files(tmp_path):
+    from catalyst.init import default_commands_dir
+    assert default_commands_dir("claude-code") == Path(".claude/commands")
+    assert default_commands_dir("unknown") is None

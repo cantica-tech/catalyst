@@ -1,7 +1,21 @@
 # R1.2: Installation UX simplification
 
-> Open. Detection must be real and tested, and the kernel stays module-agnostic:
-> `--module` keeps no default (the module proposal below is rejected).
+> **Done 2026-10-08 (the durable part).** What shipped, with tests (CI runs them on Linux, macOS and Windows):
+>
+> - `--user` defaults to the project's `git config user.name`.
+> - `--commands-dir` defaults from `--agent` (`claude-code` → `.claude/commands`).
+> - `--module` keeps no default (kernel module-agnostic): without it `init` installs nothing and lists the modules
+>   it finds next to the project or catalyst; the agent proposes one and the user confirms.
+> - BOOTSTRAP §2, INSTANTIATION-GUIDE §1, the checklist, CLI.md and the Claude shim say so, and got shorter.
+>
+> Questions left to the user: project name (repo name proposed), module (found ones proposed), rule documents,
+> git username — 4, from 7. **Not done, on purpose:** computing `--at` (R3.1 replaces the working-copy location
+> with the in-repo `.catalyst/` locator, decision A1), the simple/advanced rule-document switch (the default
+> document already applies when none is given), and guessing the git username (`git config` holds a display
+> name, not an account login). The R2 exit criterion (≤ 3 questions) is met once R3.1 lands.
+>
+> The analysis below is the original plan (Copilot, 2026-10-07), kept for reference; its `--module se` default
+> was rejected.
 
 **Objective:** Reduce installation judgment questions from ~6 to ≤3.
 
