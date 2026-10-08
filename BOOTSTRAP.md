@@ -156,12 +156,13 @@ work against). Then:
    entity folder with its index and templates catalog, frozen definitions,
    the first user with a userid, the journal, the vendored CLI, the
    `<app-name>.catalyst` pointer and the gitignored `.criterion` symlink.
-   It also copies `INVARIANTS.md` into the working copy and installs a
-   session-start hook (where the agent supports one) that re-injects it,
-   so later sessions in the project are grounded without this repository.
+   It also copies `INVARIANTS.md` into the working copy, for the
+   session-start hook of step 4 to re-inject.
    It refuses if catalyst is already installed.
 4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
-   end-of-turn hook if the agent has one, add the project's root
+   agent's hooks where it supports them — `catalyst hook start` at session
+   start, so later sessions are grounded without this repository, and
+   `catalyst hook stop` at the end of each turn (the shim says how) — add the project's root
    `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
    stack, tooling, dev environment and CI decided as the first rules, §3) or
    **retrofit** (existing code: rules gathered incrementally, optionally

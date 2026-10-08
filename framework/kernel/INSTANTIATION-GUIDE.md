@@ -114,10 +114,8 @@ lives, and, afterwards, its first rules.
    - writes an empty `development/journal.jsonl`, `version.txt`,
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
      root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
-     and vendors the CLI at `bin/catalyst.pyz`;
-   - installs a session-start hook, where the agent supports one, that
-     re-injects the working copy's `INVARIANTS.md`, so every later session
-     in the project starts grounded;
+     and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
+     session-start hook of step 5 re-injects);
    - writes `<app-name>.catalyst` at the project root (no path in it; the
      only catalyst file the product repository tracks; its `journal_since`
      is the project's `HEAD`, or `""` with no commit yet — the baseline
@@ -185,9 +183,12 @@ lives, and, afterwards, its first rules.
    is for; the kernel never names them (INV-30). `plugins/<type>/<name>/`
    appears when a plugin is activated; `.ledger/` holds the agent's install
    ledger (`BOOTSTRAP.md` §3).
-5. **Wire the agent and the project's tasks.** If the running agent
-   supports an end-of-turn hook, register `catalyst hook stop` the way its
-   shim says (`CLI.md` "Hooks"). An agent without command files instead
+5. **Wire the agent and the project's tasks.** Register the agent's hooks
+   the way its shim says (`CLI.md` "Hooks"), where it supports them:
+   `catalyst hook start` at session start, so every later session starts
+   grounded, and `catalyst hook stop` at the end of each turn. For Claude
+   Code, merge `agents/claude-code/settings.template.json` (both hooks) into
+   the project's `.claude/settings.json`. An agent without command files instead
    exposes each command of the composed `CODE-OF-CONDUCT.md` §4 as a named
    procedure and lists them in the deployed `README.md` (`BOOTSTRAP.md` §1)
    — the composed §4 is the canonical list; never re-enumerate a subset of
@@ -199,6 +200,8 @@ lives, and, afterwards, its first rules.
    project's own tasks still run on a clone where `.criterion` isn't set up
    yet:
    ```yaml
+   version: "3"
+
    vars:
      # Resolves the deployed agent's CLI binary from the pointer's "agent"
      # field. "claude-code" is the one known id whose CLI binary name
