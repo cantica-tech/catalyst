@@ -5,3 +5,6 @@ __pycache__/
 
 /.criterion
 /dist/
+
+# golden corpus captures: private governance data, local only
+tests/fixtures/*-golden-corpus.tar.gz

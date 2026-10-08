@@ -15,6 +15,16 @@ from pathlib import Path
 from datetime import datetime
 import pytest
 
+# The corpus is captured locally (scripts/capture-golden-corpus.sh) and never committed:
+# it holds a deployment's private governance data. Tests that need it skip without it.
+CORPUS = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus.tar.gz"
+
+
+def _corpus():
+    if not CORPUS.exists():
+        pytest.skip(f"golden corpus not captured locally: {CORPUS.name}")
+    return CORPUS
+
 
 class TestGoldenCorpusCapture:
     """Test golden corpus capture script and artifacts."""
@@ -27,9 +37,7 @@ class TestGoldenCorpusCapture:
     @pytest.fixture
     def corpus_tarball(self, fixtures_dir):
         """Get the catalyst golden corpus tarball."""
-        tarball = fixtures_dir / "catalyst-framework-golden-corpus.tar.gz"
-        assert tarball.exists(), f"Golden corpus tarball not found: {tarball}"
-        return tarball
+        return _corpus()
 
     @pytest.fixture
     def corpus_metadata(self, fixtures_dir):
@@ -67,15 +75,12 @@ class TestGoldenCorpusCapture:
                 found = any(m for m in member_names if m.startswith(expected))
                 assert found, f"Expected directory not found in tarball: {expected}"
 
-    def test_corpus_tarball_contains_git_history(self, corpus_tarball):
-        """Verify tarball contains .criterion/.git directory."""
+    def test_corpus_tarball_has_no_git_history(self, corpus_tarball):
+        """The corpus never carries the working copy's git repository (private history)."""
         with tarfile.open(corpus_tarball) as tar:
-            members = tar.getmembers()
-            member_names = {m.name for m in members}
-            
-            # Check for .git directory
-            has_git = any(m for m in member_names if ".git/" in m)
-            assert has_git, "Tarball should contain .criterion/.git directory"
+            names = tar.getnames()
+        assert not [n for n in names if "/.git/" in n or n.endswith("/.git")], \
+            "Corpus must not contain .criterion/.git: recapture with scripts/capture-golden-corpus.sh"
 
     def test_corpus_metadata_file_exists_and_is_valid_json(self, corpus_metadata):
         """Verify metadata file exists and contains valid JSON."""
@@ -178,9 +183,7 @@ class TestGoldenCorpusExtraction:
     @pytest.fixture
     def corpus_tarball(self):
         """Get the catalyst golden corpus tarball."""
-        tarball = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus.tar.gz"
-        assert tarball.exists()
-        return tarball
+        return _corpus()
 
     @pytest.fixture
     def extracted_corpus(self, corpus_tarball):
@@ -204,11 +207,9 @@ class TestGoldenCorpusExtraction:
         assert extracted_corpus.exists(), f"Extracted .criterion not found at {extracted_corpus}"
         assert extracted_corpus.is_dir()
 
-    def test_extracted_corpus_has_git_repository(self, extracted_corpus):
-        """Verify extracted corpus contains a git repository."""
-        git_dir = extracted_corpus / ".git"
-        assert git_dir.exists(), "Extracted corpus should contain .git directory"
-        assert git_dir.is_dir()
+    def test_extracted_corpus_has_no_git_repository(self, extracted_corpus):
+        """The extracted corpus carries no git repository (private history stays out)."""
+        assert not (extracted_corpus / ".git").exists()
 
     def test_extracted_corpus_has_rules_directory(self, extracted_corpus):
         """Verify extracted corpus contains rules directory."""
@@ -327,8 +328,7 @@ class TestGoldenCorpusR3MigrationScaffolding:
     @pytest.fixture
     def corpus_tarball(self):
         """Get the catalyst golden corpus tarball."""
-        tarball = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus.tar.gz"
-        return tarball
+        return _corpus()
 
     @pytest.fixture
     def corpus_metadata(self):

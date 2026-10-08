@@ -1,6 +1,8 @@
 #!/bin/bash
 # Capture golden corpus snapshots for R3 migration and R5 UI parity testing
 # Usage: ./scripts/capture-golden-corpus.sh [deployment-name]
+# The tarball holds private governance data: it is gitignored and must never be
+# committed. The working copy's own .git (its private history) is never captured.
 
 set -e
 
@@ -29,6 +31,9 @@ echo "Source: $CRITERION_PATH"
 echo "Creating tarball..."
 TAR_FILE="$FIXTURES_DIR/${DEPLOYMENT_NAME}-golden-corpus.tar.gz"
 tar -czf "$TAR_FILE" \
+    --exclude='.git' \
+    --exclude='.ledger' \
+    --exclude='.journal-restore' \
     --exclude='._*' \
     --exclude='.DS_Store' \
     -C "$(dirname "$CRITERION_PATH")" "$(basename "$CRITERION_PATH")" 2>/dev/null || {
