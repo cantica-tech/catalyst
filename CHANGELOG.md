@@ -14,6 +14,9 @@ messages.
   is still no default module). No layout change, no migration.
 - Migration 0.46.0, step 6 corrected: the criterion pull request that
   rewrites the CI workflow is not checked; check it locally before merging.
+- Windows: parallel `id next` callers wait while the ID lock is being
+  released (a "delete pending" file reads as permission denied) instead of
+  failing.
 
 ## 0.46.0 — 2026-10-08
 

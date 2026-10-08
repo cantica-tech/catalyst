@@ -185,3 +185,25 @@ def test_parallel_cli_callers_never_get_the_same_id(tmp_path):
     status = subprocess.run(["git", "-C", str(project / ".criterion"), "status", "--porcelain"],
                             capture_output=True, text=True, encoding="utf-8").stdout
     assert status == ""
+
+
+def test_the_lock_waits_while_windows_reports_it_delete_pending(tmp_path, monkeypatch):
+    """Windows: opening a lock file its holder is deleting fails with
+    PermissionError; that means busy, so the caller waits and gets the lock."""
+    import os
+    from catalyst import ids
+    from catalyst.deployment import load
+    dep = load(make_project(tmp_path, git=True))
+    real_open, calls = os.open, []
+
+    def flaky_open(path, *a, **kw):
+        calls.append(path)
+        if len(calls) == 1:
+            raise PermissionError(13, "Permission denied", path)
+        return real_open(path, *a, **kw)
+
+    monkeypatch.setattr(ids, "BUSY", (FileExistsError, PermissionError))
+    monkeypatch.setattr(ids.os, "open", flaky_open)
+    with ids.id_lock(dep, wait=5):
+        pass
+    assert len(calls) == 2

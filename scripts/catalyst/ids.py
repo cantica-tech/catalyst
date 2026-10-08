@@ -135,6 +135,9 @@ def next_rule_id(dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str,
 # than LOCK_STALE seconds belongs to a crashed caller and is broken.
 LOCK_STALE = 30.0
 LOCK_WAIT = 60.0
+# On Windows a lock file being deleted by its holder is "delete pending": opening
+# or stat-ing it fails with PermissionError, which means busy, not forbidden.
+BUSY = (FileExistsError, PermissionError) if os.name == "nt" else (FileExistsError,)
 
 
 def state_dir(dep: Deployment) -> Path:
@@ -156,13 +159,15 @@ def id_lock(dep: Deployment, wait: float = LOCK_WAIT, stale: float = LOCK_STALE)
     while True:
         try:
             fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
+        except BUSY:
             try:
                 if time.time() - lock.stat().st_mtime > stale:
                     lock.unlink()            # a crashed holder: break its lock
                     continue
             except FileNotFoundError:
                 continue                     # released meanwhile
+            except BUSY:
+                pass                         # being released (Windows): wait
             if time.monotonic() > deadline:
                 raise IdError(f"the ID lock {lock} is held by another process — retry, or remove it "
                               "if no catalyst command is running") from None
