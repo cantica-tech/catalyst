@@ -78,7 +78,7 @@ def _write(path: Path, data) -> Path:
 
 
 def _git(repo: Path, *args: str) -> str:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
     if res.returncode != 0:
         raise AnalysisError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
     return res.stdout

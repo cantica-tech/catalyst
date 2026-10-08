@@ -100,7 +100,7 @@ def artifact(art_id: str, title: str, fields: dict[str, str]) -> str:
 
 def write(path: Path, text: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))        # LF on every platform, as git stores it
     return path
 
 

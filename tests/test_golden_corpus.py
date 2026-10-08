@@ -44,7 +44,7 @@ class TestGoldenCorpusCapture:
         """Get the catalyst golden corpus metadata."""
         metadata_file = fixtures_dir / "catalyst-framework-golden-corpus-metadata.json"
         assert metadata_file.exists(), f"Metadata file not found: {metadata_file}"
-        with open(metadata_file) as f:
+        with open(metadata_file, encoding="utf-8") as f:
             return json.load(f)
 
     def test_corpus_tarball_exists_and_is_valid(self, corpus_tarball):
@@ -236,7 +236,7 @@ class TestGoldenCorpusExtraction:
         assert version_file.is_file()
         
         # Version should be readable
-        version = version_file.read_text().strip()
+        version = version_file.read_text(encoding="utf-8").strip()
         assert version, "version.txt should not be empty"
 
     def test_extracted_corpus_has_deployment_metadata(self, extracted_corpus):
@@ -288,7 +288,7 @@ class TestGoldenCorpusMetadata:
     def corpus_metadata(self):
         """Get the catalyst golden corpus metadata."""
         metadata_file = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus-metadata.json"
-        with open(metadata_file) as f:
+        with open(metadata_file, encoding="utf-8") as f:
             return json.load(f)
 
     def test_metadata_kernel_version_format(self, corpus_metadata):
@@ -334,7 +334,7 @@ class TestGoldenCorpusR3MigrationScaffolding:
     def corpus_metadata(self):
         """Get the catalyst golden corpus metadata."""
         metadata_file = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus-metadata.json"
-        with open(metadata_file) as f:
+        with open(metadata_file, encoding="utf-8") as f:
             return json.load(f)
 
     def test_r3_migration_can_extract_and_load_corpus(self, corpus_tarball, corpus_metadata):
@@ -353,7 +353,7 @@ class TestGoldenCorpusR3MigrationScaffolding:
             assert journal_path.exists()
             
             # Count journal entries match metadata
-            journal_lines = journal_path.read_text().strip().split("\n")
+            journal_lines = journal_path.read_text(encoding="utf-8").strip().split("\n")
             expected_count = corpus_metadata["journal_entries"]
             # Allow some variance due to extraction/line ending differences
             assert abs(len(journal_lines) - expected_count) <= 1, \
@@ -388,7 +388,7 @@ class TestGoldenCorpusR5UIParityScaffolding:
     def corpus_metadata(self):
         """Get the catalyst golden corpus metadata."""
         metadata_file = Path(__file__).parent / "fixtures" / "catalyst-framework-golden-corpus-metadata.json"
-        with open(metadata_file) as f:
+        with open(metadata_file, encoding="utf-8") as f:
             return json.load(f)
 
     def test_r5_ui_can_read_corpus_metadata(self, corpus_metadata):

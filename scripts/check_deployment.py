@@ -161,7 +161,7 @@ def _resolve_pointer(pointer_path: Path) -> Path | None:
     field and return it as a Path if it names a real directory, else None
     (no such field, malformed or stale pointer)."""
     try:
-        data = json.loads(pointer_path.read_text())
+        data = json.loads(pointer_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     source = data.get("agent-source")
@@ -396,7 +396,7 @@ def check_module_indexes(root: Path, model: DeploymentModel) -> list[str]:
     for folder in model.module_folders:
         d = _locate_folder(root, folder)
         if d is not None and not (d / f"{folder}.md").is_file():
-            errors.append(f"module index: {d.relative_to(root)}/{folder}.md "
+            errors.append(f"module index: {d.relative_to(root).as_posix()}/{folder}.md "
                           f"is missing (module {model.module_id})")
     return errors
 
@@ -541,7 +541,7 @@ def check_definitions_exist(root: Path, model: DeploymentModel | None = None) ->
 def _read_pointer_data(project_root: Path) -> dict:
     for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
         try:
-            data = json.loads(pointer.read_text())
+            data = json.loads(pointer.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(data, dict):
@@ -558,7 +558,7 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     deployed_file = root / "version.txt"
     if not deployed_file.is_file():
         return [f"{DEPLOY_DIRNAME}/version.txt is missing"]
-    deployed = deployed_file.read_text().strip()
+    deployed = deployed_file.read_text(encoding="utf-8").strip()
     if project_root is None:
         return errors
     pointer = _read_pointer_data(project_root)
@@ -571,7 +571,7 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
         )
     kernel_file = project_root / "version.txt"
     if (project_root / "framework" / "kernel").is_dir() and kernel_file.is_file():
-        kernel = kernel_file.read_text().strip()
+        kernel = kernel_file.read_text(encoding="utf-8").strip()
         if kernel != deployed:
             errors.append(
                 f"version drift: the kernel is {kernel} but this repository's "

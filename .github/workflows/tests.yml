@@ -10,9 +10,6 @@ jobs:
   pytest:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
-    # Windows is a target but not passing yet (symlinks, POSIX paths, shebangs):
-    # it runs and reports without failing the build until it does.
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:

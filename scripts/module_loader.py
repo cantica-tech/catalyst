@@ -228,7 +228,7 @@ def _read_pointer(project_root: Path) -> dict[str, Any]:
     """The first parseable *.catalyst pointer at `project_root`, or {}."""
     for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
         try:
-            data = json.loads(pointer.read_text())
+            data = json.loads(pointer.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(data, dict):
@@ -269,13 +269,13 @@ def resolve_module_id(project_root: Path | str | None) -> str | None:
 
     cfg_yaml = root / DEPLOY_DIRNAME / "config.yaml"
     if cfg_yaml.is_file():
-        parsed = parse_simple_yaml(cfg_yaml.read_text())
+        parsed = parse_simple_yaml(cfg_yaml.read_text(encoding="utf-8"))
         if isinstance(parsed, dict) and parsed.get("module"):
             return str(parsed["module"])
 
     mod_yaml = root / DEPLOY_DIRNAME / "module.yaml"
     if mod_yaml.is_file():
-        parsed = parse_simple_yaml(mod_yaml.read_text())
+        parsed = parse_simple_yaml(mod_yaml.read_text(encoding="utf-8"))
         if isinstance(parsed, dict) and parsed.get("id"):
             return str(parsed["id"])
 
@@ -334,7 +334,7 @@ def load_etd_file(path: Path) -> ETD | None:
     """Parse one ETD YAML file, or None if it is missing or malformed."""
     if not path.is_file():
         return None
-    data = parse_simple_yaml(path.read_text())
+    data = parse_simple_yaml(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not data.get("id_prefix"):
         return None
     return parse_etd_dict(data)
@@ -421,7 +421,7 @@ def load_module(project_root: Path | str | None = None,
         mdir = find_module_dir(project_root, target_id)
     if mdir is None:
         return None
-    data = parse_simple_yaml((mdir / "module.yaml").read_text())
+    data = parse_simple_yaml((mdir / "module.yaml").read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         return None
 

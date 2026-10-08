@@ -98,9 +98,9 @@ def test_every_paragraph_of_the_real_section4_lands_somewhere():
     from pathlib import Path
     from catalyst.spec import parse, section4_text
     coc = Path(__file__).resolve().parent.parent / "framework" / "kernel" / "rules-of-development.template.md"
-    s = parse(coc.read_text())
+    s = parse(coc.read_text(encoding="utf-8"))
     covered = sum(len(v) for v in s.procedures.values()) + len(s.general)
-    paragraphs = [b for b in "\n".join(section4_text(coc.read_text())).split("\n\n")
+    paragraphs = [b for b in "\n".join(section4_text(coc.read_text(encoding="utf-8"))).split("\n\n")
                   if b.strip() and not b.lstrip().startswith(("- `/", "#"))]
     assert covered >= len([p for p in paragraphs if not p.startswith("  ")]) * 0.9
 

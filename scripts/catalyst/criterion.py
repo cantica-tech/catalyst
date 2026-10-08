@@ -32,6 +32,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from catalyst import proc
 from catalyst.deployment import Deployment
 
 DEFAULT_BRANCH = "criterion"
@@ -148,7 +149,7 @@ def check_branch(branch: str | None) -> str:
 
 
 def run(repo: Path, *args: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, input=input)
+    res = proc.run(["git", "-C", str(repo), *args], input=input)
     if check and res.returncode != 0:
         raise CriterionError(f"git {' '.join(args)} failed in {repo}: {(res.stderr or res.stdout).strip()}")
     return res
@@ -187,11 +188,11 @@ def repo_place(project_root: Path) -> tuple[Path, str]:
     (`""` at the top, else `sub/dir/`): `.gitmodules` lives at the top and
     names the working copy `<prefix>.criterion` (fw-STRUCTURE-000017)."""
     top = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
-                         capture_output=True, text=True).stdout.strip()
+                         capture_output=True, text=True, encoding="utf-8").stdout.strip()
     if not top:
         return Path(project_root), ""
     prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
-                            capture_output=True, text=True).stdout.strip()
+                            capture_output=True, text=True, encoding="utf-8").stdout.strip()
     return Path(top), prefix
 
 
@@ -201,7 +202,7 @@ def is_submodule(project_root: Path) -> bool:
     if not gm.is_file():
         return False
     res = subprocess.run(["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8")
     return any(line.split()[-1] == f"{prefix}.criterion" for line in res.stdout.splitlines())
 
 
@@ -622,13 +623,13 @@ def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
     if shutil.which("gh") is None:
         return None
     existing = subprocess.run(["gh", "pr", "view", head, "--json", "url", "--jq", ".url"],
-                              cwd=wc, capture_output=True, text=True)
+                              cwd=wc, capture_output=True, text=True, encoding="utf-8")
     if existing.returncode == 0 and existing.stdout.strip():
         return existing.stdout.strip()
     res = subprocess.run(["gh", "pr", "create", "--base", base, "--head", head, "--title", title,
                           "--body", "Opened by `catalyst criterion push`. CI runs `catalyst check` "
                           "and `catalyst criterion integrity` on this pull request."],
-                         cwd=wc, capture_output=True, text=True)
+                         cwd=wc, capture_output=True, text=True, encoding="utf-8")
     return res.stdout.strip().splitlines()[-1] if res.returncode == 0 and res.stdout.strip() else None
 
 
@@ -932,8 +933,7 @@ def protect(dep: Deployment, apply: bool) -> str:
         return f"would PUT {endpoint}:\n{payload}\n(re-run with --yes to apply)"
     if shutil.which("gh") is None:
         raise CriterionError("gh is not installed")
-    res = subprocess.run(["gh", "api", "-X", "PUT", endpoint, "--input", "-"], input=payload,
-                         capture_output=True, text=True)
+    res = proc.run(["gh", "api", "-X", "PUT", endpoint, "--input", "-"], input=payload)
     if res.returncode != 0:
         raise CriterionError(f"gh api {endpoint} failed: {res.stderr.strip() or res.stdout.strip()}")
     return f"protected {repo}:{branch} — pull requests required, status check 'catalyst' required"

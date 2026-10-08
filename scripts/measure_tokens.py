@@ -93,7 +93,7 @@ def measure_command_specs() -> list[TokenBudget]:
                 cwd=ROOT,
                 env={**__import__("os").environ, "PYTHONPATH": str(ROOT / "scripts")},
                 capture_output=True,
-                text=True,
+                text=True, encoding="utf-8",
                 timeout=10
             )
             if res.returncode == 0:
@@ -214,7 +214,7 @@ def save_baselines(budgets: list[TokenBudget], baseline_file: Path) -> None:
         ]
     }
     
-    baseline_file.write_text(json.dumps(data, indent=2))
+    baseline_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def measure_all() -> list[TokenBudget]:

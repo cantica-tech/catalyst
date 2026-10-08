@@ -39,7 +39,7 @@ def write_example_module(mdir: Path) -> Path:
         "required_paths:\n"
         "  - path: development/ITEMS-SUMMARY.md\n"
         "    invariant: INV-EX-1\n"
-    )
+    , encoding="utf-8")
     (mdir / "schemas" / "item.yaml").write_text(
         "id_prefix: ITEM\n"
         "name: Item\n"
@@ -64,7 +64,7 @@ def write_example_module(mdir: Path) -> Path:
         "    - Done\n"
         "  closed_states:\n"
         "    - Done\n"
-    )
+    , encoding="utf-8")
     return mdir
 
 
@@ -74,19 +74,19 @@ def test_resolve_module_id_none_when_undeclared(tmp_path: Path):
 
 
 def test_resolve_module_id_from_pointer(tmp_path: Path):
-    (tmp_path / "app.catalyst").write_text(json.dumps({"module": "example-process"}))
+    (tmp_path / "app.catalyst").write_text(json.dumps({"module": "example-process"}), encoding="utf-8")
     assert resolve_module_id(tmp_path) == "example-process"
 
 
 def test_resolve_module_id_from_criterion_config(tmp_path: Path):
     (tmp_path / ".criterion").mkdir()
-    (tmp_path / ".criterion" / "config.yaml").write_text("module: example-process\n")
+    (tmp_path / ".criterion" / "config.yaml").write_text("module: example-process\n", encoding="utf-8")
     assert resolve_module_id(tmp_path) == "example-process"
 
 
 def test_resolve_module_id_from_criterion_module_yaml(tmp_path: Path):
     (tmp_path / ".criterion").mkdir()
-    (tmp_path / ".criterion" / "module.yaml").write_text("id: example-process\n")
+    (tmp_path / ".criterion" / "module.yaml").write_text("id: example-process\n", encoding="utf-8")
     assert resolve_module_id(tmp_path) == "example-process"
 
 
@@ -121,7 +121,7 @@ def test_load_module_declared_by_pointer_from_sibling_checkout(tmp_path: Path):
     project = tmp_path / "app"
     project.mkdir()
     write_example_module(tmp_path / "catalyst-example-process")
-    (project / "app.catalyst").write_text(json.dumps({"module": "example-process"}))
+    (project / "app.catalyst").write_text(json.dumps({"module": "example-process"}), encoding="utf-8")
     manifest = load_module(project)
     assert manifest is not None
     assert manifest.path == tmp_path / "catalyst-example-process"
@@ -133,7 +133,7 @@ def test_load_module_from_deployment_modules_dir(tmp_path: Path):
     deploy = tmp_path / "agent" / ".criterion"
     write_example_module(deploy / "modules" / "example-process")
     (project / "app.catalyst").write_text(json.dumps(
-        {"module": "example-process", "agent-source": str(deploy)}))
+        {"module": "example-process", "agent-source": str(deploy)}), encoding="utf-8")
     assert resolve_deploy_root(project) == deploy
     manifest = load_module(project)
     assert manifest is not None
@@ -145,7 +145,7 @@ def test_resolve_deploy_root_prefers_criterion_symlink(tmp_path: Path):
     project.mkdir()
     deploy = tmp_path / "agent" / ".criterion"
     write_example_module(deploy / "modules" / "example-process")
-    (project / "app.catalyst").write_text(json.dumps({"module": "example-process"}))
+    (project / "app.catalyst").write_text(json.dumps({"module": "example-process"}), encoding="utf-8")
     (project / ".criterion").symlink_to(deploy)
     assert resolve_deploy_root(project).resolve() == deploy.resolve()
     manifest = load_module(project)

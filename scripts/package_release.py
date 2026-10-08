@@ -121,7 +121,7 @@ def zip_file(zf: zipfile.ZipFile, path: Path, arcname: str) -> None:
 
 
 def run_cmd(cmd: list[str], cwd: Path) -> str:
-    res = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=True)
+    res = subprocess.run(cmd, cwd=cwd, text=True, encoding="utf-8", capture_output=True, check=True)
     return res.stdout.strip()
 
 
@@ -239,12 +239,12 @@ def build_id(root: Path) -> str:
     apart: `g<short sha>` of `root`'s HEAD, `.dirty` when the files a build
     embeds differ from it; "" outside git."""
     head = subprocess.run(["git", "-C", str(root), "rev-parse", "--short=12", "HEAD"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, encoding="utf-8")
     if head.returncode != 0 or not head.stdout.strip():
         return ""
     dirty = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no",
                             "--", "scripts", "framework/kernel/entities", "version.txt"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8")
     return f"g{head.stdout.strip()}" + (".dirty" if dirty.returncode != 0 or dirty.stdout.strip() else "")
 
 

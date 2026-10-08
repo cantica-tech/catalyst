@@ -11,12 +11,12 @@ def make_workspace(tmp_path: Path) -> Path:
     repo, and a catalogued module that is not checked out."""
     root = tmp_path / "catalyst"
     root.mkdir()
-    (root / "version.txt").write_text("0.33.0\n")
+    (root / "version.txt").write_text("0.33.0\n", encoding="utf-8")
 
     kernel_dir = root / "framework" / "kernel"
     kernel_dir.mkdir(parents=True)
-    (kernel_dir / "README.md").write_text("# Catalyst Kernel\n")
-    (kernel_dir / "INVARIANTS.md").write_text("# Invariants\n")
+    (kernel_dir / "README.md").write_text("# Catalyst Kernel\n", encoding="utf-8")
+    (kernel_dir / "INVARIANTS.md").write_text("# Invariants\n", encoding="utf-8")
     (root / "framework" / "modules").mkdir()
     (root / "framework" / "modules" / "catalog.md").write_text(
         "# Process module catalog\n\n"
@@ -24,20 +24,20 @@ def make_workspace(tmp_path: Path) -> Path:
         "|---|---|---|\n"
         "| `example-process` | `git@example.com:x/catalyst-example-process.git` | `main` |\n"
         "| `absent-process` | `git@example.com:x/catalyst-absent-process.git` | `main` |\n"
-    )
+    , encoding="utf-8")
 
     mod_dir = tmp_path / "catalyst-example-process"
     mod_dir.mkdir()
-    (mod_dir / "version.txt").write_text("1.2.0\n")
+    (mod_dir / "version.txt").write_text("1.2.0\n", encoding="utf-8")
     (mod_dir / "module.yaml").write_text(
         "id: example-process\n"
         "name: Example Process Module\n"
         "version: 1.0.0\n"
         "description: A fictional module for tests.\n"
-    )
-    (mod_dir / "README.md").write_text("# Module\n")
+    , encoding="utf-8")
+    (mod_dir / "README.md").write_text("# Module\n", encoding="utf-8")
     (mod_dir / ".git").mkdir()
-    (mod_dir / ".git" / "HEAD").write_text("ref\n")
+    (mod_dir / ".git" / "HEAD").write_text("ref\n", encoding="utf-8")
     return root
 
 
@@ -64,7 +64,7 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     calls: list[list[str]] = []
     # Mock run_cmd to record, and never run, git commands
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: calls.append(cmd) or "")
-    (root / "LICENSE").write_text("Apache License\n")
+    (root / "LICENSE").write_text("Apache License\n", encoding="utf-8")
 
     released = pr.package_modules(root)
     pr.package_kernel(root)
@@ -72,7 +72,7 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     # 1. Verify module output
     mod_release_dir = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
     assert released == [mod_release_dir]
-    manifest_data = json.loads((mod_release_dir / "manifest.json").read_text())
+    manifest_data = json.loads((mod_release_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest_data == {
         "id": "example-process",
         "name": "Example Process Module",
@@ -95,7 +95,7 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
 
     # 2. Verify kernel output
     kernel_release_dir = root / "catalyst" / "kernel" / "v0.33.0"
-    kernel_manifest_data = json.loads((kernel_release_dir / "manifest.json").read_text())
+    kernel_manifest_data = json.loads((kernel_release_dir / "manifest.json").read_text(encoding="utf-8"))
     assert kernel_manifest_data["id"] == "catalyst-kernel"
     assert kernel_manifest_data["version"] == "0.33.0"
 
@@ -127,13 +127,13 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     assert not (publish_dir / "catalyst" / "modules" / "absent-process").exists()
     assert not (publish_dir / "README.md").exists()
 
-    readme = (publish_dir / "catalyst" / "modules" / "README.md").read_text()
+    readme = (publish_dir / "catalyst" / "modules" / "README.md").read_text(encoding="utf-8")
     assert "Example Process Module" in readme
-    assert "example/" not in (publish_dir / "catalyst" / "README.md").read_text()
+    assert "example/" not in (publish_dir / "catalyst" / "README.md").read_text(encoding="utf-8")
     (publish_dir / "catalyst" / "example").mkdir()
-    (publish_dir / "catalyst" / "example" / "README.md").write_text("# Example\n")
+    (publish_dir / "catalyst" / "example" / "README.md").write_text("# Example\n", encoding="utf-8")
     pr.publish_releases(root, publish_dir)
-    assert "[example/](example/README.md)" in (publish_dir / "catalyst" / "README.md").read_text()
+    assert "[example/](example/README.md)" in (publish_dir / "catalyst" / "README.md").read_text(encoding="utf-8")
 
     # 4. With push, the module repositories and the publish directory are
     # committed and pushed
@@ -154,11 +154,11 @@ def test_publish_releases_missing_dir(tmp_path: Path):
 def test_package_modules_skips_when_not_checked_out(tmp_path: Path, monkeypatch):
     root = tmp_path / "catalyst"
     (root / "framework" / "modules").mkdir(parents=True)
-    (root / "version.txt").write_text("0.35.0\n")
+    (root / "version.txt").write_text("0.35.0\n", encoding="utf-8")
     (root / "framework" / "modules" / "catalog.md").write_text(
         "| Id | Repository | Default branch |\n|---|---|---|\n"
         "| `absent-process` | `x` | `main` |\n"
-    )
+    , encoding="utf-8")
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
     assert pr.package_modules(root) == []
 
@@ -173,7 +173,7 @@ def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path
     """The module checkout sits on development: the archive is committed on
     origin main, and development neither receives it nor gets pushed."""
     def git(*args, cwd):
-        return subprocess.run(["git", *args], cwd=cwd, check=True, text=True,
+        return subprocess.run(["git", *args], cwd=cwd, check=True, text=True, encoding="utf-8",
                               capture_output=True).stdout.strip()
 
     origin = tmp_path / "origin.git"
@@ -182,7 +182,7 @@ def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path
     git("clone", "-q", str(origin), str(mod_dir), cwd=tmp_path)
     for k, v in (("user.name", "T"), ("user.email", "t@example.com")):
         git("config", k, v, cwd=mod_dir)
-    (mod_dir / "module.yaml").write_text("id: example-process\n")
+    (mod_dir / "module.yaml").write_text("id: example-process\n", encoding="utf-8")
     git("add", ".", cwd=mod_dir)
     git("commit", "-q", "-m", "init", cwd=mod_dir)
     git("push", "-q", "origin", "HEAD:main", cwd=mod_dir)
@@ -191,7 +191,7 @@ def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path
 
     dest = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
     dest.mkdir(parents=True)
-    (dest / "manifest.json").write_text("{}\n")
+    (dest / "manifest.json").write_text("{}\n", encoding="utf-8")
     module = pr.ModuleInfo("example-process", "Example", "d", "1.2.0", mod_dir)
     pr.commit_module_release(module, dest)
 
@@ -211,7 +211,7 @@ def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
     import time
     root = make_workspace(tmp_path)
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
-    (root / "LICENSE").write_text("Apache License\n")
+    (root / "LICENSE").write_text("Apache License\n", encoding="utf-8")
     mod_zip = (tmp_path / "catalyst-example-process" / "catalyst" / "modules"
                / "example-process" / "v1.2.0" / "example-process-v1.2.0.zip")
     kernel_dir = root / "catalyst" / "kernel" / "v0.33.0"
@@ -240,12 +240,12 @@ def test_a_module_release_states_its_own_kernel_requirement(tmp_path: Path, caps
     release = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
 
     pr.package_modules(root)
-    manifest = json.loads((release / "manifest.json").read_text())
+    manifest = json.loads((release / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["kernelVersion"] == manifest["frameworkVersion"] == ">=0.30.0"
     first = {p.name: p.read_bytes() for p in release.iterdir()}
     assert "declares no kernel_version" not in capsys.readouterr().out
 
-    (root / "version.txt").write_text("0.99.0\n")              # a newer kernel packages it again
+    (root / "version.txt").write_text("0.99.0\n", encoding="utf-8")              # a newer kernel packages it again
     pr.package_modules(root)
     assert {p.name: p.read_bytes() for p in release.iterdir()} == first
 
