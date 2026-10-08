@@ -21,6 +21,10 @@ messages.
   (statuses and transitions from the ETD; a `RECON-` case is refused) and
   `catalyst link <ID> <field> <ID>…`; each regenerates the indexes and
   journals. `/status` runs `catalyst status set`.
+- Administration verbs (roadmap R2 W3): `catalyst user add|remove|modify|assign-role`,
+  `catalyst role add|modify`, `catalyst freeze|unfreeze`, `catalyst definition
+  migrate`, each with the refusals of its slash command and one journal entry.
+  `/user-*`, `/role-*`, `/freeze` and `/migrate-definition` run them.
 
 ## 0.46.1 — 2026-10-08
 

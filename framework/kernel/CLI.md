@@ -375,6 +375,25 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
+### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
+
+Each refuses what its slash command refuses, writes, and journals one entry
+(`--as`, `--intent`, `--json`; exit `1` and no change on a refusal).
+
+- `catalyst user add <name> <role> [--git-username <u>]`, `user remove
+  <name>` (deactivates; never the last active user), `user modify <name>
+  <field> <value>` (not `name`, `registered`, `userid`, `roles`), `user
+  assign-role <name> <role>`. A new user gets a drawn userid (INV-26).
+- `catalyst role add <role> --action <a>... [--reconciliation
+  full|propose|none]` (default `propose`), `role modify <role> --action <a>...`.
+- `catalyst freeze <item>` / `unfreeze <item>`: an artifact ID, entity type,
+  template name or working-copy path, listed in (or removed from) the
+  working copy's `.frozen`.
+- `catalyst definition migrate <type> <version> [--kernel <dir>]`: overwrite
+  `definitions/<type>.md` with that version from the kernel's or the
+  deployed module's `definitions/<type>/`; refuses a version that does not
+  exist (INV-23).
+
 ### Writing verbs: `new`, `status set`, `link`
 
 The mechanical half of creating and changing artifacts, from the entity type

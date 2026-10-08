@@ -262,6 +262,48 @@ def cmd_edit(args) -> int:
     return 0
 
 
+def cmd_admin(args) -> int:
+    """Administration verbs (R2 W3): users, roles, freeze/unfreeze, definitions."""
+    from module_loader import REPO_ROOT
+
+    from catalyst import admin
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    intent = args.intent or []
+    try:
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        if args.admin == "user":
+            sub_cmd = args.user_command
+            if sub_cmd == "add":
+                out = admin.user_add(dep, args.name, args.role, signer, intent, git_username=args.git_username)
+            elif sub_cmd == "remove":
+                out = admin.user_remove(dep, args.name, signer, intent)
+            elif sub_cmd == "modify":
+                out = admin.user_modify(dep, args.name, args.field, args.value, signer, intent)
+            else:
+                out = admin.user_assign_role(dep, args.name, args.role, signer, intent)
+        elif args.admin == "role":
+            if args.role_command == "add":
+                out = admin.role_add(dep, args.name, args.action or [], signer, intent, args.reconciliation)
+            else:
+                out = admin.role_modify(dep, args.name, args.action or [], signer, intent)
+        elif args.admin in ("freeze", "unfreeze"):
+            out = {"frozen" if args.admin == "freeze" else "unfrozen":
+                   admin.freeze(dep, args.item, signer, intent, unfreeze=args.admin == "unfreeze")}
+        else:
+            kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
+            entity, old = admin.migrate_definition(dep, args.entity, args.version, kernel, signer, intent)
+            out = {"definition": entity, "from": old, "to": args.version}
+    except (admin.AdminError, IdError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(out, ensure_ascii=False) if args.json else
+          "; ".join(f"{k}: {v}" for k, v in out.items() if k != "notes"))
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -883,6 +925,76 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="link")
+
+    p = sub.add_parser("user", help="register, deactivate or change users (IAM/users/users.json)")
+    us = p.add_subparsers(dest="user_command", required=True)
+    q = us.add_parser("add", help="register a user with a fresh userid and one role")
+    q.add_argument("name")
+    q.add_argument("role")
+    q.add_argument("--git-username", help="default: the name")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="user")
+    q = us.add_parser("remove", help="deactivate a user (never deleted; never the last active one)")
+    q.add_argument("name")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="user")
+    q = us.add_parser("modify", help="change one field (not name, registered, userid or roles)")
+    q.add_argument("name")
+    q.add_argument("field")
+    q.add_argument("value")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="user")
+    q = us.add_parser("assign-role", help="add a role to a user")
+    q.add_argument("name")
+    q.add_argument("role")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="user")
+
+    p = sub.add_parser("role", help="add or change roles (IAM/roles/roles.json)")
+    rs = p.add_subparsers(dest="role_command", required=True)
+    q = rs.add_parser("add", help="add a role with its actions and reconciliation level")
+    q.add_argument("name")
+    q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
+    q.add_argument("--reconciliation", choices=["full", "propose", "none"], default="propose")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="role")
+    q = rs.add_parser("modify", help="replace a role's actions")
+    q.add_argument("name")
+    q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="role")
+
+    for verb, text in (("freeze", "protect an item from /sync-framework (.frozen)"),
+                       ("unfreeze", "remove an item from .frozen")):
+        p = sub.add_parser(verb, help=text)
+        p.add_argument("item", help="an artifact ID, entity type, template name or working-copy path")
+        p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+        p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+        p.add_argument("--json", action="store_true")
+        p.set_defaults(func=cmd_admin, admin=verb)
+
+    p = sub.add_parser("definition", help="deployed entity definitions")
+    ds = p.add_subparsers(dest="definition_command", required=True)
+    q = ds.add_parser("migrate", help="move definitions/<type>.md to a version that exists (INV-23)")
+    q.add_argument("entity", help="the entity type's definitions folder name, e.g. role")
+    q.add_argument("version", type=int)
+    q.add_argument("--kernel", type=Path, help="framework/kernel of the catalyst release (default: this checkout's)")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_admin, admin="definition")
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)
