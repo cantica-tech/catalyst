@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.47.0 — 2026-10-08
+
+Verbs replace procedures (migration `0.47.0/verbs-replace-procedures.md`).
 
 - Read-only views (roadmap R2 W1): `catalyst list <type|all>` (artifacts of
   any entity type, rules, users, roles, templates; `--filter KEY=VALUE`),
