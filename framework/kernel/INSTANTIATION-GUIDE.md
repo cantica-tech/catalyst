@@ -52,15 +52,14 @@ lives, and, afterwards, its first rules.
    it was only bootstrap metadata.
 3. Resolve the rest of `catalyst init`'s inputs:
    - **The active module** (`--module <id>`). There is no default module; if
-     the user has not said which one, list the production modules in
-     `framework/modules/catalog.md` and ask. `catalyst init` finds a module
-     checked out next to the project or to catalyst as `catalyst-<id>`;
-     otherwise pass `--module-dir <dir>` (a checkout of the module's
+     the user has not said which one, `catalyst init` without `--module`
+     lists the modules checked out next to the project or to catalyst as
+     `catalyst-<id>` (production modules: `framework/modules/catalog.md`):
+     propose one and ask. For one elsewhere, pass `--module-dir <dir>` (a checkout of the module's
      repository at the release matching this kernel version). Like plugins,
      a module is never sourced from this framework repository.
-   - **The first user** (`--user <name>`, `--git-username <name>`), who is
-     registered as Admin — a deployment is not valid without one active user
-     (INV-16). Ask who it should be if it isn't obvious from context.
+   - **The first user**, registered as Admin (INV-16): `--user` defaults to
+     `git config user.name`; ask for the git username (`--git-username`).
    - **The working-copy directory** (`--at <dir>`). It is always named
      `.criterion/`, but it is not built inside the target project's own
      tree: it goes in a location this agent owns (a per-project data
@@ -73,8 +72,8 @@ lives, and, afterwards, its first rules.
      symlinks), the working copy is a real `.criterion/` directory in the
      project, gitignored the same way.
    - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
-     pointer's `agent` field, and, for an agent with command files, where
-     they go (`--commands-dir <dir>`).
+     pointer's `agent` field; it also places the command files
+     (`--commands-dir` overrides).
    - Optionally, **where the project's tests live** (`--test-locations`),
      which fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2 — on the
      greenfield path this comes out of the testing decision (§3).

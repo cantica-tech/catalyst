@@ -67,7 +67,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-03 | Hard rules | 01a §1.1 K-03 | kernel docs/brief | Merge | Merges into the 10 laws via generated `brief` (07 §7, §8: BOOTSTRAP §0 → `brief`) | R4.1 |
 | K-04 | Capability detection and fallbacks | 01a §1.1 K-04 | user/agent shim | Merge | Merges into generated agent adapters; fallback = instruction file (07 §5.4) | R4.5 |
 | K-05 | Agent-switch handling | 01a §1.1 K-05 | kernel CLI | Merge | Merges into `catalyst move` + the agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 |
-| K-06 | Install (`catalyst init`) | 01a §1.1 K-06 | kernel CLI | Keep | `catalyst init` (07 §5.2, §13: ≤ 3 commands, ≤ 3k tokens); install simplification (R1.2) | R0.3 (done), R1.2 |
+| K-06 | Install (`catalyst init`) | 01a §1.1 K-06 | kernel CLI | Keep | `catalyst init` (07 §5.2, §13: ≤ 3 commands, ≤ 3k tokens); install simplification (R1.2: user from git config, command dir from the agent, found modules listed) | R0.3 (done), R1.2 (done) |
 | K-07 | Deployment ledger | 01a §1.1 K-07 | kernel docs/brief | Keep | Survives in the ≤ 3k-token install (*owner, 2026-10-08*) | R0.3 (done) |
 | K-08 | Re-ground cadence | 01a §1.1 K-08 | kernel docs/brief | Merge | Merges into `catalyst brief` run by the session-start hook (07 §5.1, §5.2) | R4.1 |
 | K-09 | Assent gate | 01a §1.1 K-09 | kernel docs/brief | Keep | Law L3 "Ask before you publish"; `publish` assent token (07 §7) | R4.1, R3.6 |
@@ -183,7 +183,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-41 | Open a RECON case | 01b §3.5 P-41 | kernel CLI | Keep | `catalyst reconcile` (07 §12) | — |
 | PR-42 | Resolve / propose | 01b §3.5 P-42 | kernel CLI | Keep | `/reconcile` judgment + `catalyst reconcile` role gate (07 §12) | R2 W2 |
 | PR-43 | Close a resolved case | 01b §3.5 P-43 | kernel CLI | Keep | `/reconcile <id> close` (defined by R0.7) → `catalyst reconcile` (07 §12) | R0.7 (done) |
-| PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification (R1.2) | R0.3 (done), R1.2 |
+| PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification (R1.2: user from git config, command dir from the agent, found modules listed) | R0.3 (done), R1.2 (done) |
 | PR-45 | Project remove / export / import | 01b §3.6 P-45 | kernel CLI | Merge | Merges into `catalyst move` (07 §8, *owner, 2026-10-08*) | R2 W5 |
 | PR-46 | Pre-pointer migration | 01b §3.6 P-46 | kernel CLI | Park | Until R3.4 decides whether the optional `catalyst migrate` is built | R3.4 |
 | PR-47 | Agent switch | 01b §3.6 P-47 | kernel CLI | Merge | Merges into `catalyst move` + agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 |

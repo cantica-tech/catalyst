@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.46.1 — 2026-10-08
+
+- `init` asks less: `--user` defaults to the project's `git config user.name`,
+  `--commands-dir` to the agent's (`.claude/commands` for `claude-code`), and
+  without `--module` it installs nothing and lists the modules it finds (there
+  is still no default module). No layout change, no migration.
+- Migration 0.46.0, step 6 corrected: the criterion pull request that
+  rewrites the CI workflow is not checked; check it locally before merging.
+
 ## 0.46.0 — 2026-10-08
 
 Grounded sessions and safe gates (migration
