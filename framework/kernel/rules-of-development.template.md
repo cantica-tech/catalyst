@@ -373,71 +373,40 @@ the seven currently exist anywhere.
 - `/help` — return help documentation for the framework or for a specific
   command when provided.
 
-When the user enters `/user-add <name> <role>: ...`, refuse with a clear
-message if `<name>` already has an entry in `IAM/users/users.json`
-(point to `/user-modify`/`/user-assign-role`). If `IAM/users/users.json`
-or `IAM/roles/roles.json` doesn't exist yet, create them from the
-deployment's own current `IAM/users/templates/TEMPLATE-USERS-vN.json`
-and `IAM/roles/templates/TEMPLATE-ROLES-vN.json` (the highest `N`
-present). If `<role>` isn't one of the roles listed in
-`IAM/roles/roles.json`, ask whether to use an existing role or run
-`/role-add` for `<role>` first. Otherwise draw the new user's `userid`
-with `catalyst userid gen` (never by hand — `Rules-of-Rules.md` §11,
-INV-26), append a new entry (`registered`: today, `active: true`,
-`roles: [<role>]`, `userid`), journal it (`catalyst journal append --command /user-add --action create --artifact "user <name>" ... --file IAM/users/users.json`) — plus `--file IAM/roles/roles.json` if it
-was just created — and report it. If this is the
-project's first registered user, note that the hard "at least one active
-user" requirement (§2) is now satisfied.
+When the user enters `/user-add <name> <role>: ...`, run `catalyst user add
+"<name>" "<role>" [--git-username <u>] --intent "<why>"`. It refuses a name
+already registered and a role `IAM/roles/roles.json` lacks (then ask
+whether to pick an existing role or `/role-add` it first), creates the IAM
+files from their templates when missing, draws the userid (INV-26) and
+journals. If this is the project's first registered user, note that the
+"at least one active user" requirement (§2) is now satisfied.
 
-When the user enters `/user-remove <name>`, refuse with a clear message if
-`<name>` has no entry in `IAM/users/users.json`. If `<name>` is the only
-`active: true` entry, refuse — this would leave the project with zero
-active users (hard rule, §2, INV-25's fundamental-invariant exception to
-acting without asking) — and point at `/user-add` for a replacement
-first. Otherwise set that entry's `active`
-field to `false` — never delete it, since existing `Signed-off-by`
-references on already-signed artifacts must stay resolvable. Then
-journal it (`catalyst journal append --command /user-remove --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the
-result.
+When the user enters `/user-remove <name>`, run `catalyst user remove
+"<name>" --intent "<why>"`: it deactivates, never deletes (signatures stay
+resolvable), and refuses to deactivate the only active user (§2) — then
+point at `/user-add` for a replacement first.
 
-When the user enters `/user-modify <name> <field> <value>: ...`, refuse
-with a clear message if `<name>` has no entry in `IAM/users/users.json`
-(point to `/user-add`). Refuse if `<field>` is `roles` (point to
-`/user-assign-role`) or `name`/`registered` (identity/audit fields, never
-edited in place). Refuse if `<field>` is `active` set to `false` (point to
-`/user-remove`, which also checks the "at least one active user" rule).
-Otherwise update `<field>` to `<value>`, journal it (`catalyst journal append --command /user-modify --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the result.
+When the user enters `/user-modify <name> <field> <value>: ...`, run
+`catalyst user modify "<name>" <field> "<value>" --intent "<why>"`. It refuses
+`roles` (use `/user-assign-role`), the identity fields `name`/`registered`/
+`userid`, and `active` set to false (use `/user-remove`).
 
-When the user enters `/user-assign-role <name> <role>: ...`, refuse with a
-clear message if `<name>` has no entry in `IAM/users/users.json` (point
-to `/user-add`). If `<role>` isn't one of the roles listed in
-`IAM/roles/roles.json`, ask whether to use an existing role or run
-`/role-add` for `<role>` first. If `<name>`'s `roles` array already
-contains `<role>`, say so and make no change. Otherwise append `<role>` to
-that array, journal it (`catalyst journal append --command /user-assign-role --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the result.
+When the user enters `/user-assign-role <name> <role>: ...`, run `catalyst user
+assign-role "<name>" "<role>" --intent "<why>"`; on an unknown role, ask
+whether to pick an existing one or `/role-add` it first.
 
-When the user enters `/user-list [--role <role>] [--active-only]`, read
-`IAM/users/users.json`. If it doesn't exist, say so rather than
-inventing users. Apply `--role`/`--active-only` filters if given, and
-report the matching entries. If none match, say so rather than inventing
-matches.
+When the user enters `/user-list [--role <role>] [--active-only]`, run
+`catalyst list user` (`--filter roles=<role>`, `--filter active=true`) and
+report what it prints; never add users it does not list.
 
-When the user enters `/role-add <role> <actions>: ...`, refuse with a
-clear message if `<role>` already has an entry in
-`IAM/roles/roles.json` (point to `/role-modify`). If
-`IAM/roles/roles.json` doesn't exist yet, create it from the
-deployment's own current `IAM/roles/templates/TEMPLATE-ROLES-vN.json`
-first. Otherwise append a new entry (`name: <role>`, `actions: <actions>`,
-`reconciliation: <reconciliation>` — `full`/`propose`/`none`,
-`Rules-of-Rules.md` §16; `propose` when not given, never silently
-`full`), journal it (`catalyst journal append --command /role-add --action create --artifact "role <role>" ... --file IAM/roles/roles.json`) and report it.
+When the user enters `/role-add <role> <actions>: ...`, run `catalyst role add
+"<role>" --action <a> ... [--reconciliation full|propose|none] --intent
+"<why>"` (`propose` when not given, never silently `full`;
+`Rules-of-Rules.md` §16). It refuses a role that exists (use `/role-modify`).
 
-When the user enters `/role-modify <role> <actions>: ...`, refuse with a
-clear message if `<role>` has no entry in `IAM/roles/roles.json` (point
-to `/role-add`). Otherwise replace that entry's `actions`,
-journal it (`catalyst journal append --command /role-modify --action update --artifact "role <role>" ... --file IAM/roles/roles.json`) and report the
-result. This never retroactively changes a `Signed-off-by` value already
-recorded on an existing artifact.
+When the user enters `/role-modify <role> <actions>: ...`, run `catalyst role
+modify "<role>" --action <a> ... --intent "<why>"`: it replaces the role's
+actions and never changes a `Signed-off-by` already recorded.
 
 The seven work-item creation commands (§4) have no procedure here —
 they're plugin-contributed, not core; see whichever
@@ -452,33 +421,21 @@ is not an entity index, so its row is added here rather than by
 `catalyst index regen`. Then journal the change with
 `catalyst journal append --command /meta-tag --action create ...`.
 
-When the user enters `/list <type> [--filter ...]`, inspect the relevant
-catalogs and return the matching items. If `type` is `all`, inspect every
-supported collection and apply the same filters there. If `type` is
-`template`, require `--type <template-type>` and list the matching templates
-for that family. If no items match, return an empty result rather than
-inventing matches.
+When the user enters `/list <type> [--filter ...]`, run `catalyst list
+<type> [--filter ...]` (`--type <family>` for templates) and report what it
+prints; an empty result stays empty.
 
-When the user enters `/freeze <item-id|item-path|type|template-name>`, resolve
-the item to its backing file path, append that path to the root-level
-`.frozen` file if it is not already present, and report success. The item is
-then protected from automatic framework synchronization until it is
-explicitly removed from `.frozen` or re-synchronized with an override.
+When the user enters `/freeze <item-id|item-path|type|template-name>`, run
+`catalyst freeze <item> --intent "<why>"`: it resolves the item to its path,
+lists it in the working copy's `.frozen` and journals it; `/sync-framework`
+then skips it until `catalyst unfreeze <item>` or a forced sync.
 
-When the user enters `/migrate-definition <entity-type> <version>`, first
-confirm `<entity-type>` names a real entity type (this framework's source
-has a `definitions/<entity-type>/` folder for it — see `definitions/
-README.md`'s "Entity types covered" list); if not, refuse and name the
-valid types. Obtain this framework's current source content the same way
-`/sync-framework` does (`SYNCHRONIZE.md`'s "Version rule" — the `release`
-branch of the catalyst repository), and check whether `definitions/
-<entity-type>/DEFINITION-<ENTITY-TYPE>-v<version>.md` exists there. If it
-does not, refuse and report the highest version number that does exist for
-that type instead of guessing or rounding to the nearest one. If it does,
-overwrite the deployed `.criterion/definitions/<entity-type>.md` with that
-exact version's content — this is the one and only way that file ever
-changes once deployed, per `SYNCHRONIZE.md`'s definitions carve-out — and
-report the old version number moving to the new one.
+When the user enters `/migrate-definition <entity-type> <version>`, run
+`catalyst definition migrate <entity-type> <version> --kernel <framework/kernel
+of the release> --intent "<why>"` (the release as `/sync-framework` obtains
+it, `SYNCHRONIZE.md` "Version rule"). It refuses a type with no definitions
+and a version that does not exist (naming the highest that does), and is
+the only way a deployed `definitions/<type>.md` changes (INV-23).
 
 Every `/catalyzer` subcommand resolves plugin identity, repository URL, and
 version information exclusively from the `catalog.md` registry of the
@@ -648,21 +605,12 @@ carrying the bundle's pointer fields over as-is (`repoed`,
 the import with `catalyst journal append --command /project --action sync`
 covering the pointer and `.gitignore`, then report the result.
 
-When the user enters `/status <artefact-id> <status> [force]`, update the
-artifact's `Status` field. If the supplied status is one of the valid statuses
-for that artifact type, change it normally. If the status is invalid and the
-command includes the word `force`, change it to that invalid value anyway. If
-the status is invalid and `force` is not supplied, respond that the status
-change is impossible and do not modify the artifact. If the artifact ID does
-not resolve to an existing artifact, state that the artifact cannot be found.
-If it is a `RECON-` case, refuse even with `force` and point to `/reconcile`:
-its role gate (`Rules-of-Rules.md` §16) is the only way a reconciliation's
-`Status` changes. The valid statuses are the `Status` values the type's entity type
-definition allows (a forced value outside them is reported by
-`catalyst validate` as an `enum-value` warning). After the edit, run
-`catalyst index regen` and
-`catalyst journal append --command /status --action status-change ...`
-(§4's common ending).
+When the user enters `/status <artefact-id> <status> [force]`, run
+`catalyst status set <artefact-id> <status> [--force] --intent "<why>"` and
+report what it prints. It checks the type's statuses and transitions,
+refuses a `RECON-` case even with `--force` (only `/reconcile` changes one,
+`Rules-of-Rules.md` §16), regenerates the indexes and journals the change;
+on a refusal, change nothing by hand.
 
 Each plugin must be defined by the following minimum metadata fields: `name`,
 `description`, `uuid`, `version`, `active`, and `type`. The plugin definition
@@ -762,17 +710,9 @@ this deployed set — `/dogfood` (see that repo's own `.claude/commands/`)
 is the current example.
 
 When the user enters `/journal [--since <date>] [--artifact <id>]
-[--actor <name>] [--rule <id>]`, read `development/journal.jsonl` (one
-JSON object per line) and apply whichever filters were given — `--since`
-on `timestamp`, `--artifact` on `artifact`, `--actor` on `actor`,
-`--rule` on membership in `targets`. Report the matching entries in
-timestamp order: what changed, who, which command, which rule(s), and
-each entry's `intent`. Paths in older entries may be bare
-(working-copy relative), `<repo>:path` or absolute; read them as their
-project-root-relative form (`Rules-of-Rules.md` §12). To report the
-journal's integrity as well, run `catalyst journal verify`. If the journal
-doesn't exist or is empty, say so rather than inventing history. This
-command never appends to the journal itself.
+[--actor <name>] [--rule <id>]`, run `catalyst journal show` with the same
+filters and report what it prints, in its order; for integrity too, run
+`catalyst journal verify`. Never append to the journal.
 
 When the user enters `/journal-restore <timestamp>`, run
 `catalyst journal restore <timestamp> <side-dir>` with a new, empty side

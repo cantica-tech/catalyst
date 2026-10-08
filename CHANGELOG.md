@@ -6,6 +6,28 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.47.0 — 2026-10-08
+
+Verbs replace procedures (migration `0.47.0/verbs-replace-procedures.md`).
+
+- Read-only views (roadmap R2 W1): `catalyst list <type|all>` (artifacts of
+  any entity type, rules, users, roles, templates; `--filter KEY=VALUE`),
+  `catalyst view <ID>` (fields, links both ways, journal history),
+  `catalyst backlog` (open work by type and status, missing links, rules no
+  open work targets) and `catalyst journal show` (filtered entries), each
+  with `--json`. `/list`, `/user-list` and `/journal` now run them instead
+  of having the agent read the files.
+- Writing verbs (roadmap R2 W2): `catalyst new <type> --title … --field …`
+  (next ID, latest template filled and signed, references checked,
+  back-references kept), `catalyst status set <ID> <status> [--force]`
+  (statuses and transitions from the ETD; a `RECON-` case is refused) and
+  `catalyst link <ID> <field> <ID>…`; each regenerates the indexes and
+  journals. `/status` runs `catalyst status set`.
+- Administration verbs (roadmap R2 W3): `catalyst user add|remove|modify|assign-role`,
+  `catalyst role add|modify`, `catalyst freeze|unfreeze`, `catalyst definition
+  migrate`, each with the refusals of its slash command and one journal entry.
+  `/user-*`, `/role-*`, `/freeze` and `/migrate-definition` run them.
+
 ## 0.46.1 — 2026-10-08
 
 - `init` asks less: `--user` defaults to the project's `git config user.name`,

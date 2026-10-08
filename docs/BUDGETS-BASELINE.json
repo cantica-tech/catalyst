@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-08T08:41:18+00:00",
+  "timestamp": "2026-10-08T14:53:13+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -10,8 +10,8 @@
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 14856,
-      "tokens": 3714,
+      "bytes": 13581,
+      "tokens": 3395,
       "category": "grounding"
     },
     {
@@ -328,8 +328,8 @@
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 14856,
-      "tokens": 3714,
+      "bytes": 13581,
+      "tokens": 3395,
       "category": "install"
     },
     {
@@ -340,14 +340,14 @@
     },
     {
       "name": "framework/kernel/INSTANTIATION-GUIDE.md",
-      "bytes": 25265,
-      "tokens": 6316,
+      "bytes": 25006,
+      "tokens": 6251,
       "category": "install"
     },
     {
       "name": "framework/kernel/INSTANTIATION-CHECKLIST.md",
-      "bytes": 6862,
-      "tokens": 1715,
+      "bytes": 6947,
+      "tokens": 1736,
       "category": "install"
     }
   ]

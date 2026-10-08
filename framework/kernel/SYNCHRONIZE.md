@@ -535,6 +535,13 @@ Target version `0.46.0`. Full procedure:
 the session-start hook, recompose, and have the user set each role's
 `reconciliation` level. Layout change: `.criterion/INVARIANTS.md`.
 
+### From `0.46.x`: verbs replace procedures
+
+Target version `0.47.0`. Full procedure:
+`migrations/0.47.0/verbs-replace-procedures.md` (this repository) — not
+duplicated here. Re-vendor the CLI (the procedures now call its verbs) and
+recompose. No layout change.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current
