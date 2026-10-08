@@ -35,6 +35,7 @@ from catalyst.deployment import Deployment
 
 MIGRATION_ROW = re.compile(r"^\|\s*\[`([^`]+)`\]\([^)]*\)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*(.*?)\s*\|\s*$")
 AGENT_COMMANDS_DIRS = {"claude-code": ".claude/commands"}
+VERBATIM = ("ANALYSIS-PLAYBOOK.md", "definitions/README.md")   # kernel documents init copies as they are
 
 
 class SyncError(Exception):
@@ -209,6 +210,18 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
                          ("INVARIANTS.module.md", module_dir / "INVARIANTS.module.md" if module_dir else None)):
         if source is not None and source.is_file() and not _same(source, root / name):
             p.actions.append(Action("invariants", f".criterion/{name}", "add" if not (root / name).exists() else "update"))
+    for rel in VERBATIM:
+        new_doc, mine = src.kernel / rel, root / rel
+        if not new_doc.is_file() or _same(new_doc, mine):
+            continue
+        base_doc = src.base_kernel / rel if src.base_kernel else None
+        if not mine.exists():
+            p.actions.append(Action("kernel-doc", f".criterion/{rel}", "add"))
+        elif base_doc is not None and _same(base_doc, mine):
+            p.actions.append(Action("kernel-doc", f".criterion/{rel}", "update"))
+        else:
+            p.actions.append(Action("kernel-doc", f".criterion/{rel}", "conflict",
+                                    "differs from the release it came from: compare by hand"))
     if src.module is not None and mod is not None:
         changed = _tree_changes(src.module, root / "modules" / mod.id)
         if changed:
@@ -280,6 +293,11 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
         if a.kind == "cli":
             shutil.copyfile(src.cli, root / "bin" / "catalyst.pyz")
             touched.append(root / "bin" / "catalyst.pyz")
+        elif a.kind == "kernel-doc" and a.change in ("add", "update"):
+            rel = a.target.removeprefix(".criterion/")
+            (root / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(src.kernel / rel, root / rel)
+            touched.append(root / rel)
         elif a.kind == "invariants":
             name = Path(a.target).name
             source = src.kernel / name if name == "INVARIANTS.md" else (src.module or root / "modules" / mod.id) / name

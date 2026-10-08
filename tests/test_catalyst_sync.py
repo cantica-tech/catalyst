@@ -105,3 +105,22 @@ def test_the_cli_plans_without_writing(tmp_path, capsys):
     assert "Plan: kernel" in capsys.readouterr().out
     assert (project / ".criterion" / "version.txt").read_text(encoding="utf-8") == before
     assert main(["--project", str(project), "sync", "plan", "--kernel", str(tmp_path / "nope")]) == 1
+
+
+def test_verbatim_kernel_documents_follow_the_release_unless_edited(tmp_path):
+    project, deployed = _deployment(tmp_path)
+    base = _release(tmp_path, deployed)
+    new = _release(tmp_path, "9.9.9")
+    (new / "ANALYSIS-PLAYBOOK.md").write_text("playbook 9.9.9\n", encoding="utf-8")
+    (new / "definitions" / "README.md").write_text("readme 9.9.9\n", encoding="utf-8")
+    (project / ".criterion" / "definitions" / "README.md").write_text("my notes\n", encoding="utf-8")
+    dep = load(project)
+    src = sync.Sources(dep, new, None, base, None)
+    p = sync.plan(dep, src, None)
+    changes = {a.target: a.change for a in p.actions if a.kind == "kernel-doc"}
+    assert changes == {".criterion/ANALYSIS-PLAYBOOK.md": "update", ".criterion/definitions/README.md": "conflict"}
+    sync.apply(dep, src, None, "ada", [])
+    src.close()
+    root = project / ".criterion"
+    assert (root / "ANALYSIS-PLAYBOOK.md").read_text(encoding="utf-8") == "playbook 9.9.9\n"
+    assert (root / "definitions" / "README.md").read_text(encoding="utf-8") == "my notes\n"

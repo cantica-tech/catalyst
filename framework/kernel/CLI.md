@@ -384,12 +384,13 @@ deployment was composed from is found next to a release zip
 (`…/v<deployed>/kernel-v<deployed>.zip`), or from the checkout's git tag of
 the deployed version; `--base-kernel` names it otherwise.
 
-- `plan` lists what would change — CLI, invariants, module tree, governing
-  documents (recompose), command files (`--commands-dir`, default the
+- `plan` lists what would change — CLI, invariants, the kernel documents
+  copied as they are (`ANALYSIS-PLAYBOOK.md`, `definitions/README.md`), module
+  tree, governing documents (recompose), command files (`--commands-dir`, default the
   agent's), definitions of new types, versions — and the kernel and module
   migrations between the two versions, in order. It writes nothing.
 - `apply` does it and journals one `/sync-framework` entry. A command file
-  edited locally is reported, never overwritten; a recompose conflict stops
+  or kernel document edited locally is reported, never overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
   The migrations' judgment steps stay with the agent.
 
