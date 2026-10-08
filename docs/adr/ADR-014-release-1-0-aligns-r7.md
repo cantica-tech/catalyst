@@ -1,7 +1,7 @@
 # ADR-014: Release 1.0 aligns R7 (R3.9: multi-user server, R5: UI parity)
 
 **Date:** 2026-10-07  
-**Status:** Pending  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** infra
 

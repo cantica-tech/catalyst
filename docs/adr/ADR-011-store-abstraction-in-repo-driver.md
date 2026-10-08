@@ -1,7 +1,7 @@
 # ADR-011: Store abstraction with in-repo driver (R3 default)
 
 **Date:** 2026-10-07  
-**Status:** Pending  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

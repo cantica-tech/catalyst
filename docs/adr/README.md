@@ -14,34 +14,34 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 |---|-------|--------|-------|
 | [ADR-001](ADR-001-one-file-per-rule-document.md) | One file per rule document, not per rule ID | ✅ Accepted | kernel |
 | [ADR-002](ADR-002-session-scoped-stop-hook.md) | Session-scoped stop hook (block only session edits) | ✅ Accepted | kernel |
-| [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ✅ Accepted | kernel |
-| [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ✅ Accepted | kernel |
-| [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ✅ Accepted | kernel |
-| [ADR-017](ADR-017-prose-feature-freeze.md) | Prose feature freeze until the R2 verbs exist (R1.2) | ✅ Accepted | kernel |
+| [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ⏳ Pending | kernel |
+| [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ⏳ Pending | kernel |
+| [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ⏳ Pending | kernel |
+| [ADR-017](ADR-017-prose-feature-freeze.md) | Prose feature freeze until the R2 verbs exist (R1.6) | ✅ Accepted | kernel |
 
 ### Module & Process
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
 | [ADR-006](ADR-006-se-module-canonical-through-r2.md) | SE module as canonical process plugin (through R2) | ⏳ Pending | SE module |
-| [ADR-007](ADR-007-artifact-tiers-severity.md) | Artifact tiers (Support, Guidance, Enforcement) for severity | ✅ Accepted | SE module |
-| [ADR-008](ADR-008-workflow-narrative-thread.md) | Workflow links as narrative thread (not state machines) | ✅ Accepted | SE module |
+| [ADR-007](ADR-007-artifact-tiers-severity.md) | Artifact tiers (Support, Guidance, Enforcement) for severity | ⏳ Pending | SE module |
+| [ADR-008](ADR-008-workflow-narrative-thread.md) | Workflow links as narrative thread (not state machines) | ⏳ Pending | SE module |
 
 ### Store & Migration
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ✅ Accepted | kernel |
-| [ADR-010](ADR-010-catalyst-toml-locator.md) | Locator format: catalyst.toml (vs. catalyst.json, .criterion symlink) | ✅ Accepted | kernel |
-| [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ✅ Accepted | kernel |
+| [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ⏳ Pending | kernel |
+| [ADR-010](ADR-010-catalyst-toml-locator.md) | Locator format: catalyst.toml (vs. catalyst.json, .criterion symlink) | ⏳ Pending | kernel |
+| [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ⏳ Pending | kernel |
 
 ### Naming & Versioning
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-012](ADR-012-catalyst-framework-kernel-naming.md) | Naming: catalyst framework (repo), kernel (framework/kernel), modules (SE, plugins) | ✅ Accepted | infra |
-| [ADR-013](ADR-013-version-ceiling-r1-start.md) | Version ceiling: R1 starts at 0.46.0; 1.0.0 after R7 complete | ✅ Accepted | infra |
-| [ADR-014](ADR-014-release-1-0-aligns-r7.md) | Release 1.0.0 aligns with R7 completion (production-ready) | ✅ Accepted | infra |
+| [ADR-012](ADR-012-catalyst-framework-kernel-naming.md) | Naming: catalyst framework (repo), kernel (framework/kernel), modules (SE, plugins) | ⏳ Pending | infra |
+| [ADR-013](ADR-013-version-ceiling-r1-start.md) | Version ceiling: R1 starts at 0.46.0; 1.0.0 after R7 complete | ⏳ Pending | infra |
+| [ADR-014](ADR-014-release-1-0-aligns-r7.md) | Release 1.0.0 aligns with R7 completion (production-ready) | ⏳ Pending | infra |
 
 ### User Interfaces (R5–R6)
 
@@ -52,8 +52,8 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 
 ## Status Legend
 
-- ✅ **Accepted:** Decision is final and implemented
-- ⏳ **Pending:** Decision made but not yet fully implemented
+- ⏳ **Pending:** Drafted, awaiting the owner's decision
+- ✅ **Accepted:** Decided by the owner
 - 🔄 **Superseded:** Replaced by another ADR (see ADR-XX)
 - ❌ **Rejected:** Decided against; preserved for historical context
 

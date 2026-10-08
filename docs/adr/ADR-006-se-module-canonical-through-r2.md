@@ -1,7 +1,7 @@
 # ADR-006: SE module as canonical process plugin (through R2)
 
 **Date:** 2026-10-07  
-**Status:** Pending  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** SE module
 
@@ -11,7 +11,7 @@ The catalyst framework was designed to support multiple process modules (plugins
 
 The question arose: during the R0–R2 phase, should the SE module be treated as the canonical, primary process module? And if so, through which roadmap phase should this status continue?
 
-The planning document (06-roadmap-streamline.md, R1.2 phase) indicates that feature freeze on prose should remain until R2 verbs exist, suggesting the SE module's status remains primary through that phase.
+The planning document (06-roadmap-streamline.md, R1.6 phase) indicates that feature freeze on prose should remain until R2 verbs exist, suggesting the SE module's status remains primary through that phase.
 
 ## Decision
 
@@ -30,7 +30,7 @@ This status is revisited at R2 completion to determine whether SE remains primar
   - Simplifies initial framework adoption (one clear process model)
   - Enables focused refinement of the SE module's design
   - Reduces scope of testing and documentation burden
-  - Provides a stable baseline for roadmap planning (R1.2 feature freeze applies to the SE module)
+  - Provides a stable baseline for roadmap planning (R1.6 feature freeze applies to the SE module)
   - Allows SE-specific optimizations to the framework
 
 - **Negative:**
@@ -52,6 +52,6 @@ This status is revisited at R2 completion to determine whether SE remains primar
 
 ## Related
 
-- Source: `what-is-going-on/06-roadmap-streamline.md` (R1.2 feature freeze decision)
+- Source: `what-is-going-on/06-roadmap-streamline.md` (R1.6 feature freeze decision)
 - Roadmap: See ADR-014 (Release 1.0 roadmap alignment)
 - Related: ADR-007 (Artifact tiers), ADR-008 (Workflow links as narrative)

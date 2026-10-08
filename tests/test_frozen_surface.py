@@ -1,4 +1,4 @@
-"""The kernel's prose surface is frozen until R2 (roadmap R1.2, ADR-017)."""
+"""The kernel's prose surface is frozen until R2 (roadmap R1.6, ADR-017)."""
 import json
 import shutil
 import sys

@@ -1,7 +1,7 @@
 # ADR-009: Existing deployments remain LEGACY; new deployments use locator
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

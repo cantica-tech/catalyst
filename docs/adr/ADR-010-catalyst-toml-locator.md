@@ -1,7 +1,7 @@
 # ADR-010: catalyst.toml locator (R3) replaces symlink + pointer + submodule
 
 **Date:** 2026-10-07  
-**Status:** Pending  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

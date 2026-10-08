@@ -1,7 +1,7 @@
 # ADR-007: Artifact tiers (Support, Guidance, Enforcement) for severity
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** SE module
 

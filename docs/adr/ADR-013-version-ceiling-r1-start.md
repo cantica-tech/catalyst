@@ -1,7 +1,7 @@
 # ADR-013: Version ceiling: kernel 0.46.0, SE module 2.4.0 (R1 start)
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** infra
 

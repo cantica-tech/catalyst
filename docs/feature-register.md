@@ -1,6 +1,7 @@
 # Feature register (R1.3 inventory lock)
 
-**Status: draft — verdicts proposed, awaiting owner review.** Nothing in this file is approved.
+**Status: draft — verdicts proposed, awaiting owner review.** Only rows marked *owner, 2026-10-08* carry an owner
+decision; every other verdict is a proposal.
 **Date:** 2026-10-08.
 
 ## Purpose
@@ -35,25 +36,25 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
   - **Park**: kept on the shelf until the condition named in *New home*.
 - **New home** follows 07. Where 06 and 07 say nothing, it reads "unchanged (no roadmap item)".
 - **Roadmap item** cites a 06 ID or "—":
-  - R0.1…R0.21, R1.1…R1.5, R3.1…R3.9, R4.1…R4.8 and R5.1…R5.5 are numbered items.
+  - R0.1…R0.21, R1.1…R1.6, R3.1…R3.9, R4.1…R4.8 and R5.1…R5.5 are numbered items.
   - "R2 W1"…"R2 W5" are the R2 waves (06 §R2).
   - "R6" and "R7" are phases without numbered items.
   - "(done)" appears only where `11-r0-status.md` records the item as done.
   - "decided (ADR-nnn), impl. R2" marks an owner-accepted decision that has not been implemented yet.
   - R2's un-numbered paragraph on the `commands.yaml` registry (06 §R2, after the wave table) has no ID, so its rows
     show "—" and name it under *New home*.
-  - R1.2 is the prose feature freeze. Install simplification is a later candidate with no roadmap ID.
+  - R1.2 is install simplification; R1.6 is the prose feature freeze (ADR-017).
 
 ## Totals
 
 | Table | Inventory entries | Register rows | Keep | Merge | Drop | Park |
 |---|---:|---:|---:|---:|---:|---:|
 | Kernel (01a) | 73 | 73 | 45 | 24 | 2 | 2 |
-| Processes (01b §3) | 71 | 71 | 41 | 25 | 1 | 4 |
+| Processes (01b §3) | 71 | 71 | 42 | 24 | 1 | 4 |
 | Commands (01b §4) | 38 | 38 | 15 | 20 | 2 | 1 |
 | Software engineering (02 §1.3) | 46 | 46 | 23 | 22 | 1 | 0 |
 | Plugins (02 §3.1) | 10 | 10 | 3 | 3 | 0 | 4 |
-| **All** | **238** | **238** | **127** | **94** | **6** | **11** |
+| **All** | **238** | **238** | **128** | **93** | **6** | **11** |
 
 ---
 
@@ -66,8 +67,8 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-03 | Hard rules | 01a §1.1 K-03 | kernel docs/brief | Merge | Merges into the 10 laws via generated `brief` (07 §7, §8: BOOTSTRAP §0 → `brief`) | R4.1 |
 | K-04 | Capability detection and fallbacks | 01a §1.1 K-04 | user/agent shim | Merge | Merges into generated agent adapters; fallback = instruction file (07 §5.4) | R4.5 |
 | K-05 | Agent-switch handling | 01a §1.1 K-05 | kernel CLI | Merge | Merges into the agent-neutral store and `catalyst open` (07 §5.2, §8); interim `catalyst agent switch` until R3 | R2 W5, R3.5 |
-| K-06 | Install (`catalyst init`) | 01a §1.1 K-06 | kernel CLI | Keep | `catalyst init` (07 §5.2, §13: ≤ 3 commands, ≤ 3k tokens); install simplification is a later candidate (no roadmap ID) | R0.3 (done) |
-| K-07 | Deployment ledger | 01a §1.1 K-07 | kernel docs/brief | Keep | unchanged (no roadmap item) | R0.3 (done) |
+| K-06 | Install (`catalyst init`) | 01a §1.1 K-06 | kernel CLI | Keep | `catalyst init` (07 §5.2, §13: ≤ 3 commands, ≤ 3k tokens); install simplification (R1.2) | R0.3 (done), R1.2 |
+| K-07 | Deployment ledger | 01a §1.1 K-07 | kernel docs/brief | Keep | Survives in the ≤ 3k-token install (*owner, 2026-10-08*) | R0.3 (done) |
 | K-08 | Re-ground cadence | 01a §1.1 K-08 | kernel docs/brief | Merge | Merges into `catalyst brief` run by the session-start hook (07 §5.1, §5.2) | R4.1 |
 | K-09 | Assent gate | 01a §1.1 K-09 | kernel docs/brief | Keep | Law L3 "Ask before you publish"; `publish` assent token (07 §7) | R4.1, R3.6 |
 | K-10 | Invariants file | 01a §1.1 K-10 | kernel docs/brief | Merge | Merges into the 10 laws + generated `brief`; `INVARIANTS.md` becomes generated (07 §7, §8) | R4.1 |
@@ -182,7 +183,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-41 | Open a RECON case | 01b §3.5 P-41 | kernel CLI | Keep | `catalyst reconcile` (07 §12) | — |
 | PR-42 | Resolve / propose | 01b §3.5 P-42 | kernel CLI | Keep | `/reconcile` judgment + `catalyst reconcile` role gate (07 §12) | R2 W2 |
 | PR-43 | Close a resolved case | 01b §3.5 P-43 | kernel CLI | Keep | `/reconcile <id> close` (defined by R0.7) → `catalyst reconcile` (07 §12) | R0.7 (done) |
-| PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification is a later candidate (no roadmap ID) | R0.3 (done) |
+| PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification (R1.2) | R0.3 (done), R1.2 |
 | PR-45 | Project remove / export / import | 01b §3.6 P-45 | kernel CLI | Merge | Merges into `catalyst project export\|import\|remove` (06 W5); 07 §8 end state: removed / `catalyst move` | R2 W5 |
 | PR-46 | Pre-pointer migration | 01b §3.6 P-46 | kernel CLI | Park | Until R3.4 decides whether the optional `catalyst migrate` is built | R3.4 |
 | PR-47 | Agent switch | 01b §3.6 P-47 | kernel CLI | Merge | Merges into `catalyst open` + agent-neutral store (07 §8); interim `catalyst agent switch` | R2 W5, R3.5 |
@@ -192,8 +193,8 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-51 | Version freshness check | 01b §3.7 P-51 | kernel CLI | Keep | unchanged (no roadmap item) | — |
 | PR-52 | `/sync-framework` | 01b §3.7 P-52 | kernel CLI | Merge | Merges into `catalyst sync plan\|apply` + `/sync-framework` wrapper (07 §12) | R2 W4 |
 | PR-53 | One-time migrations | 01b §3.7 P-53 | kernel CLI | Keep | Migrations as tested code, keyed by format version (07 §10, §12) | R0.6 (done), R2 W4 |
-| PR-54 | Plugin preservation during sync | 01b §3.7 P-54 | kernel CLI | Merge | Merges into `catalyst catalog merge`, a sync sub-step (06 W4); see open questions | R2 W4 |
-| PR-55 | Sync four-eyes verification | 01b §3.7 P-55 | kernel CLI | Merge | Merges into `catalyst sync plan\|apply` + `catalyst check` (06 W4); see open questions | R2 W4 |
+| PR-54 | Plugin preservation during sync | 01b §3.7 P-54 | kernel CLI | Merge | Merges into `catalyst sync plan\|apply`, which keeps the installed plugins; no `catalog merge` verb (dropped from W4, *owner, 2026-10-08*) | R2 W4 |
+| PR-55 | Sync four-eyes verification | 01b §3.7 P-55 | kernel CLI | Keep | Stays for now, alongside `catalyst sync plan\|apply` + `catalyst check` (*owner, 2026-10-08*) | R2 W4 |
 | PR-56 | Module recomposition | 01b §3.7 P-56 | kernel CLI | Merge | Merges into `catalyst sync` as a sub-step (06 W4) | R2 W4 |
 | PR-57 | Command/task parity | 01b §3.7 P-57 | kernel CLI | Merge | Merges into generation from the `commands.yaml` registry, which ends the parity script (06 §R2) | — |
 | PR-58 | Four-eyes code analysis | 01b §3.8 P-58 | kernel CLI | Keep | `catalyst analysis …` + `/run-analysis` wrapper (07 §12) | — |
@@ -324,9 +325,8 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 
 ## Open questions for the owner
 
-1. **Locator path and ADR status (K-19, K-20).** 06 R3.1 says `catalyst.toml` and 07 §8 says `.catalyst/catalyst.toml`.
-   ADR-010 puts it at the repository root. ADR-010 and ADR-011 read "Pending" in their files but "Accepted" in
-   `docs/adr/README.md`.
+1. **Locator path (K-19, K-20).** 06 R3.1 says `catalyst.toml` and 07 §8 says `.catalyst/catalyst.toml`.
+   ADR-010 (Pending) puts it at the repository root.
 2. **`/project` and agent switch (K-05, K-24, PR-45, PR-47, CMD-15, CMD-16).** 06 W5 builds
    `catalyst project export|import|remove` and an interim `agent switch`. 07 §8 removes both and points to
    `catalyst move`, which no 06 item schedules. Which end state applies?
@@ -335,14 +335,16 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
    `protect` have no named home in 07.
 4. **Workflow (K-50, PR-40).** Today a WORKFLOW- is a procedure document. 07 §4.1 calls it a "declared state machine",
    while ADR-008 says workflows are "narrative threads, not state machines".
-5. **Plugin catalog merge (PR-54).** 06 W4 lists `catalog merge`, but 06 R4.7 and 07 §8 park plugins and drop the
-   catalog commands.
-6. **Sync four-eyes (PR-55).** 06 and 07 do not say whether the two-agent sync verification is retired once
-   `sync plan|apply` and `check` exist.
-7. **Module install (K-17, PL-04).** `catalyst module install` (07 §10) has no 06 item.
-8. **Rows 06/07 do not mention (kept, unchanged):** K-07, K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33 and SE-34.
-   Confirm Keep. In particular, does the ledger (K-07) survive a ≤ 3k-token install?
-9. **Drop/Park basis (K-52, PR-34, CMD-08; K-55/56, PR-68…70, CMD-12, PL-02/03/09/10).** These rest on the
+5. **Module install (K-17, PL-04).** `catalyst module install` (07 §10) has no 06 item.
+6. **Rows 06/07 do not mention (kept, unchanged):** K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33 and SE-34.
+   Confirm Keep.
+7. **Drop/Park basis (K-52, PR-34, CMD-08; K-55/56, PR-68…70, CMD-12, PL-02/03/09/10).** These rest on the
    recommendations B3/B4 in `10`, not on decisions taken.
-10. **R1.2 label.** `12-r1-status.md` names R1.2 "install simplification", whereas 06 defines R1.2 as the prose
-    feature freeze. This register follows 06.
+
+## Decided (owner, 2026-10-08)
+
+- **ADR status:** `docs/adr/README.md` shows every ADR the owner has not decided as Pending, matching the files.
+- **Plugin catalog merge (PR-54):** dropped from 06 W4; sync keeps installed plugins itself.
+- **Sync four-eyes (PR-55):** stays for now.
+- **Ledger (K-07):** survives the ≤ 3k-token install.
+- **R1.2** is install simplification; the prose feature freeze is R1.6 (ADR-017).

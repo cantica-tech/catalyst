@@ -1,7 +1,7 @@
 # ADR-003: Rule domains define seams; rule documents map to domains
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

@@ -1,7 +1,7 @@
 # ADR-005: Artifacts linked to rules via etd: ID pointers
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

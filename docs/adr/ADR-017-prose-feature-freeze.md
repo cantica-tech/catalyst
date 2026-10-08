@@ -16,7 +16,7 @@ to replace.
 
 ## Decision
 
-The kernel's prose surface is frozen until the R2 verbs exist (roadmap R1.2):
+The kernel's prose surface is frozen until the R2 verbs exist (roadmap R1.6):
 
 - **Frozen:** the invariants (`INVARIANTS.md`), the meta-rules
   (`rules-of-rules.template.md`), the §4 slash commands
@@ -47,11 +47,10 @@ entirely at the end of R2.
 
 1. **Freeze by convention only:** no mechanism; the past week shows it does
    not hold.
-2. **Install simplification as R1.2:** a different item (fewer install
-   questions); it needs the R2 verbs for real detection, so it moves to R2 as a
-   candidate.
+2. **Fold it into install simplification:** a different item (roadmap R1.2,
+   fewer install questions); the freeze stands on its own.
 
 ## Related
 
-- Roadmap R1.2 (prose feature freeze), R1.1 (token budgets), R2 (code replaces prose)
-- `docs/plans/r1-2-install-ux-simplification.md` (R2 candidate, not R1.2)
+- Roadmap R1.6 (prose feature freeze), R1.2 (install simplification), R1.1 (token budgets), R2 (code replaces prose)
+- `docs/plans/r1-2-install-ux-simplification.md` (R1.2)

@@ -1,8 +1,7 @@
-# Installation UX simplification (R2 candidate)
+# R1.2: Installation UX simplification
 
-> Not roadmap R1.2: R1.2 is the prose feature freeze (ADR-017). This plan needs the
-> R2 verbs for real detection, and the kernel stays module-agnostic: `--module`
-> keeps no default.
+> Open. Detection must be real and tested, and the kernel stays module-agnostic:
+> `--module` keeps no default (the module proposal below is rejected).
 
 **Objective:** Reduce installation judgment questions from ~6 to ≤3.
 

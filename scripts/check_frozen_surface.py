@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prose feature freeze (roadmap R1.2, ADR-017): the kernel's rule surface may not
+"""Prose feature freeze (roadmap R1.6, ADR-017): the kernel's rule surface may not
 change until the R2 verbs exist.
 
 The surface is what an agent must read and obey as prose: the invariants, the

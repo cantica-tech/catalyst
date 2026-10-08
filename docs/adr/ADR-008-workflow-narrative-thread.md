@@ -1,7 +1,7 @@
 # ADR-008: Workflow links as narrative thread (not state machines)
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Pending (awaiting owner decision)  
 **Author:** Catalyst Team  
 **Affected scope:** SE module
 
