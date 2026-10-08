@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-10-07T17:59:14.150542",
+  "phase": "R1.4\u2013R1.5",
+  "measurements": {
+    "R1.1_baseline": {
+      "total_tokens": 41024,
+      "description": "R1.1: Initial baseline (BOOTSTRAP, INVARIANTS, install docs)"
+    },
+    "R1.2_changes": {
+      "total_tokens": 41775,
+      "delta": "+751 tokens (+1.8%)",
+      "description": "R1.2: Install UX simplification (expanded INSTANTIATION-GUIDE)"
+    },
+    "R1.4_golden_corpus": {
+      "total_tokens": 5931,
+      "description": "R1.4: Golden corpus capture script + test suite + metadata"
+    },
+    "R1.5_adrs": {
+      "total_tokens": 14043,
+      "description": "R1.5: 16 architecture decision records + README + PARKING"
+    },
+    "cumulative_r1": {
+      "total_tokens": 61749,
+      "delta": "+20725 tokens cumulative vs. R1.1 (+50.5%)",
+      "description": "R1.1\u2013R1.5 cumulative (grounding docs + R1.2 changes + R1.4 + R1.5)"
+    }
+  },
+  "notes": [
+    "R1.4 adds ~6K tokens (test infrastructure; golden corpus tarball is binary, not counted)",
+    "R1.5 adds ~14K tokens (16 ADRs + README + PARKING)",
+    "Cumulative R1 growth is within acceptable range (50% increase vs baseline)",
+    "Token budgets per category tracked for future regression testing"
+  ]
+}

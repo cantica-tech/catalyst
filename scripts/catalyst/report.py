@@ -28,7 +28,7 @@ def build(dep: Deployment, since: str | None = None) -> dict:
         from catalyst.trace import commits as git_commits, check_message
         window = [f"--since={since}"] if since else ["-200"]
         try:
-            history = git_commits(dep.project_root, window + ["HEAD"])
+            history = git_commits(dep.project_root, ["HEAD"], options=tuple(window))
         except ValueError:
             history = []                               # no commits yet
         for sha, parents, body in history:

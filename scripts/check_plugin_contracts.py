@@ -98,7 +98,7 @@ def normalize_url(url: str) -> str:
 def origin_url() -> str | None:
     try:
         out = subprocess.check_output(
-            ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True
+            ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True, encoding="utf-8"
         )
         return normalize_url(out)
     except Exception:
@@ -168,9 +168,19 @@ def validate_plugin(plugin_dir: Path, framework_url: str | None) -> list[str]:
     return errors
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    """`--require` (CI, submodules checked out): no plugin to check is a
+    failure, so the gate can never pass by checking nothing."""
+    argv = list(argv or [])
+    if [a for a in argv if a != "--require"]:
+        print("usage: check_plugin_contracts.py [--require]")
+        return 2
     plugins = find_plugins()
     if not plugins:
+        if "--require" in argv:
+            print("plugin contract validation FAILED: no plugin with a working-contract.md found "
+                  "(are the submodules checked out?) (--require)")
+            return 1
         print("no plugins with working-contract.md found; skipping contract checks")
         return 0
 
@@ -189,4 +199,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

@@ -9,6 +9,11 @@ artifacts and meta-tags — gets proposed, tracked, and closed. Subordinate to
 that file governs the rules themselves; this file governs the work items
 that reference those rules.
 
+Documents cited by name that are not in this working copy — `CLI.md`,
+`MODULE-SPECIFICATION.md`, `SYNCHRONIZE.md`, `INSTANTIATION-GUIDE.md`,
+`FORMAT.md` and the like — are the catalyst kernel's, under
+`framework/kernel/` in the `catalyst` repository.
+
 ---
 
 ## 1. No development without a targeted rule
@@ -35,8 +40,8 @@ ceremony tiers (its §3 contribution).
 
 ## 2. Users, roles, and signing
 
-`IAM/users/users.json` is a JSON array of registered users
-(`{name, roles, registered, active, notes, userid}`, plus an optional
+`IAM/users/users.json` holds the registered users as a `users` array
+(`{"users": [...]}` of `{name, roles, registered, active, notes, userid}`, plus an optional
 `git_username`, the name `catalyst criterion push` commits under —
 `Rules-of-Rules.md` §13), managed only by
 `/user-add`/`/user-remove`/`/user-modify`/`/user-assign-role`/`/user-list`
@@ -44,11 +49,14 @@ ceremony tiers (its §3 contribution).
 `git_username` or `userid`; one already written is never rewritten.
 Each user has one or
 more roles drawn from
-`IAM/roles/roles.json`, a JSON array of `{name, actions}` objects
-mapping each role to the actions/commands it's expected to perform.
-`roles.json` is seeded with a default agile-role mapping
-(`templates/roles.template.json`) and then extended via `/role-add`
-(new role) or `/role-modify` (change an existing role's actions).
+`IAM/roles/roles.json`, a `roles` array (`{"roles": [...]}`) of
+`{name, actions, reconciliation}` objects mapping each role to the
+actions/commands it's expected to perform (`reconciliation`:
+`Rules-of-Rules.md` §16). `roles.json` is seeded with a default
+agile-role mapping (`IAM/roles/templates/TEMPLATE-ROLES-vN.json`) and
+then extended via `/role-add` (new role) or `/role-modify` (change an
+existing role's actions). Every command that writes either file journals
+it (§4).
 
 **This is JSON, not hand-edited markdown, precisely because it's managed
 exclusively by commands** — the same reasoning that keeps
@@ -71,23 +79,21 @@ role mismatch is noted, never a block or a confirmation prompt:
    completes, resolve who is signing it: the user established earlier
    this session, or ask if not yet established (don't guess from git
    config — confirm with the user).
-2. Look up that name in `IAM/users/users.json`. If unregistered, proceed
-   anyway, noting that the signer isn't registered — `/user-add` can
-   register them properly as a follow-up, but doesn't gate this write.
+2. Look up that name in `IAM/users/users.json`. If unregistered, register
+   them first (`/user-add`): the CLI refuses an unregistered signer
+   (`CLI.md`, "Signer").
 3. Look up their role(s) in `IAM/roles/roles.json` and check whether the
    action being performed is one that role covers. If it isn't, proceed
    anyway — never refuse outright — noting the mismatch.
 4. Fill the artifact's `Signed-off-by` field with the user's name
-   (carrying forward any unregistered-signer or role-mismatch note from
-   steps 2-3) and proceed.
+   (carrying forward any role-mismatch note from step 3) and proceed.
 5. Allocate the entity's ID with `catalyst id next <PREFIX> --as <signer>`
    (`CLI.md`), which carries that signer's `userid` as its suffix
    (`Rules-of-Rules.md` §20, INV-26) — the same moment, never a separate
    step done later. Always pass the signer confirmed in step 1 as `--as`;
-   the CLI's own fallback to the git identity is not a confirmation. If
-   the signer has no `userid` yet (unregistered, or registered before
-   INV-26 existed), register them first (`/user-add`); the CLI refuses to
-   allocate a suffixed ID ahead of its signer.
+   the CLI's own fallback to the sole active user is not a confirmation.
+   If the signer has no `userid` yet (registered before INV-26 existed),
+   the CLI refuses to allocate a suffixed ID ahead of its signer.
 
 Every development artifact of the active module and every work item
 carries a `Signed-off-by` field for this reason (see each type's
@@ -181,8 +187,8 @@ A product commit made for the change cites the artifact or rule it serves
   array (additive; doesn't remove their other roles).
 - `/user-list [--role <role>] [--active-only]` — list registered users,
   optionally filtered.
-- `/role-add <role> <actions>` — add a new role entry to
-  `IAM/roles/roles.json`. Refuses if `<role>` already exists — use
+- `/role-add <role> <actions> [full|propose|none]` — add a new role
+  entry, with its `reconciliation` level, to `IAM/roles/roles.json`. Refuses if `<role>` already exists — use
   `/role-modify` instead.
 - `/role-modify <role> <actions>` — replace an existing role's `actions`.
   Refuses if `<role>` doesn't exist — use `/role-add` instead.
@@ -275,7 +281,7 @@ the seven currently exist anywhere.
   After a `/dogfood` run that ends clean or ends with fixes applied and
   reverified, offer this command (`create` if not yet shared, `push`
   otherwise) as the natural next step — never run it automatically.
-- `/reconcile <RECON-id> accept|accept-with-edits|reject|propose <text>`
+- `/reconcile <RECON-id> accept|accept-with-edits|reject|propose <text>|close`
   — resolve, or move toward resolving, an open reconciliation case
   (`Rules-of-Rules.md` §16, `INVARIANTS.md` INV-21): `accept` merges its
   `Proposed` content into the `Entity` it names as-is, `accept-with-edits`
@@ -285,9 +291,12 @@ the seven currently exist anywhere.
   fills `Resolved`/`Resolver`, and regenerates
   `reconciliations/reconciliations.md` (`catalyst index regen`). `propose <text>` instead appends
   `<text>` as a new `Revisions` row and moves `Status` to `Under Review`
-  without resolving anything. **Genuinely role-gated, not advisory**: the
+  without resolving anything. `close` moves a `Resolved-*` case to
+  `Closed` once any accepted change has landed in the `Entity`; a
+  `Closed` case is final (a dispute that returns opens a new case).
+  **Genuinely role-gated, not advisory**: the
   actor's `reconciliation` field in `IAM/roles/roles.json` must be `full`
-  for the three resolving verbs — `propose`-level actors may only use
+  for the three resolving verbs and `close` — `propose`-level actors may only use
   `propose`, and `none`-level actors are refused on any verb. If the case
   names a `Workflow` (`WORKFLOW-NNNNNN`, `Rules-of-Rules.md` §19), read
   its `## Steps`/`## Gates / exit criteria` before choosing a verb.
@@ -311,15 +320,14 @@ the seven currently exist anywhere.
   fresh `.criterion` symlink. Refuses if a deployment already exists here,
   unless `force` is given, in which case it overwrites the existing one
   — confirm explicitly first.
-- `/switch-agent [agent-id]` — force the agent-switch procedure (hard
-  rule 6, `BOOTSTRAP.md` §1.1, `Rules-of-Rules.md` §14's Agent switching
-  procedure) to run now, regardless of whether the running agent's
+- `/switch-agent [agent-id]` — force the agent-switch procedure (INV-6,
+  `Rules-of-Rules.md` §14's Agent switching procedure) to run now, regardless of whether the running agent's
   identity already appears to match `<app-name>.catalyst`'s `agent`
   field. The manual escape hatch for when the automatic per-session
   check is skipped or only partially completes (e.g. the working copy
   already mirrored but the pointer's `agent` field never updated to
   match). Resolves the owned location of `<agent-id>` (defaulting to the
-  running agent's own identifier if omitted) per `BOOTSTRAP.md` §1,
+  running agent's own identifier if omitted) per `Rules-of-Rules.md` §14,
   mirrors `.criterion/` into it if it existed elsewhere (exact copy,
   overwriting the destination — never a partial merge), repoints the
   `.criterion` symlink, updates `<app-name>.catalyst` (`agent`,
@@ -327,7 +335,8 @@ the seven currently exist anywhere.
   No `Taskfile.yml` edit: it reaches the working copy through the
   symlink.
 - `/status` — update an artifact or work item's `Status` field, then
-  regenerate indexes and journal the change.
+  regenerate indexes and journal the change. Refuses a `RECON-` case:
+  its `Status` changes only through `/reconcile` (role-gated).
 - `/audit <file-name>` — analyze the change-impact of the specified file by
   checking the current repository state, the file's role in the framework,
   and the rules or artifacts that depend on it, then return a concise impact
@@ -375,7 +384,8 @@ present). If `<role>` isn't one of the roles listed in
 `/role-add` for `<role>` first. Otherwise draw the new user's `userid`
 with `catalyst userid gen` (never by hand — `Rules-of-Rules.md` §11,
 INV-26), append a new entry (`registered`: today, `active: true`,
-`roles: [<role>]`, `userid`) and report it. If this is the
+`roles: [<role>]`, `userid`), journal it (`catalyst journal append --command /user-add --action create --artifact "user <name>" ... --file IAM/users/users.json`) — plus `--file IAM/roles/roles.json` if it
+was just created — and report it. If this is the
 project's first registered user, note that the hard "at least one active
 user" requirement (§2) is now satisfied.
 
@@ -386,7 +396,8 @@ active users (hard rule, §2, INV-25's fundamental-invariant exception to
 acting without asking) — and point at `/user-add` for a replacement
 first. Otherwise set that entry's `active`
 field to `false` — never delete it, since existing `Signed-off-by`
-references on already-signed artifacts must stay resolvable. Report the
+references on already-signed artifacts must stay resolvable. Then
+journal it (`catalyst journal append --command /user-remove --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the
 result.
 
 When the user enters `/user-modify <name> <field> <value>: ...`, refuse
@@ -395,7 +406,7 @@ with a clear message if `<name>` has no entry in `IAM/users/users.json`
 `/user-assign-role`) or `name`/`registered` (identity/audit fields, never
 edited in place). Refuse if `<field>` is `active` set to `false` (point to
 `/user-remove`, which also checks the "at least one active user" rule).
-Otherwise update `<field>` to `<value>` and report the result.
+Otherwise update `<field>` to `<value>`, journal it (`catalyst journal append --command /user-modify --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the result.
 
 When the user enters `/user-assign-role <name> <role>: ...`, refuse with a
 clear message if `<name>` has no entry in `IAM/users/users.json` (point
@@ -403,7 +414,7 @@ to `/user-add`). If `<role>` isn't one of the roles listed in
 `IAM/roles/roles.json`, ask whether to use an existing role or run
 `/role-add` for `<role>` first. If `<name>`'s `roles` array already
 contains `<role>`, say so and make no change. Otherwise append `<role>` to
-that array and report the result.
+that array, journal it (`catalyst journal append --command /user-assign-role --action update --artifact "user <name>" ... --file IAM/users/users.json`) and report the result.
 
 When the user enters `/user-list [--role <role>] [--active-only]`, read
 `IAM/users/users.json`. If it doesn't exist, say so rather than
@@ -416,12 +427,15 @@ clear message if `<role>` already has an entry in
 `IAM/roles/roles.json` (point to `/role-modify`). If
 `IAM/roles/roles.json` doesn't exist yet, create it from the
 deployment's own current `IAM/roles/templates/TEMPLATE-ROLES-vN.json`
-first. Otherwise append a new entry
-(`name: <role>`, `actions: <actions>`) and report it.
+first. Otherwise append a new entry (`name: <role>`, `actions: <actions>`,
+`reconciliation: <reconciliation>` — `full`/`propose`/`none`,
+`Rules-of-Rules.md` §16; `propose` when not given, never silently
+`full`), journal it (`catalyst journal append --command /role-add --action create --artifact "role <role>" ... --file IAM/roles/roles.json`) and report it.
 
 When the user enters `/role-modify <role> <actions>: ...`, refuse with a
 clear message if `<role>` has no entry in `IAM/roles/roles.json` (point
-to `/role-add`). Otherwise replace that entry's `actions` and report the
+to `/role-add`). Otherwise replace that entry's `actions`,
+journal it (`catalyst journal append --command /role-modify --action update --artifact "role <role>" ... --file IAM/roles/roles.json`) and report the
 result. This never retroactively changes a `Signed-off-by` value already
 recorded on an existing artifact.
 
@@ -589,11 +603,11 @@ When the user enters `/project create <project name>: ...`, refuse if a
 exists at this project's root — point to `/project import ... force`
 instead. Otherwise run the instantiation procedure
 (`INSTANTIATION-GUIDE.md` §1): resolve the module, rule documents, first
-user and agent-owned location (`BOOTSTRAP.md` §1), then run
+user and agent-owned location (`Rules-of-Rules.md` §14), then run
 `catalyst init --name <project name> ...`, which builds the working copy,
 writes `<app-name>.catalyst` (no path in it), links `.criterion` (or keeps
 the in-project fallback directory) and gitignores `/.criterion`; then the
-guide's judgment steps. Report the result; per hard rule 4, nothing is
+guide's judgment steps. Report the result; per INV-4, nothing is
 committed automatically.
 
 When the user enters `/project remove <project name> [force]: ...`,
@@ -641,7 +655,9 @@ command includes the word `force`, change it to that invalid value anyway. If
 the status is invalid and `force` is not supplied, respond that the status
 change is impossible and do not modify the artifact. If the artifact ID does
 not resolve to an existing artifact, state that the artifact cannot be found.
-The valid statuses are the `Status` values the type's entity type
+If it is a `RECON-` case, refuse even with `force` and point to `/reconcile`:
+its role gate (`Rules-of-Rules.md` §16) is the only way a reconciliation's
+`Status` changes. The valid statuses are the `Status` values the type's entity type
 definition allows (a forced value outside them is reported by
 `catalyst validate` as an `enum-value` warning). After the edit, run
 `catalyst index regen` and
@@ -783,7 +799,7 @@ artifact under this document and carries no `Domain` field.)
 
 ## 6. Development-artifact IDs
 
-Per `Rules-of-Rules.md` §5: `<PREFIX>-(NNNNNN)-(userid)`, where `<PREFIX>`
+Per `Rules-of-Rules.md` §6: `<PREFIX>-(NNNNNN)-(userid)`, where `<PREFIX>`
 is one of the active module's rule-linked entity-type ID prefixes —
 sequential per type, zero-padded 6 digits, never reused, never renumbered,
 plus the signer's `userid` as a trailing suffix from the moment they're

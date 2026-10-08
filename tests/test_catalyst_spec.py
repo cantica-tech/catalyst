@@ -98,8 +98,52 @@ def test_every_paragraph_of_the_real_section4_lands_somewhere():
     from pathlib import Path
     from catalyst.spec import parse, section4_text
     coc = Path(__file__).resolve().parent.parent / "framework" / "kernel" / "rules-of-development.template.md"
-    s = parse(coc.read_text())
+    s = parse(coc.read_text(encoding="utf-8"))
     covered = sum(len(v) for v in s.procedures.values()) + len(s.general)
-    paragraphs = [b for b in "\n".join(section4_text(coc.read_text())).split("\n\n")
+    paragraphs = [b for b in "\n".join(section4_text(coc.read_text(encoding="utf-8"))).split("\n\n")
                   if b.strip() and not b.lstrip().startswith(("- `/", "#"))]
     assert covered >= len([p for p in paragraphs if not p.startswith("  ")]) * 0.9
+
+
+COLON_FORM = """# R
+
+## 4. Slash-command entry points
+
+- `/create-bug` — create a new bug artifact.
+- `/create-req` or `/create-requirement` — create a new requirement artifact.
+
+When the user enters `/create-bug: ...`, create a new bug artifact immediately
+with the ID from `catalyst id next BUG`.
+
+When the user enters `/create-req:` or `/create-requirement: ...`, create a
+new requirement artifact immediately.
+
+A paragraph that belongs to no command.
+
+## 5. Next
+"""
+
+
+def test_colon_form_procedures_belong_to_their_command(tmp_path):
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", COLON_FORM)
+    dep = load(p)
+    assert "catalyst id next BUG" in spec(dep, "create-bug")
+    assert "new requirement artifact immediately" in spec(dep, "create-requirement")
+    assert main(["--project", str(p), "spec", "--general"]) == 0
+
+
+def test_colon_form_is_not_general(tmp_path, capsys):
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", COLON_FORM)
+    assert main(["--project", str(p), "spec", "--general"]) == 0
+    out = capsys.readouterr().out
+    assert "belongs to no command" in out
+    assert "id next BUG" not in out and "requirement artifact immediately" not in out
+
+
+def test_bullet_without_a_command_name_is_skipped(tmp_path):
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md",
+          "## 4. C\n\n- `/x|y` — odd.\n- `/ok` — fine.\n\n## 5. N\n")
+    assert commands(load(p)) == ["ok"]

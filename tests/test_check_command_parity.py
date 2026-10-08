@@ -10,7 +10,7 @@ def make_coc(tmp_path: Path, section4_body: str, *, before="", after="") -> Path
         "## 4. Slash-command entry points\n\n"
         f"{section4_body}"
         f"{after}"
-    )
+    , encoding="utf-8")
     return coc
 
 
@@ -18,14 +18,14 @@ def make_commands(tmp_path: Path, names: list[str]) -> Path:
     commands_dir = tmp_path / ".claude" / "commands"
     commands_dir.mkdir(parents=True)
     for name in names:
-        (commands_dir / f"{name}.md").write_text(f"# /{name}\n")
+        (commands_dir / f"{name}.md").write_text(f"# /{name}\n", encoding="utf-8")
     return commands_dir
 
 
 def make_taskfile(tmp_path: Path, names: list[str], *, filename="Taskfile.common.yml") -> Path:
     taskfile = tmp_path / filename
     body = "\n".join(f'  {name}:\n    desc: "..."\n    cmds:\n      - "true"' for name in names)
-    taskfile.write_text(f'version: "3"\n\ntasks:\n{body}\n')
+    taskfile.write_text(f'version: "3"\n\ntasks:\n{body}\n', encoding="utf-8")
     return taskfile
 
 
@@ -150,7 +150,7 @@ def test_check_command_parity_missing_code_of_conduct_file(tmp_path: Path):
 
 def test_check_command_parity_missing_section4(tmp_path: Path):
     coc = tmp_path / "CODE-OF-CONDUCT.md"
-    coc.write_text("## 1. Something else\n\nNo section 4 here.\n")
+    coc.write_text("## 1. Something else\n\nNo section 4 here.\n", encoding="utf-8")
     commands_dir = make_commands(tmp_path, ["create-item"])
     errors = ccp.check_command_parity(commands_dir, coc)
     assert any("has no '## 4.' section" in e for e in errors)
@@ -284,11 +284,11 @@ def write_example_module(project: Path, *, with_spec: bool) -> None:
         "  - name: create-item\n"
         "    description: Create a new item\n"
         "    spec_path: commands/create-item.md\n"
-    )
+    , encoding="utf-8")
     if with_spec:
         (mdir / "commands").mkdir()
-        (mdir / "commands" / "create-item.md").write_text("# /create-item\n")
-    (project / "app.catalyst").write_text('{"module": "example-process"}')
+        (mdir / "commands" / "create-item.md").write_text("# /create-item\n", encoding="utf-8")
+    (project / "app.catalyst").write_text('{"module": "example-process"}', encoding="utf-8")
 
 
 def test_check_module_manifest_parity_noop_without_module(tmp_path: Path):
@@ -311,3 +311,23 @@ def test_check_module_manifest_parity_accepts_command_file_or_spec(tmp_path: Pat
     other = tmp_path / "other"
     write_example_module(other, with_spec=False)
     assert ccp.check_module_manifest_parity(other, make_commands(other, ["create-item"])) == []
+
+
+def test_require_fails_when_no_deployment(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert ccp.main(["--require"]) == 1
+    assert "--require" in capsys.readouterr().out
+    assert ccp.main([]) == 0
+
+
+def test_require_still_fails_broken_parity(tmp_path: Path, monkeypatch):
+    deploy_root = tmp_path / ".criterion"
+    deploy_root.mkdir()
+    make_coc(deploy_root, "- `/create-item` — create an item.\n")
+    commands_dir = make_commands(tmp_path, ["create-item", "dogfood"])
+    make_taskfile(deploy_root, ["create-item"])
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(ccp, "COMMANDS_DIR", commands_dir)
+    assert ccp.main(["--require"]) == 0
+    (commands_dir / "create-item.md").unlink()
+    assert ccp.main(["--require"]) == 1

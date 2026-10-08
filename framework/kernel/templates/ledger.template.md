@@ -5,7 +5,7 @@ unit of work and writes it after, so progress survives context loss and any
 drift is visible against a written record. Deploy to
 `.criterion/.ledger/<task>.todo.md` in the target repo.
 
-## Resolved mode (from BOOTSTRAP.md §1)
+## Resolved mode (from the catalyst repository's BOOTSTRAP.md §1)
 - Sub-agents: <parallel | sequential-fallback>
 - Working copy: <resolved agent-owned path, linked as .criterion | in-project fallback>
 - Memory: <memory-tool cache | .criterion/DEPLOYMENT.md + <app-name>.catalyst read fresh>

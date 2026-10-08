@@ -61,12 +61,14 @@ lives, and, afterwards, its first rules.
    - **The first user** (`--user <name>`, `--git-username <name>`), who is
      registered as Admin — a deployment is not valid without one active user
      (INV-16). Ask who it should be if it isn't obvious from context.
-   - **The agent-owned location** (`--at <dir>`). The working-copy
-     directory is always named `.criterion/`, but it is not built inside the
-     target project's own tree: it goes in a location this agent owns (a
-     per-project data directory the running agent already maintains),
-     computed per machine from the agent's own conventions — its shim says
-     how — and never written into a tracked file (INV-6). Without `--at`
+   - **The working-copy directory** (`--at <dir>`). It is always named
+     `.criterion/`, but it is not built inside the target project's own
+     tree: it goes in a location this agent owns (a per-project data
+     directory the running agent already maintains), computed per machine
+     from the agent's own conventions — its shim says how — and never
+     written into a tracked file (INV-6). `<dir>` is the `.criterion`
+     directory itself (`<agent's per-project directory>/.criterion`), not
+     its parent. Without `--at`
      (an agent with no owned-space concept, or a platform without
      symlinks), the working copy is a real `.criterion/` directory in the
      project, gitignored the same way.
@@ -79,8 +81,9 @@ lives, and, afterwards, its first rules.
 4. **Run `catalyst init`** from the project root (or pass `--project
    <root>`), with `--kernel <framework/kernel>` of the catalyst checkout or
    kernel release when running the zipapp. It refuses if the project
-   already has a `*.catalyst` pointer or a `.criterion`, or if the target
-   location is not empty. In order, it:
+   already has a `*.catalyst` pointer or a `.criterion` (one holding only
+   the install ledger, `.ledger/`, is adopted), or if the target location
+   is not empty. In order, it:
    - composes `CODE-OF-CONDUCT.md` (the kernel's
      `rules-of-development.template.md` with the module's
      `code-of-conduct.module.md` §3/§4 inserted under
@@ -110,7 +113,9 @@ lives, and, afterwards, its first rules.
      from the kernel's default role mapping (INV-16, INV-26);
    - writes an empty `development/journal.jsonl`, `version.txt`,
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
-     root `README.md`, and vendors the CLI at `bin/catalyst.pyz`;
+     root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
+     and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
+     session-start hook of step 5 re-injects);
    - writes `<app-name>.catalyst` at the project root (no path in it; the
      only catalyst file the product repository tracks; its `journal_since`
      is the project's `HEAD`, or `""` with no commit yet — the baseline
@@ -133,8 +138,10 @@ lives, and, afterwards, its first rules.
    <agent-owned location>/.criterion/     # reached as <project root>/.criterion
      .git/                  # the working copy's own history
      ACCESS-CONTROL.md
+     ANALYSIS-PLAYBOOK.md
      CODE-OF-CONDUCT.md
      DEPLOYMENT.md
+     INVARIANTS.md
      README.md
      Taskfile.common.yml
      version.txt
@@ -176,9 +183,12 @@ lives, and, afterwards, its first rules.
    is for; the kernel never names them (INV-30). `plugins/<type>/<name>/`
    appears when a plugin is activated; `.ledger/` holds the agent's install
    ledger (`BOOTSTRAP.md` §3).
-5. **Wire the agent and the project's tasks.** If the running agent
-   supports an end-of-turn hook, register `catalyst hook stop` the way its
-   shim says (`CLI.md` "Hooks"). An agent without command files instead
+5. **Wire the agent and the project's tasks.** Register the agent's hooks
+   the way its shim says (`CLI.md` "Hooks"), where it supports them:
+   `catalyst hook start` at session start, so every later session starts
+   grounded, and `catalyst hook stop` at the end of each turn. For Claude
+   Code, merge `agents/claude-code/settings.template.json` (both hooks) into
+   the project's `.claude/settings.json`. An agent without command files instead
    exposes each command of the composed `CODE-OF-CONDUCT.md` §4 as a named
    procedure and lists them in the deployed `README.md` (`BOOTSTRAP.md` §1)
    — the composed §4 is the canonical list; never re-enumerate a subset of
@@ -190,6 +200,8 @@ lives, and, afterwards, its first rules.
    project's own tasks still run on a clone where `.criterion` isn't set up
    yet:
    ```yaml
+   version: "3"
+
    vars:
      # Resolves the deployed agent's CLI binary from the pointer's "agent"
      # field. "claude-code" is the one known id whose CLI binary name
@@ -289,7 +301,7 @@ Above it, once such a plugin is active:
   board in place of sprint membership (the schema's own
   `rules-of-work-items.template.md` §6).
 - Using something else entirely → the framework's hard requirement is
-  only §1 of `rules-of-development.md` (no development without a
+  only §1 of `CODE-OF-CONDUCT.md` (no development without a
   targeted rule) — everything above that is replaceable with whatever
   process vocabulary your team actually uses, as long as it still
   bottoms out in the active module's development artifacts. Without any
@@ -372,7 +384,7 @@ after the fact.
    under it.
 4. Retrofit IDs onto existing prose bullets (if a rules doc already
    exists in some other form) in document order, per §3 — top-level
-   bullets get `NNN`; enumerated sub-cases inside one bullet get
+   bullets get `NNNNNN` (`catalyst id next-rule`); enumerated sub-cases inside one bullet get
    `-1`/`-2`/... suffixes rather than new top-level IDs.
 5. Once rules exist, retrofit active-module artifacts for any
    already-known issues and pending work (an existing known-issues index
@@ -429,7 +441,7 @@ instantiated ruleset available whenever the guide is used again.
 At the end of a successful instantiation via the retrofit path (§4), if the
 project currently has no active-module artifacts or other tracked work
 items yet, propose running
-[`analysis-playbook.md`](analysis-playbook.md) next to help bootstrap the
+[`ANALYSIS-PLAYBOOK.md`](ANALYSIS-PLAYBOOK.md) (`/run-analysis`) next to help bootstrap the
 first round of project-specific rules and evidence — it reads an existing
 codebase, so it does not apply after the greenfield path (§3), whose
 dev-environment rule document already is the first round of rules.

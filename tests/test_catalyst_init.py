@@ -54,25 +54,25 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     assert report.errors == [] and report.warnings == []
     root = dep.root
     assert (req.project / ".criterion").is_symlink()
-    assert "/.criterion" in (req.project / ".gitignore").read_text()
-    pointer = json.loads((req.project / "app.catalyst").read_text())
+    assert "/.criterion" in (req.project / ".gitignore").read_text(encoding="utf-8")
+    pointer = json.loads((req.project / "app.catalyst").read_text(encoding="utf-8"))
     assert pointer["module"] == "example-process" and pointer["repoed"] is False
     assert pointer["journal_since"] == ""        # no commit yet: the whole history is governed
-    user = json.loads((root / "IAM" / "users" / "users.json").read_text())["users"][0]
+    user = json.loads((root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))["users"][0]
     assert user["git_username"] == "ada" and len(user["userid"]) == 8
-    coc = (root / "CODE-OF-CONDUCT.md").read_text()
+    coc = (root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
     assert "### From module example-process" in coc and f"rr-META-000009-{user['userid']}" in coc
     assert "{{RULES_DIR}}" not in coc
     assert (root / "development" / "subs" / "subs.md").is_file()        # ETD location honoured
     assert (root / "items" / "templates" / "TEMPLATE-ITEM-v1.md").is_file()
-    assert (root / "definitions" / "item.md").read_text() == "# Item v2\n"  # latest definition
+    assert (root / "definitions" / "item.md").read_text(encoding="utf-8") == "# Item v2\n"  # latest definition
     assert (root / "bin" / "catalyst.pyz").is_file()
     # the analysis process ships with the deployment (BUG-000002)
-    assert (root / "ANALYSIS-PLAYBOOK.md").read_text().startswith("# Analysis Playbook")
+    assert (root / "ANALYSIS-PLAYBOOK.md").read_text(encoding="utf-8").startswith("# Analysis Playbook")
     assert (root / "analyses" / "analyses.md").is_file()
     assert (root / "analyses" / "templates" / "TEMPLATE-ANALYSIS-v1.md").is_file()
     assert (root / "definitions" / "analysis.md").is_file()
-    entries = (root / "development" / "journal.jsonl").read_text().splitlines()
+    entries = (root / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
     assert json.loads(entries[0])["command"] == "catalyst init"
 
 
@@ -117,12 +117,12 @@ def test_recompose_merges_template_changes_and_keeps_local_edits(tmp_path):
     new_kernel = tmp_path / "kernel-new"
     shutil.copytree(KERNEL, new_kernel)
     ror_t = new_kernel / "rules-of-rules.template.md"
-    ror_t.write_text(ror_t.read_text() + "\n## 99. `rr-META-099` A new kernel rule\n\nNew.\n")
+    ror_t.write_text(ror_t.read_text(encoding="utf-8") + "\n## 99. `rr-META-099` A new kernel rule\n\nNew.\n", encoding="utf-8")
     ror = root / "rules" / "Rules-of-Rules.md"
-    ror.write_text(ror.read_text().replace("Meta-rules governing", "Meta-rules (local note) governing", 1))
+    ror.write_text(ror.read_text(encoding="utf-8").replace("Meta-rules governing", "Meta-rules (local note) governing", 1), encoding="utf-8")
     params = deployed_params(root, "example-process")
     results = recompose(root, params, (base_kernel, req.module), (new_kernel, req.module))
-    text = ror.read_text()
+    text = ror.read_text(encoding="utf-8")
     assert "(local note)" in text and f"rr-META-000099-{params.userid}" in text
     assert {r.path: r.conflicts for r in results}["rules/Rules-of-Rules.md"] == 0
 
@@ -158,7 +158,7 @@ def test_seeded_templates_are_resolved(tmp_path):
     req = request(tmp_path)
     init(req)
     root = load(req.project).root
-    rule_t = (root / "rules" / "templates" / "TEMPLATE-RULE-v1.md").read_text()
+    rule_t = (root / "rules" / "templates" / "TEMPLATE-RULE-v1.md").read_text(encoding="utf-8")
     assert "{{RULES_DIR}}" not in rule_t and "Copy this file" not in rule_t
 
 
@@ -174,13 +174,13 @@ def test_commands_from_a_release_are_generated_from_section4(tmp_path):
     import shutil
     release = tmp_path / "release-kernel"
     shutil.copytree(KERNEL, release)
-    (release / "manifest.json").write_text('{"version": "9.9.9"}')
+    (release / "manifest.json").write_text('{"version": "9.9.9"}', encoding="utf-8")
     req = request(tmp_path, kernel=release, commands_dir=Path(".claude/commands"))
     init(req)
     names = {p.stem for p in (req.project / ".claude" / "commands").glob("*.md")}
     assert "check-rules" in names and "create-item" in names          # kernel + module §4
     assert "create-bug" not in names                                  # another module's command
-    assert json.loads((req.project / "app.catalyst").read_text())["kernel_version"] == "9.9.9"
+    assert json.loads((req.project / "app.catalyst").read_text(encoding="utf-8"))["kernel_version"] == "9.9.9"
 
 
 def test_recompose_skips_frozen_documents(tmp_path):
@@ -188,7 +188,7 @@ def test_recompose_skips_frozen_documents(tmp_path):
     req = request(tmp_path)
     init(req)
     root = load(req.project).root
-    (root / ".frozen").write_text("CODE-OF-CONDUCT.md\n")
+    (root / ".frozen").write_text("CODE-OF-CONDUCT.md\n", encoding="utf-8")
     results = {r.path: r for r in recompose(root, deployed_params(root, "example-process"),
                                              (KERNEL, req.module), (KERNEL, req.module))}
     assert results["CODE-OF-CONDUCT.md"].frozen
@@ -197,21 +197,148 @@ def test_recompose_skips_frozen_documents(tmp_path):
 def test_single_template_named_like_its_folder_is_the_item_template(tmp_path):
     req = request(tmp_path)
     mod = req.module
-    (mod / "templates" / "items.template.md").write_text("# `ITEM-NNNNNN` — item named like its folder\n")
+    (mod / "templates" / "items.template.md").write_text("# `ITEM-NNNNNN` — item named like its folder\n", encoding="utf-8")
     y = mod / "module.yaml"
-    y.write_text(y.read_text().replace("templates/item.template.md", "templates/items.template.md"))
+    y.write_text(y.read_text(encoding="utf-8").replace("templates/item.template.md", "templates/items.template.md"), encoding="utf-8")
     init(req)
     root = load(req.project).root
-    assert "named like its folder" in (root / "items" / "templates" / "TEMPLATE-ITEM-v1.md").read_text()
-    assert (root / "items" / "items.md").read_text().startswith("# Items index")
+    assert "named like its folder" in (root / "items" / "templates" / "TEMPLATE-ITEM-v1.md").read_text(encoding="utf-8")
+    assert (root / "items" / "items.md").read_text(encoding="utf-8").startswith("# Items index")
 
 
 def test_init_after_a_first_commit_sets_the_baseline_there(tmp_path):
     req = request(tmp_path)
-    (req.project / "main.py").write_text("print('hi')\n")
+    (req.project / "main.py").write_text("print('hi')\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(req.project), "add", "-A"], check=True)
     subprocess.run(["git", "-C", str(req.project), "-c", "user.name=a", "-c", "user.email=a@a",
                     "commit", "-qm", "skeleton"], check=True)
-    head = subprocess.check_output(["git", "-C", str(req.project), "rev-parse", "HEAD"], text=True).strip()
+    head = subprocess.check_output(["git", "-C", str(req.project), "rev-parse", "HEAD"], text=True, encoding="utf-8").strip()
     init(req)
-    assert json.loads((req.project / "app.catalyst").read_text())["journal_since"] == head
+    assert json.loads((req.project / "app.catalyst").read_text(encoding="utf-8"))["journal_since"] == head
+
+
+# --- install order, --at, rollback, grounding (BOOTSTRAP §2, INV-6) -------------
+def _ledger(where: Path) -> Path:
+    return write(where / ".ledger" / "install.todo.md", "- [ ] install\n")
+
+
+def test_a_ledger_only_in_project_criterion_is_adopted_and_moved_to_the_working_copy(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    init(req)
+    assert (req.project / ".criterion").is_symlink()
+    assert (req.at / ".ledger" / "install.todo.md").read_text(encoding="utf-8") == "- [ ] install\n"
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_a_ledger_only_in_project_criterion_is_kept_without_at(tmp_path):
+    req = request(tmp_path, at=None)
+    _ledger(req.project / ".criterion")
+    init(req)
+    assert (req.project / ".criterion" / ".ledger" / "install.todo.md").is_file()
+    assert (req.project / ".criterion" / "CODE-OF-CONDUCT.md").is_file()
+
+
+def test_a_ledger_only_target_is_adopted(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.at)
+    init(req)
+    assert (req.at / ".ledger" / "install.todo.md").is_file() and (req.at / "CODE-OF-CONDUCT.md").is_file()
+
+
+def test_at_names_the_working_copy_or_its_parent(tmp_path):
+    """`--at <dir>/.criterion` is the working copy; any other `--at` is the
+    directory that holds it (INV-6: the working copy is always `.criterion`)."""
+    agent_space = tmp_path / "agent-space"
+    write(agent_space / "memory" / "MEMORY.md", "notes\n")
+    req = request(tmp_path, at=agent_space)
+    init(req)
+    assert (agent_space / ".criterion" / "CODE-OF-CONDUCT.md").is_file()
+    assert (agent_space / "memory" / "MEMORY.md").read_text(encoding="utf-8") == "notes\n"
+    assert Path(__import__("os").path.realpath(req.project / ".criterion")) == (agent_space / ".criterion").resolve()
+
+
+def test_a_non_empty_target_is_refused_untouched(tmp_path):
+    req = request(tmp_path)
+    write(req.at / "stray.md", "x\n")
+    with pytest.raises(InitError, match="not empty"):
+        init(req)
+    assert sorted(p.name for p in req.at.iterdir()) == ["stray.md"]
+    assert not (req.project / ".criterion").exists()
+
+
+def test_an_in_project_criterion_with_more_than_a_ledger_is_refused(tmp_path):
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    write(req.project / ".criterion" / "other.md", "x\n")
+    with pytest.raises(InitError, match="already exists"):
+        init(req)
+
+
+def test_rollback_leaves_an_existing_empty_target_empty(tmp_path, monkeypatch):
+    import catalyst.init as ci
+    req = request(tmp_path)
+    req.at.mkdir(parents=True)
+    monkeypatch.setattr(ci, "_git", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
+    with pytest.raises(InitError, match="rolled back"):
+        init(req)
+    assert req.at.is_dir() and list(req.at.iterdir()) == []
+    monkeypatch.undo()
+    init(req)
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_rollback_puts_an_adopted_ledger_back(tmp_path, monkeypatch):
+    import catalyst.init as ci
+    req = request(tmp_path)
+    _ledger(req.project / ".criterion")
+    monkeypatch.setattr(ci, "_git", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
+    with pytest.raises(InitError, match="rolled back"):
+        init(req)
+    assert not (req.project / ".criterion").is_symlink()
+    assert (req.project / ".criterion" / ".ledger" / "install.todo.md").read_text(encoding="utf-8") == "- [ ] install\n"
+    assert not req.at.exists()
+
+
+def test_init_deploys_the_invariants_and_the_session_start_hook_prints_them(tmp_path, capsys):
+    from catalyst.__main__ import main
+    req = request(tmp_path)
+    write(req.module / "INVARIANTS.module.md", "# Module invariants\n\nM-1.\n")
+    init(req)
+    root = load(req.project).root
+    assert (root / "INVARIANTS.md").read_text(encoding="utf-8") == (KERNEL / "INVARIANTS.md").read_text(encoding="utf-8")
+    assert (root / "INVARIANTS.module.md").read_text(encoding="utf-8").startswith("# Module invariants")
+    capsys.readouterr()
+    assert main(["--project", str(req.project), "hook", "start"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith((KERNEL / "INVARIANTS.md").read_text(encoding="utf-8").splitlines()[0]) and "M-1." in out
+    assert run_checks(load(req.project)).errors == []
+
+
+def test_session_start_hook_is_silent_outside_a_deployment(tmp_path, capsys):
+    from catalyst.__main__ import main
+    assert main(["--project", str(tmp_path), "hook", "start"]) == 0
+
+
+def test_settings_template_has_session_start_and_stop_hooks():
+    settings = json.loads((REPO / "agents" / "claude-code" / "settings.template.json").read_text(encoding="utf-8"))
+    start = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert start == "python3 .criterion/bin/catalyst.pyz hook start"
+    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == "python3 .criterion/bin/catalyst.pyz hook stop"
+
+
+def test_init_announces_its_writes_into_the_product_repository(tmp_path):
+    req = request(tmp_path)
+    steps = init(req)
+    assert any("refs/catalyst/journal" in s and "product repository" in s for s in steps)
+    ref = subprocess.run(["git", "-C", str(req.project), "rev-parse", "--verify", "-q", "refs/catalyst/journal"],
+                         capture_output=True, text=True, encoding="utf-8")
+    assert ref.returncode == 0
+
+
+def test_iam_template_catalogs_are_named_after_the_singular_type(tmp_path):
+    req = request(tmp_path)
+    init(req)
+    root = load(req.project).root
+    assert (root / "IAM" / "users" / "templates" / "templates-user.md").is_file()
+    assert (root / "IAM" / "roles" / "templates" / "templates-role.md").is_file()

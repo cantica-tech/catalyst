@@ -8,7 +8,7 @@ import stop_hook as sh
 def write_check(root: Path, name: str, code: int, out: str = "") -> None:
     scripts = root / "scripts"
     scripts.mkdir(exist_ok=True)
-    (scripts / name).write_text(f"print({out!r})\nraise SystemExit({code})\n")
+    (scripts / name).write_text(f"print({out!r})\nraise SystemExit({code})\n", encoding="utf-8")
 
 
 def fake_root(tmp_path: Path, failing: set[str]) -> Path:
@@ -17,12 +17,12 @@ def fake_root(tmp_path: Path, failing: set[str]) -> Path:
                     f"{check} broke" if check in failing else "ok")
     pkg = tmp_path / "scripts" / "catalyst"
     pkg.mkdir()
-    (pkg / "__init__.py").write_text("")
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
     code = 1 if "catalyst check" in failing else 0
     (pkg / "__main__.py").write_text(
         "import sys\n"
         f"code = {code} if sys.argv[1] == 'check' else 0\n"
-        "print(f'catalyst {sys.argv[1]} said {code}')\nraise SystemExit(code)\n")
+        "print(f'catalyst {sys.argv[1]} said {code}')\nraise SystemExit(code)\n", encoding="utf-8")
     return tmp_path
 
 
@@ -62,3 +62,12 @@ def test_second_block_lets_stop_through(monkeypatch, capsys):
 def test_malformed_hook_input_is_treated_as_empty():
     assert sh.read_hook_input(io.StringIO("not json")) == {}
     assert sh.read_hook_input(io.StringIO("")) == {}
+
+
+def test_a_crash_blocks_the_stop(monkeypatch, capsys):
+    def boom(root=None):
+        raise OSError("python3 vanished")
+    monkeypatch.setattr(sh, "run_checks", boom)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
+    assert sh.main() == 2
+    assert "python3 vanished" in capsys.readouterr().err

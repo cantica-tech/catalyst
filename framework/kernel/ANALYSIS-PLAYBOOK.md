@@ -79,7 +79,7 @@ reports `analyses/reports/<ID>/`.
    verification. For each one, the user accepts, edits then accepts, or
    rejects; never decide for them. On acceptance, write the artifact:
    - a **domain**: `rules/domains/<prefix>-<CODE>-<short-description>.md`
-     per `Rules-of-Rules.md` §6, registered in `domains.md`;
+     per `Rules-of-Rules.md` §7, registered in `domains.md`;
    - a **rule**: its ID from `catalyst id next-rule <prefix> <DOMAIN>`,
      written into the rule document and `rules/rules.md` per
      `Rules-of-Rules.md` (status ✅ / ⚠️ / ❌ from the finding: `holds` /

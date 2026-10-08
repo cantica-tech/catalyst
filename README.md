@@ -106,7 +106,9 @@ role → typical-action mapping (`/role-add`/`-modify`, seeded with a default
 agile-role set). A project must always have at least one active user — the
 one hard requirement — but role checks themselves are advisory, not access
 control: catalyst has no way to verify who's actually typing, so a mismatch
-prompts for confirmation rather than blocking.
+is noted on the artifact, never a block or a confirmation prompt (INV-25).
+The one exception is reconciliation: resolving a `RECON-` case is genuinely
+gated by the role's `reconciliation` level.
 
 ## History: the journal
 

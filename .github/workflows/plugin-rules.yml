@@ -19,4 +19,4 @@ jobs:
       - name: Validate plugin rules
         run: python3 scripts/check_plugins.py
       - name: Validate plugin contracts
-        run: python3 scripts/check_plugin_contracts.py
+        run: python3 scripts/check_plugin_contracts.py --require

@@ -9,7 +9,7 @@ def write_gitmodules(root: Path, entries: list[tuple[str, str]]) -> None:
         lines.append(f'[submodule "{name}"]')
         lines.append(f"\tpath = {path}")
         lines.append(f"\turl = https://example.com/{name}.git")
-    (root / ".gitmodules").write_text("\n".join(lines) + "\n")
+    (root / ".gitmodules").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def test_load_submodule_entries_parses_paths(tmp_path: Path):
@@ -25,15 +25,15 @@ def test_load_submodule_entries_missing_file_returns_empty(tmp_path: Path):
 def test_validate_plugin_structure_valid(tmp_path: Path):
     plugin_dir = tmp_path / "framework" / "kernel" / "plugins" / "repository" / "catalyst-git"
     plugin_dir.mkdir(parents=True)
-    (plugin_dir / "README.md").write_text("# readme\n")
-    (plugin_dir / "working-contract.md").write_text("# contract\n")
+    (plugin_dir / "README.md").write_text("# readme\n", encoding="utf-8")
+    (plugin_dir / "working-contract.md").write_text("# contract\n", encoding="utf-8")
     assert cpg.validate_plugin_structure(tmp_path) == []
 
 
 def test_validate_plugin_structure_missing_readme(tmp_path: Path):
     plugin_dir = tmp_path / "framework" / "kernel" / "plugins" / "repository" / "catalyst-git"
     plugin_dir.mkdir(parents=True)
-    (plugin_dir / "working-contract.md").write_text("# contract\n")
+    (plugin_dir / "working-contract.md").write_text("# contract\n", encoding="utf-8")
     errors = cpg.validate_plugin_structure(tmp_path)
     assert any("README.md is missing" in e for e in errors)
 
@@ -41,7 +41,7 @@ def test_validate_plugin_structure_missing_readme(tmp_path: Path):
 def test_validate_plugin_structure_missing_contract(tmp_path: Path):
     plugin_dir = tmp_path / "framework" / "kernel" / "plugins" / "repository" / "catalyst-git"
     plugin_dir.mkdir(parents=True)
-    (plugin_dir / "README.md").write_text("# readme\n")
+    (plugin_dir / "README.md").write_text("# readme\n", encoding="utf-8")
     errors = cpg.validate_plugin_structure(tmp_path)
     assert any("working-contract.md is missing" in e for e in errors)
 

@@ -10,6 +10,11 @@ apply to the *process* of maintaining those documents and the code they
 describe, not to the app's behavior itself. Binding on anyone (human or
 agent) adding to any of them, at any point after this file exists.
 
+Documents cited by name that are not in this working copy — `CLI.md`,
+`MODULE-SPECIFICATION.md`, `SYNCHRONIZE.md`, `INSTANTIATION-GUIDE.md`,
+`FORMAT.md` and the like — are the catalyst kernel's, under
+`framework/kernel/` in the `catalyst` repository.
+
 Each rule must belong to a rule type directory under `{{RULES_DIR}}/`, be
 stored as its own markdown file in that directory, be listed in the
 corresponding type index, and be referenced from the global index
@@ -105,8 +110,7 @@ resolving.
   appended). Prefer this over inventing a new top-level rule when the
   sub-items are only meaningful in the context of the parent bullet.
 - **`(userid)`** — always the final segment, after any `[-parent-id]`.
-  See rr-META-020 for the full mechanism and the rule/domain
-  authorship limitation.
+  See rr-META-020 for the full mechanism.
 
 Rules with no sub-items or parent never have that trailing segment —
 it's absent, not empty. The `userid` segment, by contrast, is never
@@ -133,8 +137,8 @@ absent once rr-META-020 applies.
 ### Adding a new rule
 
 1. Pick (or confirm) the `DOMAIN` it belongs to.
-2. Take the next unused `NNN` in that domain — check both the domain's
-   existing bullets and the Linked Artifacts quick index.
+2. Take the next `NNNNNN` in that domain from `catalyst id next-rule
+   <doc-prefix> <DOMAIN> --as <signer>` — never by hand.
 3. Only add `[-parent-id]` if the rule is a numbered sub-case of one
    existing bullet, or an explicit specialization of another rule.
 
@@ -149,7 +153,7 @@ trace of why. Instead, retire it in place:
    that's a *new* rule with a *new* ID) and append a one-line reason plus
 the date, e.g. `🗑 retired {{DATE}} — superseded by \`{{new-id}}\``.
 3. If something replaces it, the replacement is a normal new rule (next
-   `NNN` in its domain) — retirement does not imply the new rule
+   `NNNNNN` in its domain) — retirement does not imply the new rule
    inherits the old number, even via `[-parent-id]`.
 4. Never repurpose a retired rule's ID for an unrelated rule later, even
    in the same domain.
@@ -190,7 +194,7 @@ never renumbered. It is unique within its type and signer: the trailing
 concurrently in a shared deployment (§13) may legitimately hold the same
 number under different userids. Every rule-linked member
 carries its own `Targets`/`Domain` and is subject to
-`rules-of-development.md` §1 ("no development without a targeted
+`CODE-OF-CONDUCT.md` §1 ("no development without a targeted
 rule"). Which prefixes belong to this format, and any separate,
 non-rule-linked schemes the module also defines, are the active
 module's meta-rules (`MODULE-SPECIFICATION.md` §6.1).
@@ -213,7 +217,7 @@ gets one file at
 for artifact and work-item filenames (see `INSTANTIATION-GUIDE.md` §1): the
 bare `{{DOC_PREFIX}}-{{CODE}}.md` is not a valid filename, the file must carry
 a short description of what the domain covers as part of its name. The
-`{{CODE}}` used inside rule IDs (`{{DOC_PREFIX}}-{{CODE}}-{{NNN}}`) is
+`{{CODE}}` used inside rule IDs (`{{DOC_PREFIX}}-{{CODE}}-NNNNNN-<userid>`) is
 unaffected by this — only the on-disk filename gains the description suffix.
 See [`templates/domain.template.md`](templates/domain.template.md) → the
 current `{{RULES_DIR}}/domains/templates/TEMPLATE-DOMAIN-vN.md`, for the
@@ -230,8 +234,8 @@ domain file shorter.
 - **Code**: `{{PARENT}}.{{SUB}}` — parent code, a literal `.`, then a
   short sub-mnemonic (e.g. `GATE.DOCKER`). This is still one `DOMAIN`
   value for ID purposes: a rule under it is
-  `{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-{{NNN}}` (e.g. `ui-GATE.DOCKER-004`),
-  with `NNN` scoped to the sub-domain, not the parent.
+  `{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-NNNNNN-<userid>` (e.g.
+  `ui-GATE.DOCKER-000004-Ab3xR9pQ`), with `NNNNNN` scoped to the sub-domain, not the parent.
 - **File**: `domains/{{DOC_PREFIX}}-{{PARENT}}.{{SUB}}-{{short-description}}.md`,
   alongside (not nested under) the parent's own
   `domains/{{DOC_PREFIX}}-{{PARENT}}-{{short-description}}.md` — the
@@ -277,8 +281,8 @@ list. Extend the existing domain instead of duplicating it.
 declaring either no conflict or the specific supersede/amend/
 contradict relationship to named existing rule IDs.
 5. Add the one-line pointer under the `##` heading in the rule document.
-6. Only then add the domain's first rule bullet(s), `NNN` starting at
-   `001`.
+6. Only then add the domain's first rule bullet(s), `NNNNNN` starting at
+   `000001`.
 
 A domain's code is permanent, same as a rule ID — never reused for an
 unrelated domain even if the original is later emptied out or retired
@@ -334,14 +338,14 @@ carries no prescribed semantics — its actual population and lifecycle
 ## 11. `rr-META-011` Users and roles are advisory, not access control
 
 `IAM/users/users.json` (`templates/users.template.json`) is the registry
-of people who can sign work — a JSON array of `{name, roles, registered,
-active, notes, userid}` objects, kept as data rather than a hand-edited
+of people who can sign work — a JSON object whose `users` array holds
+`{name, roles, registered, active, notes, userid}` objects, kept as data rather than a hand-edited
 document because it is managed exclusively by commands:
 `/user-add`/`/user-remove`/`/user-modify`/`/user-assign-role`/`/user-list`
-— see `rules-of-development.md` §4. `IAM/roles/roles.json`
+— see `CODE-OF-CONDUCT.md` §4. `IAM/roles/roles.json`
 (`templates/roles.template.json`) maps each role to the actions/commands
-it typically performs — a JSON array of `{name, actions, reconciliation}`
-objects (`reconciliation` is `full`/`propose`/`none` — see §16, the one
+it typically performs — a JSON object whose `roles` array holds
+`{name, actions, reconciliation}` objects (`reconciliation` is `full`/`propose`/`none` — see §16, the one
 field in this file that's genuinely enforced rather than advisory), seeded
 with a default agile-role mapping and then extended via `/role-add`
 (new role) and `/role-modify` (change an existing role's actions).
@@ -375,11 +379,12 @@ Catalyst has no way to verify who is actually typing, so beyond that one
 hard existence requirement, this scheme is **advisory**: before an
 artifact-creating or status-changing command completes, the agent
 resolves who is signing it, checks their role(s) against `roles.json`,
-and — if the action isn't one their role covers, or they aren't
-registered at all — proceeds anyway (INV-25), noting the mismatch rather
-than pausing for confirmation or refusing outright. Every entity of the
+and — if the action isn't one their role covers — proceeds anyway
+(INV-25), noting the mismatch rather than pausing for confirmation or
+refusing outright. An unregistered signer is registered first
+(`/user-add`): the CLI refuses to sign for one (`CLI.md`, "Signer"). Every entity of the
 active module's entity types, and every work item, carries a `Signed-off-by`
-field recording the outcome (`rules-of-development.md` §2); at the same
+field recording the outcome (`CODE-OF-CONDUCT.md` §2); at the same
 moment, that resolved signer's `userid` is appended as the entity's own
 id suffix (INV-26, rr-META-020) — never resolved separately or later.
 
@@ -628,8 +633,8 @@ takes one of two shapes:
 - **Local-only** (the default): it builds in **agent-owned space**, a
   per-project data location the running agent already maintains,
   outside the project being governed. Its location is computed per
-  machine by the running agent from its own conventions (`BOOTSTRAP.md`
-  §1; each agent's shim says how) and is never written into a tracked
+  machine by the running agent from its own conventions (each agent's
+  shim says how) and is never written into a tracked
   file.
 - **Shared** (§13): it is a **git submodule** of the product repository
   at `.criterion`, checked out from the criterion repository. The
@@ -647,7 +652,7 @@ agents, tools, the project's own `Taskfile.yml` — reaches the working
 copy. Local-only, it is a **symlink** to the agent-owned `.criterion/`,
 always gitignored (`/.criterion` in the project's `.gitignore`); the
 agent creates or repairs it at install, at `/project import`, and at
-every session start (`BOOTSTRAP.md` §1.1). Shared, it is the submodule
+every session start (the agent switching procedure below). Shared, it is the submodule
 checkout, which `catalyst criterion join` initialises in a fresh clone;
 the agent never replaces it with a symlink. Every document path written
 `.criterion/...` therefore means the same thing on every machine and for
@@ -685,7 +690,7 @@ anywhere. Detect this (a `.criterion/` dir at the project root and no
 structural change, so confirm with the user before proceeding, the same
 courtesy as `/criterion create`:
 
-1. Resolve the agent-owned location per `BOOTSTRAP.md` §1. If the
+1. Resolve the agent-owned location (local-only, above). If the
    running agent has no owned-space concept, there is nothing to move —
    stop here; the in-project fallback shape already **is** the target
    shape, it just still needs its `<app-name>.catalyst` pointer written
@@ -705,7 +710,7 @@ courtesy as `/criterion create`:
    content hash) — this is exactly what the journal (§12) exists to
    record, and its immutability means the pre-migration history stays
    readable at its old hashes regardless of where the tree now lives.
-6. Report the result. Per hard rule 4, nothing is committed
+6. Report the result. Per INV-4, nothing is committed
    automatically — but note explicitly that `<app-name>.catalyst` is now
    something the user will want tracked, unlike anything that came before
    it.
@@ -713,7 +718,7 @@ courtesy as `/criterion create`:
 ### Agent switching procedure
 
 When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
-1. Resolve the running agent's own owned location per `BOOTSTRAP.md` §1 (or the in-project fallback `.criterion/`).
+1. Resolve the running agent's own owned location (local-only, above) (or the in-project fallback `.criterion/`).
 2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
 3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`. A shared deployment's `.criterion` is a submodule inside the project (§13): skip steps 2–3 for it.
 4. Update `<app-name>.catalyst`: set `agent` to the current agent's identifier and `updated` to the current date string (`YYYY-MM-DD`) — nothing else; the pointer holds no path, and the project's `Taskfile.yml` needs no edit.
@@ -845,7 +850,7 @@ the same shape for its own `rules-of-work-items.md` (§8, INV-22).
   `templates/` treatment. `TEMPLATE-USERS-v1.json`/`TEMPLATE-ROLES-v1.json`
   version the registry's *seed shape* (the array a fresh deployment
   starts from), not a per-instance document — `users.json`/`roles.json`
-  are each one JSON array, not one-file-per-instance, so there is
+  are each one JSON registry, not one-file-per-instance, so there is
   exactly one live instance per type, versioned the same way any other
   type's template is.
 - `plugins/` — unchanged (INV-10..13): `<type>/<name>/`, each activated
@@ -919,7 +924,10 @@ instead; `reject` leaves the shared branch's version unchanged and the
 proposer drops or reworks their change; `propose <text>`
 appends `<text>` as a new `## Revisions` row without resolving anything.
 `Status` moves `Open` → `Under Review` → one of `Resolved-Accepted` /
-`Resolved-Accepted-with-Edits` / `Resolved-Rejected` → `Closed`.
+`Resolved-Accepted-with-Edits` / `Resolved-Rejected` → `Closed`; only
+`/reconcile <id> close` (a `full`-level actor, once any accepted change
+has landed in the `Entity`) closes a case, and `/status` never changes a
+`RECON-` case's `Status`. A `Closed` case is final.
 
 **Who can do what is genuinely gated by role — the one deliberate
 exception to `rr-META-011`'s advisory-only principle.** Each role in
@@ -1141,19 +1149,14 @@ proceed.
 
 **For a type with a resolvable signer** (every type above except
 rules): the `userid` is exactly that resolved signer's — the same
-person `rules-of-development.md` §2's signer-resolution procedure names
+person `CODE-OF-CONDUCT.md` §2's signer-resolution procedure names
 in `Signed-off-by`. No separate lookup, no separate decision.
 
-**For a rule** (and, by extension, a domain's own code, which is
-never suffixed — see below): no rule or domain template carries an
-authorship field of any kind, so there is nothing today recording who
-added a given rule. Until a dedicated field is designed, use the sole
-registered active user; if more than one is active, use whichever was
-most recently registered. **This is a known, documented limitation**,
-not a permanent design choice — a deployment with real multi-author
-rule authorship will get an inaccurate attribution under this fallback,
-and should treat adding a real per-rule authorship field as its own
-future tracked maintenance item once that limitation actually bites.
+**For a rule** (a domain's own code is never suffixed — see below):
+the signer is resolved the same way (`CODE-OF-CONDUCT.md` §2) and named
+with `catalyst id next-rule --as <signer>` (`CLI.md`); the suffix is the
+rule's only authorship record, since no rule or domain template carries
+an authorship field.
 
 **Domains are out of scope.** A domain has no numeric sequence — it's
 identified by its `CODE` alone (§7), embedded as a substring inside

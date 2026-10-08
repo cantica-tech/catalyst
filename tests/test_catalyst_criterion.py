@@ -25,7 +25,7 @@ NO_CHECK = lambda dep: ""       # structural checks are covered elsewhere
 
 def git(repo: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(repo), *args], check=True,
-                          capture_output=True, text=True).stdout.strip()
+                          capture_output=True, text=True, encoding="utf-8").stdout.strip()
 
 
 @pytest.fixture(autouse=True)
@@ -45,10 +45,10 @@ def world(tmp_path, monkeypatch):
         subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
     project = make_project(tmp_path / "ada")
     users = project / ".criterion" / "IAM" / "users" / "users.json"
-    data = json.loads(users.read_text())
+    data = json.loads(users.read_text(encoding="utf-8"))
     data["users"].append({"name": "Bob", "git_username": "bob", "roles": ["Admin"],
                           "active": True, "userid": BOB_ID})
-    users.write_text(json.dumps(data))
+    users.write_text(json.dumps(data), encoding="utf-8")
     agent = tmp_path / "ada-agent" / ".criterion"
     agent.parent.mkdir()
     shutil.move(str(project / ".criterion"), str(agent))
@@ -111,16 +111,16 @@ def test_create_publishes_and_makes_a_submodule(world):
     ada = world["ada"]
     assert cr.is_submodule(ada)
     assert (ada / ".criterion").is_dir() and not (ada / ".criterion").is_symlink()
-    pointer = json.loads((ada / "app.catalyst").read_text())
+    pointer = json.loads((ada / "app.catalyst").read_text(encoding="utf-8"))
     assert pointer["repoed"] is True and pointer["criterion_branch"] == "criterion"
-    attrs = (ada / ".criterion" / ".gitattributes").read_text()
+    attrs = (ada / ".criterion" / ".gitattributes").read_text(encoding="utf-8")
     assert "development/journal.jsonl merge=union" in attrs and "items/items.md merge=union" in attrs
     assert (ada / ".criterion" / cr.CI_WORKFLOW).is_file()
-    entries = [json.loads(l) for l in (ada / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()]
+    entries = [json.loads(l) for l in (ada / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()]
     created = [e for e in entries if e["command"] == "catalyst criterion create"]
     assert {f["path"] for f in created[0]["files"]} == {".criterion/.gitattributes", f".criterion/{cr.CI_WORKFLOW}"}
     assert {f["path"] for f in created[1]["files"]} == {"app.catalyst", ".gitmodules", ".gitignore"}
-    assert "/.criterion" not in (ada / ".gitignore").read_text()
+    assert "/.criterion" not in (ada / ".gitignore").read_text(encoding="utf-8")
     # the product commit pins the rules version
     assert git(ada, "ls-tree", "HEAD", ".criterion").split()[1] == "commit"
 
@@ -151,7 +151,7 @@ def test_concurrent_work_merges_without_losing_anything(world):
     assert len(merge) == 1 and merge[0]["files"][0]["path"] == ".criterion/items/items.md"
     # Bob's rebased index lists both, in ID order
     index = subprocess.run(["git", "-C", str(wc), "show", "origin/criterion:items/items.md"],
-                           capture_output=True, text=True).stdout
+                           capture_output=True, text=True, encoding="utf-8").stdout
     assert index.index("ITEM-000001") < index.index(a_item) and b_item in index
     assert merged
     # after syncing, the union-merged journal verifies: forks are warnings, not errors
@@ -174,13 +174,13 @@ def test_sync_refuses_local_work_then_fast_forwards(world):
         cr.sync(load(bob))
     git(bob / ".criterion", "reset", "-q", "--hard", "HEAD~1")
     cr.sync(load(bob))
-    assert f"ITEM-000002-{USERID}" in (bob / ".criterion" / "items" / "items.md").read_text()
+    assert f"ITEM-000002-{USERID}" in (bob / ".criterion" / "items" / "items.md").read_text(encoding="utf-8")
 
 
 def test_a_real_conflict_stops_the_push(world):
     for who in ("ada", "bob"):
         f = world[who] / ".criterion" / "items" / "ITEM-000001-first-item.md"
-        f.write_text(f.read_text().replace("| Open |", f"| Done by {who} |"))
+        f.write_text(f.read_text(encoding="utf-8").replace("| Open |", f"| Done by {who} |"), encoding="utf-8")
     a = push(world, "ada", "Ada closes it")
     merge_topic(world, a.branch)
     wc = world["bob"] / ".criterion"
@@ -207,7 +207,7 @@ def test_integrity_catches_a_merge_that_drops_a_journal_line(world):
     wc = world["ada"] / ".criterion"
     git(wc, "checkout", "-q", "criterion")
     git(wc, "merge", "-q", "--no-ff", "--no-commit", a.branch)
-    (wc / "development" / "journal.jsonl").write_text("")       # a bad merge resolution
+    (wc / "development" / "journal.jsonl").write_text("", encoding="utf-8")       # a bad merge resolution
     git(wc, "add", "-A")
     git(wc, "commit", "-q", "-m", "bad merge")
     problems = cr.integrity(wc)
@@ -239,12 +239,12 @@ def test_journal_blobs_travel_with_the_repository(world):
     fresh = world["tmp"] / "carol"
     subprocess.run(["git", "clone", "-q", "-b", "criterion", str(world["remote"]), str(fresh)], check=True)
     cr.share_pins(fresh, publish=False)
-    for line in (fresh / "development" / "journal.jsonl").read_text().splitlines():
+    for line in (fresh / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines():
         for f in json.loads(line)["files"]:
             if f["after"] and f["path"].startswith(".criterion/"):
                 assert j.blob_exists(fresh, f["after"]), f["path"]
     remote_pins = subprocess.run(["git", "-C", str(world["remote"]), "rev-list", "--parents", "-n", "1",
-                                  "refs/catalyst/journal"], capture_output=True, text=True).stdout.split()
+                                  "refs/catalyst/journal"], capture_output=True, text=True, encoding="utf-8").stdout.split()
     assert len(remote_pins) >= 2
 
 
@@ -293,10 +293,10 @@ def test_create_rolls_back_when_the_submodule_step_fails(tmp_path, monkeypatch):
         return real_run(repo, *args, **kw)
 
     monkeypatch.setattr(cr, "run", failing_submodule_add)
-    before = (project / ".gitignore").read_text()
+    before = (project / ".gitignore").read_text(encoding="utf-8")
     with pytest.raises(cr.CriterionError, match="nothing changed in the project"):
         cr.create(load(project), str(remote))
-    assert (project / ".criterion").is_symlink() and (project / ".gitignore").read_text() == before
+    assert (project / ".criterion").is_symlink() and (project / ".gitignore").read_text(encoding="utf-8") == before
     assert not cr.is_submodule(project)
     load(project)                                           # still a working deployment
 
@@ -314,8 +314,8 @@ def test_a_clean_three_way_merge_of_one_artifact_is_journaled(world):
     for who, old, new in (("ada", "# `ITEM", "# `ITEM"), ("bob", "Text.", "Text, edited by Bob.")):
         dep = load(world[who])
         f = dep.root / "items" / "ITEM-000001-first-item.md"
-        text = f.read_text()
-        f.write_text(text.replace("| Open |", "| Done |") if who == "ada" else text.replace(old, new))
+        text = f.read_text(encoding="utf-8")
+        f.write_text(text.replace("| Open |", "| Done |") if who == "ada" else text.replace(old, new), encoding="utf-8")
         j.append(dep, j.AppendRequest(command="/edit", action="update", artifact="ITEM-000001",
                                       targets=[], intent=[f"{who} edits"], files=[str(f)], actor=who))
     a = push(world, "ada", "status")
@@ -334,9 +334,9 @@ def test_rules_index_is_not_union_merged():
 def test_write_attributes_keeps_the_teams_own_lines(world):
     dep = load(world["ada"])
     attrs = dep.root / ".gitattributes"
-    attrs.write_text("*.csv merge=union\n*.png binary\n" + attrs.read_text())
+    attrs.write_text("*.csv merge=union\n*.png binary\n" + attrs.read_text(encoding="utf-8"), encoding="utf-8")
     cr.write_attributes(dep)
-    text = attrs.read_text()
+    text = attrs.read_text(encoding="utf-8")
     assert "*.csv merge=union" in text and "*.png binary" in text
     assert text.count("development/journal.jsonl merge=union") == 1
 
@@ -356,17 +356,17 @@ def test_integrity_sees_files_with_quoted_names(world):
 def test_push_journals_a_refreshed_gitattributes(world):
     wc = world["ada"] / ".criterion"
     attrs = wc / ".gitattributes"
-    attrs.write_text(attrs.read_text() + "rules/rules.md merge=union\n")     # an older generated line
+    attrs.write_text(attrs.read_text(encoding="utf-8") + "rules/rules.md merge=union\n", encoding="utf-8")     # an older generated line
     git(wc, "commit", "-qam", "old attributes")
     add_item(world["ada"], "ada", "Thing")
     res = push(world, "ada", "thing", checker=lambda dep: "\n".join(
         str(i) for i in j.verify(dep) if i.level == "error"))
-    assert res.commits >= 1 and "rules/rules.md" not in attrs.read_text()
+    assert res.commits >= 1 and "rules/rules.md" not in attrs.read_text(encoding="utf-8")
 
 
 def test_dirty_keeps_the_first_path_whole(world):
     wc = world["bob"] / ".criterion"
-    (wc / "DEPLOYMENT.md").write_text("changed\n")
+    (wc / "DEPLOYMENT.md").write_text("changed\n", encoding="utf-8")
     assert "DEPLOYMENT.md" in cr.dirty(wc)
 
 
@@ -406,7 +406,7 @@ def test_create_without_a_url_stays_local(solo):
     assert git(agent, "symbolic-ref", "--short", "HEAD") == "shared"
     assert cr.remote_url(agent) is None and not cr.dirty(agent)
     assert (agent / ".gitattributes").is_file() and (agent / cr.CI_WORKFLOW).is_file()
-    pointer = json.loads(next(project.glob("*.catalyst")).read_text())
+    pointer = json.loads(next(project.glob("*.catalyst")).read_text(encoding="utf-8"))
     assert pointer["criterion_branch"] == "shared" and not pointer.get("repoed")
     assert next(project.glob("*.catalyst")).name in git(project, "diff", "--cached", "--name-only")
     st = cr.status(load(project))
@@ -449,12 +449,12 @@ def test_join_asks_for_the_url_when_the_product_has_no_submodule(solo):
     cr.join(bob, str(solo["remote"]))
     assert cr.is_submodule(bob)
     assert git(bob / ".criterion", "symbolic-ref", "--short", "HEAD") == "criterion"
-    pointer = json.loads(next(bob.glob("*.catalyst")).read_text())
+    pointer = json.loads(next(bob.glob("*.catalyst")).read_text(encoding="utf-8"))
     assert pointer["repoed"] is True and pointer["catalyst_repo_url"] == str(solo["remote"])
     staged = git(bob, "diff", "--cached", "--name-only").split()
     assert ".gitmodules" in staged and ".criterion" in staged
-    assert "/.criterion" not in (bob / ".gitignore").read_text()
-    last = json.loads((bob / ".criterion" / "development" / "journal.jsonl").read_text().splitlines()[-1])
+    assert "/.criterion" not in (bob / ".gitignore").read_text(encoding="utf-8")
+    last = json.loads((bob / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()[-1])
     assert last["command"] == "catalyst criterion join"
 
 
@@ -482,3 +482,102 @@ def test_cli_asks_for_the_url_on_a_terminal(solo, capsys, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt="": str(solo["remote"]))
     assert main(["criterion", "sync"]) == 0
     assert cr.is_submodule(project)
+
+
+# --- the product repository's journal pins travel with sync and push ---------
+def _has_blob(repo: Path, sha: str) -> bool:
+    return subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}^{{blob}}"],
+                          capture_output=True).returncode == 0
+
+
+def _journal_product_file(world, name: str, text: str) -> str:
+    """Ada journals a product file (never committed) and shares the product
+    repository's pins; returns the blob only her clone has."""
+    ada = world["ada"]
+    write(ada / "src" / name, text)
+    entry = j.append(load(ada), j.AppendRequest(
+        command="/status", action="update", artifact=f"product file {name}", targets=[],
+        intent=["a product change"], files=[str(ada / "src" / name)], actor="ada"))
+    sha = next(f["after"] for f in entry["files"] if f["path"].endswith(name))
+    cr.share_pins(ada)                        # `catalyst journal pin --share`
+    return sha
+
+
+def test_sync_fetches_the_product_repositorys_pins(world):
+    sha = _journal_product_file(world, "a.txt", "product content A\n")
+    bob = world["bob"]
+    assert not _has_blob(bob, sha)
+    cr.sync(load(bob))
+    assert _has_blob(bob, sha)
+
+
+def test_push_fetches_the_product_repositorys_pins(world):
+    sha = _journal_product_file(world, "b.txt", "product content B\n")
+    bob = world["bob"]
+    add_item(bob, "bob", "Bob thing")
+    push(world, "bob", "Bob adds an item")
+    assert _has_blob(bob, sha)
+
+
+# --- the CI gate runs the base branch's checker, verified by hash -------------
+def test_ci_gate_runs_the_checker_from_the_base_branch():
+    ci = cr.CI_TEMPLATE
+    assert "pull_request_target:" in ci                      # the workflow itself comes from the base
+    assert "ref: ${{ github.event.pull_request.base.sha || github.sha }}" in ci
+    assert "path: gate" in ci and "path: change" in ci
+    assert "persist-credentials: false" in ci and "contents: read" in ci
+    assert "sha256sum --check --strict bin/catalyst.pyz.sha256" in ci
+    run_lines = [line.strip() for line in ci.splitlines() if "--working-copy" in line]
+    assert run_lines and all('"$GITHUB_WORKSPACE/gate/bin/catalyst.pyz"' in line for line in run_lines)
+    assert "python3 bin/catalyst.pyz" not in ci              # never the copy under review
+    assert "refs/pull/" in ci                                # the merge result, as integrity needs
+
+
+def test_create_and_push_record_the_checker_hash(solo):
+    import hashlib
+    project, agent = solo["ada"], solo["agent"]
+    write(agent / "bin" / "catalyst.pyz", "pyz v1\n")
+    cr.create(load(project), None, "criterion", cr.CI_TEMPLATE)
+    recorded = (agent / cr.GATE_HASH).read_text(encoding="utf-8")
+    assert recorded == hashlib.sha256(b"pyz v1\n").hexdigest() + "  bin/catalyst.pyz\n"
+    assert not cr.dirty(agent)
+    dep, _ = cr.ensure_remote(load(project), str(solo["remote"]))
+    wc = project / ".criterion"
+    write(wc / "bin" / "catalyst.pyz", "pyz v2\n")
+    j.append(dep, j.AppendRequest(command="/sync-framework", action="update", artifact="CLI", targets=[],
+                                  intent=["upgrade"], files=[str(wc / "bin" / "catalyst.pyz")], actor="ada"))
+    signer = load_corpus(dep).user("Ada Lovelace")
+    cr.push(dep, signer, "upgrade the CLI", open_pr=False, checker=NO_CHECK)
+    assert (wc / cr.GATE_HASH).read_text(encoding="utf-8").startswith(hashlib.sha256(b"pyz v2\n").hexdigest())
+    assert not cr.dirty(wc)
+
+
+# --- git option injection ------------------------------------------------------
+@pytest.mark.parametrize("url", ["--upload-pack=touch pwned", "-u", "ext::sh -c touch% pwned", "",
+                                 "https://example.com/a\nb"])
+def test_hostile_urls_are_refused(solo, url):
+    project = solo["ada"]
+    with pytest.raises(cr.CriterionError, match="URL"):
+        cr.create(load(project), url, "criterion", cr.CI_TEMPLATE)
+    with pytest.raises(cr.CriterionError, match="URL"):
+        cr.join(project, url) if url else cr.check_url(url)
+    assert not (project / "pwned").exists() and not (solo["tmp"] / "pwned").exists()
+
+
+@pytest.mark.parametrize("branch", ["--upload-pack=x", "-b", "a..b", "a b", ""])
+def test_hostile_branches_are_refused(solo, branch):
+    project = solo["ada"]
+    with pytest.raises(cr.CriterionError, match="branch"):
+        cr.create(load(project), None, branch, cr.CI_TEMPLATE)
+    pointer = next(project.glob("*.catalyst"))
+    data = json.loads(pointer.read_text(encoding="utf-8"))
+    data["criterion_branch"] = branch or "-"
+    pointer.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(cr.CriterionError, match="branch"):
+        cr.shared_branch(load(project))
+
+
+def test_ordinary_urls_are_accepted():
+    for url in ("https://github.com/o/r.git", "ssh://git@host/o/r.git", "git@github.com:o/r.git",
+                "file:///srv/r.git", "/srv/r.git", "../r.git", "C:\\repos\\r.git"):
+        assert cr.check_url(url) == url

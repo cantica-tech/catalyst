@@ -11,8 +11,8 @@ intent is, whether two rules conflict.
 The CLI is agent-agnostic and module-agnostic. It reads the kernel's
 entity types (`entities/`) plus the active module's Entity Type
 Definitions (`MODULE-SPECIFICATION.md`), so it knows every type a
-deployment has without naming any of them. It needs Python 3 and `git`,
-and nothing else.
+deployment has without naming any of them. It needs Python 3.9 or later
+and `git`, and nothing else.
 
 ## Invocation
 
@@ -34,7 +34,14 @@ Every command works on the deployment found at or above the current
 directory: the project root holding the `*.catalyst` pointer, and its
 working copy reached through `<project root>/.criterion` (INV-6).
 `--project <dir>` starts the search elsewhere. `catalyst --version`
-prints the CLI's version, which is the kernel version it shipped with.
+prints the CLI's version, which is the kernel version it shipped with;
+a zipapp built from a git checkout appends its build, as
+`<version>+g<12-char sha>`, plus `.dirty` when the sources it packed
+differed from that commit.
+
+A revision or range argument (`trace`, `unrecorded`, `journal adopt`)
+that starts with `-` is rejected, so it can never reach `git` as an
+option.
 
 `--working-copy <dir>` (before the subcommand) opens a bare working copy
 instead: a directory holding `version.txt` and `rules/`, with no project
@@ -95,14 +102,15 @@ decides its inputs and does the judgment steps after it.
   checkout named `catalyst-<id>` (next to the project or to catalyst), or
   given with `--module-dir`.
 - `--user` and `--git-username` register the first user, as Admin, with a
-  fresh userid (INV-16, INV-26).
+  fresh userid (INV-16, INV-26). `--git-username` defaults to `--user`.
 - `--rule-doc <file>:<prefix>` (repeatable) seeds a rule document and its
   ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
   document, `<name>-rules.md`, prefix `br`.
 - `--test-locations` fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2.
 - `--at <dir>` builds the working copy in agent-owned space and links
-  `<project root>/.criterion` to it; without it, `.criterion/` is a real
-  directory in the project. Either way `/.criterion` is gitignored (INV-6).
+  `<project root>/.criterion` to it. `<dir>` is the `.criterion` directory
+  itself (`<agent's per-project directory>/.criterion`), never its parent.
+  Without it, `.criterion/` is a real directory in the project. Either way `/.criterion` is gitignored (INV-6).
 - `--agent` is recorded in the pointer's `agent` field.
 - `--commands-dir <dir>` (relative to the project) receives one command
   file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
@@ -113,8 +121,8 @@ decides its inputs and does the judgment steps after it.
   required when running a vendored `catalyst.pyz`.
 
 It refuses (exit `1`, nothing written) if the project already has a
-`*.catalyst` pointer or a `.criterion`, or the `--at` directory is not
-empty. On success it prints one line per step, commits nothing in the
+`*.catalyst` pointer or a `.criterion` — one holding only the install
+ledger (`.ledger/`) is adopted — or the `--at` directory is not empty. On success it prints one line per step, commits nothing in the
 project repository, gives the working copy its own git history, and
 journals the install as the first entry. The pointer's `journal_since` is
 the project's `HEAD` at install (`""` with no commit yet): the baseline
@@ -177,7 +185,9 @@ with an [unrecorded change](#catalyst-unrecorded-range---json) is reported
 at that command's level: a warning during the beta, an error from format
 `1.0` or under `"strict_journal": true`. A pointer with no `journal_since`
 is a warning (history not checked; migration `0.42.0` adds the field). A
-bare working copy skips this check.
+bare working copy skips this check. Uncommitted changes are read only
+where the deployment governs ([What a deployment governs](#what-a-deployment-governs));
+OS clutter (`.DS_Store`, `Thumbs.db`, `desktop.ini`) is never reported.
 
 ### `catalyst validate [--strict] [--json]`
 
@@ -217,7 +227,17 @@ exits `2` with the failures on stderr so the agent keeps working until
 they are fixed, and `0` otherwise. When the hook input says a stop hook
 already blocked this stop, it reports the failures without blocking
 again, so an unfixable failure cannot loop a session. Without a
-deployment it exits `0`. See [Hooks](#hooks).
+deployment it exits `0`. It fails closed: an unexpected error inside the
+hook (a corrupt journal, say) exits `2` with the reason, never `1`,
+which agents treat as non-blocking. See [Hooks](#hooks).
+
+### `catalyst hook start`
+
+The agent's session-start hook: prints the working copy's `INVARIANTS.md`
+and, when the module ships one, `INVARIANTS.module.md` (both copied there
+by `init`), so a deployed project's sessions start grounded. It never
+blocks a session: it always exits `0`, prints nothing outside a
+deployment, and one line when the working copy is unreachable.
 
 ### What a deployment governs
 
@@ -743,15 +763,22 @@ not fail `--strict`.
 
 #### The CI workflow
 
-`create` writes `.github/workflows/catalyst.yml` into the criterion
-repository (never overwriting an existing one). On every pull request
-against, and every push to, the shared branch it checks out the full
-history and runs, from the working copy's own vendored CLI:
+`create` writes `.github/workflows/catalyst.yml` and
+`bin/catalyst.pyz.sha256` into the criterion repository; `push` refreshes
+both when they change. The change under review cannot change its own
+gate: the workflow runs on `pull_request_target`, so its definition comes
+from the base branch, with read-only permissions. It checks the base out
+as `gate/`, verifies `gate/bin/catalyst.pyz` against the hash the base
+records, checks the pull request's merge result out as `change/` (as
+data: nothing in it runs), and runs the base's checker on it:
 
 ```
-python3 bin/catalyst.pyz --working-copy . check
-python3 bin/catalyst.pyz --working-copy . criterion integrity   # pull requests only
+python3 "$GITHUB_WORKSPACE/gate/bin/catalyst.pyz" --working-copy . check
+python3 "$GITHUB_WORKSPACE/gate/bin/catalyst.pyz" --working-copy . criterion integrity   # pull requests only
 ```
+
+A pull request that changes the workflow itself is therefore checked by
+the previous workflow; the new one applies once it is merged.
 
 The job is named `catalyst`, the status check `protect` requires.
 
@@ -773,12 +800,19 @@ These apply to every entry the CLI writes (`Rules-of-Rules.md` §12).
 - **Pinning.** Every journaled blob is kept reachable under
   `refs/catalyst/journal`: a commit chain whose tree holds each blob
   under its own hash. Unreachable blobs are otherwise pruned by `git gc`,
-  which would break point-in-time restore.
+  which would break point-in-time restore. This writes objects and that
+  one ref into the **product repository's** `.git` too (never a commit
+  or a branch, nothing pushed); the first time the ref is created in a
+  repository, `journal append` and `init` say so. The ref stays local
+  until `journal pin --share`; `git update-ref -d refs/catalyst/journal`
+  removes it (restore then loses the blobs `git gc` prunes).
 - **Entries are written with `catalyst journal append`, never by hand.**
 
 ## Hooks
 
-An agent that supports an end-of-turn hook registers
+An agent that supports a session-start hook registers
+`catalyst hook start` as that hook, so every session starts from the
+invariants. An agent that supports an end-of-turn hook registers
 `catalyst hook stop` as that hook, so every turn ends with a deployment
 that passes `catalyst check`. How to register it is agent-specific: the
 agent's shim says how (for example, a settings template under

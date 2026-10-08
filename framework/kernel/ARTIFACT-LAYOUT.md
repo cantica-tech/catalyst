@@ -75,19 +75,19 @@ the surrounding deploy-procedure text.
         users/
             templates/
                 README.md
-                templates-users.md       # templates catalog: Version | File | Timestamp | Notes
+                templates-user.md        # templates catalog: Version | File | Timestamp | Notes
                 TEMPLATE-USERS-v1.json   # versions the registry's seed shape, not a per-instance doc
                 ...
             README.md
-            users.json                   # users registry (one JSON array)
+            users.json                   # users registry ({"users": [...]})
         roles/
             templates/
                 README.md
-                templates-roles.md
+                templates-role.md
                 TEMPLATE-ROLES-v1.json
                 ...
             README.md
-            roles.json                   # roles registry (one JSON array)
+            roles.json                   # roles registry ({"roles": [...]})
     modules/                             # Process Modules & ETD schemas (MODULE-SPECIFICATION.md)
         <module-id>/
             module.yaml                  # Module manifest
