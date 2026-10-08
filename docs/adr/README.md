@@ -17,6 +17,7 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 | [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ✅ Accepted | kernel |
 | [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ✅ Accepted | kernel |
 | [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ✅ Accepted | kernel |
+| [ADR-017](ADR-017-prose-feature-freeze.md) | Prose feature freeze until the R2 verbs exist (R1.2) | ✅ Accepted | kernel |
 
 ### Module & Process
 
