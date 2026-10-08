@@ -32,7 +32,7 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
 | [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ⏳ Pending | kernel |
-| [ADR-010](ADR-010-catalyst-toml-locator.md) | Locator `.catalyst/catalyst.toml` (vs. catalyst.json, .criterion symlink) | ✅ Accepted | kernel |
+| [ADR-010](ADR-010-catalyst-toml-locator.md) | `catalyst.toml` locates the criterion in `$HOME/.catalyst` (no working copy in the project; Python floor 3.11) | ✅ Accepted | kernel |
 | [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ⏳ Pending | kernel |
 
 ### Naming & Versioning
