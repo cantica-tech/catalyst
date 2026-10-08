@@ -225,15 +225,10 @@ KERNEL_ENTITIES_DIR = REPO_ROOT / "framework" / "kernel" / "entities"
 
 
 def _read_pointer(project_root: Path) -> dict[str, Any]:
-    """The first parseable *.catalyst pointer at `project_root`, or {}."""
-    for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
-        try:
-            data = json.loads(pointer.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(data, dict):
-            return data
-    return {}
+    """The project file at `project_root` (catalyst.toml, else a legacy
+    *.catalyst pointer), or {}."""
+    import project_file
+    return project_file.read_dir(project_root)
 
 
 def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
@@ -243,16 +238,8 @@ def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
     legacy "agent-source" when it names a real directory."""
     if not project_root:
         return None
-    root = Path(project_root).resolve()
-    local = root / DEPLOY_DIRNAME
-    if local.is_dir():
-        return local
-    source = _read_pointer(root).get("agent-source")
-    if source:
-        candidate = Path(str(source)).expanduser()
-        if candidate.is_dir():
-            return candidate
-    return None
+    import project_file
+    return project_file.resolve(Path(project_root).resolve())
 
 
 def resolve_module_id(project_root: Path | str | None) -> str | None:

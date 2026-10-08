@@ -334,11 +334,13 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
         elif a.kind == "version":
             (root / "version.txt").write_text(src.version + "\n", encoding="utf-8")
             touched.append(root / "version.txt")
-            for pointer in sorted(dep.project_root.glob("*.catalyst")):
-                data = json.loads(pointer.read_text(encoding="utf-8"))
+            import project_file
+            pointer = project_file.find(dep.project_root)
+            if pointer is not None and not dep.standalone:
+                data = project_file.read(pointer)
                 data["kernel_version"] = src.version
                 data["updated"] = datetime.date.today().isoformat()
-                pointer.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+                project_file.write(pointer, data)
                 touched.append(pointer)
     if touched:
         artifact = f"kernel {src.version}" + (f", module {mod.id} {p.to_module}" if p.to_module else "")

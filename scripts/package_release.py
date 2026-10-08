@@ -245,7 +245,7 @@ def read_kernel_version(root: Path) -> str:
     return version_file.read_text(encoding="utf-8").strip() if version_file.is_file() else "0.35.0"
 
 
-CLI_MODULES = ("module_loader.py", "check_deployment.py")
+CLI_MODULES = ("module_loader.py", "check_deployment.py", "project_file.py")
 
 
 def build_id(root: Path) -> str:

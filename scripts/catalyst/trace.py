@@ -195,7 +195,8 @@ def route(top: Path, message_file: Path, cli: list[str]) -> int:
                          capture_output=True, text=True, encoding="utf-8")
     staged = [p for p in res.stdout.split("\0") if p]
     owners = sorted({o for o in (owner(top, p) for p in staged) if o is not None})
-    if not owners and any(Path(top).glob("*.catalyst")):
+    import project_file
+    if not owners and project_file.is_project(Path(top)):
         owners = [Path(top).absolute()]
     status = 0
     for o in owners:

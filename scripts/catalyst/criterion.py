@@ -32,6 +32,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import project_file
+
 from catalyst import proc
 from catalyst.deployment import Deployment
 
@@ -708,11 +710,11 @@ def _record_local(dep: Deployment, branch: str) -> list[str]:
     notes = []
     if run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip() != branch:
         run(wc, "checkout", "-q", "-B", branch)
-    pointer_path = next(project.glob("*.catalyst"))
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer_path = project_file.find(project)
+    pointer = project_file.read(pointer_path)
     if pointer.get("criterion_branch", DEFAULT_BRANCH) != branch or "criterion_branch" not in pointer:
         pointer.update({"criterion_branch": branch, "updated": datetime.date.today().isoformat()})
-        pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+        project_file.write(pointer_path, pointer)
         run(project, "add", pointer_path.name, check=False)
         from catalyst import journal
         journal.append(dep, journal.AppendRequest(
@@ -742,11 +744,11 @@ def _unignore(project: Path) -> str | None:
 
 def _record_shared(project: Path, url: str, branch: str) -> Path:
     """Record the sharing in the pointer and stage the product files."""
-    pointer_path = next(project.glob("*.catalyst"))
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer_path = project_file.find(project)
+    pointer = project_file.read(pointer_path)
     pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
                     "updated": datetime.date.today().isoformat()})
-    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+    project_file.write(pointer_path, pointer)
     run(project, "add", pointer_path.name, str(repo_place(project)[0] / ".gitmodules"),
         *([".gitignore"] if (project / ".gitignore").is_file() else []))
     return pointer_path
@@ -830,7 +832,7 @@ def _add_submodule(project_root: Path, url: str) -> None:
     """Add an existing criterion repository as the product's `.criterion`
     submodule, on the pointer's shared branch (staged, not committed)."""
     check_url(url)
-    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    pointer = project_file.read_dir(project_root)
     branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
     link = project_root / ".criterion"
     if link.is_symlink():
@@ -871,7 +873,7 @@ def join(project_root: Path, url: str | None = None) -> str:
             added = True
     run(project_root, "submodule", "update", "--init", ".criterion")
     wc = project_root / ".criterion"
-    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    pointer = project_file.read_dir(project_root)
     branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
     run(wc, "fetch", "-q", "--prune", "origin")
     if run(wc, "rev-parse", "-q", "--verify", f"origin/{branch}", check=False).returncode != 0:
@@ -897,7 +899,7 @@ def join(project_root: Path, url: str | None = None) -> str:
             command="catalyst criterion join", action="update", artifact="deployment shared", targets=[],
             intent=[f"This product now checks out the criterion repository {pointer.get('catalyst_repo_url')} "
                     "as its .criterion submodule; the pointer records the sharing."],
-            files=[str(project_root / p) for p in (next(project_root.glob("*.catalyst")).name,
+            files=[str(project_root / p) for p in (project_file.find(project_root).name,
                                                    ".gitmodules", ".gitignore")
                    if (project_root / p).is_file()],
             actor=_actor(shared), allow_unchanged=True))

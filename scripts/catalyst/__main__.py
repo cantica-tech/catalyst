@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from catalyst import version_string
-from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
+from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
 from catalyst.analysis import AnalysisError
@@ -338,6 +338,34 @@ def cmd_sync(args) -> int:
     return 0
 
 
+def cmd_where(args) -> int:
+    """Where the project's criterion is (roadmap R3.1): the project file, its
+    name, and the criterion it resolves to — the home store, or legacy."""
+    import project_file
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 1
+    data = project_file.read_dir(project)
+    name = project_file.project_name(data)
+    criterion = project_file.resolve(project)
+    home = project_file.home_criterion(name) if name else None
+    kind = ("home" if criterion is not None and criterion == home else
+            "legacy" if criterion is not None else "missing")
+    out = {"project": str(project), "file": project_file.find(project).name, "name": name,
+           "criterion": str(criterion) if criterion else None, "kind": kind,
+           "expected": str(home) if home else None}
+    if args.json:
+        print(json.dumps(out, indent=2))
+    else:
+        print(f"project    {out['project']} ({out['file']}, name {name})")
+        print(f"criterion  {out['criterion'] or 'not found'} ({kind})"
+              + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else ""))
+    return 0 if criterion is not None else 1
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -587,9 +615,10 @@ def cmd_criterion(args) -> int:
     sub = args.criterion_command
     if sub == "join":
         start = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
-        project = next((d for d in (start, *start.parents) if any(d.glob("*.catalyst"))), None)
+        import project_file
+        project = project_file.find_up(start)
         if project is None:
-            raise DeploymentNotFound(f"no *.catalyst pointer at or above {start}")
+            raise DeploymentNotFound(f"no catalyst.toml (or legacy *.catalyst pointer) at or above {start}")
         try:
             head = cr.join(project, args.url)
         except cr.NeedsURL as exc:
@@ -1046,6 +1075,10 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
         q.set_defaults(func=cmd_sync)
+
+    p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_where)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

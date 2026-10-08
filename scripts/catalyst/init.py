@@ -230,8 +230,9 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if not NAME_RE.match(req.name):
         raise InitError(f"--name '{req.name}' must be letters, digits, '.', '_' or '-' (no path)")
     project = req.project.resolve()
-    if any(project.glob("*.catalyst")):
-        raise InitError(f"{project} already has a *.catalyst pointer — catalyst is installed")
+    import project_file
+    if project_file.is_project(project):
+        raise InitError(f"{project} already has {project_file.find(project).name} — catalyst is installed")
     link = project / WORKING_COPY
     # BOOTSTRAP §2 starts the deployment ledger before the install: a
     # .criterion holding only .ledger/ is adopted, anything else refused
