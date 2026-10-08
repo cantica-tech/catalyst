@@ -1,7 +1,7 @@
 # ADR-010: catalyst.toml locator (R3) replaces symlink + pointer + submodule
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Accepted (owner, 2026-10-08: the file lives at `.catalyst/catalyst.toml`)  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 
@@ -25,7 +25,7 @@ The proposal (what-is-going-on/08-criterion-proposals.md) suggests a clearer mod
 **In R3, introduce `catalyst.toml` as the canonical locator file that replaces the symlink + pointer + submodule model.**
 
 The `catalyst.toml` file:
-- Resides in the product repository root (tracked in git)
+- Resides at `.catalyst/catalyst.toml` in the product repository (tracked in git); the `.catalyst/` folder keeps the project root clean and gives later files a home
 - Contains all deployment metadata (kernel version, module version, working-copy path, deployment mode, etc.)
 - Is human-readable (TOML format)
 - Serves as the single source of truth for the deployment configuration

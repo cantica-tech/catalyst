@@ -1,7 +1,7 @@
 # Feature register (R1.3 inventory lock)
 
 **Status: draft — verdicts proposed, awaiting owner review.** Only rows marked *owner, 2026-10-08* carry an owner
-decision; every other verdict is a proposal.
+decision; every other verdict is a proposal. All open questions are answered (see the end).
 **Date:** 2026-10-08.
 
 ## Purpose
@@ -36,7 +36,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
   - **Park**: kept on the shelf until the condition named in *New home*.
 - **New home** follows 07. Where 06 and 07 say nothing, it reads "unchanged (no roadmap item)".
 - **Roadmap item** cites a 06 ID or "—":
-  - R0.1…R0.21, R1.1…R1.6, R3.1…R3.9, R4.1…R4.8 and R5.1…R5.5 are numbered items.
+  - R0.1…R0.21, R1.1…R1.6, R3.1…R3.9, R4.1…R4.9 and R5.1…R5.5 are numbered items.
   - "R2 W1"…"R2 W5" are the R2 waves (06 §R2).
   - "R6" and "R7" are phases without numbered items.
   - "(done)" appears only where `11-r0-status.md` records the item as done.
@@ -66,7 +66,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-02 | Single install entry | 01a §1.1 K-02 | kernel CLI | Merge | Merges into `catalyst init` (judgment questions only) plus `catalyst brief` (07 §5.2, §8); instantiation docs generated | R4.1, R4.4 |
 | K-03 | Hard rules | 01a §1.1 K-03 | kernel docs/brief | Merge | Merges into the 10 laws via generated `brief` (07 §7, §8: BOOTSTRAP §0 → `brief`) | R4.1 |
 | K-04 | Capability detection and fallbacks | 01a §1.1 K-04 | user/agent shim | Merge | Merges into generated agent adapters; fallback = instruction file (07 §5.4) | R4.5 |
-| K-05 | Agent-switch handling | 01a §1.1 K-05 | kernel CLI | Merge | Merges into the agent-neutral store and `catalyst open` (07 §5.2, §8); interim `catalyst agent switch` until R3 | R2 W5, R3.5 |
+| K-05 | Agent-switch handling | 01a §1.1 K-05 | kernel CLI | Merge | Merges into `catalyst move` + the agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 |
 | K-06 | Install (`catalyst init`) | 01a §1.1 K-06 | kernel CLI | Keep | `catalyst init` (07 §5.2, §13: ≤ 3 commands, ≤ 3k tokens); install simplification (R1.2) | R0.3 (done), R1.2 |
 | K-07 | Deployment ledger | 01a §1.1 K-07 | kernel docs/brief | Keep | Survives in the ≤ 3k-token install (*owner, 2026-10-08*) | R0.3 (done) |
 | K-08 | Re-ground cadence | 01a §1.1 K-08 | kernel docs/brief | Merge | Merges into `catalyst brief` run by the session-start hook (07 §5.1, §5.2) | R4.1 |
@@ -78,14 +78,14 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-14 | Entity Type Definition (ETD) | 01a §1.1 K-14 | kernel CLI | Merge | Merges into `module.yaml` v3 `Entity` (fields, states, transitions, guards, `derived_status`; 07 §4.2) | R4.3 |
 | K-15 | Grounding model | 01a §1.1 K-15 | kernel CLI | Keep | Law L2; module `grounding`; `validate` (07 §7) | R4.3 |
 | K-16 | Document composition | 01a §1.1 K-16 | kernel CLI | Merge | Merges into the generated Handbook per module (07 §8, §9); Taskfile/command list from the `commands.yaml` registry | R4.2 |
-| K-17 | Module catalog | 01a §1.1 K-17 | kernel CLI | Merge | Merges into `modules/` folders in the core repo + `catalyst module install` (07 §10) | — |
+| K-17 | Module catalog | 01a §1.1 K-17 | kernel CLI | Merge | Merges into `modules/` folders in the core repo + `catalyst module install` (07 §10; plan `docs/plans/r4-9-module-install.md`, *owner, 2026-10-08*) | R4.9 |
 | K-18 | Kernel purity check | 01a §1.1 K-18 | kernel CLI | Keep | Law L8, purity check in CI (07 §7); repo-only checks under `catalyst dev …` | R3.8 |
-| K-19 | Pointer file | 01a §1.1 K-19 | kernel CLI | Merge | Merges into the locator `.catalyst/catalyst.toml` + `catalyst where` (07 §8); old pointers read-only for one minor (ADR-009) | R3.1, R3.4 |
-| K-20 | Working copy in agent-owned space | 01a §1.1 K-20 | kernel CLI | Merge | Merges into the locator + store driver (07 §8 "pointer + symlink + submodule + agent dir → locator"); legacy read-only | R3.1, R3.2, R3.4 |
+| K-19 | Pointer file | 01a §1.1 K-19 | kernel CLI | Merge | Merges into the locator `.catalyst/catalyst.toml` + `catalyst where` (07 §8, ADR-010, *owner, 2026-10-08*); old pointers read-only for one minor (ADR-009) | R3.1, R3.4 |
+| K-20 | Working copy in agent-owned space | 01a §1.1 K-20 | kernel CLI | Merge | Merges into the locator `.catalyst/catalyst.toml` + store driver (07 §8, ADR-010, *owner, 2026-10-08*); legacy read-only | R3.1, R3.2, R3.4 |
 | K-21 | In-project fallback | 01a §1.1 K-21 | kernel CLI | Merge | Merges into the default `in-repo` store driver (07 §3 L1; decision A1) | R3.2 |
-| K-22 | Shared deployment ("repoed") | 01a §1.1 K-22 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12) | R3.6 |
-| K-23 | `/criterion` lifecycle | 01a §1.1 K-23 | kernel CLI | Merge | Merges into `git-remote` driver + `publish` (07 §12); `integrity`/`protect`: see open questions | R3.6 |
-| K-24 | `/project` lifecycle | 01a §1.1 K-24 | kernel CLI | Merge | Merges into `catalyst project export\|import\|remove` (06 W5); 07 §8 end state: removed / `catalyst move` | R2 W5 |
+| K-22 | Shared deployment ("repoed") | 01a §1.1 K-22 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12); R3.6 required, not optional (*owner, 2026-10-08*) | R3.6 |
+| K-23 | `/criterion` lifecycle | 01a §1.1 K-23 | kernel CLI | Merge | Merges into `git-remote` driver + `publish` (07 §12); `integrity` becomes a `catalyst check` rule, `protect` a `publish` option (*owner, 2026-10-08*) | R3.6 |
+| K-24 | `/project` lifecycle | 01a §1.1 K-24 | kernel CLI | Merge | Merges into `catalyst move` (07 §8, *owner, 2026-10-08*); `project export\|import\|remove` dropped from W5 | R2 W5 |
 | K-25 | Uniform artifact-type layout | 01a §1.1 K-25 | kernel CLI | Keep | Generated from `module.yaml` v3 (07 §4.2); `ARTIFACT-LAYOUT` generated | R4.4 |
 | K-26 | Descriptive file naming | 01a §1.1 K-26 | kernel CLI | Keep | `catalyst new` writes ID + slug (07 §4.2) | R2 W2 |
 | K-27 | Rules, rule documents, rules index | 01a §1.1 K-27 | kernel CLI | Keep | One file per rule document (ADR-001), `validate` enforces it; kernel entity Rule (07 §4.1) | decided (ADR-001), impl. R2 |
@@ -111,13 +111,13 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-47 | SessionStart invariant injection | 01a §1.1 K-47 | user/agent shim | Merge | Merges into the session-start hook running `catalyst brief` (07 §5.2) | R0.4 (done), R4.1 |
 | K-48 | Index regeneration | 01a §1.1 K-48 | kernel CLI | Keep | Projections written by every verb; law L6 (07 §7) | R2 W2 |
 | K-49 | Reconciliation cases `RECON-` | 01a §1.1 K-49 | kernel CLI | Keep | `catalyst reconcile` with role gate in code (07 §12) | R0.7 (done), R2 W2 |
-| K-50 | Workflows `WORKFLOW-` | 01a §1.1 K-50 | kernel CLI | Keep | Kernel entity Workflow, declared by modules (07 §4.1); see open questions | R4.3 |
+| K-50 | Workflows `WORKFLOW-` | 01a §1.1 K-50 | kernel CLI | Keep | Kernel entity Workflow: a declared state machine, declared by modules (07 §4.1, *owner, 2026-10-08*; ADR-008 rejected) | R4.3 |
 | K-51 | Four-eyes analysis `ANALYSIS-` | 01a §1.1 K-51 | kernel CLI | Keep | `catalyst analysis …` + `/run-analysis` wrapper (07 §12) | — |
-| K-52 | Meta-tags | 01a §1.1 K-52 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §4.1, §8) | — |
+| K-52 | Meta-tags | 01a §1.1 K-52 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §4.1, §8; B4, *owner, 2026-10-08*) | — |
 | K-53 | Frozen definitions | 01a §1.1 K-53 | kernel CLI | Keep | Law L7, `catalyst definition migrate` (07 §7) | R0.8 (done), R2 W3 |
 | K-54 | `.frozen` / `/freeze` | 01a §1.1 K-54 | kernel CLI | Keep | `catalyst freeze` (07 §12) | R2 W3 |
-| K-55 | Plugin gate, provenance, contract, target | 01a §1.1 K-55 | plugin | Park | Until a second real plugin exists (07 §8) | R4.7 |
-| K-56 | Content-contributing plugins / work items | 01a §1.1 K-56 | plugin | Park | Until a second real plugin exists; the capability goes to modules as data, several per deployment (07 §4.2, §8) | R4.7 |
+| K-55 | Plugin gate, provenance, contract, target | 01a §1.1 K-55 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8) | R4.7 |
+| K-56 | Content-contributing plugins / work items | 01a §1.1 K-56 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*); the capability goes to modules as data, several per deployment (07 §4.2, §8) | R4.7 |
 | K-57 | `catalyst-git` plugin | 01a §1.1 K-57 | plugin | Keep | Optional extension, not core: `extensions/` (07 §8) | R4.7 |
 | K-58 | `/sync-framework` | 01a §1.1 K-58 | kernel CLI | Keep | `catalyst sync plan\|apply` (07 §12) | R2 W4 |
 | K-59 | Migrations | 01a §1.1 K-59 | kernel CLI | Keep | Migrations as tested code, keyed by format version (07 §10, §12) | R0.6 (done), R2 W4 |
@@ -127,12 +127,12 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-63 | Persistent memory note | 01a §1.1 K-63 | user/agent shim | Drop | Survives as the locator (declared location) + `catalyst open` (06 R3.5) | R3.5 |
 | K-64 | Greenfield path | 01a §1.1 K-64 | kernel docs/brief | Keep | Generated instantiation docs (06 R4.4) | R4.4 |
 | K-65 | Retrofit path | 01a §1.1 K-65 | kernel docs/brief | Keep | Generated instantiation docs (06 R4.4); `/run-analysis --bootstrap` | R4.4 |
-| K-66 | `dev-instructions.yaml` | 01a §1.1 K-66 | kernel CLI | Keep | unchanged (no roadmap item) | — |
+| K-66 | `dev-instructions.yaml` | 01a §1.1 K-66 | kernel CLI | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | K-67 | `/dogfood` | 01a §1.1 K-67 | user/agent shim | Keep | Catalyst-only; dogfooding resumes after R3 (06 cross-cutting "Governance of catalyst itself") | — |
 | K-68 | Beta kit | 01a §1.1 K-68 | kernel docs/brief | Keep | `beta/` rewritten for the new flow (06 R7) | R7 |
 | K-69 | Glossary | 01a §1.1 K-69 | kernel docs/brief | Keep | Generated; `catalyst glossary <term>` (07 §5.1, §9) | R4.4 |
 | K-70 | Repo-level checkers | 01a §1.1 K-70 | kernel CLI | Merge | Merges into `catalyst dev …` (06 R3.8); command parity ends with the `commands.yaml` registry | R0.15 (done), R3.8 |
-| K-71 | `catalyst report` | 01a §1.1 K-71 | kernel CLI | Keep | unchanged (no roadmap item) | — |
+| K-71 | `catalyst report` | 01a §1.1 K-71 | kernel CLI | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | K-72 | Atomic, real-time updates | 01a §1.1 K-72 | kernel docs/brief | Keep | Law L1 (absorbs INV-29); demoted or mechanised (06 R4.6) | R4.6 |
 | K-73 | Act without asking | 01a §1.1 K-73 | kernel CLI | Merge | Merges into law L3 as tooling ("the exception rule is tooling, not law", 07 §7) | R4.1 |
 
@@ -148,7 +148,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-06 | Rule storage/indexing | 01b §3.1 P-06 | kernel CLI | Keep | One file per rule document, enforced by `validate` (ADR-001) | decided (ADR-001), impl. R2 |
 | PR-07 | Domain creation | 01b §3.1 P-07 | kernel docs/brief | Keep | Handbook (07 §9); kernel entity Rule (+ domain) (07 §4.1) | R4.2 |
 | PR-08 | Sub-domain split | 01b §3.1 P-08 | kernel docs/brief | Keep | Handbook (07 §9) | R4.2 |
-| PR-09 | ID rename cross-reference sweep | 01b §3.1 P-09 | kernel CLI | Keep | unchanged (no roadmap item) | — |
+| PR-09 | ID rename cross-reference sweep | 01b §3.1 P-09 | kernel CLI | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | PR-10 | Signer resolution | 01b §3.2 P-10 | kernel CLI | Keep | `--as` on mutating verbs (07 §5.2) | — |
 | PR-11 | Advisory role check | 01b §3.2 P-11 | kernel CLI | Keep | Demoted or mechanised (06 R4.6) | R4.6 |
 | PR-12 | userid generation | 01b §3.2 P-12 | kernel CLI | Keep | Inside `catalyst user …` (07 §12) | R2 W3 |
@@ -173,24 +173,24 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-31 | Artifact creation (module) | 01b §3.4 P-31 | kernel CLI | Merge | Merges into `catalyst new <PREFIX>` (07 §4.2) | R2 W2 |
 | PR-32 | Status change | 01b §3.4 P-32 | kernel CLI | Merge | Merges into `catalyst status <ID> <state>` (07 §4.2) | R0.7 (done), R2 W2 |
 | PR-33 | Closing an item | 01b §3.4 P-33 | kernel CLI | Merge | Merges into transition guards in `module.yaml` v3, enforced by `catalyst status` (07 §4.2) | R2 W2, R4.3 |
-| PR-34 | Meta-tagging | 01b §3.4 P-34 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §8) | — |
+| PR-34 | Meta-tagging | 01b §3.4 P-34 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §8; B4, *owner, 2026-10-08*) | — |
 | PR-35 | Index regeneration | 01b §3.4 P-35 | kernel CLI | Keep | Projections written by every verb; law L6 (07 §7) | R2 W2 |
 | PR-36 | Chain validation | 01b §3.4 P-36 | kernel CLI | Keep | `catalyst check` / `validate`, rule ids `C-001…` (07 §7) | — |
 | PR-37 | Definition freezing | 01b §3.4 P-37 | kernel CLI | Merge | Merges into `catalyst sync` (definitions create-only) (06 W4); law L7 | R0.8 (done), R2 W4 |
 | PR-38 | Definition migration | 01b §3.4 P-38 | kernel CLI | Merge | Merges into `catalyst definition migrate` (06 W3) | R2 W3 |
 | PR-39 | Freezing items from sync | 01b §3.4 P-39 | kernel CLI | Merge | Merges into `catalyst freeze\|unfreeze` (06 W3; 07 §12) | R2 W3 |
-| PR-40 | Workflow authoring | 01b §3.4 P-40 | kernel CLI | Keep | Kernel entity Workflow, declared by modules (07 §4.1); see open questions | R4.3 |
+| PR-40 | Workflow authoring | 01b §3.4 P-40 | kernel CLI | Keep | Kernel entity Workflow: a declared state machine, declared by modules (07 §4.1, *owner, 2026-10-08*; ADR-008 rejected) | R4.3 |
 | PR-41 | Open a RECON case | 01b §3.5 P-41 | kernel CLI | Keep | `catalyst reconcile` (07 §12) | — |
 | PR-42 | Resolve / propose | 01b §3.5 P-42 | kernel CLI | Keep | `/reconcile` judgment + `catalyst reconcile` role gate (07 §12) | R2 W2 |
 | PR-43 | Close a resolved case | 01b §3.5 P-43 | kernel CLI | Keep | `/reconcile <id> close` (defined by R0.7) → `catalyst reconcile` (07 §12) | R0.7 (done) |
 | PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification (R1.2) | R0.3 (done), R1.2 |
-| PR-45 | Project remove / export / import | 01b §3.6 P-45 | kernel CLI | Merge | Merges into `catalyst project export\|import\|remove` (06 W5); 07 §8 end state: removed / `catalyst move` | R2 W5 |
+| PR-45 | Project remove / export / import | 01b §3.6 P-45 | kernel CLI | Merge | Merges into `catalyst move` (07 §8, *owner, 2026-10-08*) | R2 W5 |
 | PR-46 | Pre-pointer migration | 01b §3.6 P-46 | kernel CLI | Park | Until R3.4 decides whether the optional `catalyst migrate` is built | R3.4 |
-| PR-47 | Agent switch | 01b §3.6 P-47 | kernel CLI | Merge | Merges into `catalyst open` + agent-neutral store (07 §8); interim `catalyst agent switch` | R2 W5, R3.5 |
-| PR-48 | Share (criterion create/join/push/sync/status/protect) | 01b §3.6 P-48 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12) | R3.6 |
+| PR-47 | Agent switch | 01b §3.6 P-47 | kernel CLI | Merge | Merges into `catalyst move` + agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 |
+| PR-48 | Share (criterion create/join/push/sync/status/protect) | 01b §3.6 P-48 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12); `protect` becomes a `publish` option, R3.6 required (*owner, 2026-10-08*) | R3.6 |
 | PR-49 | Merge-conflict handling | 01b §3.6 P-49 | kernel CLI | Keep | RECON + laws L3/L5, no AI merges (07 §7) | R3.6 |
 | PR-50 | Criterion CI | 01b §3.6 P-50 | kernel CLI | Keep | CI gate runs the CLI pinned by hash from the base branch (07 §10) | R0.13 (done), R3.7 |
-| PR-51 | Version freshness check | 01b §3.7 P-51 | kernel CLI | Keep | unchanged (no roadmap item) | — |
+| PR-51 | Version freshness check | 01b §3.7 P-51 | kernel CLI | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | PR-52 | `/sync-framework` | 01b §3.7 P-52 | kernel CLI | Merge | Merges into `catalyst sync plan\|apply` + `/sync-framework` wrapper (07 §12) | R2 W4 |
 | PR-53 | One-time migrations | 01b §3.7 P-53 | kernel CLI | Keep | Migrations as tested code, keyed by format version (07 §10, §12) | R0.6 (done), R2 W4 |
 | PR-54 | Plugin preservation during sync | 01b §3.7 P-54 | kernel CLI | Merge | Merges into `catalyst sync plan\|apply`, which keeps the installed plugins; no `catalog merge` verb (dropped from W4, *owner, 2026-10-08*) | R2 W4 |
@@ -201,15 +201,15 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PR-59 | Rule/link consistency check | 01b §3.8 P-59 | kernel docs/brief | Keep | `/check-rules` (absorbs `/audit`, 07 §8) | — |
 | PR-60 | Change-impact audit | 01b §3.8 P-60 | kernel docs/brief | Merge | Merges into `/check-rules` (07 §8) | — |
 | PR-61 | Dogfood | 01b §3.8 P-61 | user/agent shim | Keep | Catalyst-only; resumes after R3 (06 cross-cutting) | — |
-| PR-62 | Recreation drift check | 01b §3.8 P-62 | user/agent shim | Keep | unchanged (no roadmap item) | — |
+| PR-62 | Recreation drift check | 01b §3.8 P-62 | user/agent shim | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | PR-63 | Roadmap ingest | 01b §3.9 P-63 | kernel CLI | Merge | Merges into `catalyst roadmap …` + `/roadmap` (07 §8, §12); item extraction stays judgment (07 §5.3) | R2 W3 |
 | PR-64 | Roadmap full update | 01b §3.9 P-64 | kernel CLI | Merge | Merges into `catalyst roadmap …` (07 §12) | R2 W3 |
 | PR-65 | Roadmap delta merge | 01b §3.9 P-65 | kernel CLI | Merge | Merges into `catalyst roadmap …` (07 §12) | R2 W3 |
 | PR-66 | Roadmap removal | 01b §3.9 P-66 | kernel CLI | Merge | Merges into `catalyst roadmap …` (07 §12) | R2 W3 |
 | PR-67 | Backlog regeneration | 01b §3.9 P-67 | kernel CLI | Merge | Merges into `catalyst backlog` / `catalyst view` with `derived_status` from `module.yaml` (07 §4.2) | R2 W1 |
-| PR-68 | Plugin catalog ops | 01b §3.9 P-68 | plugin | Park | Until a second real plugin exists; catalog commands dropped meanwhile (07 §8) | R4.7 |
-| PR-69 | Plugin startup activation | 01b §3.9 P-69 | plugin | Park | Until a second real plugin exists (07 §8); the "hard rule" is demoted or mechanised | R4.6, R4.7 |
-| PR-70 | Content-contributing activation | 01b §3.9 P-70 | plugin | Park | Until a second real plugin exists; the capability goes to modules as data (07 §4.2, §8) | R4.7 |
+| PR-68 | Plugin catalog ops | 01b §3.9 P-68 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*); catalog commands dropped meanwhile (07 §8) | R4.7 |
+| PR-69 | Plugin startup activation | 01b §3.9 P-69 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8); the "hard rule" is demoted or mechanised | R4.6, R4.7 |
+| PR-70 | Content-contributing activation | 01b §3.9 P-70 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*); the capability goes to modules as data (07 §4.2, §8) | R4.7 |
 | PR-71 | Release | 01b §3.9 P-71 | user/agent shim | Keep | Maintainers' tool, outside the product (07 §12); signed releases | R7 |
 
 ## 3. Commands (01b §4)
@@ -223,15 +223,15 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | CMD-05 | `/user-list` | 01b §4.1 #5 | kernel CLI | Merge | Merges into `catalyst list` (07 §4.2) | R0.2 (done), R2 W1 |
 | CMD-06 | `/role-add` | 01b §4.1 #6 | kernel CLI | Merge | Merges into `/role` → `catalyst role …` (07 §8) | R0.2 (done), R2 W3 |
 | CMD-07 | `/role-modify` | 01b §4.1 #7 | kernel CLI | Merge | Merges into `/role` → `catalyst role …` (07 §8) | R0.2 (done), R2 W3 |
-| CMD-08 | `/meta-tag` | 01b §4.1 #8 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §8) | — |
+| CMD-08 | `/meta-tag` | 01b §4.1 #8 | kernel CLI | Drop | Survives as a `tags:` field in any entity (07 §8; B4, *owner, 2026-10-08*) | — |
 | CMD-09 | `/list` | 01b §4.1 #9 | kernel CLI | Keep | `catalyst list …` (07 §4.2) | R2 W1 |
 | CMD-10 | `/freeze` | 01b §4.1 #10 | kernel CLI | Merge | Merges into `catalyst freeze\|unfreeze` (07 §12) | R2 W3 |
 | CMD-11 | `/migrate-definition` | 01b §4.1 #11 | kernel CLI | Merge | Merges into `catalyst definition migrate` (06 W3) | R2 W3 |
-| CMD-12 | `/catalyzer` | 01b §4.1 #12 | plugin | Park | Until a second real plugin exists (07 §8) | R4.7 |
-| CMD-13 | `/criterion` | 01b §4.1 #13 | kernel CLI | Merge | Merges into `publish` + `git-remote` driver (07 §12); "criterion" name retired (06 Naming track) | R3.6 |
+| CMD-12 | `/catalyzer` | 01b §4.1 #12 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8) | R4.7 |
+| CMD-13 | `/criterion` | 01b §4.1 #13 | kernel CLI | Merge | Merges into `publish` + `git-remote` driver (07 §12); `integrity` → `catalyst check` rule, `protect` → `publish` option; "criterion" name retired (*owner, 2026-10-08*) | R3.6 |
 | CMD-14 | `/reconcile` | 01b §4.1 #14 | kernel CLI | Keep | `/reconcile` judgment wrapper + `catalyst reconcile` (07 §12) | R0.7 (done), R2 W2 |
-| CMD-15 | `/project` | 01b §4.1 #15 | kernel CLI | Merge | Merges into `catalyst project export\|import\|remove` (06 W5); 07 §8 end state: removed / `catalyst move` | R2 W5 |
-| CMD-16 | `/switch-agent` | 01b §4.1 #16 | kernel CLI | Drop | Survives as the agent-neutral store + `catalyst open` (07 §8; 06 R3.5); interim `catalyst agent switch` | R2 W5, R3.5 |
+| CMD-15 | `/project` | 01b §4.1 #15 | kernel CLI | Merge | Merges into `catalyst move` (07 §8, *owner, 2026-10-08*) | R2 W5 |
+| CMD-16 | `/switch-agent` | 01b §4.1 #16 | kernel CLI | Drop | Survives as `catalyst move` + the agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 |
 | CMD-17 | `/status` | 01b §4.1 #17 | kernel CLI | Keep | `catalyst status <ID> <state>` (07 §4.2) | R0.7 (done), R2 W2 |
 | CMD-18 | `/audit` | 01b §4.1 #18 | kernel docs/brief | Merge | Merges into `/check-rules` (07 §8) | — |
 | CMD-19 | `/run-analysis` | 01b §4.1 #19 | kernel CLI | Keep | `catalyst analysis …` + `/run-analysis` wrapper (07 §12) | — |
@@ -280,7 +280,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | SE-19 | `/roadmap-remove <name>` | 02 §1.3.2 SE-19 | kernel CLI | Merge | Merges into `catalyst roadmap …` (07 §8, §12) | R2 W3 |
 | SE-20 | Ceremony tiers (module part) | 02 §1.3.3 SE-20 | module (software-engineering) | Keep | `tiers[]` in `module.yaml` v3 (07 §4.2) | R4.3 |
 | SE-21 | Adoption mapping | 02 §1.3.3 SE-21 | module (software-engineering) | Keep | Module `guidance.md` (07 §4.2); `/adopt` judgment | R4.3 |
-| SE-22 | Rule-document quick index | 02 §1.3.3 SE-22 | module (software-engineering) | Keep | unchanged (no roadmap item) | — |
+| SE-22 | Rule-document quick index | 02 §1.3.3 SE-22 | module (software-engineering) | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | SE-23 | Closing conditions | 02 §1.3.3 SE-23 | module (software-engineering) | Merge | Merges into transition guards (`children_closed\|nonempty\|section_nonempty`) in `module.yaml` v3, enforced by `catalyst status` (07 §4.2) | R2 W2, R4.3 |
 | SE-24 | Dev-artifact ID scheme | 02 §1.3.3 SE-24 | module (software-engineering) | Keep | Entity `prefix` in `module.yaml` v3; IDs issued by `catalyst new` (07 §4.2) | R2 W2, R4.3 |
 | SE-25 | FEAT → REQ promotion | 02 §1.3.3 SE-25 | module (software-engineering) | Keep | `catalyst link` + module `guidance.md` (07 §4.2) | R2 W2 |
@@ -291,8 +291,8 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | SE-30 | Placement | 02 §1.3.3 SE-30 | module (software-engineering) | Keep | Entity `folder` in `module.yaml` v3 (07 §4.2) | R4.3 |
 | SE-31 | Signing | 02 §1.3.3 SE-31 | kernel CLI | Merge | Merges into kernel signing K-38 (`--as` + userid suffix) | — |
 | SE-32 | Journal shape | 02 §1.3.3 SE-32 | kernel CLI | Merge | Merges into kernel journal K-39 (filled by `catalyst new`/`status`) | R2 W2 |
-| SE-33 | Rename propagation | 02 §1.3.3 SE-33 | module (software-engineering) | Keep | unchanged (no roadmap item) | — |
-| SE-34 | Required paths | 02 §1.3.3 SE-34 | module (software-engineering) | Keep | unchanged (no roadmap item) | — |
+| SE-33 | Rename propagation | 02 §1.3.3 SE-33 | module (software-engineering) | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
+| SE-34 | Required paths | 02 §1.3.3 SE-34 | module (software-engineering) | Keep | unchanged (no roadmap item; Keep confirmed, *owner, 2026-10-08*) | — |
 | SE-35 | Severity scale | 02 §1.3.3 SE-35 | module (software-engineering) | Keep | Enum field in `module.yaml` v3 (07 §4.2) | R4.3 |
 | SE-36 | Vetting / New domain / New rules sections | 02 §1.3.3 SE-36 | module (software-engineering) | Keep | Entity `sections[]` in `module.yaml` v3 (07 §4.2) | R4.3 |
 | SE-37 | Suggested role actions | 02 §1.3.3 SE-37 | module (software-engineering) | Keep | Module `guidance.md` (07 §4.2) | R4.3 |
@@ -311,35 +311,21 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | ID | Feature | Source | Owner | Verdict | New home | Roadmap item |
 |---|---|---|---|---|---|---|
 | PL-01 | catalyst-git | 02 §3.1 P1 | plugin | Keep | Optional extension, not core: `extensions/` (07 §8) | R4.7 |
-| PL-02 | agile (project-management) | 02 §3.1 P2 | plugin | Park | Until a second real plugin exists; the capability goes to modules as data (07 §8) | R4.7 |
-| PL-03 | `project-management/` type slot | 02 §3.1 P3 | plugin | Park | Until a second real plugin exists (07 §8) | R4.7 |
-| PL-04 | Process modules | 02 §3.1 P4 | module (software-engineering) | Keep | Modules as data (`module.yaml` + `guidance.md`), folders in the core repo, several per deployment (07 §4.2, §10) | R4.3 |
+| PL-02 | agile (project-management) | 02 §3.1 P2 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*); the capability goes to modules as data (07 §8) | R4.7 |
+| PL-03 | `project-management/` type slot | 02 §3.1 P3 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8) | R4.7 |
+| PL-04 | Process modules | 02 §3.1 P4 | module (software-engineering) | Keep | Modules as data (`module.yaml` + `guidance.md`), folders in the core repo (07 §4.2, §10); installed by `catalyst module install` (*owner, 2026-10-08*) | R4.3, R4.9 |
 | PL-05 | `sample-process` | 02 §3.1 P5 | module (software-engineering) | Merge | Merges into the second reference module used as a CI fixture (07 §13; 06 R7) | R7 |
 | PL-06 | SE module UI bundle | 02 §3.1 P6 | UI | Merge | Merges into ETD-driven generic rendering (07 §6, §12) | R6 |
 | PL-07 | `sample-process/ui` | 02 §3.1 P7 | UI | Merge | Merges into ETD-driven generic rendering (07 §6, §12) | R6 |
 | PL-08 | Agent adapter | 02 §3.1 P8 | user/agent shim | Keep | Generated agent adapters (`catalyst adapters write`, 07 §5.4) | R4.5 |
-| PL-09 | `/register-catalyzer`, `/modify-catalyzer`, `/delete-catalyzer` | 02 §3.1 P9 | plugin | Park | Until a second real plugin exists (07 §8: "3 personal commands parked") | R4.7 |
-| PL-10 | `/catalyzer` | 02 §3.1 P10 | plugin | Park | Until a second real plugin exists (07 §8) | R4.7 |
+| PL-09 | `/register-catalyzer`, `/modify-catalyzer`, `/delete-catalyzer` | 02 §3.1 P9 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8: "3 personal commands parked") | R4.7 |
+| PL-10 | `/catalyzer` | 02 §3.1 P10 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8) | R4.7 |
 
 ---
 
 ## Open questions for the owner
 
-1. **Locator path (K-19, K-20).** 06 R3.1 says `catalyst.toml` and 07 §8 says `.catalyst/catalyst.toml`.
-   ADR-010 (Pending) puts it at the repository root.
-2. **`/project` and agent switch (K-05, K-24, PR-45, PR-47, CMD-15, CMD-16).** 06 W5 builds
-   `catalyst project export|import|remove` and an interim `agent switch`. 07 §8 removes both and points to
-   `catalyst move`, which no 06 item schedules. Which end state applies?
-3. **Sharing (K-22, K-23, PR-48, PR-50, CMD-13).** 01b §4.3 keeps `/criterion` among the ~16 commands, while 06/07
-   retire the name and move sharing to `git-remote` + `publish`; 06 marks R3.6 "optional". `criterion integrity` and
-   `protect` have no named home in 07.
-4. **Workflow (K-50, PR-40).** Today a WORKFLOW- is a procedure document. 07 §4.1 calls it a "declared state machine",
-   while ADR-008 says workflows are "narrative threads, not state machines".
-5. **Module install (K-17, PL-04).** `catalyst module install` (07 §10) has no 06 item.
-6. **Rows 06/07 do not mention (kept, unchanged):** K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33 and SE-34.
-   Confirm Keep.
-7. **Drop/Park basis (K-52, PR-34, CMD-08; K-55/56, PR-68…70, CMD-12, PL-02/03/09/10).** These rest on the
-   recommendations B3/B4 in `10`, not on decisions taken.
+None. The 2026-10-08 answers are below.
 
 ## Decided (owner, 2026-10-08)
 
@@ -348,3 +334,10 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 - **Sync four-eyes (PR-55):** stays for now.
 - **Ledger (K-07):** survives the ≤ 3k-token install.
 - **R1.2** is install simplification; the prose feature freeze is R1.6 (ADR-017).
+- **Locator (K-19, K-20):** `.catalyst/catalyst.toml` (ADR-010 accepted with this path).
+- **`/project` and agent switch (K-05, K-24, PR-45, PR-47, CMD-15, CMD-16):** follow 07: `catalyst move` added to R2 W5; `agent switch` only until `move` exists.
+- **Sharing (K-22, K-23, PR-48, CMD-13):** R3.6 required; `integrity` becomes a `catalyst check` rule, `protect` a `publish` option.
+- **Workflow (K-50, PR-40):** a declared state machine (07 §4.1); ADR-008 rejected.
+- **Module install (K-17, PL-04):** roadmap item R4.9, plan `docs/plans/r4-9-module-install.md`.
+- **Unmentioned rows (K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33, SE-34):** Keep confirmed.
+- **B3 / B4 (`10`):** accepted: plugins parked until R4.7, meta-tags become a `tags:` field.

@@ -1,7 +1,7 @@
 # ADR-008: Workflow links as narrative thread (not state machines)
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Rejected (owner, 2026-10-08): a workflow is a declared state machine, declared by modules (07 §4.1)  
 **Author:** Catalyst Team  
 **Affected scope:** SE module
 

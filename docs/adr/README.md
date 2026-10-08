@@ -25,14 +25,14 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 |---|-------|--------|-------|
 | [ADR-006](ADR-006-se-module-canonical-through-r2.md) | SE module as canonical process plugin (through R2) | ⏳ Pending | SE module |
 | [ADR-007](ADR-007-artifact-tiers-severity.md) | Artifact tiers (Support, Guidance, Enforcement) for severity | ⏳ Pending | SE module |
-| [ADR-008](ADR-008-workflow-narrative-thread.md) | Workflow links as narrative thread (not state machines) | ⏳ Pending | SE module |
+| [ADR-008](ADR-008-workflow-narrative-thread.md) | Workflow links as narrative thread (not state machines) | ❌ Rejected: workflows are declared state machines | SE module |
 
 ### Store & Migration
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
 | [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ⏳ Pending | kernel |
-| [ADR-010](ADR-010-catalyst-toml-locator.md) | Locator format: catalyst.toml (vs. catalyst.json, .criterion symlink) | ⏳ Pending | kernel |
+| [ADR-010](ADR-010-catalyst-toml-locator.md) | Locator `.catalyst/catalyst.toml` (vs. catalyst.json, .criterion symlink) | ✅ Accepted | kernel |
 | [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ⏳ Pending | kernel |
 
 ### Naming & Versioning
