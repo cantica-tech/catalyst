@@ -128,7 +128,7 @@ def test_the_hook_routes_each_staged_file_to_its_deployment(monorepo, tmp_path):
     fake_cli = [sys.executable, "-c",
                 "import sys; a = sys.argv; p = a[a.index('--project') + 1]; "
                 f"open({str(record)!r}, 'a').write(p + '\\n'); "
-                "sys.exit(1 if p.endswith('inner/app') else 0)"]
+                "sys.exit(1 if p.replace(chr(92), '/').endswith('inner/app') else 0)"]
     msg = tmp_path / "MSG"
     msg.write_text("chore: x\n", encoding="utf-8")
 

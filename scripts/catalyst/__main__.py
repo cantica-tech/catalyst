@@ -837,9 +837,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    for stream in (sys.stdout, sys.stderr):       # a console code page (cp1252) cannot print every
-        if hasattr(stream, "reconfigure"):        # character a deployment holds: degrade, never crash
-            stream.reconfigure(errors="backslashreplace")
+    for stream in (sys.stdout, sys.stderr):       # UTF-8 out, whatever the code page (cp1252), so
+        if hasattr(stream, "reconfigure"):        # git and hooks read it back; degrade, never crash
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
