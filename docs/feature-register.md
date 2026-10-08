@@ -313,7 +313,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | PL-01 | catalyst-git | 02 §3.1 P1 | plugin | Keep | Optional extension, not core: `extensions/` (07 §8) | R4.7 |
 | PL-02 | agile (project-management) | 02 §3.1 P2 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*); the capability goes to modules as data (07 §8) | R4.7 |
 | PL-03 | `project-management/` type slot | 02 §3.1 P3 | plugin | Park | Until a second real plugin exists (B3, *owner, 2026-10-08*) (07 §8) | R4.7 |
-| PL-04 | Process modules | 02 §3.1 P4 | module (software-engineering) | Keep | Modules as data (`module.yaml` + `guidance.md`), folders in the core repo (07 §4.2, §10); installed by `catalyst module install` (*owner, 2026-10-08*) | R4.3, R4.9 |
+| PL-04 | Process modules | 02 §3.1 P4 | module (software-engineering) | Keep | Modules as data (`module.yaml` + `guidance.md`), folders in the core repo, several per deployment (07 §4.2, §10); installed by `catalyst module install` (*owner, 2026-10-08*) | R4.3, R4.9 |
 | PL-05 | `sample-process` | 02 §3.1 P5 | module (software-engineering) | Merge | Merges into the second reference module used as a CI fixture (07 §13; 06 R7) | R7 |
 | PL-06 | SE module UI bundle | 02 §3.1 P6 | UI | Merge | Merges into ETD-driven generic rendering (07 §6, §12) | R6 |
 | PL-07 | `sample-process/ui` | 02 §3.1 P7 | UI | Merge | Merges into ETD-driven generic rendering (07 §6, §12) | R6 |
@@ -338,6 +338,6 @@ None. The 2026-10-08 answers are below.
 - **`/project` and agent switch (K-05, K-24, PR-45, PR-47, CMD-15, CMD-16):** follow 07: `catalyst move` added to R2 W5; `agent switch` only until `move` exists.
 - **Sharing (K-22, K-23, PR-48, CMD-13):** R3.6 required; `integrity` becomes a `catalyst check` rule, `protect` a `publish` option.
 - **Workflow (K-50, PR-40):** a declared state machine (07 §4.1); ADR-008 rejected.
-- **Module install (K-17, PL-04):** roadmap item R4.9, plan `docs/plans/r4-9-module-install.md`.
+- **Module install (K-17, PL-04):** roadmap item R4.9, plan `docs/plans/r4-9-module-install.md`; several modules per deployment, `install` adds one beside the others.
 - **Unmentioned rows (K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33, SE-34):** Keep confirmed.
 - **B3 / B4 (`10`):** accepted: plugins parked until R4.7, meta-tags become a `tags:` field.
