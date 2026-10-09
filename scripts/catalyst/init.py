@@ -82,10 +82,11 @@ class InitRequest:
     git_username: str | None = None
     rule_docs: list[tuple[str, str]] = field(default_factory=list)   # (file name, prefix)
     test_locations: str | None = None
-    at: Path | None = None             # agent-owned location; None = in-project fallback
+    at: Path | None = None             # legacy agent-owned location; None = the home store (ADR-010)
     agent: str = "unknown"
     commands_dir: Path | None = None   # write command files here (e.g. .claude/commands)
     userid: str | None = None          # fixed first userid (reproducible examples); else drawn
+    runtime: bool = True               # fill the home criterion's .venv (R3.1a)
 
 
 def today() -> str:
@@ -180,12 +181,14 @@ def _ledger_only(folder: Path) -> bool:
         and not entries[0].is_symlink()
 
 
-def working_copy_root(project: Path, at: Path | None) -> Path:
-    """Where the working copy goes. `--at` may name the working copy itself
-    (`<dir>/.criterion`) or the agent-owned directory that holds it (any
-    other name): the working copy is `<dir>/.criterion` either way."""
+def working_copy_root(project: Path, at: Path | None, name: str | None = None) -> Path:
+    """Where the criterion goes: the home store `$CATALYST_HOME/projects/<name>/criterion`
+    (ADR-010), or — legacy, for one minor — `--at`, which may name the
+    working copy itself (`<dir>/.criterion`) or the agent-owned directory
+    that holds it: the working copy is `<dir>/.criterion` either way."""
     if at is None:
-        return project / WORKING_COPY
+        import project_file
+        return project_file.home_criterion(name or project.name)
     at = Path(os.path.abspath(at.expanduser()))
     root = at if at.name == WORKING_COPY else at / WORKING_COPY
     return root.resolve()
@@ -230,8 +233,9 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if not NAME_RE.match(req.name):
         raise InitError(f"--name '{req.name}' must be letters, digits, '.', '_' or '-' (no path)")
     project = req.project.resolve()
-    if any(project.glob("*.catalyst")):
-        raise InitError(f"{project} already has a *.catalyst pointer — catalyst is installed")
+    import project_file
+    if project_file.is_project(project):
+        raise InitError(f"{project} already has {project_file.find(project).name} — catalyst is installed")
     link = project / WORKING_COPY
     # BOOTSTRAP §2 starts the deployment ledger before the install: a
     # .criterion holding only .ledger/ is adopted, anything else refused
@@ -257,7 +261,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     else:
         raise InitError(f"cannot tell the kernel version of {kernel}")
     stamp = today()
-    root = working_copy_root(project, req.at)
+    root = working_copy_root(project, req.at, req.name)
+    home_store = req.at is None
+    if home_store and root.is_dir() and any(root.iterdir()) and not _ledger_only(root):
+        raise InitError(f"a criterion named '{req.name}' already exists ({root}) — choose another --name")
     if req.at and (root == project or project in root.parents):
         raise InitError("--at must be outside the project (it is the agent-owned location); "
                         "omit it for an in-project working copy")
@@ -266,7 +273,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if root.is_dir() and any(root.iterdir()) and not _ledger_only(root):
         raise InitError(f"{root} exists and is not empty (only an empty directory, or one holding "
                         f"nothing but the {LEDGER}/ deployment ledger, is adopted)")
-    if req.at and project_ledger and (root / LEDGER).exists():
+    if project_ledger and (root / LEDGER).exists():
         raise InitError(f"two deployment ledgers: {link / LEDGER} and {root / LEDGER} — keep one")
     if root.is_dir():
         # existing (empty or ledger-only): a rollback empties it back, never deletes it
@@ -394,8 +401,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
            f"- Active module: `{manifest.id}` v{manifest.version}\n- Installed: {stamp} by {req.user} "
            f"with `catalyst init`\n- Shared: no (local-only; `catalyst criterion create <url>` shares it)\n")
     _write(root / "README.md", f"# `{req.name}` — catalyst working copy\n\nGoverned by `CODE-OF-CONDUCT.md` "
-           "and `rules/Rules-of-Rules.md`; run `python3 .criterion/bin/catalyst.pyz check` from the "
-           "project root. Folders: `rules/`, `definitions/`, `IAM/`, `development/` (journal), and one "
+           "and `rules/Rules-of-Rules.md`; run `catalyst check` from the project (the launcher "
+           "`$HOME/.catalyst/bin/catalyst` runs this criterion's own runtime). Folders: `rules/`, `definitions/`, `IAM/`, `development/` (journal), and one "
            "folder per entity type (see each folder's README).\n")
     _vendor_cli(root / "bin" / "catalyst.pyz")
     # the analysis process's prompts and findings format (/run-analysis)
@@ -418,10 +425,21 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     head = subprocess.run(["git", "-C", str(project), "rev-parse", "--verify", "-q", "HEAD"],
                           capture_output=True, text=True, encoding="utf-8")
     pointer["journal_since"] = head.stdout.strip() if head.returncode == 0 else ""
-    pointer_path = project / f"{req.name}.catalyst"
+    import project_file
+    pointer_path = project / (project_file.NAME if home_store else f"{req.name}.catalyst")
     created.append(pointer_path)
-    _write(pointer_path, json.dumps(pointer, indent=2))
-    if req.at:
+    project_file.write(pointer_path, pointer)
+    if home_store:
+        if project_ledger:                       # BOOTSTRAP's ledger moves into the criterion
+            shutil.move(str(link / LEDGER), str(root / LEDGER))
+            link.rmdir()
+
+            def put_ledger_back_home() -> None:
+                link.mkdir(exist_ok=True)
+                shutil.move(str(root / LEDGER), str(link / LEDGER))
+            created.append(put_ledger_back_home)
+            steps.append(f"adopted the deployment ledger: moved {LEDGER}/ into the criterion")
+    elif req.at:
         if project_ledger:                       # the ledger moves into the working copy
             shutil.move(str(link / LEDGER), str(root / LEDGER))
             link.rmdir()
@@ -435,18 +453,25 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         link.symlink_to(root)
     elif project_ledger:
         steps.append(f"adopted the deployment ledger ({LEDGER}/) already in .criterion")
-    gitignore = project / ".gitignore"
-    if not gitignore.exists():
-        created.append(gitignore)
-    lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.is_file() else []
-    if "/.criterion" not in lines:
-        _write(gitignore, "\n".join(lines + ["/.criterion"]))
-    steps.append(f"wrote {pointer_path.name}; .criterion {'links to ' + str(root) if req.at else 'is in-project'}"
-                 "; /.criterion gitignored")
+    if home_store:
+        steps.append(f"wrote {pointer_path.name} (the only file catalyst adds to the project); "
+                     f"the criterion is {root}")
+    else:
+        gitignore = project / ".gitignore"
+        if not gitignore.exists():
+            created.append(gitignore)
+        lines = gitignore.read_text(encoding="utf-8").splitlines() if gitignore.is_file() else []
+        if "/.criterion" not in lines:
+            _write(gitignore, "\n".join(lines + ["/.criterion"]))
+        steps.append(f"wrote {pointer_path.name} (legacy); .criterion links to {root}; /.criterion gitignored")
     if req.commands_dir is not None:
         steps.append(_write_commands(req, module_src, root, created))
 
     # --- the working copy's own history, and the first journal entry ------
+    if home_store and req.runtime:
+        from catalyst import runtime as rt
+        venv, _ = rt.install_into(root, version, root / "bin" / "catalyst.pyz")
+        steps.append(f"filled the criterion's runtime {venv} (catalyst {version}, git-ignored)")
     _git(root, "init", "-q")
     _git(root, "add", "-A")
     _git(root, "-c", f"user.name={req.git_username or req.user}", "-c",
@@ -459,7 +484,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         command="catalyst init", action="create", artifact=f"deployment of {req.name}", targets=[],
         intent=[f"Install catalyst (kernel {version}, module {manifest.id} {manifest.version}) into "
                 f"{req.name}, on the user's explicit request (INV-2)."],
-        files=([str(pointer_path), str(project / ".gitignore")] +
+        files=([str(pointer_path)] + ([str(project / ".gitignore")] if not home_store else []) +
                ([str(p) for p in sorted((req.project / req.commands_dir).glob("*.md"))]
                 if req.commands_dir is not None else [])
                if _is_repo(project) else []) +
@@ -478,6 +503,15 @@ PRODUCT_GIT_NOTICE = ("note: wrote the journaled product files' blobs into the p
                       "kept by the ref refs/catalyst/journal (no commit, no branch, nothing pushed)")
 
 
+def kernel_command_files(kernel: Path) -> list[Path]:
+    """The kernel's command files: `commands/` of a kernel release, else the
+    catalyst checkout's `.claude/commands/` — never `/dogfood`."""
+    for folder in (kernel / "commands", kernel.parent.parent / ".claude" / "commands"):
+        if folder.is_dir():
+            return sorted(p for p in folder.glob("*.md") if p.stem != "dogfood")
+    return []
+
+
 def _write_commands(req: InitRequest, module_src: Path, root: Path, created: list[Path]) -> str:
     """One command file per command in the composed CODE-OF-CONDUCT §4
     (aliases included): the module's own files, the kernel's from a catalyst
@@ -493,8 +527,7 @@ def _write_commands(req: InitRequest, module_src: Path, root: Path, created: lis
     s = parse((root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8"))
     names = sorted(set(s.bullets) | set(s.aliases))
     module_cmds = {p.stem: p for p in (module_src / "commands").glob("*.md")}
-    kernel_cmds_dir = req.kernel.parent.parent / ".claude" / "commands"
-    kernel_cmds = {p.stem: p for p in kernel_cmds_dir.glob("*.md")} if kernel_cmds_dir.is_dir() else {}
+    kernel_cmds = {p.stem: p for p in kernel_command_files(req.kernel)}
     copied = generated = 0
     for name in names:
         target = dest / f"{name}.md"

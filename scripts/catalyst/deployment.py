@@ -62,14 +62,9 @@ class Deployment:
 
 
 def read_pointer(project_root: Path) -> dict:
-    for pointer in sorted(project_root.glob("*.catalyst")):
-        try:
-            data = json.loads(pointer.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(data, dict):
-            return data
-    return {}
+    """The project file's fields (catalyst.toml, else a legacy *.catalyst)."""
+    import project_file
+    return project_file.read_dir(project_root)
 
 
 def load(start: Path | None = None) -> Deployment:
@@ -78,19 +73,21 @@ def load(start: Path | None = None) -> Deployment:
     start = Path(os.path.abspath(start)) if start else logical_cwd()
     root = find_deploy_root(start)
     project_root = find_project_root(start)
-    pointer_dir = next((d for d in (start, *start.parents) if any(d.glob("*.catalyst"))), None)
+    import project_file
+    pointer_dir = project_file.find_up(start)
     if root is None or project_root is None:
         if pointer_dir is not None:
+            name = project_file.project_name(project_file.read_dir(pointer_dir)) or "<name>"
             raise WorkingCopyMissing(
-                f"{pointer_dir} has a *.catalyst pointer but no reachable .criterion "
-                "working copy (repair the symlink: BOOTSTRAP.md §1.1)")
+                f"{pointer_dir} has {project_file.find(pointer_dir).name} but its criterion is not reachable "
+                f"(expected {project_file.home_criterion(name)}, or a legacy .criterion)")
         raise DeploymentNotFound(
             f"no catalyst deployment found at or above {start} "
-            "(expected a *.catalyst pointer and a .criterion working copy)")
-    if not any(project_root.glob("*.catalyst")):
+            "(expected a catalyst.toml, or a legacy *.catalyst pointer)")
+    if not project_file.is_project(project_root):
         raise DeploymentNotFound(
-            f"{project_root} has a .criterion directory but no *.catalyst pointer — "
-            "if this is an agent-owned working copy, run catalyst from the project instead")
+            f"{project_root} has a .criterion directory but no catalyst.toml (or *.catalyst pointer) — "
+            "run catalyst from the project instead")
     module = load_module(project_root)
     etds = dict(load_kernel_entities())
     if module is not None:

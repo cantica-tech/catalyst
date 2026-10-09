@@ -117,6 +117,11 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
 
 ## Synchronization checklist
 
+`catalyst sync plan` lists, and `catalyst sync apply` performs, the
+mechanical items below (3, 4's command files, 6, 7's definitions, CLI and
+version, 8's journal entry); what remains is the confirmation (2), each
+migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
+
 1. Check the framework repository on the `release` branch for the latest
    version and changes.
 2. Ask for exactly one confirmation before beginning the synchronization.
@@ -541,6 +546,15 @@ Target version `0.47.0`. Full procedure:
 `migrations/0.47.0/verbs-replace-procedures.md` (this repository) — not
 duplicated here. Re-vendor the CLI (the procedures now call its verbs) and
 recompose. No layout change.
+
+### From `0.47.x`: the criterion in catalyst's home store
+
+Target version `0.48.0`. Full procedure:
+`migrations/0.48.0/criterion-in-catalyst-home.md` (this repository) — not
+duplicated here. Install the runtime and launcher, point the hooks at the
+launcher, and — with the user's assent — `catalyst move --to-home`. Layout
+change: the criterion leaves the project; `catalyst.toml` replaces
+`<name>.catalyst`.
 
 ## Expected outcome
 

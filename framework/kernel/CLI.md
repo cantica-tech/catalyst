@@ -11,8 +11,9 @@ intent is, whether two rules conflict.
 The CLI is agent-agnostic and module-agnostic. It reads the kernel's
 entity types (`entities/`) plus the active module's Entity Type
 Definitions (`MODULE-SPECIFICATION.md`), so it knows every type a
-deployment has without naming any of them. It needs Python 3.9 or later
-and `git`, and nothing else.
+deployment has without naming any of them. It needs Python 3.11 or later
+(a criterion's own runtime brings one, `catalyst runtime install`) and `git`,
+and nothing else.
 
 ## Invocation
 
@@ -87,7 +88,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ```
 catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
-              [--at <dir>] [--agent <id>] [--commands-dir <dir>]
+              [--agent <id>] [--commands-dir <dir>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
 
@@ -109,10 +110,13 @@ decides its inputs and does the judgment steps after it.
   ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
   document, `<name>-rules.md`, prefix `br`.
 - `--test-locations` fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2.
-- `--at <dir>` builds the working copy in agent-owned space and links
-  `<project root>/.criterion` to it. `<dir>` is the `.criterion` directory
-  itself (`<agent's per-project directory>/.criterion`), never its parent.
-  Without it, `.criterion/` is a real directory in the project. Either way `/.criterion` is gitignored (INV-6).
+- The criterion goes to `$CATALYST_HOME/projects/<name>/criterion` (default
+  `$HOME/.catalyst`) and `catalyst.toml` is the only file added to the project
+  (INV-6); a name already used on this machine is refused. Its runtime fills
+  the criterion's `.venv` (`--no-runtime` defers it to `catalyst runtime
+  install`). Legacy, for one minor: `--at <dir>` builds it in agent-owned
+  space behind a gitignored `.criterion` symlink and a `<name>.catalyst`
+  pointer.
 - `--agent` is recorded in the pointer's `agent` field.
 - `--commands-dir <dir>` (relative to the project; default: the agent's,
   `.claude/commands` for `claude-code`) receives one command
@@ -124,8 +128,9 @@ decides its inputs and does the judgment steps after it.
   required when running a vendored `catalyst.pyz`.
 
 It refuses (exit `1`, nothing written) if the project already has a
-`*.catalyst` pointer or a `.criterion` — one holding only the install
-ledger (`.ledger/`) is adopted — or the `--at` directory is not empty. On success it prints one line per step, commits nothing in the
+`catalyst.toml` (or legacy pointer) or a `.criterion` — one holding only the
+install ledger (`.ledger/`) is moved into the criterion — or the criterion's
+directory is not empty. On success it prints one line per step, commits nothing in the
 project repository, gives the working copy its own git history, and
 journals the install as the first entry. The pointer's `journal_since` is
 the project's `HEAD` at install (`""` with no commit yet): the baseline
@@ -374,6 +379,53 @@ side of a trial:
 `errors`, `warnings`, `commits`, `commits_traced`, `unrecorded_commits`,
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
+
+### `catalyst where`, `catalyst runtime install|status`
+
+- `where` names the project file (`catalyst.toml`, or a legacy
+  `<name>.catalyst`) and the criterion it resolves to:
+  `$CATALYST_HOME/projects/<name>/criterion` (`CATALYST_HOME` defaults to
+  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `1` when none is found.
+- `runtime install` builds this version's runtime once per machine in
+  `$CATALYST_HOME/runtimes/<version>/` (uv `--relocatable` when uv is
+  installed, else Python's `venv`; `catalyst.pyz` sits in its site-packages),
+  installs the launcher `$CATALYST_HOME/bin/catalyst` (and `catalyst.cmd`),
+  and copies the runtime into the criterion's `.venv` (git-ignored). The
+  launcher runs the `.venv` of the project it is called from — no activation
+  — or a legacy deployment's vendored CLI. `runtime status` reports all three.
+
+### `catalyst move --to-home | --name <new>`
+
+- `--to-home` moves a legacy deployment into the home store
+  (`$CATALYST_HOME/projects/<name>/criterion`): a `.criterion` symlink into
+  agent space (its target moves), an in-project `.criterion` directory, or a
+  `.criterion` git submodule — which becomes a standalone repository with its
+  branches, remote and unpushed work, the product dropping the submodule.
+  `<name>.catalyst` becomes `catalyst.toml`, `/.criterion` leaves
+  `.gitignore`, the runtime fills the criterion's `.venv` (`--no-runtime`
+  defers it), and the move is journaled. Product changes are staged, never
+  committed. A name already used on the machine is refused.
+- `--name <new>` renames a home-store project: its criterion directory and
+  `project_name` in `catalyst.toml`.
+
+### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip>]`
+
+The mechanical half of `/sync-framework`. `--kernel` is a catalyst
+checkout's `framework/kernel` or a `kernel-vX.Y.Z.zip`; `--module` the
+module's checkout (reduced to what its release ships) or zip. The base the
+deployment was composed from is found next to a release zip
+(`…/v<deployed>/kernel-v<deployed>.zip`), or from the checkout's git tag of
+the deployed version; `--base-kernel` names it otherwise.
+
+- `plan` lists what would change — CLI, invariants, the kernel documents
+  copied as they are (`ANALYSIS-PLAYBOOK.md`, `definitions/README.md`), module
+  tree, governing documents (recompose), command files (`--commands-dir`, default the
+  agent's), definitions of new types, versions — and the kernel and module
+  migrations between the two versions, in order. It writes nothing.
+- `apply` does it and journals one `/sync-framework` entry. A command file
+  or kernel document edited locally is reported, never overwritten; a recompose conflict stops
+  the sync before anything is written; a plugin catalog is never touched.
+  The migrations' judgment steps stay with the agent.
 
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 
@@ -647,12 +699,40 @@ finding or a missing artifact, is an error.
 
 ### `catalyst criterion <subcommand>`
 
-Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). A shared
-deployment's working copy is a git submodule of the product repository
-at `.criterion`, checked out from a dedicated criterion repository on
-its **shared branch** (the pointer's `criterion_branch`, default
-`criterion`). Contributors land changes through pull requests against
-that branch.
+Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). The criterion
+repository has a **shared branch** (`criterion_branch`, default
+`criterion`); contributors land changes through pull requests against it.
+
+**In the home store (ADR-010, the default since R3.1)** the criterion is its
+own repository at `$CATALYST_HOME/projects/<name>/criterion`; nothing of it
+is in the product:
+
+- `create <url>` pushes the criterion there and records `repoed`,
+  `catalyst_repo_url` and `criterion_branch` in `catalyst.toml` (staged,
+  journaled). No submodule, no `.gitignore` change.
+- `join [<url>]` clones the criterion repository named in `catalyst.toml`
+  (or `<url>`) into this machine's home store on the shared branch, or
+  brings an existing clone up to date; a same-named criterion with another
+  remote is refused. It fills the criterion's runtime.
+- `push`, `sync`, `status` (mode `home`), `integrity` and `protect` work on
+  the criterion as below.
+- **Product CI** clones it into its own home store, then runs its CLI:
+
+  ```yaml
+  - env:
+      CATALYST_HOME: ${{ runner.temp }}/catalyst
+    run: |
+      read -r name url branch < <(python3 -c 'import tomllib; d = tomllib.load(open("catalyst.toml", "rb")); print(d["project_name"], d["catalyst_repo_url"], d.get("criterion_branch") or "criterion")')
+      git clone -q -b "$branch" "$url" "$CATALYST_HOME/projects/$name/criterion"
+      python3 "$CATALYST_HOME/projects/$name/criterion/bin/catalyst.pyz" trace "$range"
+  ```
+
+  (a private criterion repository needs a read-only deploy key or token
+  for the clone).
+
+**Legacy, for one minor:** a shared deployment whose working copy is a git
+submodule of the product repository at `.criterion` keeps working as
+described below; `catalyst move --to-home` turns it into the form above.
 
 Every subcommand fails with exit `1` and a reason on stderr when git
 fails or a precondition does not hold; nothing is half-applied in the

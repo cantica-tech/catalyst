@@ -25,11 +25,11 @@ creates concrete rules for that particular project.
 
 An install is two kinds of work. Everything mechanical — the working copy's
 skeleton, the composed governing documents, the seeded module, definitions,
-the first user, the journal, the vendored CLI, the pointer and the
-`.criterion` symlink — is one deterministic command, `catalyst init`
-(step 4, `CLI.md`). What stays with the agent is judgment: the project's
-name, its module, its rule documents, its first user, where the working copy
-lives, and, afterwards, its first rules.
+the first user, the journal, the vendored CLI and runtime, the criterion in
+`$HOME/.catalyst/projects/<name>/criterion` and `catalyst.toml` — is one
+deterministic command, `catalyst init` (step 4, `CLI.md`). What stays with the
+agent is judgment: the project's name, its module, its rule documents, its
+first user, and, afterwards, its first rules.
 
 1. Decide your rule document(s) and their prefixes based on the project’s
    actual structure (e.g. one document per natural seam in the system — UI
@@ -60,17 +60,6 @@ lives, and, afterwards, its first rules.
      a module is never sourced from this framework repository.
    - **The first user**, registered as Admin (INV-16): `--user` defaults to
      `git config user.name`; ask for the git username (`--git-username`).
-   - **The working-copy directory** (`--at <dir>`). It is always named
-     `.criterion/`, but it is not built inside the target project's own
-     tree: it goes in a location this agent owns (a per-project data
-     directory the running agent already maintains), computed per machine
-     from the agent's own conventions — its shim says how — and never
-     written into a tracked file (INV-6). `<dir>` is the `.criterion`
-     directory itself (`<agent's per-project directory>/.criterion`), not
-     its parent. Without `--at`
-     (an agent with no owned-space concept, or a platform without
-     symlinks), the working copy is a real `.criterion/` directory in the
-     project, gitignored the same way.
    - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
      pointer's `agent` field; it also places the command files
      (`--commands-dir` overrides).
@@ -115,12 +104,12 @@ lives, and, afterwards, its first rules.
      root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
      and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
      session-start hook of step 5 re-injects);
-   - writes `<app-name>.catalyst` at the project root (no path in it; the
-     only catalyst file the product repository tracks; its `journal_since`
-     is the project's `HEAD`, or `""` with no commit yet — the baseline
-     after which changes made outside catalyst are detected), links `.criterion`
-     to the working copy when `--at` was given, and adds `/.criterion` to
-     the project's `.gitignore`;
+   - builds the criterion at `$HOME/.catalyst/projects/<name>/criterion`
+     (refusing a name already used on this machine) with its runtime in
+     `.venv`, and writes `catalyst.toml` at the project root — no path in
+     it, the only file catalyst adds to the project; its `journal_since` is
+     the project's `HEAD`, or `""` with no commit yet — the baseline after
+     which changes made outside catalyst are detected;
    - with `--commands-dir`, writes one command file per command of the
      composed `CODE-OF-CONDUCT.md` §4 (the kernel's and the module's);
    - initialises the working copy's own git history, and journals the
@@ -218,10 +207,9 @@ lives, and, afterwards, its first rules.
 
    includes:
      common:
-       # The gitignored .criterion symlink (or in-project fallback
-       # directory) at the project root — INV-6. Optional, so a clone
-       # without it still runs this project's own tasks.
-       taskfile: .criterion/Taskfile.common.yml
+       # The criterion's common tasks, in catalyst's space (INV-6).
+       # Optional, so a clone without a criterion still runs its own tasks.
+       taskfile: '{{env "CATALYST_HOME" | default (printf "%s/.catalyst" (env "HOME"))}}/projects/<name>/criterion/Taskfile.common.yml'
        optional: true
        flatten: true
        vars:
@@ -424,16 +412,15 @@ Keep a compact note with at least:
 
 - the framework name (`catalyst framework`)
 - the deployed project path
-- the resolved working-copy location (where the `.criterion` symlink
-  points on this machine)
+- the criterion's location (`catalyst where`)
 - the date or context of the instantiation
 - any short notes that help identify the project later
 
 When this guide is used again for the same project, check memory first and
 reuse the existing note as the default project context. If a prior note
 already exists for that project, update it instead of creating a duplicate.
-When switching agents, update this persistent memory note alongside `<app-name>.catalyst`
-(`agent`, `updated`) and the `.criterion` symlink.
+When switching agents, update this persistent memory note alongside
+`catalyst.toml` (`agent`, `updated`).
 This makes the association durable across sessions and keeps the project's
 instantiated ruleset available whenever the guide is used again.
 

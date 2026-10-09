@@ -182,7 +182,7 @@ def test_runs_from_inside_a_symlinked_working_copy(tmp_path, monkeypatch):
     assert dep.project_root == project and "ITEM" in dep.etds
     monkeypatch.chdir(real)
     monkeypatch.setenv("PWD", str(real))
-    with pytest.raises(DeploymentNotFound, match="no \\*.catalyst pointer"):
+    with pytest.raises(DeploymentNotFound, match="no catalyst.toml"):
         load()
 
 

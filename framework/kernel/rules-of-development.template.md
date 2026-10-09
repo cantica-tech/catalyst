@@ -648,46 +648,23 @@ it is unavailable (`/sync-framework` restores it) and do not invent missing
 content.
 
 When the user enters `/sync-framework [latest|<version>] [--force <scope>]`,
-inspect the requested kernel version, compare it with the deployed
-framework, and synchronize any missing or outdated files and version
-information. If the first argument is `latest`, resolve the newest available
-kernel version from the framework source. If no version argument is
-provided, synchronize against the currently installed local version. Before
-synchronizing an item, check the root-level `.frozen` file. If the item's
-path is listed there, skip it unless the command includes one of the valid
-overrides: `--force <type>`, `--force <item-id>`, or `--force all`. When an
-item is refreshed during the synchronization process, it must not remain in
-`.frozen`; remove it from the list so the refreshed version no longer carries
-the frozen protection. Synchronization must never deactivate an
-already-active plugin as a side effect of a kernel version change: a
-plugin stays active across the sync unless its entry in the relevant
-`plugins/<type>/catalog.md` explicitly excludes the target framework
-version via the `Compatibility` field — a bare `*`, or an absent field, is
-never grounds for deactivation. Only when that field names a version or
-range that excludes the target version may the synchronization process
-deactivate the plugin, and it must then report which plugin was deactivated
-and why. Synchronization must also never treat a deployed project's
-`plugins/<type>/catalog.md` or any installed plugin directory under
-`plugins/<type>/<name>/` as framework template content to overwrite
-wholesale: once a project has registered or activated any plugin, that
-catalog and those directories are project-owned state, so synchronization
-may only merge into `catalog.md` — adding rows for newly available plugins
-not yet present, and refreshing the pinned `Release`/`Tag`/`Compatibility`
-columns of a row that already exists — and must never delete an existing
-row, blank the file, or delete or replace an installed plugin's directory
-contents. A missing row or directory is something the user resolves
-afterward via `/catalyzer activate` or `/catalyzer download`, never
-something `/sync-framework` performs or silently corrects on its own. The
-refresh always replaces `.criterion/bin/catalyst.pyz` with the release's
-`bin/catalyst.pyz`, then journals the sync with
-`catalyst journal append --command /sync-framework --action sync` and
-runs `catalyst check`. After
-the refresh completes, perform a four-eyes
-verification pass: one sub-agent verifies the newly deployed framework against
-`INSTANTIATION-GUIDE.md` and the framework rules, and a second independent
-sub-agent repeats the verification from a separate pass. The sync is not
-complete until both sub-agents approve the deployment; any disagreement or
-failed validation becomes a blocking issue.
+obtain the target kernel release (`latest`: the newest on the release
+branch; none given: the installed version; a version that is not a tag is
+refused, `SYNCHRONIZE.md` "Version rule") and the active module's matching
+release, then run `catalyst sync plan --kernel <kernel> [--module <module>]`
+and show the plan; on the user's one confirmation, `catalyst sync apply`
+with the same sources. It re-vendors the CLI, copies the invariants,
+refreshes the module tree, recomposes the governing documents (items in
+`.frozen` are skipped; `--force <scope>` means `catalyst recompose --force`
+for them, by hand), refreshes command files the release changed (one
+edited locally is reported, never overwritten), creates definitions for new
+types only (INV-23), sets the versions and journals the sync. It never
+touches a plugin catalog or an installed plugin. Then carry out, in the
+order the plan lists them, each migration's judgment steps, add a
+`DEPLOYMENT.md` history line, run `catalyst check`, and do the four-eyes
+verification: one sub-agent verifies the deployment against
+`INSTANTIATION-GUIDE.md` and the framework rules, a second independently;
+the sync is complete only when both approve.
 
 When the user enters `/check-rules`, start with `catalyst check`: it
 reports the mechanical findings — deployment structure, missing rule

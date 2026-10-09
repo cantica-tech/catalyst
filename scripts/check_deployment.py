@@ -172,12 +172,13 @@ def _resolve_pointer(pointer_path: Path) -> Path | None:
 
 
 def find_project_root(start: Path) -> Path | None:
-    """The directory at or above `start` holding the *.catalyst pointer (or,
-    for a legacy deployment, the .criterion/ directory) — where the active
-    module is declared."""
+    """The directory at or above `start` holding the project file
+    (catalyst.toml, or a legacy *.catalyst pointer) whose criterion is
+    reachable, or a legacy .criterion/ directory — where the active module
+    is declared."""
+    import project_file
     for base in (start, *start.parents):
-        if any(_resolve_pointer(p) is not None
-               for p in base.glob(f"*{POINTER_SUFFIX}")):
+        if project_file.is_project(base) and project_file.resolve(base) is not None:
             return base
         if (base / DEPLOY_DIRNAME).is_dir():
             return base
@@ -189,14 +190,11 @@ def find_deploy_root(start: Path) -> Path | None:
     <project root>/.criterion (a symlink into agent-owned space, followed,
     or the in-project directory), else a pre-0.37.0 pointer's legacy
     "agent-source" (INV-6)."""
+    import project_file
     for base in (start, *start.parents):
-        candidate = base / DEPLOY_DIRNAME
-        if candidate.is_dir():
-            return candidate
-        for pointer in sorted(base.glob(f"*{POINTER_SUFFIX}")):
-            resolved = _resolve_pointer(pointer)
-            if resolved is not None:
-                return resolved
+        resolved = project_file.resolve(base)
+        if resolved is not None:
+            return resolved
     return None
 
 
@@ -539,14 +537,8 @@ def check_definitions_exist(root: Path, model: DeploymentModel | None = None) ->
 
 
 def _read_pointer_data(project_root: Path) -> dict:
-    for pointer in sorted(project_root.glob(f"*{POINTER_SUFFIX}")):
-        try:
-            data = json.loads(pointer.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if isinstance(data, dict):
-            return data
-    return {}
+    import project_file
+    return project_file.read_dir(project_root)
 
 
 def check_version_drift(root: Path, project_root: Path | None) -> list[str]:

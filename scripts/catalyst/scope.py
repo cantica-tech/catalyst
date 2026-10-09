@@ -49,7 +49,8 @@ def _ignore_lines(directory: str) -> tuple[str, ...] | None:
 @lru_cache(maxsize=4096)
 def _has_pointer(directory: str) -> bool:
     d = Path(directory)
-    return d.is_dir() and any(p.is_file() for p in d.glob("*.catalyst"))
+    import project_file
+    return d.is_dir() and project_file.is_project(d)
 
 
 def opted_out(directory: Path) -> bool:
