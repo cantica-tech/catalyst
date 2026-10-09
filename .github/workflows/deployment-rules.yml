@@ -24,6 +24,7 @@ jobs:
       - name: Check out catalogued process modules
         run: |
           mkdir -p "$RUNNER_TEMP/modules"
+          # shellcheck disable=SC2016  # the backticks are the catalog's Markdown, matched literally
           grep -E '^\| `[a-z0-9-]+` \|' framework/modules/catalog.md | while IFS='|' read -r _ id repo branch _; do
             id=$(echo "$id" | tr -d ' `'); repo=$(echo "$repo" | tr -d ' `'); branch=$(echo "$branch" | tr -d ' `')
             url=$(echo "$repo" | sed -E 's#^git@github.com:#https://github.com/#')
@@ -40,7 +41,7 @@ jobs:
           set -e
           git config --global user.name "catalyst-ci"
           git config --global user.email "catalyst-ci@localhost"
-          ls "$RUNNER_TEMP/modules" | grep -q . || { echo "no catalogued module checked out"; exit 1; }
+          [ -n "$(ls -A "$RUNNER_TEMP/modules")" ] || { echo "no catalogued module checked out"; exit 1; }
           for dir in "$RUNNER_TEMP"/modules/*/; do
             id=$(basename "$dir")
             proj="$RUNNER_TEMP/deployments/$id/project"
