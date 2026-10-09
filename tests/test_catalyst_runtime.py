@@ -93,3 +93,17 @@ def test_mcp_always_runs_the_newest_runtime(tmp_path, pyz):
     assert run("where").returncode != 0
     out = run("mcp")
     assert out.returncode == 0 and out.stdout == "", out.stderr
+
+
+def test_newest_runtime_is_by_version_then_build_time_never_by_build_hash(tmp_path, pyz):
+    old = rt.ensure_runtime("1.2.0+gf4972074a5fc", pyz)
+    for pth in old.rglob("catalyst.pth"):         # the older build cannot run catalyst
+        pth.unlink()
+    os.utime(old, (1, 1))
+    rt.ensure_runtime("1.2.0+gd48e5a5", pyz)
+    launcher = rt.install_launcher()
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PWD"] = str(tmp_path)
+    out = subprocess.run([sys.executable, str(launcher), "--version"], capture_output=True, text=True,
+                         encoding="utf-8", cwd=tmp_path, env=env)
+    assert out.returncode == 0 and out.stdout.startswith("catalyst "), out.stderr

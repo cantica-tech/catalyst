@@ -154,7 +154,9 @@ def main():
         if legacy.is_file():
             os.execv(sys.executable, [sys.executable, str(legacy), *sys.argv[1:]])
         sys.exit(f"catalyst: {d} has no reachable criterion (expected {criterion})")
-    runtimes = sorted((home / "runtimes").glob("*/"), key=lambda p: [int(n) for n in re.findall(r"\d+", p.name)])
+    # newest: the highest X.Y.Z, then the latest built (a build's +g<sha> does not order)
+    runtimes = sorted((home / "runtimes").glob("*/"), key=lambda p: (
+        [int(n) for n in re.findall(r"\d+", re.match(r"[\d.]*", p.name).group())], p.stat().st_mtime))
     py = python_of(runtimes[-1]) if runtimes else None
     if py:                               # outside any project (e.g. `catalyst init`), or `mcp`: the newest runtime
         os.execv(str(py), [str(py), "-m", "catalyst", *sys.argv[1:]])
