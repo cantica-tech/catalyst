@@ -3,7 +3,6 @@
 __pycache__/
 *.pyc
 
-/.criterion
 /dist/
 
 # golden corpus captures: private governance data, local only
