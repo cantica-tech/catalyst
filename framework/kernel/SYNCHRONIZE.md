@@ -118,7 +118,7 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
 ## Synchronization checklist
 
 `catalyst sync plan` lists, and `catalyst sync apply` performs, the
-mechanical items below (3, 4's command files, 6, 7's definitions, CLI and
+mechanical items below (3, 4's retired command files and hooks, 6, 7's definitions, CLI and
 version, 8's journal entry); what remains is the confirmation (2), each
 migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
 
@@ -236,14 +236,12 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
    - every documented slash command from the composed `CODE-OF-CONDUCT.md`
      §4 — `rules-of-development.template.md` §4 plus the active module's
      §4 (item 6), the canonical list; this file must never re-enumerate a
-     subset of it — must be available in the deployed environment after
-     synchronization. Under Claude Code: create any
-     `.claude/commands/<name>.md` missing relative to that list (following
-     `templates/slash-command.template.md`), and refresh an existing one
-     only if this kernel or module version actually changed that
-     command's spec in the composed §4 — an unchanged command's file
-     is project-owned content like any other synced file, not something to
-     overwrite wholesale on every sync. Same treatment for
+     subset of it — reaches the agent as a prompt of the user-level
+     `catalyst mcp` server, read at runtime: a sync writes no command
+     file. It retires those older versions wrote: an unedited one in
+     `.claude/commands/` is removed, a locally edited one reported as a
+     conflict (never deleted), and catalyst's hooks leave the project's
+     `.claude/settings.json` (its other settings kept). For
      `Taskfile.common.yml` (in the criterion, not the project tree —
      INV-6) against `templates/Taskfile.common.template.yml` plus
      the module's `Taskfile.module.yml`: add any task missing relative to
@@ -554,6 +552,14 @@ duplicated here. Install the runtime and launcher, point the hooks at the
 launcher, and — with the user's assent — `catalyst move --to-home`. Layout
 change: the criterion leaves the project; `catalyst.toml` replaces
 `<name>.catalyst`.
+
+### From `0.48.x`: agents wired at user level
+
+Target version `0.49.0`. Full procedure:
+`migrations/0.49.0/agents-at-user-level.md` (this repository). Run
+`catalyst agent install <agent>` on each machine; `catalyst sync apply`
+retires the project's catalyst command files and hooks, and the user
+commits that removal.
 
 ## Expected outcome
 

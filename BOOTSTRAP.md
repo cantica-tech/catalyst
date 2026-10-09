@@ -125,13 +125,13 @@ work against). Then:
    criterion in `$HOME/.catalyst/projects/<name>/criterion` with its own
    runtime, and `catalyst.toml` — the only file it adds to the project.
    It also copies `INVARIANTS.md` into the working copy, for the
-   session-start hook of step 4 to re-inject.
+   server and session-start hook of step 4 to re-inject.
    It refuses if catalyst is already installed.
-4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
-   agent's hooks where it supports them — `catalyst hook start` at session
-   start, so later sessions are grounded without this repository, and
-   `catalyst hook stop` at the end of each turn (the shim says how) — never
-   touching the project's own `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
+4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: wire the
+   agent once per machine, at user level, with `catalyst agent install
+   <agent>` (the `catalyst mcp` server, whose prompts are the §4 commands,
+   and the end-of-turn `catalyst hook stop`) — never writing command
+   files, hooks or a `Taskfile.yml` into the project, then the path's first rules — **greenfield** (no code yet:
    stack, tooling, dev environment and CI decided as the first rules, §3) or
    **retrofit** (existing code: rules gathered incrementally, optionally
    bootstrapped with `/run-analysis --bootstrap`, §4) — and

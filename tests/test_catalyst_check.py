@@ -105,3 +105,16 @@ def test_stop_and_start_hooks_speak_each_agents_format(tmp_path, monkeypatch, ca
     assert "INV-1" in json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
     assert main(["hook", "stop", "--format", "json"]) == 0 and capsys.readouterr().out == ""   # no project
+
+
+def test_a_suspended_governance_never_blocks_the_stop(tmp_path, monkeypatch, capsys):
+    project = make_project(tmp_path, git=True)
+    monkeypatch.chdir(project)
+    (project / ".criterion" / "development" / "journal.jsonl").write_bytes(b'{"a": "\xff"}\n')
+    assert _stop(project, monkeypatch) == 2
+    capsys.readouterr()
+    pointer = project / "app.catalyst"
+    pointer.write_text(json.dumps({**json.loads(pointer.read_text(encoding="utf-8")), "governance": "suspended"}),
+                       encoding="utf-8")
+    assert _stop(project, monkeypatch) == 0
+    assert "suspended" in capsys.readouterr().err

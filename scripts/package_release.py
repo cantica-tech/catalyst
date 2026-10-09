@@ -337,13 +337,11 @@ def package_kernel(root: Path) -> Path:
                 continue
             zip_file(zf, file, rel_path.as_posix())
 
-        # The kernel's command files (never /dogfood) and the agent
-        # templates, so an install or a sync from a release has them.
-        for file in sorted((root / ".claude" / "commands").glob("*.md")):
-            if file.stem != "dogfood":
-                zip_file(zf, file, f"commands/{file.name}")
+        # The agent adapters (no command files: `catalyst mcp` serves §4),
+        # the Claude Code plugin's `.claude-plugin/` included.
         for file in sorted((root / "agents").rglob("*")):
-            if file.is_file() and not any(p.startswith(".") for p in file.relative_to(root).parts):
+            if file.is_file() and not any(p.startswith(".") and p != ".claude-plugin"
+                                          for p in file.relative_to(root).parts):
                 zip_file(zf, file, file.relative_to(root).as_posix())
 
         # The CLI, vendored by install and /sync-framework into

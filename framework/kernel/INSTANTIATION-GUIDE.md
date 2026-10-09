@@ -61,8 +61,8 @@ first user, and, afterwards, its first rules.
    - **The first user**, registered as Admin (INV-16): `--user` defaults to
      `git config user.name`; ask for the git username (`--git-username`).
    - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
-     pointer's `agent` field; it also places the command files
-     (`--commands-dir` overrides).
+     pointer's `agent` field (nothing else: the agent is wired at user
+     level, step 5).
    - Optionally, **where the project's tests live** (`--test-locations`),
      which fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2 — on the
      greenfield path this comes out of the testing decision (§3).
@@ -103,15 +103,13 @@ first user, and, afterwards, its first rules.
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
      root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
      and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
-     session-start hook of step 5 re-injects);
+     `catalyst mcp` server and session-start hook of step 5 re-inject);
    - builds the criterion at `$HOME/.catalyst/projects/<name>/criterion`
      (refusing a name already used on this machine) with its runtime in
      `.venv`, and writes `catalyst.toml` at the project root — no path in
      it, the only file catalyst adds to the project; its `journal_since` is
      the project's `HEAD`, or `""` with no commit yet — the baseline after
      which changes made outside catalyst are detected;
-   - with `--commands-dir`, writes one command file per command of the
-     composed `CODE-OF-CONDUCT.md` §4 (the kernel's and the module's);
    - initialises the working copy's own git history, and journals the
      install as its first entry.
 
@@ -171,16 +169,16 @@ first user, and, afterwards, its first rules.
    is for; the kernel never names them (INV-30). `plugins/<type>/<name>/`
    appears when a plugin is activated; `.ledger/` holds the agent's install
    ledger (`BOOTSTRAP.md` §3).
-5. **Wire the agent and the project's tasks.** Register the agent's hooks
-   the way its shim says (`CLI.md` "Hooks"), where it supports them:
-   `catalyst hook start` at session start, so every later session starts
-   grounded, and `catalyst hook stop` at the end of each turn. For Claude
-   Code, merge `agents/claude-code/settings.template.json` (both hooks) into
-   the project's `.claude/settings.json`. An agent without command files instead
-   exposes each command of the composed `CODE-OF-CONDUCT.md` §4 as a named
-   procedure and lists them in the deployed `README.md` (`BOOTSTRAP.md` §1)
-   — the composed §4 is the canonical list; never re-enumerate a subset of
-   it anywhere else. Never create or edit the project's own `Taskfile.yml`
+5. **Wire the agent and the project's tasks.** Once per machine, run
+   `catalyst agent install <agent>` (`CLI.md`): it writes only the agent's
+   user-level config — the `catalyst mcp` server, whose prompts are the
+   commands of the composed `CODE-OF-CONDUCT.md` §4 and whose instructions
+   are the invariants, and the end-of-turn `catalyst hook stop` (plus
+   `catalyst hook start` where the instructions may not reach the model).
+   Never write command files or hooks into the project. An agent without
+   MCP prompts reads each command's procedure with the server's `command`
+   tool — the composed §4 is the canonical list; never re-enumerate a
+   subset of it anywhere else. Never create or edit the project's own `Taskfile.yml`
    (or any other file of the project but `catalyst.toml`): the composed
    `Taskfile.common.yml` stays in the criterion and runs on its own, from
    the project's root, with `catalyst task <command> -- <arguments>`

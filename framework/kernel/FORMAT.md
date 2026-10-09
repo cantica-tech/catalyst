@@ -87,6 +87,7 @@ parses as a JSON object.
 | `format` | string | The format version this deployment is written in. | `check`: warning if absent, error if not supported. |
 | `kernel_version` | string | The kernel version the deployment is at. Pre-0.35.0 name: `framework_version`, still read. | Structure: must equal `.criterion/version.txt` (`version drift`). |
 | `module` | string | The active module's id. Its ETDs are loaded from `.criterion/modules/<module>/` (then a sibling checkout `catalyst-<module>`). | A module that cannot be found leaves the checks kernel-only (the check's scope line says so). |
+| `governance` | string | Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything. | — |
 | `agent` | string | The id of the agent that last owned the working copy, e.g. `claude-code`; `unknown` if none was given. `catalyst task` resolves the agent command from it. | — |
 | `repoed` | boolean | `true` once the deployment is shared (INV-18). | — |
 | `catalyst_repo` | string or null | Informational name of the criterion repository. | — |

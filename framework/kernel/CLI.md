@@ -88,7 +88,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ```
 catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
-              [--agent <id>] [--commands-dir <dir>] [--no-runtime]
+              [--agent <id>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
 
@@ -117,12 +117,9 @@ decides its inputs and does the judgment steps after it.
   install`). Legacy, for one minor: `--at <dir>` builds it in agent-owned
   space behind a gitignored `.criterion` symlink and a `<name>.catalyst`
   pointer.
-- `--agent` is recorded in the pointer's `agent` field.
-- `--commands-dir <dir>` (relative to the project; default: the agent's,
-  `.claude/commands` for `claude-code`) receives one command
-  file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
-  from the catalyst checkout's own command files (never `/dogfood`), then
-  the module's `commands/`.
+- `--agent` is recorded in the pointer's `agent` field. `init` writes no
+  agent file into the project: `catalyst agent install <agent>` wires the
+  agent once per machine, at user level.
 - `--kernel` is the `framework/kernel` directory of a catalyst checkout or
   kernel release. It defaults to the checkout the CLI runs from, so it is
   required when running a vendored `catalyst.pyz`.
@@ -158,7 +155,7 @@ Prints only what one command needs from the deployed `CODE-OF-CONDUCT.md`
 followed by a one-line reminder of the common ending (signer, IDs, index
 regeneration, journal). The canonical text is still §4; `spec` only
 selects it, so an agent reads a command's few hundred words instead of the
-whole document. Command files call it first (`templates/slash-command.template.md`);
+whole document. The `catalyst mcp` prompts return it for each command;
 the full document is read only when the spec points elsewhere or a
 judgment needs the Rules-of-Rules sections it cites. `<command>` may be
 given with or without its `/`; without one, `spec` lists every command.
@@ -238,6 +235,9 @@ again, so an unfixable failure cannot loop a session. Without a
 deployment it exits `0`. It fails closed: an unexpected error inside the
 hook (a corrupt journal, say) exits `2` with the reason, never `1`,
 which agents treat as non-blocking. See [Hooks](#hooks).
+
+While `catalyst.toml` says `governance = "suspended"` (an owner's
+decision), it reports that and exits `0` without checking.
 
 `--format` says how to block, in the agent's terms: `exit2` (the default,
 Claude Code) as above; `json` prints `{"decision": "block", "reason": ...}`
@@ -489,11 +489,12 @@ the deployed version; `--base-kernel` names it otherwise.
 
 - `plan` lists what would change — CLI, invariants, the kernel documents
   copied as they are (`ANALYSIS-PLAYBOOK.md`, `definitions/README.md`), module
-  tree, governing documents (recompose), command files (`--commands-dir`, default the
-  agent's), definitions of new types, versions — and the kernel and module
+  tree, governing documents (recompose), the agent files an older catalyst wrote
+  into the project to retire (`.claude/commands/`, or `--commands-dir`, and the
+  hooks in `.claude/settings.json`), definitions of new types, versions — and the kernel and module
   migrations between the two versions, in order. It writes nothing.
-- `apply` does it and journals one `/sync-framework` entry. A command file
-  or kernel document edited locally is reported, never overwritten; a recompose conflict stops
+- `apply` does it and journals one `/sync-framework` entry. A command file catalyst wrote
+  but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
   The migrations' judgment steps stay with the agent.
 
@@ -1023,10 +1024,9 @@ An agent that supports a session-start hook registers
 `catalyst hook start` as that hook, so every session starts from the
 invariants. An agent that supports an end-of-turn hook registers
 `catalyst hook stop` as that hook, so every turn ends with a deployment
-that passes `catalyst check`. How to register it is agent-specific: the
-agent's shim says how (for example, a settings template under
-`agents/<agent>/` in this repository, merged into the project's agent
-settings at install). An agent without hook support runs `catalyst check`
+that passes `catalyst check`. `catalyst agent install <agent>` registers
+both, in the agent's own format (`--format`), at user level — never in
+the project. An agent without hook support runs `catalyst check`
 at the end of every artifact-changing command instead
 (`CODE-OF-CONDUCT.md` §4).
 

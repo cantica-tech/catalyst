@@ -105,11 +105,11 @@ def test_init_refuses_an_installed_project(tmp_path):
         init(req)
 
 
-def test_init_writes_command_files(tmp_path):
-    req = request(tmp_path, commands_dir=Path(".claude/commands"))
-    init(req)
-    names = {p.stem for p in (req.project / ".claude" / "commands").glob("*.md")}
-    assert "check-rules" in names and "dogfood" not in names
+def test_init_writes_no_agent_files_into_the_project(tmp_path):
+    req = request(tmp_path, agent="claude-code")
+    steps = init(req)
+    assert not (req.project / ".claude").exists()
+    assert any("catalyst agent install" in s for s in steps)
 
 
 def test_compose_places_module_sections():
@@ -143,7 +143,7 @@ def test_recompose_merges_template_changes_and_keeps_local_edits(tmp_path):
 
 def test_failed_install_rolls_back_and_can_be_rerun(tmp_path, monkeypatch):
     import catalyst.init as ci
-    req = request(tmp_path, commands_dir=Path(".claude/commands"))
+    req = request(tmp_path)
     before = (req.project / ".gitignore").exists()
 
     def boom(*a, **k):
@@ -153,7 +153,7 @@ def test_failed_install_rolls_back_and_can_be_rerun(tmp_path, monkeypatch):
         init(req)
     assert not list(req.project.glob("*.catalyst"))
     assert not (req.project / ".criterion").exists() and not (req.project / ".criterion").is_symlink()
-    assert not req.at.exists() and not (req.project / ".claude").exists()
+    assert not req.at.exists()
     assert (req.project / ".gitignore").exists() == before
     monkeypatch.undo()
     init(req)                                               # re-run succeeds
@@ -184,17 +184,13 @@ def test_composition_parameters_are_saved_and_read_back(tmp_path):
     assert p.rule_docs == ["z-rules.md", "a-rules.md"] and p.test_locations == "`tests/`"
 
 
-def test_commands_from_a_release_are_generated_from_section4(tmp_path):
+def test_a_release_kernel_sets_the_deployed_version(tmp_path):
     import shutil
     release = tmp_path / "release-kernel"
     shutil.copytree(KERNEL, release)
     (release / "manifest.json").write_text('{"version": "9.9.9"}', encoding="utf-8")
-    req = request(tmp_path, kernel=release, commands_dir=Path(".claude/commands"))
-    init(req)
-    names = {p.stem for p in (req.project / ".claude" / "commands").glob("*.md")}
-    assert "check-rules" in names and "create-item" in names          # kernel + module §4
-    assert "create-bug" not in names                                  # another module's command
-    assert json.loads((req.project / "app.catalyst").read_text(encoding="utf-8"))["kernel_version"] == "9.9.9"
+    init(request(tmp_path, kernel=release))
+    assert json.loads((tmp_path / "app" / "app.catalyst").read_text(encoding="utf-8"))["kernel_version"] == "9.9.9"
 
 
 def test_recompose_skips_frozen_documents(tmp_path):
@@ -336,13 +332,6 @@ def test_session_start_hook_is_silent_outside_a_deployment(tmp_path, capsys):
     assert main(["--project", str(tmp_path), "hook", "start"]) == 0
 
 
-def test_settings_template_has_session_start_and_stop_hooks():
-    settings = json.loads((REPO / "agents" / "claude-code" / "settings.template.json").read_text(encoding="utf-8"))
-    start = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert start == '"$HOME/.catalyst/bin/catalyst" hook start'          # the launcher (R3.1a)
-    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == '"$HOME/.catalyst/bin/catalyst" hook stop'
-
-
 def test_init_announces_its_writes_into_the_product_repository(tmp_path):
     req = request(tmp_path)
     steps = init(req)
@@ -371,14 +360,14 @@ def _cli_init(tmp: Path, *extra: str) -> tuple[int, Path]:
     return code, project
 
 
-def test_init_takes_the_user_from_git_config_and_the_command_dir_from_the_agent(tmp_path):
+def test_init_takes_the_user_from_git_config_and_records_the_agent(tmp_path):
     mod = example_module(tmp_path)
     code, project = _cli_init(tmp_path, "--module", "example-process", "--module-dir", str(mod),
                               "--agent", "claude-code")
     assert code == 0
     users = json.loads((project / ".criterion" / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
     assert [(u["name"], u["git_username"]) for u in users["users"]] == [("Grace Hopper", "Grace Hopper")]
-    assert (project / ".claude" / "commands" / "check-rules.md").is_file()
+    assert not (project / ".claude").exists()
 
 
 def test_init_without_a_module_lists_the_ones_it_finds_and_installs_nothing(tmp_path, capsys):
@@ -387,12 +376,6 @@ def test_init_without_a_module_lists_the_ones_it_finds_and_installs_nothing(tmp_
     err = capsys.readouterr().err
     assert code == 2 and "pass --module" in err and "example-process" in err
     assert not (project / "app.catalyst").exists() and not (tmp_path / "agent").exists()
-
-
-def test_an_unknown_agent_gets_no_command_files(tmp_path):
-    from catalyst.init import default_commands_dir
-    assert default_commands_dir("claude-code") == Path(".claude/commands")
-    assert default_commands_dir("unknown") is None
 
 
 @pytest.mark.skipif(__import__("shutil").which("uv") is None and __import__("sys").version_info < (3, 11),

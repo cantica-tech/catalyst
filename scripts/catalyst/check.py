@@ -184,6 +184,10 @@ def hook_stop(dep: Deployment, data: dict | None = None, strict: bool = False, f
     unfixable failure can't loop the session. A check that crashes is a
     failure too (fail closed): Claude Code ignores any exit but 2."""
     data = hook_input() if data is None else data
+    if dep.pointer.get("governance") == "suspended":     # catalyst.toml: the owner suspended enforcement
+        print("catalyst: governance suspended in catalyst.toml — not checking (`catalyst check` still reports)",
+              file=sys.stderr)
+        return 0
     try:
         report = run(dep)
     except Exception as exc:  # noqa: BLE001 — any crash must block, not switch enforcement off

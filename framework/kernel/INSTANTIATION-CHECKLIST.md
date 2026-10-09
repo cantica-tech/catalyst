@@ -28,7 +28,7 @@ from drifting. The guide holds the rationale; this holds the checks.
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
 - [ ] `catalyst init --name <name> --module <id> [--user <name>]
       --git-username <u> --rule-doc <file>:<prefix> ...
-      --agent <id> [--commands-dir <dir>] [--test-locations <where>]
+      --agent <id> [--test-locations <where>]
       [--kernel <dir>] [--module-dir <dir>]` run from the project root and
       exited `0`; its report shows each of:
       - `CODE-OF-CONDUCT.md`, `rules/Rules-of-Rules.md`, `ACCESS-CONTROL.md`
@@ -50,19 +50,13 @@ from drifting. The guide holds the rationale; this holds the checks.
         `.venv` runtime, and `catalyst.toml` at the project root — the only
         file added to the project (no path, INV-6; `journal_since` = the
         project's `HEAD`)
-      - command files, one per command of the composed §4, if
-        `--commands-dir` was given
       - the working copy's git history initialised and the install journaled
 - [ ] Module's `INVARIANTS.module.md` read together with `INVARIANTS.md` (§6.4)
 
 ## Wire up (`INSTANTIATION-GUIDE.md` §1 steps 5–8)
-- [ ] Where the agent supports them: `catalyst hook start` (session start)
-      and `catalyst hook stop` (end of turn) registered per its shim
-      (Claude Code: `agents/claude-code/settings.template.json` merged into
-      the project's `.claude/settings.json`)
-- [ ] No command files (other agents): each command of the composed
-      `CODE-OF-CONDUCT.md` §4 exposed as a named procedure and listed in
-      the deployed `README.md` (`BOOTSTRAP.md §1`)
+- [ ] `catalyst agent install <agent>` run once on this machine (user-level
+      `catalyst mcp` server and end-of-turn hook; `catalyst agent status`
+      shows it) — no command files or hooks written into the project
 - [ ] The project's own `Taskfile.yml` untouched (none created, none
       edited); `catalyst task` lists the criterion's common tasks
 - [ ] `catalyst hook install` offered; run only on the user's assent (it

@@ -861,8 +861,7 @@ def cmd_criterion(args) -> int:
 def cmd_init(args) -> int:
     from module_loader import REPO_ROOT
 
-    from catalyst.init import (InitError, InitRequest, default_commands_dir, git_user_name, init,
-                               local_modules)
+    from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
 
     kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
     if not (kernel / "rules-of-rules.template.md").is_file():
@@ -887,16 +886,15 @@ def cmd_init(args) -> int:
         steps = init(InitRequest(
             project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
             module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
-            test_locations=args.test_locations, at=args.at, agent=args.agent,
-            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid,
+            test_locations=args.test_locations, at=args.at, agent=args.agent, userid=args.userid,
             runtime=not args.no_runtime))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     for step in steps:
         print(f"- {step}")
-    print("Next: write the first rules (catalyst id next-rule), then `catalyst check`. Nothing was committed "
-          "in the project repository.")
+    print("Next: `catalyst agent install <agent>` once per machine, then the first rules (catalyst id next-rule) "
+          "and `catalyst check`. Nothing was committed in the project repository.")
     return 0
 
 
@@ -1002,9 +1000,8 @@ def build_parser() -> argparse.ArgumentParser:
                    "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)")
     p.add_argument("--no-runtime", action="store_true",
                    help="do not fill the criterion's .venv now (`catalyst runtime install` later)")
-    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
-    p.add_argument("--commands-dir", type=Path, help="write command files here (default: the agent's, "
-                   "e.g. .claude/commands for claude-code)")
+    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code (recorded in "
+                   "catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level)")
     p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
                    "(default: this checkout's)")
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
@@ -1261,7 +1258,8 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--base-kernel", type=Path,
                        help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)")
         q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
-        q.add_argument("--commands-dir", type=Path, help="the project's command files (default: the agent's)")
+        q.add_argument("--commands-dir", type=Path, help="where an older catalyst wrote the project's command files, "
+                       "to retire them (default: .claude/commands)")
         q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")

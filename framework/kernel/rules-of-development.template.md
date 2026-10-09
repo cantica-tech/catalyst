@@ -158,7 +158,7 @@ Mechanical steps are calls to the catalyst CLI (`CLI.md`), never
 re-derived by hand. **`catalyst <args>`** is shorthand for
 `python3 .criterion/bin/catalyst.pyz <args>` (or `task catalyst -- <args>`).
 `catalyst spec <name>` prints one command's own bullet and procedure from
-this section; command files read that instead of the whole document.
+this section; the `catalyst mcp` prompts return that instead of the whole document.
 Every command that creates or changes an artifact, rule, domain or
 `Status` ends the same way, after its own steps below:
 
@@ -656,8 +656,8 @@ and show the plan; on the user's one confirmation, `catalyst sync apply`
 with the same sources. It re-vendors the CLI, copies the invariants,
 refreshes the module tree, recomposes the governing documents (items in
 `.frozen` are skipped; `--force <scope>` means `catalyst recompose --force`
-for them, by hand), refreshes command files the release changed (one
-edited locally is reported, never overwritten), creates definitions for new
+for them, by hand), retires the command files and hooks older versions
+wrote into the project (one edited locally is reported, never deleted), creates definitions for new
 types only (INV-23), sets the versions and journals the sync. It never
 touches a plugin catalog or an installed plugin. Then carry out, in the
 order the plan lists them, each migration's judgment steps, add a

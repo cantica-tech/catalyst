@@ -4,7 +4,9 @@
 `plan` compares a deployment with a target kernel (and module) release and
 lists what a sync would do; `apply` does it: re-vendor the CLI, copy the
 invariants, refresh the module tree, recompose the governing documents,
-refresh command files the release changed (never one edited locally),
+retire the agent files catalyst once wrote into the project (command files
+and hooks: `catalyst agent install` wires agents at user level now — never
+a file edited locally),
 create definitions for new entity types (never touch a deployed one,
 INV-23), set the versions, and journal it. What stays with the agent: the
 migrations' judgment steps, which `plan` lists, and conflicts it reports.
@@ -34,7 +36,7 @@ from catalyst import compose, journal
 from catalyst.deployment import Deployment
 
 MIGRATION_ROW = re.compile(r"^\|\s*\[`([^`]+)`\]\([^)]*\)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*(.*?)\s*\|\s*$")
-AGENT_COMMANDS_DIRS = {"claude-code": ".claude/commands"}
+AGENT_COMMANDS_DIR = ".claude/commands"          # where init wrote command files up to 0.48
 VERBATIM = ("ANALYSIS-PLAYBOOK.md", "definitions/README.md")   # kernel documents init copies as they are
 
 
@@ -183,14 +185,22 @@ def migrations(index: Path, deployed: str, target: str, owner: str) -> list[dict
 
 
 def commands_dir(dep: Deployment, override: Path | None) -> Path | None:
+    """Where catalyst once wrote command files: --commands-dir, else Claude Code's."""
     if override is not None:
         return override if override.is_absolute() else dep.project_root / override
-    rel = AGENT_COMMANDS_DIRS.get(str(dep.pointer.get("agent", "")))
-    return dep.project_root / rel if rel else None
+    return dep.project_root / AGENT_COMMANDS_DIR
+
+
+def kernel_command_files(kernel: Path) -> list[Path]:
+    """The command files a kernel release shipped (`commands/`, or a catalyst
+    checkout's `.claude/commands/`) — never `/dogfood`."""
+    for folder in (kernel / "commands", kernel.parent.parent / ".claude" / "commands"):
+        if folder.is_dir():
+            return sorted(p for p in folder.glob("*.md") if p.stem != "dogfood")
+    return []
 
 
 def _command_sources(kernel: Path | None, module: Path | None) -> dict[str, Path]:
-    from catalyst.init import kernel_command_files
     found = {p.stem: p for p in kernel_command_files(kernel)} if kernel else {}
     if module is not None:
         found.update({p.stem: p for p in (module / "commands").glob("*.md")})
@@ -239,20 +249,12 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     elif mod is not None and moving:
         p.actions.append(Action("document", "governing documents", "skip",
                                 f"no base kernel {src.deployed} found: pass --base-kernel to recompose"))
-    if commands is not None:
-        new_cmds = _command_sources(src.kernel, src.module or (root / "modules" / mod.id if mod else None))
-        base_cmds = _command_sources(src.base_kernel, src.base_module)
-        for name, source in sorted(new_cmds.items()):
-            target = commands / f"{name}.md"
-            if not target.exists():
-                p.actions.append(Action("command", _rel(dep, target), "add"))
-            elif not _same(source, target):
-                base = base_cmds.get(name)
-                if base is not None and _same(base, target):
-                    p.actions.append(Action("command", _rel(dep, target), "update"))
-                else:
-                    p.actions.append(Action("command", _rel(dep, target), "conflict",
-                                            "edited locally or unknown base: compare by hand"))
+    if commands is not None and commands.is_dir():
+        p.actions += _retired_commands(dep, src, commands)
+    settings = dep.project_root / ".claude" / "settings.json"
+    if _catalyst_hooks(settings)[1]:
+        p.actions.append(Action("agent-hook", _rel(dep, settings), "remove",
+                                "catalyst's hooks: `catalyst agent install claude-code` holds them at user level"))
     deployed_defs = root / "definitions"
     for source in (src.kernel, src.module):
         for folder in sorted((source / "definitions").iterdir()) if source and (source / "definitions").is_dir() else []:
@@ -266,6 +268,56 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         p.migrations += migrations(src.module / "migrations" / "migrations.md", src.deployed, src.version, "module")
     p.migrations.sort(key=lambda m: (vt(m["to"]), m["owner"] != "kernel"))
     return p
+
+
+def _retired_commands(dep: Deployment, src: Sources, commands: Path) -> list[Action]:
+    """Command files catalyst wrote (a §4 command's file as a release shipped
+    it, or a generated one that defers to `catalyst spec`): removed. One edited
+    locally: left to the user. Anything else (`/dogfood`, the user's own): kept."""
+    from catalyst.spec import SpecError, load_section4
+    try:
+        s = load_section4(dep)
+        names = set(s.bullets) | set(s.aliases)
+    except (OSError, SpecError):
+        names = set()
+    shipped: dict[str, list[Path]] = {}
+    for kernel, module in ((src.base_kernel, src.base_module), (src.kernel, src.module)):
+        for name, path in _command_sources(kernel, module).items():
+            shipped.setdefault(name, []).append(path)
+    out = []
+    for path in sorted(commands.glob("*.md")):
+        name = path.stem
+        if name not in names and name not in shipped:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if any(_same(source, path) for source in shipped.get(name, [])) or f"catalyst spec {name}" in text:
+            out.append(Action("command", _rel(dep, path), "remove", "served by `catalyst mcp` now"))
+        else:
+            out.append(Action("command", _rel(dep, path), "conflict",
+                              "edited locally: catalyst no longer writes command files — remove it by hand"))
+    return out
+
+
+def _catalyst_hooks(settings: Path) -> tuple[dict, bool]:
+    """The project's agent settings without catalyst's hooks, and whether it had any."""
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, False
+    hooks = data.get("hooks") if isinstance(data, dict) else None
+    if not isinstance(hooks, dict):
+        return data, False
+    found = False
+    for event in list(hooks):
+        kept = [h for h in hooks[event] if not re.search(r"catalyst(?:\.pyz|\.cmd)?\W+hook\b|stop_hook\.py", json.dumps(h))]
+        found |= len(kept) != len(hooks[event])
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+    if not hooks:
+        del data["hooks"]
+    return data, found
 
 
 def _rel(dep: Deployment, path: Path) -> str:
@@ -316,13 +368,21 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
         for r in compose.recompose(root, params, (src.base_kernel, src.base_module), (src.kernel, root / "modules" / mod.id)):
             if r.changed:
                 touched.append(root / r.path)
-    new_cmds = _command_sources(src.kernel, root / "modules" / mod.id if mod else None) if commands else {}
     for a in p.actions:
-        if a.kind == "command" and a.change in ("add", "update"):
+        if a.kind == "command" and a.change == "remove":
             target = dep.project_root / a.target
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(new_cmds[target.stem], target)
+            target.unlink()
             touched.append(target)
+            if not any(target.parent.iterdir()):
+                target.parent.rmdir()
+        elif a.kind == "agent-hook":
+            settings = dep.project_root / a.target
+            data, _ = _catalyst_hooks(settings)
+            if data:
+                settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            else:
+                settings.unlink()
+            touched.append(settings)
         elif a.kind == "definition":
             name = Path(a.target).stem
             for source in (src.kernel, root / "modules" / mod.id if mod else None):

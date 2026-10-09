@@ -24,7 +24,7 @@ tasks:
       - python3 scripts/check_deployment.py
 
   check:command-parity:
-    desc: "Validate .claude/commands/ and Taskfile.common.yml against CODE-OF-CONDUCT.md §4"
+    desc: "Validate Taskfile.common.yml and the module's commands against CODE-OF-CONDUCT.md §4"
     cmds:
       - python3 scripts/check_command_parity.py
 
