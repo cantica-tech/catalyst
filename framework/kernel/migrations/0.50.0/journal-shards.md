@@ -58,6 +58,16 @@ or a commit made before its journal entry. From `0.50.0` (roadmap R3.3):
    shards, so its `verify` reports the shards' files as unjournaled. Run
    `catalyst criterion push` once after the sync so the `.gitattributes`
    block gains the shard line.
+
+   **The upgrade's own pull request fails the criterion's CI gate once.**
+   The gate runs the base branch's checker (verified by hash, so a pull
+   request cannot weaken it); on that pull request the base is still the
+   older CLI, which does not read the shards and reports every file the sync
+   journaled as `unjournaled`. Check it locally with the new CLI
+   (`catalyst check` passes), review it, and merge it by hand — an
+   administrator override where branch protection requires the check. From
+   the merge on, the base checker is the new one and later pull requests
+   pass the gate normally. Never weaken the gate for this.
 3. **Scripts that push the criterion** (`catalyst criterion push` in CI or a
    wrapper) add `--yes`: the person who runs them has agreed.
 4. **Tools that read the journal file directly** read every `*.jsonl` under
