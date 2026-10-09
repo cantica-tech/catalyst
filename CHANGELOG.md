@@ -6,6 +6,31 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.51.0 — 2026-10-10
+
+`catalyst open`, a faster end-of-turn check; no layout change (no migration).
+
+- `catalyst open` (roadmap R3.5): the one step after `git clone` and the start
+  of every session — clones a criterion missing on this machine from the
+  repository `catalyst.toml` names (with the product's journal pins), fills
+  the criterion's runtime from its vendored CLI, installs the launcher, and
+  reports versions, the shared copy and what is left to do. `catalyst hook
+  start` leads with the same report, changing nothing.
+- The agent is each user's choice: `catalyst open --agent <id>` records it in
+  catalyst's home, never in `catalyst.toml`; `catalyst task` dispatches to it.
+  The agent switching procedure and `/switch-agent` reduce to that command;
+  `catalyst where` replaces the memory note.
+- A faster end-of-turn check (part of roadmap R3.8): the journal is read and
+  its blobs looked up once per run, legacy paths are normalised once, and
+  files committed as journaled are compared with HEAD in one batch — `catalyst
+  check` takes about 1 s instead of 2 s (catalyst-ui) and 10 s (a deployment
+  with a long legacy journal).
+- Fixed: in a project below its repository's top level (a monorepo), the
+  journal read every product file as deleted (`git hash-object --stdin-paths`
+  resolves paths from the top level).
+- Migration 0.50.0 now says the upgrade's own pull request fails the
+  criterion's base-branch gate once: review it and merge it by hand.
+
 ## 0.50.0 — 2026-10-09
 
 The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).

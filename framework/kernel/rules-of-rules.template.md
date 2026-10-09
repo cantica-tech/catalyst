@@ -719,20 +719,19 @@ courtesy as `/criterion create`:
 
 ### Agent switching procedure
 
-When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
-
-1. Resolve the running agent's own owned location (local-only, above) (or the in-project fallback `.criterion/`).
-2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
-3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`. A shared deployment's `.criterion` is a submodule inside the project (§13): skip steps 2–3 for it.
-4. Update `<app-name>.catalyst`: set `agent` to the current agent's identifier and `updated` to the current date string (`YYYY-MM-DD`) — nothing else; the pointer holds no path, and catalyst never touches the project's `Taskfile.yml`.
-5. Update persistent framework memory (and deployment notes) with the current agent name, resolved working-copy location, and update timestamp.
-
-`/switch-agent [agent-id]` runs this same procedure on demand, unconditionally
-(steps 1–5 above, without first checking whether identity actually differs)
-— the manual escape hatch for when the automatic per-session check above is
-skipped (e.g. dropped by a compacted session) or only partially applies (one
-field updated, another left stale). Full command spec: `CODE-OF-CONDUCT.md`
-§4.
+Every session starts with `catalyst hook start` (the agent's session-start
+hook, `catalyst agent install`): it reports where the project stands — the
+criterion on this machine, versions, the runtime, the shared copy — and
+what is left to do, changing nothing. `catalyst open` does it: clones a
+criterion this machine lacks from the repository `catalyst.toml` names,
+fills the criterion's runtime, installs the launcher. The criterion's place
+does not depend on the agent, so switching agents is one command,
+`catalyst open --agent <agent-id>`, which records the agent for this user in
+catalyst's home (never in `catalyst.toml`); `/switch-agent` runs it. A legacy
+deployment (`.criterion` symlink into an agent-owned space) is moved once
+with `catalyst move --to-home`; nothing is mirrored between agents any more.
+`catalyst where` is the record of where the criterion is: no memory note is
+needed (an agent may keep one as a convenience).
 
 ### `/project create`/`remove`/`export`/`import`
 
