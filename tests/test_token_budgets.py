@@ -1,9 +1,10 @@
 """Agent-facing text may not grow past its committed token baseline (R1.1)."""
+
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import check_token_budgets as budgets  # noqa: E402
+import check_token_budgets as budgets
 
 
 def test_token_budgets_within_baseline():

@@ -89,6 +89,7 @@ parses as a JSON object.
 | `module` | string | The active module's id. Its ETDs are loaded from `.criterion/modules/<module>/` (then a sibling checkout `catalyst-<module>`). | A module that cannot be found leaves the checks kernel-only (the check's scope line says so). |
 | `governance` | string | Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything. | — |
 | `agent` | string | The id of the agent that last owned the working copy, e.g. `claude-code`; `unknown` if none was given. `catalyst task` resolves the agent command from it. | — |
+| `share` | string | Optional: the criterion's sharing driver, `git` or `local` (`catalyst share`). Absent: `git` when the criterion has a remote or `catalyst_repo_url` is set, else `local`. | An unknown driver is refused by `catalyst share`. |
 | `repoed` | boolean | `true` once the deployment is shared (INV-18). | — |
 | `catalyst_repo` | string or null | Informational name of the criterion repository. | — |
 | `catalyst_repo_url` | string or null | The criterion repository's URL, when shared. | — |
@@ -376,8 +377,31 @@ file exists. Role checks are advisory (`Rules-of-Rules.md` §11).
 
 ## 7. The journal
 
-`development/journal.jsonl`: one JSON object per line, append-only,
-never edited, deleted or reordered (INV-17). Empty is valid.
+One JSON object per line, append-only, never edited, deleted or
+reordered (INV-17), sharded since kernel 0.50:
+
+```
+development/journal/<actor>@<machine>/<YYYY-MM>.jsonl
+development/journal.jsonl            # before 0.50 only: read, never written
+```
+
+- **Shards.** Each entry goes to its actor's shard for this machine and
+  the entry's month: `<actor>` is the actor lowercased, every run of
+  characters outside `[a-z0-9._-]` replaced by `-`; `<machine>` is a random
+  id created once in `$CATALYST_HOME/machine` (never the host name). Two
+  people, or one person on two machines, never write the same file, so a
+  shared criterion merges without conflicts.
+- **Lock.** `journal append` and `journal adopt` hold the criterion's
+  journal lock (a file in the working copy's git directory) from reading
+  the last states to writing the entry: concurrent sessions never compute
+  a `before` from a stale state.
+- **Order.** The journal reads as every source merged in causal order:
+  each source keeps its own order, and the next entry is the earliest one
+  whose files all start from their state so far (or, for a file not seen
+  yet, from a state no pending entry produces); timestamps only break ties,
+  so a machine with a skewed clock cannot reorder a chain. Tools refer to an
+  entry as `<source>:<line>` (`journal/ada@k3j9q2/2026-10.jsonl:3`,
+  `journal.jsonl:12`).
 
 ```json
 {"timestamp": "2026-09-28T10:00:00Z", "actor": "ada", "command": "/create-item", "action": "create", "artifact": "ITEM-000012-Ab3xR9pQ", "targets": ["br-AUTH-000003-Ab3xR9pQ"], "intent": ["Validate the login form as br-AUTH-000003 requires."], "files": [{"path": ".criterion/items/ITEM-000012-login-form-validation.md", "before": null, "after": "3b18e512dba79e4c8300dd08aeb37f8e728b8dad"}, {"path": "src/login.py", "before": "9f87015fb23e4f7322f05d868f516b97b75ba037", "after": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"}], "writer": "catalyst/0.41.0", "tier": "feature"}
@@ -385,7 +409,7 @@ never edited, deleted or reordered (INV-17). Empty is valid.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `timestamp` | string | UTC, `YYYY-MM-DDTHH:MM:SSZ`; non-decreasing down the file. |
+| `timestamp` | string | UTC, `YYYY-MM-DDTHH:MM:SSZ`; non-decreasing down a shard. |
 | `actor` | string | The signer: a registered user's `git_username`, else `name`. |
 | `command` | string | The command, e.g. `/create-item`; for a tiered change outside any command, the tier (`chore`). |
 | `action` | string | `create`, `update`, `close`, `retire`, `status-change` or `sync`. |
@@ -407,7 +431,7 @@ never edited, deleted or reordered (INV-17). Empty is valid.
 - **Legacy entries** (no `writer`: bare working-copy-relative paths,
   `<repo>:path` prefixes, absolute paths) are normalised on read and never
   rewritten.
-- Structure: the file exists; every line is a JSON object with the eight
+- Structure: the journal exists (a shard or the legacy file); every line is a JSON object with the eight
   required fields; every `files[]` entry has a `path` and 40-hex-or-null
   hashes. `catalyst journal verify` (part of `check`) adds: timestamps in
   order, each file's `before` equal to its previous `after`, every blob
@@ -416,9 +440,11 @@ never edited, deleted or reordered (INV-17). Empty is valid.
   ones. `catalyst check` also warns about a product file git shows as
   changed that the journal has never recorded.
 - **Unrecorded changes.** A non-merge product commit after the pointer's
-  `journal_since` that changes a file to a blob that was not its latest
-  journaled `after` as of the commit (a hand revert included), and was not
-  adopted for that commit, is an unrecorded change (`catalyst unrecorded`; `check`,
+  `journal_since` that changes a file to a blob its journal chain does not
+  reach after the commit's parent blob (a blob never journaled, or a hand
+  revert to an older state), and was not adopted for that commit, is an
+  unrecorded change. Content decides, never clocks: committing before
+  journaling, rebases and skewed machines do not matter. An unrecorded change (`catalyst unrecorded`; `check`,
   `trace` and the commit-msg hook report it): a warning while the format
   is a release candidate, an error from `1.0` or under `strict_journal`.
   `.criterion` is never a product file. `catalyst journal adopt` records
@@ -434,6 +460,7 @@ type's index:
 ```
 # catalyst: append-only and regenerated files merge by union (catalyst criterion)
 development/journal.jsonl merge=union
+development/journal/**/*.jsonl merge=union
 items/items.md merge=union
 reconciliations/reconciliations.md merge=union
 workflows/workflows.md merge=union

@@ -21,6 +21,7 @@
 
 **Current state (BOOTSTRAP §2 step 2 − Resolve inputs):**
 Judgment questions asked during install:
+
 1. Project name (asks if no `dev-instructions.yaml`)
 2. Active module (asks; no default)
 3. Rule document(s) and prefix per seam (asks)
@@ -56,7 +57,8 @@ refactor window (2–3 months).
 **Risk:** Future modules arriving later than R3/R5 will need the choice back,
 but that's acceptable — this is a tactical R1 simplification, not permanent.
 
-**Effort:** 
+**Effort:**
+
 - Update BOOTSTRAP §2 to make `--module se` default during R0–R2.
 - Document in migration that this changes at R3/R5 when multi-module is ready.
 
@@ -67,7 +69,8 @@ but that's acceptable — this is a tactical R1 simplification, not permanent.
 **Current:** Ask for one `--rule-doc <file>:<prefix>` per project seam.
 Most projects answer: "business-rules:br" (single document).
 
-**Proposed:** 
+**Proposed:**
+
 - Default to one rule document: `<project-name>-rules.md` with prefix `br`.
 - Offer an *advanced* option: "Custom rule documents?" (yes/no).
 - If yes, ask for list; if no, use default.
@@ -76,6 +79,7 @@ Most projects answer: "business-rules:br" (single document).
 cuts a question for the common case.
 
 **Effort:**
+
 - Add `--no-advanced` flag to `catalyst init` (use default rule doc; skip prompt).
 - Modify BOOTSTRAP judgment step to offer "Simple (one document) / Advanced (custom)".
 - Update INSTANTIATION-GUIDE §1 to reflect this choice.
@@ -87,6 +91,7 @@ cuts a question for the common case.
 **Current:** Ask for both `--user <name>` and `--git-username <name>` separately.
 
 **Proposed:**
+
 - Infer git username from `git config user.name` (via `catalyst init` detection).
 - Fall back to `git config user.email` (extract local part before `@`).
 - If no git config found, ask once: "Git user identity?" (accepts `name <email>`).
@@ -96,6 +101,7 @@ cuts a question for the common case.
 Git config is already present on most developer machines.
 
 **Effort:**
+
 - Add git-config probe to `catalyst init` entry point (Python).
 - Update BOOTSTRAP §2 to say "Catalyst will detect your git user; or type…".
 - Document fallback path for machines without git config.
@@ -107,6 +113,7 @@ Git config is already present on most developer machines.
 **Current:** Ask where to put `.criterion/` for agent-owned storage.
 
 **Proposed:**
+
 - For Claude Code and other agents with agent-owned per-project storage,
   compute and use it silently (per the agent's shim, e.g. `CLAUDE.md`).
 - For agents without owned-space, use in-project `.criterion/` (already fallback).
@@ -116,6 +123,7 @@ Git config is already present on most developer machines.
 Eliminates one question entirely.
 
 **Effort:**
+
 - Update BOOTSTRAP §2 to remove the judgment step for `--at`.
 - Modify `catalyst init` to compute `--at` from the agent's config if
   `--at` not provided.
@@ -128,6 +136,7 @@ Eliminates one question entirely.
 **Current:** Judgment on whether to write `.claude/commands/` or equivalent.
 
 **Proposed:**
+
 - For agents supporting command files, compute the path from agent config
   (e.g. `.claude/commands` for Claude Code).
 - Pass `--commands-dir` silently; no ask.
@@ -135,6 +144,7 @@ Eliminates one question entirely.
 **Why:** Command directory is part of agent setup, not user decision. Eliminates one question entirely.
 
 **Effort:**
+
 - Update BOOTSTRAP §2 to remove judgment for command directory.
 - Modify `catalyst init` to accept `--commands-dir` from agent config.
 - Document per-agent command-dir paths in BOOTSTRAP §1.1.
@@ -157,12 +167,14 @@ After R1.2, BOOTSTRAP §2 "Resolve inputs" reduces to **3 judgments**:
 ## Implementation Steps
 
 ### Phase 1: BOOTSTRAP/INSTANTIATION docs update
+
 - [ ] Modify BOOTSTRAP.md §2 "Resolve inputs" to reflect new flow
 - [ ] Update INSTANTIATION-GUIDE.md §1 with new defaults
 - [ ] Document fallback for "advanced rule docs"
 - [ ] Add git-config auto-detect strategy
 
 ### Phase 2: CLI (`catalyst init`) changes
+
 - [ ] Add `--module se` hardcoded default for R1–R2
 - [ ] Add git-config probe (call `git config user.name/email`)
 - [ ] Add logic: if no `--at` provided and agent known, compute it
@@ -170,13 +182,15 @@ After R1.2, BOOTSTRAP §2 "Resolve inputs" reduces to **3 judgments**:
 - [ ] Add `--no-advanced` flag (use default rule doc; skip prompt)
 
 ### Phase 3: Testing
+
 - [ ] Test install with all defaults (repo name, SE module, auto git user)
 - [ ] Test install with git-config missing (should prompt once)
 - [ ] Test install on macOS, Linux, Windows + WSL
 - [ ] Test with existing agents (Claude Code, others) to verify location inference
 
 ### Phase 4: Token measurement
-- [ ] Run `measure_tokens.py` after changes to verify BOOTSTRAP/INSTANTIATION 
+
+- [ ] Run `measure_tokens.py` after changes to verify BOOTSTRAP/INSTANTIATION
   docs did not expand (should shrink by ~10–15%);
 - [ ] Update BUDGETS-BASELINE.json if threshold crossed
 

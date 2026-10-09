@@ -49,12 +49,6 @@ This folder contains the reusable document templates that seed the deployed cata
   complete until `/user-add` has registered at least one active user.
   `IAM/users/` and `IAM/roles/` each get the same `templates/` treatment
   as every other artifact type (`INVARIANTS.md` INV-20).
-- [`journal.template.jsonl`](journal.template.jsonl) — an empty file,
-  copied to `development/journal.jsonl` on first deploy (`INVARIANTS.md`
-  INV-17). Append-only, one JSON object per line, transaction-log-grade
-  (exact before/after `git hash-object -w` content pointers per touched
-  file, not just prose) — see `Rules-of-Rules.md` §12 for the full schema
-  and the `/journal-restore` point-in-time reconstruction mechanism.
 - [`catalyst-pointer.template.json`](catalyst-pointer.template.json) —
   copy to `<app-name>.catalyst` **at the target project's own root**
   (`INVARIANTS.md` INV-6), the one exception to "everything else deploys

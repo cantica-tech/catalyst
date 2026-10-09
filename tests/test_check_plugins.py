@@ -74,14 +74,9 @@ def test_validate_submodule_policy_ignores_non_plugin_submodules(tmp_path: Path)
 
 
 def test_parse_submodule_status_flags_uninitialized_plugin():
-    status = (
-        "-abc123 framework/kernel/plugins/repository/catalyst-git\n"
-        " 1234567 vendor/other (heads/main)\n"
-    )
+    status = "-abc123 framework/kernel/plugins/repository/catalyst-git\n 1234567 vendor/other (heads/main)\n"
     errors = cpg.parse_submodule_status(status, {"framework/kernel/plugins/repository/catalyst-git"})
-    assert any(
-        "framework/kernel/plugins/repository/catalyst-git is not initialized" in e for e in errors
-    )
+    assert any("framework/kernel/plugins/repository/catalyst-git is not initialized" in e for e in errors)
 
 
 def test_parse_submodule_status_ignores_non_plugin_paths():

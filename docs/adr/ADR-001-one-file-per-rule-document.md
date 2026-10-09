@@ -8,6 +8,7 @@
 ## Context
 
 During the R0 phase, ambiguity existed about how to organize rules in the catalyst framework:
+
 1. **One file per individual rule ID** (e.g., `rr-META-001.md`, `rr-META-002.md`, …) — creates ~100+ files, splits related rules across many files
 2. **One file per rule document** (e.g., `Rules-of-Rules.md` contains RR-META-001…006) — keeps related rules grouped in coherent documents
 
@@ -16,6 +17,7 @@ The existing practice already used one file per rule document, but this decision
 ## Decision
 
 **One file per rule document.** Rules are organized by domain/purpose in documents; each rule document is one file. Examples:
+
 - `Rules-of-Rules.md` contains meta-rules (how rules are created, versioned, cited)
 - Domain documents contain 1–20 related rules with clear ID numbering (e.g., structure rules, behavior rules, plugin rules)
 

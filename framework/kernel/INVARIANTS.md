@@ -31,6 +31,9 @@ one-line placeholder; numbers are never reused.
   module-independent part "the kernel", never "the framework core".
 - **INV-4 — Assent before push.** Never push anything (project or catalyst)
   without the user's explicit assent. No target-repo commit without assent.
+  The CLI enforces it for the criterion: every command that publishes
+  (`catalyst share push|create`, `criterion push`, `criterion create <url>`)
+  prints what it would publish and exits `3` unless given `--yes`.
 - **INV-25 — Act without asking, except where it breaks something
   fundamental.** Creating, reading, or updating an entity proceeds by
   default, without pausing for the user's authorization — routine,
@@ -111,8 +114,13 @@ one-line placeholder; numbers are never reused.
   and refuses if doing so would leave zero active users — this specific
   case isn't advisory, since it would break this invariant's own hard
   requirement (INV-25's fundamental-invariant exception).
-- **INV-17 — Append-only, replayable journal.** `development/journal.jsonl`
-  always exists (empty is fine). Every command that creates, modifies,
+- **INV-17 — Append-only, replayable journal.** The journal always
+  exists: one shard per actor, machine and month under
+  `development/journal/` (`<actor>@<machine>/<YYYY-MM>.jsonl`), plus, in a
+  deployment made before kernel 0.50, `development/journal.jsonl`, read and
+  never written again. Appends are serialised by the criterion's journal
+  lock; the shards read as one journal in causal order (each file's chain
+  decides, timestamps only break ties). Every command that creates, modifies,
   closes, or retires a rule-linked artifact, rule, domain, or work item, or
   changes a `Status` field, appends exactly one entry — timestamp, actor,
   command, action, artifact ID, `targets` (rule IDs, when applicable), one
@@ -125,8 +133,9 @@ one-line placeholder; numbers are never reused.
   that point reconstructs the exact tree state then, via `/journal-restore`
   into a side directory — never overwriting the live tree outright.
   Entries are immutable once written: never edited, deleted, or reordered.
-  A product commit after the pointer's `journal_since` whose changes no
-  entry records was made outside catalyst: it is detected, and adopted
+  A product commit after the pointer's `journal_since` whose result is not
+  a state its file's journal chain reaches after the commit's parent state
+  (decided by content hashes, never by clocks) was made outside catalyst: it is detected, and adopted
   into the journal or reverted, never silently left (`/adopt`).
   Complements — does not duplicate — the `catalyst-git` plugin's
   continuous compliance auditing of a *deployed project*; this journal is
@@ -140,9 +149,11 @@ one-line placeholder; numbers are never reused.
   requests against the shared branch (`criterion_branch`):
   `catalyst criterion push` commits, rebases (the journal and generated
   indexes merge by union), runs `catalyst check` and
-  `catalyst criterion integrity`, and pushes a topic branch; the same
-  two checks run in the criterion repository's CI, and
-  `catalyst criterion protect` makes them required. A real conflict
+  `catalyst criterion integrity`, and pushes a topic branch (with the
+  user's assent, INV-4); the same two checks run in the criterion
+  repository's CI — `catalyst check` includes the integrity check whenever
+  the criterion's HEAD is a merge — and `catalyst criterion protect` (or
+  `share create --protect`) makes them required. A real conflict
   stops the push with nothing pushed; the agent never applies a merge —
   it may record a proposed resolution as a `RECON-` case for a human to
   accept (INV-21). Identity is self-declared: branch protection and

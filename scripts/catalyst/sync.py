@@ -17,6 +17,7 @@ base the deployment was composed from is found next to a release zip
 (`…/kernel/v<deployed>/kernel-v<deployed>.zip`) or, for a catalyst checkout,
 from the git tag of the deployed version.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -36,8 +37,8 @@ from catalyst import compose, journal
 from catalyst.deployment import Deployment
 
 MIGRATION_ROW = re.compile(r"^\|\s*\[`([^`]+)`\]\([^)]*\)\s*\|\s*`([^`]+)`\s*\|\s*`([^`]+)`\s*\|\s*(.*?)\s*\|\s*$")
-AGENT_COMMANDS_DIR = ".claude/commands"          # where init wrote command files up to 0.48
-VERBATIM = ("ANALYSIS-PLAYBOOK.md", "definitions/README.md")   # kernel documents init copies as they are
+AGENT_COMMANDS_DIR = ".claude/commands"  # where init wrote command files up to 0.48
+VERBATIM = ("ANALYSIS-PLAYBOOK.md", "definitions/README.md")  # kernel documents init copies as they are
 
 
 class SyncError(Exception):
@@ -50,9 +51,9 @@ def vt(version: str) -> tuple[int, ...]:
 
 @dataclass
 class Action:
-    kind: str           # cli, invariants, module, document, command, definition, version
-    target: str         # what it touches
-    change: str         # add, update, conflict, skip
+    kind: str  # cli, invariants, module, document, command, definition, version
+    target: str  # what it touches
+    change: str  # add, update, conflict, skip
     detail: str = ""
 
 
@@ -66,16 +67,17 @@ class Plan:
     migrations: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
-        return {**{k: v for k, v in asdict(self).items() if k not in ("actions",)},
-                "actions": [asdict(a) for a in self.actions]}
+        return {
+            **{k: v for k, v in asdict(self).items() if k not in ("actions",)},
+            "actions": [asdict(a) for a in self.actions],
+        }
 
 
 # --- sources --------------------------------------------------------------
 class Sources:
     """Resolved directories for the new kernel/module, their bases and the CLI."""
 
-    def __init__(self, dep: Deployment, kernel: Path, module: Path | None, base_kernel: Path | None,
-                 cli: Path | None):
+    def __init__(self, dep: Deployment, kernel: Path, module: Path | None, base_kernel: Path | None, cli: Path | None):
         self.tmp = Path(tempfile.mkdtemp(prefix="catalyst-sync-"))
         self.kernel_arg = kernel
         self.kernel = self._open(kernel, "kernel")
@@ -110,6 +112,7 @@ class Sources:
         if path.suffix == ".zip":
             return self._open(path, "module")
         import package_release
+
         info = package_release.module_info_at(path)
         if info is None:
             raise SyncError(f"{path} is not a module (no module.yaml)")
@@ -137,8 +140,9 @@ class Sources:
             sibling = arg.parent.parent / f"v{self.deployed}" / f"kernel-v{self.deployed}.zip"
             return self._open(sibling, "base-kernel") if sibling.is_file() else None
         repo = arg.parent.parent
-        archive = subprocess.run(["git", "-C", str(repo), "archive", "--format=tar", self.deployed, "framework/kernel"],
-                                 capture_output=True)
+        archive = subprocess.run(
+            ["git", "-C", str(repo), "archive", "--format=tar", self.deployed, "framework/kernel"], capture_output=True
+        )
         if archive.returncode != 0:
             return None
         out = self.tmp / "base-kernel-tree"
@@ -153,6 +157,7 @@ class Sources:
         repo = self.kernel.parent.parent
         if (repo / "scripts" / "catalyst" / "__main__.py").is_file():
             import package_release
+
             return package_release.build_cli(repo, self.tmp / "catalyst.pyz")
         return None
 
@@ -168,8 +173,9 @@ def _same(a: Path, b: Path) -> bool:
 def _tree_changes(new: Path, old: Path) -> list[str]:
     rel = lambda base: {p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file()}
     new_files, old_files = rel(new), rel(old) if old.is_dir() else set()
-    return sorted(f for f in new_files | old_files
-                  if f not in new_files or f not in old_files or not _same(new / f, old / f))
+    return sorted(
+        f for f in new_files | old_files if f not in new_files or f not in old_files or not _same(new / f, old / f)
+    )
 
 
 def migrations(index: Path, deployed: str, target: str, owner: str) -> list[dict]:
@@ -179,8 +185,9 @@ def migrations(index: Path, deployed: str, target: str, owner: str) -> list[dict
     for line in index.read_text(encoding="utf-8").splitlines():
         m = MIGRATION_ROW.match(line)
         if m and vt(m.group(2)) >= vt(deployed) and vt(m.group(3)) <= vt(target):
-            out.append({"owner": owner, "file": m.group(1), "from": m.group(2), "to": m.group(3),
-                        "summary": m.group(4)})
+            out.append(
+                {"owner": owner, "file": m.group(1), "from": m.group(2), "to": m.group(3), "summary": m.group(4)}
+            )
     return out
 
 
@@ -209,17 +216,24 @@ def _command_sources(kernel: Path | None, module: Path | None) -> dict[str, Path
 
 def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     mod = dep.module
-    new_mod_version = ((src.module / "version.txt").read_text(encoding="utf-8").strip()
-                       if src.module and (src.module / "version.txt").is_file() else None)
+    new_mod_version = (
+        (src.module / "version.txt").read_text(encoding="utf-8").strip()
+        if src.module and (src.module / "version.txt").is_file()
+        else None
+    )
     p = Plan(src.deployed, src.version, getattr(mod, "version", None) if mod else None, new_mod_version)
     root = dep.root
     if src.cli is not None and not _same(src.cli, root / "bin" / "catalyst.pyz"):
         p.actions.append(Action("cli", ".criterion/bin/catalyst.pyz", "update", f"catalyst {src.version}"))
     module_dir = src.module or (root / "modules" / mod.id if mod else None)
-    for name, source in (("INVARIANTS.md", src.kernel / "INVARIANTS.md"),
-                         ("INVARIANTS.module.md", module_dir / "INVARIANTS.module.md" if module_dir else None)):
+    for name, source in (
+        ("INVARIANTS.md", src.kernel / "INVARIANTS.md"),
+        ("INVARIANTS.module.md", module_dir / "INVARIANTS.module.md" if module_dir else None),
+    ):
         if source is not None and source.is_file() and not _same(source, root / name):
-            p.actions.append(Action("invariants", f".criterion/{name}", "add" if not (root / name).exists() else "update"))
+            p.actions.append(
+                Action("invariants", f".criterion/{name}", "add" if not (root / name).exists() else "update")
+            )
     for rel in VERBATIM:
         new_doc, mine = src.kernel / rel, root / rel
         if not new_doc.is_file() or _same(new_doc, mine):
@@ -230,39 +244,83 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         elif base_doc is not None and _same(base_doc, mine):
             p.actions.append(Action("kernel-doc", f".criterion/{rel}", "update"))
         else:
-            p.actions.append(Action("kernel-doc", f".criterion/{rel}", "conflict",
-                                    "differs from the release it came from: compare by hand"))
+            p.actions.append(
+                Action(
+                    "kernel-doc",
+                    f".criterion/{rel}",
+                    "conflict",
+                    "differs from the release it came from: compare by hand",
+                )
+            )
     if src.module is not None and mod is not None:
         changed = _tree_changes(src.module, root / "modules" / mod.id)
         if changed:
-            p.actions.append(Action("module", f".criterion/modules/{mod.id}", "update",
-                                    f"{len(changed)} file(s), {p.from_module} -> {p.to_module}"))
+            p.actions.append(
+                Action(
+                    "module",
+                    f".criterion/modules/{mod.id}",
+                    "update",
+                    f"{len(changed)} file(s), {p.from_module} -> {p.to_module}",
+                )
+            )
     moving = p.from_kernel != p.to_kernel or any(a.kind == "module" for a in p.actions)
     if mod is not None and moving and src.base_kernel is not None:
         params = compose.deployed_params(root, mod.id)
-        for r in compose.recompose(root, params, (src.base_kernel, src.base_module),
-                                   (src.kernel, src.module or root / "modules" / mod.id), write=False):
+        for r in compose.recompose(
+            root,
+            params,
+            (src.base_kernel, src.base_module),
+            (src.kernel, src.module or root / "modules" / mod.id),
+            write=False,
+        ):
             if r.changed or r.frozen:
-                p.actions.append(Action("document", f".criterion/{r.path}",
-                                        "skip" if r.frozen else ("conflict" if r.conflicts else "update"),
-                                        "frozen" if r.frozen else (f"{r.conflicts} conflict(s)" if r.conflicts else "")))
+                p.actions.append(
+                    Action(
+                        "document",
+                        f".criterion/{r.path}",
+                        "skip" if r.frozen else ("conflict" if r.conflicts else "update"),
+                        "frozen" if r.frozen else (f"{r.conflicts} conflict(s)" if r.conflicts else ""),
+                    )
+                )
     elif mod is not None and moving:
-        p.actions.append(Action("document", "governing documents", "skip",
-                                f"no base kernel {src.deployed} found: pass --base-kernel to recompose"))
+        p.actions.append(
+            Action(
+                "document",
+                "governing documents",
+                "skip",
+                f"no base kernel {src.deployed} found: pass --base-kernel to recompose",
+            )
+        )
     if commands is not None and commands.is_dir():
         p.actions += _retired_commands(dep, src, commands)
     settings = dep.project_root / ".claude" / "settings.json"
     if _catalyst_hooks(settings)[1]:
-        p.actions.append(Action("agent-hook", _rel(dep, settings), "remove",
-                                "catalyst's hooks: `catalyst agent install claude-code` holds them at user level"))
+        p.actions.append(
+            Action(
+                "agent-hook",
+                _rel(dep, settings),
+                "remove",
+                "catalyst's hooks: `catalyst agent install claude-code` holds them at user level",
+            )
+        )
     deployed_defs = root / "definitions"
     for source in (src.kernel, src.module):
-        for folder in sorted((source / "definitions").iterdir()) if source and (source / "definitions").is_dir() else []:
+        for folder in (
+            sorted((source / "definitions").iterdir()) if source and (source / "definitions").is_dir() else []
+        ):
             if folder.is_dir() and not (deployed_defs / f"{folder.name}.md").exists():
-                p.actions.append(Action("definition", f".criterion/definitions/{folder.name}.md", "add",
-                                        "new entity type; existing definitions are never touched (INV-23)"))
+                p.actions.append(
+                    Action(
+                        "definition",
+                        f".criterion/definitions/{folder.name}.md",
+                        "add",
+                        "new entity type; existing definitions are never touched (INV-23)",
+                    )
+                )
     if p.from_kernel != p.to_kernel:
-        p.actions.append(Action("version", ".criterion/version.txt + pointer", "update", f"{p.from_kernel} -> {p.to_kernel}"))
+        p.actions.append(
+            Action("version", ".criterion/version.txt + pointer", "update", f"{p.from_kernel} -> {p.to_kernel}")
+        )
     p.migrations = migrations(src.kernel / "migrations" / "migrations.md", src.deployed, src.version, "kernel")
     if src.module is not None:
         p.migrations += migrations(src.module / "migrations" / "migrations.md", src.deployed, src.version, "module")
@@ -275,6 +333,7 @@ def _retired_commands(dep: Deployment, src: Sources, commands: Path) -> list[Act
     it, or a generated one that defers to `catalyst spec`): removed. One edited
     locally: left to the user. Anything else (`/dogfood`, the user's own): kept."""
     from catalyst.spec import SpecError, load_section4
+
     try:
         s = load_section4(dep)
         names = set(s.bullets) | set(s.aliases)
@@ -293,8 +352,14 @@ def _retired_commands(dep: Deployment, src: Sources, commands: Path) -> list[Act
         if any(_same(source, path) for source in shipped.get(name, [])) or f"catalyst spec {name}" in text:
             out.append(Action("command", _rel(dep, path), "remove", "served by `catalyst mcp` now"))
         else:
-            out.append(Action("command", _rel(dep, path), "conflict",
-                              "edited locally: catalyst no longer writes command files — remove it by hand"))
+            out.append(
+                Action(
+                    "command",
+                    _rel(dep, path),
+                    "conflict",
+                    "edited locally: catalyst no longer writes command files — remove it by hand",
+                )
+            )
     return out
 
 
@@ -309,7 +374,9 @@ def _catalyst_hooks(settings: Path) -> tuple[dict, bool]:
         return data, False
     found = False
     for event in list(hooks):
-        kept = [h for h in hooks[event] if not re.search(r"catalyst(?:\.pyz|\.cmd)?\W+hook\b|stop_hook\.py", json.dumps(h))]
+        kept = [
+            h for h in hooks[event] if not re.search(r"catalyst(?:\.pyz|\.cmd)?\W+hook\b|stop_hook\.py", json.dumps(h))
+        ]
         found |= len(kept) != len(hooks[event])
         if kept:
             hooks[event] = kept
@@ -329,16 +396,23 @@ def _rel(dep: Deployment, path: Path) -> str:
 
 # --- applying -------------------------------------------------------------
 def _latest_definition(folder: Path) -> Path | None:
-    found = [(int(m.group(1)), p) for p in folder.glob("DEFINITION-*-v*.md") if (m := re.search(r"-v(\d+)\.md$", p.name))]
+    found = [
+        (int(m.group(1)), p) for p in folder.glob("DEFINITION-*-v*.md") if (m := re.search(r"-v(\d+)\.md$", p.name))
+    ]
     return max(found)[1] if found else None
 
 
-def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, intent: list[str]) -> tuple[Plan, list[Path]]:
+def apply(
+    dep: Deployment, src: Sources, commands: Path | None, actor: str, intent: list[str]
+) -> tuple[Plan, list[Path]]:
     p = plan(dep, src, commands)
     blocking = [a for a in p.actions if a.change == "conflict" and a.kind == "document"]
     if blocking:
-        raise SyncError("recompose would leave conflicts in " + ", ".join(a.target for a in blocking)
-                        + ": resolve with `catalyst recompose` by hand, then sync")
+        raise SyncError(
+            "recompose would leave conflicts in "
+            + ", ".join(a.target for a in blocking)
+            + ": resolve with `catalyst recompose` by hand, then sync"
+        )
     root, touched = dep.root, []
     mod = dep.module
     for a in p.actions:
@@ -361,11 +435,16 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
         shutil.rmtree(target)
         shutil.copytree(src.module, target)
         after = {f.relative_to(target).as_posix() for f in target.rglob("*") if f.is_file()}
-        touched += [target / f for f in sorted(before | after)
-                    if f not in after or f not in before or not _same(target / f, src.base_module / f)]
+        touched += [
+            target / f
+            for f in sorted(before | after)
+            if f not in after or f not in before or not _same(target / f, src.base_module / f)
+        ]
     if mod is not None and src.base_kernel is not None and any(a.kind == "document" for a in p.actions):
         params = compose.deployed_params(root, mod.id)
-        for r in compose.recompose(root, params, (src.base_kernel, src.base_module), (src.kernel, root / "modules" / mod.id)):
+        for r in compose.recompose(
+            root, params, (src.base_kernel, src.base_module), (src.kernel, root / "modules" / mod.id)
+        ):
             if r.changed:
                 touched.append(root / r.path)
     for a in p.actions:
@@ -388,13 +467,16 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
             for source in (src.kernel, root / "modules" / mod.id if mod else None):
                 latest = _latest_definition(source / "definitions" / name) if source else None
                 if latest is not None:
-                    (root / "definitions" / f"{name}.md").write_text(latest.read_text(encoding="utf-8"), encoding="utf-8")
+                    (root / "definitions" / f"{name}.md").write_text(
+                        latest.read_text(encoding="utf-8"), encoding="utf-8"
+                    )
                     touched.append(root / "definitions" / f"{name}.md")
                     break
         elif a.kind == "version":
             (root / "version.txt").write_text(src.version + "\n", encoding="utf-8")
             touched.append(root / "version.txt")
             import project_file
+
             pointer = project_file.find(dep.project_root)
             if pointer is not None and not dep.standalone:
                 data = project_file.read(pointer)
@@ -404,10 +486,19 @@ def apply(dep: Deployment, src: Sources, commands: Path | None, actor: str, inte
                 touched.append(pointer)
     if touched:
         artifact = f"kernel {src.version}" + (f", module {mod.id} {p.to_module}" if p.to_module else "")
-        journal.append(dep, journal.AppendRequest(
-            command="/sync-framework", action="sync", artifact=artifact, targets=[],
-            intent=intent or [f"Sync to {artifact} (catalyst sync apply)"],
-            files=[str(t) for t in dict.fromkeys(touched)], actor=actor, tier="chore"))
+        journal.append(
+            dep,
+            journal.AppendRequest(
+                command="/sync-framework",
+                action="sync",
+                artifact=artifact,
+                targets=[],
+                intent=intent or [f"Sync to {artifact} (catalyst sync apply)"],
+                files=[str(t) for t in dict.fromkeys(touched)],
+                actor=actor,
+                tier="chore",
+            ),
+        )
     return p, touched
 
 

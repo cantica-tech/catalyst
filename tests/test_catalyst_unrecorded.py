@@ -1,5 +1,6 @@
 """Changes made outside catalyst: detection, severity, the hook, trace,
 check, report, and adoption (roadmap manual-changes, RM-000030..032)."""
+
 from __future__ import annotations
 
 import json
@@ -7,8 +8,7 @@ import subprocess
 
 import pytest
 
-from catalyst import journal as j
-from catalyst import unrecorded as u
+from catalyst import journal as j, unrecorded as u
 from catalyst.__main__ import main
 from catalyst.check import run as check_run
 from catalyst.deployment import load
@@ -16,8 +16,9 @@ from catalyst_fixtures import USERID, make_project, write
 
 
 def git(repo, *args) -> str:
-    return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True,
-                          text=True, encoding="utf-8").stdout.strip()
+    return subprocess.run(
+        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, encoding="utf-8"
+    ).stdout.strip()
 
 
 def set_pointer(project, **fields):
@@ -37,8 +38,18 @@ def manual_commit(project, path="src/app.py", text="print('hi')\n", msg="Hand ed
 def journaled_commit(project, path="src/lib.py", text="x = 1\n"):
     dep = load(project)
     write(project / path, text)
-    j.append(dep, j.AppendRequest(command="/status", action="update", artifact=f"ITEM-000001-{USERID}",
-                                  targets=[], intent=["agent work"], files=[path], actor="ada"))
+    j.append(
+        dep,
+        j.AppendRequest(
+            command="/status",
+            action="update",
+            artifact=f"ITEM-000001-{USERID}",
+            targets=[],
+            intent=["agent work"],
+            files=[path],
+            actor="ada",
+        ),
+    )
     git(project, "add", path)
     git(project, "commit", "-qm", f"ITEM-000001: {path}")
     return git(project, "rev-parse", "HEAD")
@@ -52,9 +63,18 @@ def fresh_project(tmp_path, monkeypatch):
     monkeypatch.chdir(p)
     set_pointer(p, journal_since=git(p, "rev-parse", "HEAD"))
     # as a migration does: the pointer edit is journaled, then committed
-    j.append(load(p), j.AppendRequest(command="/sync-framework", action="sync", artifact="baseline",
-                                      targets=[], intent=["declare the baseline"], files=["app.catalyst"],
-                                      actor="ada"))
+    j.append(
+        load(p),
+        j.AppendRequest(
+            command="/sync-framework",
+            action="sync",
+            artifact="baseline",
+            targets=[],
+            intent=["declare the baseline"],
+            files=["app.catalyst"],
+            actor="ada",
+        ),
+    )
     git(p, "commit", "-qam", "chore: declare the baseline")
     return p
 
@@ -65,11 +85,11 @@ def proj(tmp_path, monkeypatch):
 
 
 def test_level_follows_the_format_and_the_opt_in(proj):
-    assert u.level(load(proj)) == "warning"                 # 1.0-rc: the beta
+    assert u.level(load(proj)) == "warning"  # 1.0-rc: the beta
     set_pointer(proj, format="1.0")
-    assert u.level(load(proj)) == "error"                   # after the beta
+    assert u.level(load(proj)) == "error"  # after the beta
     set_pointer(proj, format="1.0-rc", strict_journal=True)
-    assert u.level(load(proj)) == "error"                   # opted in early
+    assert u.level(load(proj)) == "error"  # opted in early
     set_pointer(proj, format=None, strict_journal=False)
     assert u.level(load(proj)) == "warning"
 
@@ -107,14 +127,15 @@ def test_no_baseline_means_history_is_not_checked(proj):
 
 def test_empty_baseline_checks_the_whole_history(proj):
     set_pointer(proj, journal_since="")
-    assert u.since_baseline(load(proj))           # the fixture's own commits were never journaled
+    assert u.since_baseline(load(proj))  # the fixture's own commits were never journaled
 
 
 def test_check_warns_in_the_beta_and_errors_after(proj):
     manual_commit(proj)
     report = check_run(load(proj))
     assert any("unrecorded-change" in w for w in report.warnings) and not any(
-        "unrecorded-change" in e for e in report.errors)
+        "unrecorded-change" in e for e in report.errors
+    )
     set_pointer(proj, format="1.0")
     # 1.0 is not a supported format yet: the format error comes first, the change is an error too
     report = check_run(load(proj))
@@ -133,7 +154,7 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     sha = manual_commit(proj)
     assert main(["journal", "adopt", sha[:10], "--intent", "hand-written greeting", "--tier", "chore"]) == 0
     assert "adopted" in capsys.readouterr().out
-    entry = [e for _, e, _ in j.read(load(proj)) if e][-1]
+    entry = [e for _, e, _ in j.read(load(proj)) if e and e.get("origin")][-1]
     assert entry["origin"] == "manual" and entry["commit"] == sha and entry["actor"] == "Ada Lovelace"
     assert entry["files"][0]["path"] == "src/app.py" and entry["files"][0]["before"] is None
     assert entry["tier"] == "chore" and entry["command"] == "/adopt"
@@ -165,14 +186,24 @@ def test_commit_msg_hook_warns_in_the_beta_and_refuses_after(proj, capsys):
     set_pointer(proj, strict_journal=True)
     assert main(["hook", "commit-msg", str(msg)]) == 1
     assert "not recorded in the journal" in capsys.readouterr().err
-    j.append(load(proj), j.AppendRequest(command="/status", action="create", artifact="x", targets=[],
-                                         intent=["journaled"], files=["src/hand.py"], actor="ada"))
+    j.append(
+        load(proj),
+        j.AppendRequest(
+            command="/status",
+            action="create",
+            artifact="x",
+            targets=[],
+            intent=["journaled"],
+            files=["src/hand.py"],
+            actor="ada",
+        ),
+    )
     assert main(["hook", "commit-msg", str(msg)]) == 0
 
 
 def test_trace_reports_unrecorded_changes(proj, capsys):
     manual_commit(proj)
-    assert main(["trace", "HEAD~1..HEAD"]) == 0                  # a warning in the beta
+    assert main(["trace", "HEAD~1..HEAD"]) == 0  # a warning in the beta
     out = capsys.readouterr().out
     assert "WARNING unrecorded-change" in out and "1 with unrecorded changes" in out
     set_pointer(proj, strict_journal=True)
@@ -186,6 +217,7 @@ def test_unrecorded_command_and_report(proj, capsys):
     listed = json.loads(capsys.readouterr().out)
     assert listed[0]["commit"] == sha and listed[0]["files"][0]["path"] == "src/app.py"
     from catalyst.report import build, render
+
     r = build(load(proj))
     assert r["unrecorded_commits"] == 1 and r["adopted_commits"] == 0
     assert "1 unrecorded, 0 adopted" in render(r)
@@ -195,11 +227,18 @@ def test_unrecorded_command_and_report(proj, capsys):
 
 def test_parse_raw_skips_the_working_copy_and_mode_only_changes():
     a, b = "a" * 40, "b" * 40
-    tokens = [f":100644 100644 {a} {b} M", "src/x.py",
-              f":160000 160000 {a} {b} M", ".criterion",
-              f":100644 100644 {a} {b} M", ".criterion/rules/x.md",
-              f":100644 100755 {a} {a} M", "run.sh",
-              f":000000 100644 {'0' * 40} {b} A", "new.py"]
+    tokens = [
+        f":100644 100644 {a} {b} M",
+        "src/x.py",
+        f":160000 160000 {a} {b} M",
+        ".criterion",
+        f":100644 100644 {a} {b} M",
+        ".criterion/rules/x.md",
+        f":100644 100755 {a} {a} M",
+        "run.sh",
+        f":000000 100644 {'0' * 40} {b} A",
+        "new.py",
+    ]
     assert u._parse_raw(tokens) == [("src/x.py", a, b), ("new.py", None, b)]
 
 
@@ -209,7 +248,7 @@ def test_a_hand_commit_to_a_journaled_file_is_one_beta_warning_not_an_error(proj
     report = check_run(load(proj))
     assert [e for e in report.errors if not e.startswith("structure:")] == []
     assert sum("unrecorded-change" in w and "src/lib.py" in w for w in report.warnings) == 1
-    write(proj / "src" / "lib.py", "x = 3\n")          # edited again, not committed: work in progress
+    write(proj / "src" / "lib.py", "x = 3\n")  # edited again, not committed: work in progress
     assert any("unjournaled" in e for e in check_run(load(proj)).errors)
 
 
@@ -219,21 +258,30 @@ import os
 
 
 def at(epoch: int) -> str:
-    return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.datetime.fromtimestamp(epoch, datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def commit_at(project, epoch, msg, *paths):
     git(project, "add", *(paths or ["-A"]))
     env = dict(os.environ, GIT_COMMITTER_DATE=f"@{epoch} +0000", GIT_AUTHOR_DATE=f"@{epoch} +0000")
-    subprocess.run(["git", "-C", str(project), "commit", "-qm", msg], check=True, env=env,
-                   capture_output=True)
+    subprocess.run(["git", "-C", str(project), "commit", "-qm", msg], check=True, env=env, capture_output=True)
     return git(project, "rev-parse", "HEAD")
 
 
 def journal_at(project, epoch, path):
-    j.append(load(project), j.AppendRequest(command="/status", action="update", artifact="x", targets=[],
-                                            intent=["agent work"], files=[path], actor="ada",
-                                            timestamp=at(epoch)))
+    j.append(
+        load(project),
+        j.AppendRequest(
+            command="/status",
+            action="update",
+            artifact="x",
+            targets=[],
+            intent=["agent work"],
+            files=[path],
+            actor="ada",
+            timestamp=at(epoch),
+        ),
+    )
 
 
 def journal_errors(project):
@@ -245,7 +293,7 @@ T = 2_000_000_000
 
 def test_adopt_continues_the_chain_from_an_uncommitted_journaled_state(proj):
     write(proj / "f.txt", "A\n")
-    journal_at(proj, T, "f.txt")                     # journaled, never committed
+    journal_at(proj, T, "f.txt")  # journaled, never committed
     write(proj / "f.txt", "B\n")
     sha = commit_at(proj, T + 10, "chore: by hand", "f.txt")
     u.adopt(load(proj), [sha], ["hand edit"])
@@ -301,9 +349,10 @@ def test_a_path_with_a_space_is_reported_once(proj):
 
 def test_a_project_in_a_subdirectory_of_its_repository(tmp_path, monkeypatch):
     from catalyst_fixtures import git_init
+
     mono = tmp_path / "mono"
     mono.mkdir()
-    project = make_project(mono)                       # mono/app, not a repository of its own
+    project = make_project(mono)  # mono/app, not a repository of its own
     git_init(project / ".criterion")
     subprocess.run(["git", "init", "-q", str(mono)], check=True)
     for k, v in (("user.name", "Ada Lovelace"), ("user.email", "ada@example.com")):

@@ -23,8 +23,9 @@ def make_workspace(tmp_path: Path) -> Path:
         "| Id | Repository | Default branch |\n"
         "|---|---|---|\n"
         "| `example-process` | `git@example.com:x/catalyst-example-process.git` | `main` |\n"
-        "| `absent-process` | `git@example.com:x/catalyst-absent-process.git` | `main` |\n"
-    , encoding="utf-8")
+        "| `absent-process` | `git@example.com:x/catalyst-absent-process.git` | `main` |\n",
+        encoding="utf-8",
+    )
 
     mod_dir = tmp_path / "catalyst-example-process"
     mod_dir.mkdir()
@@ -33,8 +34,9 @@ def make_workspace(tmp_path: Path) -> Path:
         "id: example-process\n"
         "name: Example Process Module\n"
         "version: 1.0.0\n"
-        "description: A fictional module for tests.\n"
-    , encoding="utf-8")
+        "description: A fictional module for tests.\n",
+        encoding="utf-8",
+    )
     (mod_dir / "README.md").write_text("# Module\n", encoding="utf-8")
     (mod_dir / ".git").mkdir()
     (mod_dir / ".git" / "HEAD").write_text("ref\n", encoding="utf-8")
@@ -112,8 +114,7 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     # 3. Verify publishing into a distribution repository checkout
     publish_dir = tmp_path / "dist-repo"
     publish_dir.mkdir()
-    monkeypatch.setattr(pr, "run_cmd",
-                        lambda cmd, cwd: calls.append(cmd) or ("M x" if "status" in cmd else ""))
+    monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: calls.append(cmd) or ("M x" if "status" in cmd else ""))
     pr.publish_releases(root, publish_dir)
     assert calls == []
 
@@ -156,9 +157,8 @@ def test_package_modules_skips_when_not_checked_out(tmp_path: Path, monkeypatch)
     (root / "framework" / "modules").mkdir(parents=True)
     (root / "version.txt").write_text("0.35.0\n", encoding="utf-8")
     (root / "framework" / "modules" / "catalog.md").write_text(
-        "| Id | Repository | Default branch |\n|---|---|---|\n"
-        "| `absent-process` | `x` | `main` |\n"
-    , encoding="utf-8")
+        "| Id | Repository | Default branch |\n|---|---|---|\n| `absent-process` | `x` | `main` |\n", encoding="utf-8"
+    )
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
     assert pr.package_modules(root) == []
 
@@ -172,9 +172,11 @@ def test_package_modules_without_catalog(tmp_path: Path):
 def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path):
     """The module checkout sits on development: the archive is committed on
     origin main, and development neither receives it nor gets pushed."""
+
     def git(*args, cwd):
-        return subprocess.run(["git", *args], cwd=cwd, check=True, text=True, encoding="utf-8",
-                              capture_output=True).stdout.strip()
+        return subprocess.run(
+            ["git", *args], cwd=cwd, check=True, text=True, encoding="utf-8", capture_output=True
+        ).stdout.strip()
 
     origin = tmp_path / "origin.git"
     git("init", "-q", "--bare", str(origin), cwd=tmp_path)
@@ -209,17 +211,24 @@ def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
     publishing it again commits nothing."""
     import os
     import time
+
     root = make_workspace(tmp_path)
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
     (root / "LICENSE").write_text("Apache License\n", encoding="utf-8")
-    mod_zip = (tmp_path / "catalyst-example-process" / "catalyst" / "modules"
-               / "example-process" / "v1.2.0" / "example-process-v1.2.0.zip")
+    mod_zip = (
+        tmp_path
+        / "catalyst-example-process"
+        / "catalyst"
+        / "modules"
+        / "example-process"
+        / "v1.2.0"
+        / "example-process-v1.2.0.zip"
+    )
     kernel_dir = root / "catalyst" / "kernel" / "v0.33.0"
 
     pr.package_modules(root)
     pr.package_kernel(root)
-    first = {p: p.read_bytes() for p in (mod_zip, kernel_dir / "kernel-v0.33.0.zip",
-                                         kernel_dir / "catalyst.pyz")}
+    first = {p: p.read_bytes() for p in (mod_zip, kernel_dir / "kernel-v0.33.0.zip", kernel_dir / "catalyst.pyz")}
     later = time.time() + 3600
     for p in (root / "framework").rglob("*"):
         os.utime(p, (later, later))
@@ -245,7 +254,7 @@ def test_a_module_release_states_its_own_kernel_requirement(tmp_path: Path, caps
     first = {p.name: p.read_bytes() for p in release.iterdir()}
     assert "declares no kernel_version" not in capsys.readouterr().out
 
-    (root / "version.txt").write_text("0.99.0\n", encoding="utf-8")              # a newer kernel packages it again
+    (root / "version.txt").write_text("0.99.0\n", encoding="utf-8")  # a newer kernel packages it again
     pr.package_modules(root)
     assert {p.name: p.read_bytes() for p in release.iterdir()} == first
 

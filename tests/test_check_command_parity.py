@@ -5,12 +5,7 @@ import check_command_parity as ccp
 
 def make_coc(tmp_path: Path, section4_body: str, *, before="", after="") -> Path:
     coc = tmp_path / "CODE-OF-CONDUCT.md"
-    coc.write_text(
-        f"{before}"
-        "## 4. Slash-command entry points\n\n"
-        f"{section4_body}"
-        f"{after}"
-    , encoding="utf-8")
+    coc.write_text(f"{before}## 4. Slash-command entry points\n\n{section4_body}{after}", encoding="utf-8")
     return coc
 
 
@@ -31,10 +26,7 @@ def test_extract_section4_commands_parses_simple_bullets():
 
 
 def test_extract_section4_commands_handles_alias_bullet():
-    text = (
-        "## 4. Slash-command entry points\n\n"
-        "- `/create-item` or `/create-new-item` — create an item.\n"
-    )
+    text = "## 4. Slash-command entry points\n\n- `/create-item` or `/create-new-item` — create an item.\n"
     assert ccp.extract_section4_commands(text) == {"create-item", "create-new-item"}
 
 
@@ -86,26 +78,13 @@ def test_extract_section4_commands_returns_none_when_section_missing():
 
 def test_extract_taskfile_commands_parses_top_level_tasks():
     text = (
-        'version: "3"\n\n'
-        "tasks:\n"
-        "  create-item:\n"
-        '    desc: "..."\n'
-        "    cmds:\n"
-        '      - "true"\n'
-        "  list:\n"
-        '    desc: "..."\n'
+        'version: "3"\n\ntasks:\n  create-item:\n    desc: "..."\n    cmds:\n      - "true"\n  list:\n    desc: "..."\n'
     )
     assert ccp.extract_taskfile_commands(text) == {"create-item", "list"}
 
 
 def test_extract_taskfile_commands_stops_at_dedent():
-    text = (
-        "tasks:\n"
-        "  create-item:\n"
-        '    desc: "..."\n'
-        "vars:\n"
-        "  should-not-count: true\n"
-    )
+    text = 'tasks:\n  create-item:\n    desc: "..."\nvars:\n  should-not-count: true\n'
     assert ccp.extract_taskfile_commands(text) == {"create-item"}
 
 
@@ -116,8 +95,7 @@ def test_extract_taskfile_commands_returns_none_when_no_tasks_block():
 def test_check_taskfile_parity_clean_baseline_has_no_errors(tmp_path: Path):
     coc = make_coc(
         tmp_path,
-        "- `/create-item` — create an item.\n"
-        "- `/list <type>` — list artifacts.\n",
+        "- `/create-item` — create an item.\n- `/list <type>` — list artifacts.\n",
     )
     taskfile = make_taskfile(tmp_path, ["create-item", "list"])
     assert ccp.check_taskfile_parity(taskfile, coc) == []
@@ -180,9 +158,7 @@ def test_main_returns_one_for_missing_taskfile(tmp_path: Path, monkeypatch):
     assert ccp.main() == 1
 
 
-def test_main_ignores_a_taskfile_at_the_project_root_not_in_criterion(
-    tmp_path: Path, monkeypatch
-):
+def test_main_ignores_a_taskfile_at_the_project_root_not_in_criterion(tmp_path: Path, monkeypatch):
     """Taskfile.common.yml belongs inside the resolved deployment root
     (agent-owned space, INV-6), not the outer project tree — a copy left
     at the project root (the pre-0.19.0 location) must not satisfy the
@@ -199,11 +175,8 @@ def write_example_module(project: Path) -> None:
     mdir = project / "framework" / "modules" / "example-process"
     mdir.mkdir(parents=True)
     (mdir / "module.yaml").write_text(
-        "id: example-process\n"
-        "commands:\n"
-        "  - name: create-item\n"
-        "    description: Create a new item\n"
-    , encoding="utf-8")
+        "id: example-process\ncommands:\n  - name: create-item\n    description: Create a new item\n", encoding="utf-8"
+    )
     (project / "app.catalyst").write_text('{"module": "example-process"}', encoding="utf-8")
 
 

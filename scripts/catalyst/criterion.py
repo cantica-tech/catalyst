@@ -20,6 +20,7 @@ protection makes those gates real.
              index rows, journal lines — may be missing from the result.
 - protect:   branch protection for the shared branch (GitHub, explicit --yes).
 """
+
 from __future__ import annotations
 
 import datetime
@@ -33,7 +34,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import project_file
-
 from catalyst import proc
 from catalyst.deployment import Deployment
 
@@ -109,8 +109,10 @@ class NeedsURL(CriterionError):
     command needs one: the caller asks for the URL, or passes --url."""
 
     def __init__(self, what: str = "this deployment is local only"):
-        super().__init__(f"no criterion repository yet: {what} — pass --url <url> (the criterion "
-                         "repository: empty, or already holding this working copy's history)")
+        super().__init__(
+            f"no criterion repository yet: {what} — pass --url <url> (the criterion "
+            "repository: empty, or already holding this working copy's history)"
+        )
 
 
 class CriterionConflict(CriterionError):
@@ -119,9 +121,11 @@ class CriterionConflict(CriterionError):
     def __init__(self, files: list[str]):
         self.files = files
         super().__init__(
-            "rebasing onto the shared branch conflicts in: " + ", ".join(files) +
-            ". Nothing was pushed. Resolve by hand, or record a proposed resolution "
-            "as a RECON case for a human to accept (/reconcile) — never auto-apply one.")
+            "rebasing onto the shared branch conflicts in: "
+            + ", ".join(files)
+            + ". Nothing was pushed. Resolve by hand, or record a proposed resolution "
+            "as a RECON case for a human to accept (/reconcile) — never auto-apply one."
+        )
 
 
 # --- arguments that reach git ------------------------------------------------
@@ -143,10 +147,18 @@ def check_url(url: str | None) -> str:
 
 
 def check_branch(branch: str | None) -> str:
-    if (not branch or not BRANCH_RE.match(branch) or ".." in branch or "//" in branch
-            or branch.endswith((".", "/", ".lock")) or "/." in branch):
-        raise CriterionError(f"{branch!r} is not a usable shared branch name "
-                             "(letters, digits, '.', '_', '-', '/'; not starting with '-')")
+    if (
+        not branch
+        or not BRANCH_RE.match(branch)
+        or ".." in branch
+        or "//" in branch
+        or branch.endswith((".", "/", ".lock"))
+        or "/." in branch
+    ):
+        raise CriterionError(
+            f"{branch!r} is not a usable shared branch name "
+            "(letters, digits, '.', '_', '-', '/'; not starting with '-')"
+        )
     return branch
 
 
@@ -178,6 +190,7 @@ def ensure_remote(dep: Deployment, url: str | None) -> tuple[Deployment, list[st
         raise CriterionError("a working copy opened on its own cannot be published — run from the product")
     notes = create(dep, url, shared_branch(dep), CI_TEMPLATE)
     from catalyst.deployment import load
+
     return load(dep.project_root), notes
 
 
@@ -189,12 +202,17 @@ def repo_place(project_root: Path) -> tuple[Path, str]:
     """The repository top holding the project, and the project's prefix in it
     (`""` at the top, else `sub/dir/`): `.gitmodules` lives at the top and
     names the working copy `<prefix>.criterion` (fw-STRUCTURE-000017)."""
-    top = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
-                         capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    top = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip()
     if not top:
         return Path(project_root), ""
-    prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
-                            capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    prefix = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
+    ).stdout.strip()
     return Path(top), prefix
 
 
@@ -203,8 +221,12 @@ def is_submodule(project_root: Path) -> bool:
     gm = top / ".gitmodules"
     if not gm.is_file():
         return False
-    res = subprocess.run(["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
-                         capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(
+        ["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     return any(line.split()[-1] == f"{prefix}.criterion" for line in res.stdout.splitlines())
 
 
@@ -226,7 +248,7 @@ def attribute_paths(dep: Deployment) -> list[str]:
     catalyst regenerates (rows from both sides are kept, then regenerated)."""
     # rules/rules.md is hand-maintained (not regenerated): concurrent edits
     # there must surface as conflicts, not as silently duplicated rows.
-    paths = ["development/journal.jsonl"]
+    paths = ["development/journal.jsonl", "development/journal/**/*.jsonl"]
     for etd in dep.etds.values():
         folder = dep.folder(etd)
         if folder is not None and etd.naming != "free-form":
@@ -240,7 +262,7 @@ def write_attributes(dep: Deployment) -> bool:
     old = target.read_text(encoding="utf-8") if target.is_file() else ""
     generated = {f"{p} merge=union" for p in attribute_paths(dep)}
     lines, kept, in_block = old.splitlines(), [], False
-    for line in lines:                  # drop only the block catalyst wrote
+    for line in lines:  # drop only the block catalyst wrote
         if line.startswith(ATTRIBUTES_HEADER):
             in_block = True
             continue
@@ -282,6 +304,7 @@ def write_gate_hash(dep: Deployment) -> bool:
     if not pyz.is_file():
         return False
     import hashlib
+
     target = dep.root / GATE_HASH
     new = f"{hashlib.sha256(pyz.read_bytes()).hexdigest()}  bin/catalyst.pyz\n"
     if target.is_file() and target.read_text(encoding="utf-8") == new:
@@ -314,7 +337,7 @@ def share_pins(wc: Path, publish: bool = True) -> int:
     result, so every clone holds every blob the journal references. Pin
     trees are unions: nobody's pins are lost when two contributors pin in
     parallel. Returns how many blobs the merged set holds."""
-    for attempt in range(3):            # a concurrent pin push: fetch, merge, retry
+    for attempt in range(3):  # a concurrent pin push: fetch, merge, retry
         try:
             return _share_pins_once(wc, publish)
         except CriterionError:
@@ -325,19 +348,35 @@ def share_pins(wc: Path, publish: bool = True) -> int:
 
 def _share_pins_once(wc: Path, publish: bool) -> int:
     from catalyst import journal
-    has_remote = run(wc, "fetch", "-q", "--", "origin", f"+{journal.PIN_REF}:{REMOTE_PINS}",
-                     check=False).returncode == 0
+
+    has_remote = (
+        run(wc, "fetch", "-q", "--", "origin", f"+{journal.PIN_REF}:{REMOTE_PINS}", check=False).returncode == 0
+    )
     local = run(wc, "rev-parse", "-q", "--verify", journal.PIN_REF, check=False).stdout.strip()
     remote = run(wc, "rev-parse", "-q", "--verify", REMOTE_PINS, check=False).stdout.strip() if has_remote else ""
     if remote and local != remote:
         if not local or run(wc, "merge-base", "--is-ancestor", local, remote, check=False).returncode == 0:
-            run(wc, "update-ref", journal.PIN_REF, remote, local or "0" * 40)   # fast-forward
+            run(wc, "update-ref", journal.PIN_REF, remote, local or "0" * 40)  # fast-forward
         elif run(wc, "merge-base", "--is-ancestor", remote, local, check=False).returncode != 0:
-            names = journal.pinned(wc) | {line.split("\t", 1)[1] for line in
-                                          out(wc, "ls-tree", REMOTE_PINS).splitlines() if "\t" in line}
+            names = journal.pinned(wc) | {
+                line.split("\t", 1)[1] for line in out(wc, "ls-tree", REMOTE_PINS).splitlines() if "\t" in line
+            }
             tree = run(wc, "mktree", input="".join(f"100644 blob {n}\t{n}\n" for n in sorted(names))).stdout.strip()
-            commit = out(wc, "-c", "user.name=catalyst", "-c", "user.email=catalyst@localhost",
-                         "commit-tree", tree, "-p", local, "-p", remote, "-m", "catalyst journal: merge pins")
+            commit = out(
+                wc,
+                "-c",
+                "user.name=catalyst",
+                "-c",
+                "user.email=catalyst@localhost",
+                "commit-tree",
+                tree,
+                "-p",
+                local,
+                "-p",
+                remote,
+                "-m",
+                "catalyst journal: merge pins",
+            )
             run(wc, "update-ref", journal.PIN_REF, commit, local)
     if publish and run(wc, "rev-parse", "-q", "--verify", journal.PIN_REF, check=False).returncode == 0:
         run(wc, "push", "-q", "--", "origin", f"{journal.PIN_REF}:{journal.PIN_REF}")
@@ -348,24 +387,31 @@ def _share_pins_once(wc: Path, publish: bool) -> int:
 @dataclass
 class Facts:
     journal: set[str] = field(default_factory=set)
-    ids: set[str] = field(default_factory=set)       # defined: artifact files, rule headings
-    rows: set[str] = field(default_factory=set)      # registered in an index
+    ids: set[str] = field(default_factory=set)  # defined: artifact files, rule headings
+    rows: set[str] = field(default_factory=set)  # registered in an index
+
+
+def _journal_source(name: str) -> bool:
+    """The legacy journal file or one of its shards (journal.py)."""
+    return name == "development/journal.jsonl" or (name.startswith("development/journal/") and name.endswith(".jsonl"))
 
 
 def facts_at(wc: Path, rev: str) -> Facts:
     """What a revision of the working copy records, read straight from git."""
     listing = run(wc, "ls-tree", "-r", "-z", "--name-only", rev).stdout
     names = [n for n in listing.split("\0") if n]
-    md = [n for n in names if n.endswith(".md")] + (
-        ["development/journal.jsonl"] if "development/journal.jsonl" in names else [])
+    md = [n for n in names if n.endswith(".md") or _journal_source(n)]
     facts = Facts()
     if not md:
         return facts
-    res = subprocess.run(["git", "-C", str(wc), "cat-file", "--batch"],
-                         input="".join(f"{rev}:{n}\n" for n in md).encode(), capture_output=True)
+    res = subprocess.run(
+        ["git", "-C", str(wc), "cat-file", "--batch"],
+        input="".join(f"{rev}:{n}\n" for n in md).encode(),
+        capture_output=True,
+    )
     if res.returncode != 0:
         raise CriterionError(f"git cat-file --batch failed in {wc}: {res.stderr.decode().strip()}")
-    batch = res.stdout          # sizes are in bytes: parse bytes, decode each body
+    batch = res.stdout  # sizes are in bytes: parse bytes, decode each body
     contents: dict[str, str] = {}
     pos = 0
     for name in md:
@@ -376,11 +422,11 @@ def facts_at(wc: Path, rev: str) -> Facts:
             continue
         size = int(header[2])
         body_start = header_end + 1
-        contents[name] = batch[body_start:body_start + size].decode("utf-8", errors="replace")
+        contents[name] = batch[body_start : body_start + size].decode("utf-8", errors="replace")
         pos = body_start + size + 1
     for name, text in contents.items():
-        if name == "development/journal.jsonl":
-            facts.journal = {line for line in text.splitlines() if line.strip()}
+        if _journal_source(name):
+            facts.journal |= {line for line in text.splitlines() if line.strip()}
             continue
         m = ARTIFACT_NAME_RE.search(name)
         if m:
@@ -428,7 +474,7 @@ class Status:
 
 def status(dep: Deployment, fetch: bool = False) -> Status:
     wc = dep.root
-    mode = ("home" if in_home(dep) else "submodule" if is_submodule(dep.project_root) else "local")
+    mode = "home" if in_home(dep) else "submodule" if is_submodule(dep.project_root) else "local"
     if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
         return Status(mode, None, shared_branch(dep), None, [], None, None)
     remote = run(wc, "remote", "get-url", "origin", check=False).stdout.strip() or None
@@ -450,8 +496,10 @@ def guard_branch_reset(wc: Path, branch: str) -> None:
         return
     extra = run(wc, "rev-list", f"refs/heads/{branch}", "--not", "--remotes=origin", check=False).stdout.split()
     if extra:
-        raise CriterionError(f"local branch '{branch}' has {len(extra)} commit(s) not on the remote — "
-                             "push them (`catalyst criterion push`) before syncing")
+        raise CriterionError(
+            f"local branch '{branch}' has {len(extra)} commit(s) not on the remote — "
+            "push them (`catalyst criterion push`) before syncing"
+        )
 
 
 def unpushed(wc: Path, branch: str) -> list[str]:
@@ -468,13 +516,16 @@ def sync(dep: Deployment) -> str:
         raise NeedsURL()
     changes = dirty(wc)
     if changes:
-        raise CriterionError(f"{len(changes)} uncommitted change(s) in the working copy "
-                             f"({', '.join(changes[:5])}) — `catalyst criterion push` them first")
+        raise CriterionError(
+            f"{len(changes)} uncommitted change(s) in the working copy "
+            f"({', '.join(changes[:5])}) — `catalyst criterion push` them first"
+        )
     run(wc, "fetch", "-q", "--prune", "origin")
     local = unpushed(wc, branch)
     if local:
-        raise CriterionError(f"{len(local)} local commit(s) are not on the remote — "
-                             "`catalyst criterion push` them first")
+        raise CriterionError(
+            f"{len(local)} local commit(s) are not on the remote — `catalyst criterion push` them first"
+        )
     guard_branch_reset(wc, branch)
     run(wc, "checkout", "-q", "-B", branch, f"origin/{branch}")
     share_pins(wc, publish=False)
@@ -484,6 +535,60 @@ def sync(dep: Deployment) -> str:
         if topic != branch and "/" in topic:
             run(wc, "branch", "-q", "-d", topic, check=False)
     return out(wc, "rev-parse", "--short", "HEAD")
+
+
+# --- what a push would publish (INV-4: assent first) -------------------------
+@dataclass
+class Preview:
+    remote: str | None
+    branch: str  # the shared branch
+    dirty: list[str]  # uncommitted changes, committed by the push
+    commits: list[str]  # local commits no remote has ("<short> <subject>")
+    topic: str | None  # an open topic branch the push adds to (its pull request), else None: a new one
+
+    @property
+    def empty(self) -> bool:
+        return not self.dirty and not self.commits
+
+    def describe(self) -> str:
+        if self.empty:
+            return "nothing to publish: the criterion matches its shared copy"
+        lines = [f"publish to {self.remote or '(no remote yet)'} (shared branch {self.branch}):"]
+        if self.dirty:
+            shown = ", ".join(self.dirty[:8]) + (f" (+{len(self.dirty) - 8} more)" if len(self.dirty) > 8 else "")
+            lines.append(f"  {len(self.dirty)} uncommitted change(s), committed with the message given: {shown}")
+        for c in self.commits[:10]:
+            lines.append(f"  commit {c}")
+        if len(self.commits) > 10:
+            lines.append(f"  (+{len(self.commits) - 10} more commits)")
+        lines.append(
+            f"  added to the open topic branch {self.topic} (its pull request), in one batch"
+            if self.topic
+            else "  on a new topic branch, one pull request for the whole batch"
+        )
+        return "\n".join(lines)
+
+
+def preview(dep: Deployment, fetch: bool = True) -> Preview:
+    """What `push` would publish, without changing anything but the
+    remote-tracking refs (`fetch`)."""
+    wc, branch = dep.root, shared_branch(dep)
+    remote = remote_url(wc)
+    if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
+        return Preview(remote, branch, [], [], None)
+    if fetch and remote:
+        run(wc, "fetch", "-q", "--prune", "origin", check=False)
+    log = run(wc, "log", "--format=%h %s", "HEAD", "--not", "--remotes=origin", check=False)
+    commits = log.stdout.splitlines() if log.returncode == 0 else []
+    current = run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip()
+    topic = None
+    if current and current != branch:
+        remote_topic = run(wc, "rev-parse", "-q", "--verify", f"origin/{current}", check=False).stdout.strip()
+        merged = remote_topic and (
+            run(wc, "merge-base", "--is-ancestor", remote_topic, f"origin/{branch}", check=False).returncode == 0
+        )
+        topic = current if remote_topic and not merged else None
+    return Preview(remote, branch, dirty(wc), commits, topic)
 
 
 # --- push -------------------------------------------
@@ -497,8 +602,8 @@ class PushResult:
 
 def _topic(user: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", user.lower()).strip("-") or "contributor"
-    stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    return f"{slug}/{stamp}-{secrets.token_hex(2)}"      # unique even within one second
+    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    return f"{slug}/{stamp}-{secrets.token_hex(2)}"  # unique even within one second
 
 
 def _ident(wc: Path, user: str) -> list[str]:
@@ -510,8 +615,7 @@ def _ident(wc: Path, user: str) -> list[str]:
     return args
 
 
-def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
-         checker=None) -> PushResult:
+def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True, checker=None) -> PushResult:
     from catalyst.corpus import load_corpus
     from catalyst.deployment import load, load_working_copy
     from catalyst.indexes import regenerate
@@ -519,10 +623,10 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
     wc, branch = dep.root, shared_branch(dep)
     if not remote_url(wc):
         raise NeedsURL()
-    user =str(signer.get("git_username") or signer.get("name"))
+    user = str(signer.get("git_username") or signer.get("name"))
     run(wc, "fetch", "-q", "--prune", "origin")
     try:
-        share_pins(wc, publish=False)          # others' journal blobs, before anything is checked
+        share_pins(wc, publish=False)  # others' journal blobs, before anything is checked
     except CriterionError:
         pass
     fetch_product_pins(dep)
@@ -533,44 +637,73 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
     remote_topic = ""
     if topic:
         remote_topic = run(wc, "rev-parse", "-q", "--verify", f"origin/{topic}", check=False).stdout.strip()
-        merged = has_base and remote_topic and run(
-            wc, "merge-base", "--is-ancestor", remote_topic, base, check=False).returncode == 0
+        merged = (
+            has_base
+            and remote_topic
+            and run(wc, "merge-base", "--is-ancestor", remote_topic, base, check=False).returncode == 0
+        )
         if not remote_topic and run(wc, "config", f"branch.{topic}.remote", check=False).stdout.strip():
-            topic = ""                  # pushed before, branch now deleted: its PR was merged
+            topic = ""  # pushed before, branch now deleted: its PR was merged
         elif merged:
-            topic = ""                  # its pull request was merged: start a new one
-        elif remote_topic and run(wc, "merge-base", "--is-ancestor", remote_topic, "HEAD",
-                                  check=False).returncode != 0:
+            topic = ""  # its pull request was merged: start a new one
+        elif remote_topic and run(wc, "merge-base", "--is-ancestor", remote_topic, "HEAD", check=False).returncode != 0:
             raise CriterionError(
                 f"origin/{topic} has commits this working copy does not have (a reviewer's?) — "
-                f"`git -C {wc} pull --rebase origin {topic}` first; nothing was pushed")
+                f"`git -C {wc} pull --rebase origin {topic}` first; nothing was pushed"
+            )
     if not topic:
         topic, remote_topic = _topic(user), ""
     if current != topic:
         run(wc, "checkout", "-q", "-B", topic)
     if write_attributes(dep):
         from catalyst import journal as _journal
-        _journal.append(dep, _journal.AppendRequest(
-            command="catalyst criterion push", action="update",
-            artifact="merge attributes refreshed", targets=[],
-            intent=["The files that merge by union changed with the deployment's entity types "
-                    "or the kernel; .gitattributes now lists exactly those."],
-            files=[str(wc / ".gitattributes")], actor=user, allow_unchanged=True))
-    gate = [p for p, changed in ((CI_WORKFLOW, write_ci(dep, CI_TEMPLATE)), (GATE_HASH, write_gate_hash(dep)))
-            if changed]
+
+        _journal.append(
+            dep,
+            _journal.AppendRequest(
+                command="catalyst criterion push",
+                action="update",
+                artifact="merge attributes refreshed",
+                targets=[],
+                intent=[
+                    "The files that merge by union changed with the deployment's entity types "
+                    "or the kernel; .gitattributes now lists exactly those."
+                ],
+                files=[str(wc / ".gitattributes")],
+                actor=user,
+                allow_unchanged=True,
+            ),
+        )
+    gate = [
+        p for p, changed in ((CI_WORKFLOW, write_ci(dep, CI_TEMPLATE)), (GATE_HASH, write_gate_hash(dep))) if changed
+    ]
     if gate:
         from catalyst import journal as _journal
-        _journal.append(dep, _journal.AppendRequest(
-            command="catalyst criterion push", action="update",
-            artifact="CI gate refreshed", targets=[],
-            intent=["The criterion repository's CI gate follows the vendored CLI: the workflow catalyst "
-                    "wrote, and the checker's recorded hash, now match this working copy."],
-            files=[str(wc / p) for p in gate], actor=user, allow_unchanged=True))
+
+        _journal.append(
+            dep,
+            _journal.AppendRequest(
+                command="catalyst criterion push",
+                action="update",
+                artifact="CI gate refreshed",
+                targets=[],
+                intent=[
+                    "The criterion repository's CI gate follows the vendored CLI: the workflow catalyst "
+                    "wrote, and the checker's recorded hash, now match this working copy."
+                ],
+                files=[str(wc / p) for p in gate],
+                actor=user,
+                allow_unchanged=True,
+            ),
+        )
     if dirty(wc):
         run(wc, "add", "-A")
         run(wc, *_ident(wc, user), "commit", "-q", "-m", message)
-    pre_rebase = out(wc, "rev-parse", "HEAD") if run(wc, "rev-parse", "-q", "--verify", "HEAD",
-                                                      check=False).returncode == 0 else None
+    pre_rebase = (
+        out(wc, "rev-parse", "HEAD")
+        if run(wc, "rev-parse", "-q", "--verify", "HEAD", check=False).returncode == 0
+        else None
+    )
     if has_base:
         res = run(wc, *_ident(wc, user), "rebase", "-q", base, check=False)
         if res.returncode != 0:
@@ -580,23 +713,37 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
     # Rows merged by union are regenerated in ID order.
     fresh = load_working_copy(wc) if dep.standalone else load(dep.project_root)
     from catalyst import journal
+
     changes = regenerate(fresh, load_corpus(fresh))
     regenerated = [str(c.path.relative_to(wc)) for c in changes]
     # Files the rebase merged (by union, or a clean three-way merge of both
     # sides' edits) match neither side's journaled version: record their
     # merged state, with the regeneration.
     rebased = set(out(wc, "diff", "--name-only", pre_rebase, "HEAD").splitlines()) if pre_rebase else set()
-    merged = [p[len(journal.WC):] for p in journal.unjournaled(fresh)
-              if p.startswith(journal.WC) and p[len(journal.WC):] in rebased]
+    merged = [
+        p[len(journal.WC) :]
+        for p in journal.unjournaled(fresh)
+        if p.startswith(journal.WC) and p[len(journal.WC) :] in rebased
+    ]
     touched = sorted(set(regenerated) | set(merged))
     if touched:
-        journal.append(fresh, journal.AppendRequest(
-            command="catalyst criterion push", action="update",
-            artifact="files merged by rebasing onto the shared branch", targets=[],
-            intent=["Rebasing onto the shared branch merged both sides' changes to these files "
+        journal.append(
+            fresh,
+            journal.AppendRequest(
+                command="catalyst criterion push",
+                action="update",
+                artifact="files merged by rebasing onto the shared branch",
+                targets=[],
+                intent=[
+                    "Rebasing onto the shared branch merged both sides' changes to these files "
                     "(append-only and index files by union, then indexes rewritten in ID order by "
-                    "catalyst index regen); this records their merged state."],
-            files=[str(wc / p) for p in touched], actor=user, allow_unchanged=True))
+                    "catalyst index regen); this records their merged state."
+                ],
+                files=[str(wc / p) for p in touched],
+                actor=user,
+                allow_unchanged=True,
+            ),
+        )
         run(wc, "add", "-A")
         run(wc, *_ident(wc, user), "commit", "-q", "-m", "Regenerate indexes after rebase")
     report = (checker or _check)(fresh)
@@ -612,11 +759,19 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
     if commits == 0:
         return PushResult(topic, 0, None, regenerated)
     # An explicit lease: the remote branch must still be what we built on.
-    run(wc, "push", "-q", f"--force-with-lease=refs/heads/{topic}:{remote_topic}", "-u", "--", "origin",
-        f"HEAD:refs/heads/{topic}")
+    run(
+        wc,
+        "push",
+        "-q",
+        f"--force-with-lease=refs/heads/{topic}:{remote_topic}",
+        "-u",
+        "--",
+        "origin",
+        f"HEAD:refs/heads/{topic}",
+    )
     try:
         share_pins(wc)
-    except CriterionError as exc:           # the pins go with the next push; the work is safe
+    except CriterionError as exc:  # the pins go with the next push; the work is safe
         print(f"catalyst: journal pins not shared yet ({exc})")
     pr = open_pull_request(wc, branch, topic, message) if open_pr else None
     return PushResult(topic, commits, pr, regenerated)
@@ -624,6 +779,7 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True,
 
 def _check(dep: Deployment) -> str:
     from catalyst.check import run as run_checks
+
     report = run_checks(dep)
     return "\n".join(report.errors)
 
@@ -631,20 +787,42 @@ def _check(dep: Deployment) -> str:
 def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
     if shutil.which("gh") is None:
         return None
-    existing = subprocess.run(["gh", "pr", "view", head, "--json", "url", "--jq", ".url"],
-                              cwd=wc, capture_output=True, text=True, encoding="utf-8")
+    existing = subprocess.run(
+        ["gh", "pr", "view", head, "--json", "url", "--jq", ".url"],
+        cwd=wc,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if existing.returncode == 0 and existing.stdout.strip():
         return existing.stdout.strip()
-    res = subprocess.run(["gh", "pr", "create", "--base", base, "--head", head, "--title", title,
-                          "--body", "Opened by `catalyst criterion push`. CI runs `catalyst check` "
-                          "and `catalyst criterion integrity` on this pull request."],
-                         cwd=wc, capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            base,
+            "--head",
+            head,
+            "--title",
+            title,
+            "--body",
+            "Opened by `catalyst criterion push`. CI runs `catalyst check` "
+            "and `catalyst criterion integrity` on this pull request.",
+        ],
+        cwd=wc,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     return res.stdout.strip().splitlines()[-1] if res.returncode == 0 and res.stdout.strip() else None
 
 
 # --- create / join ----------------------------------------------
-def create(dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH,
-           ci_template: str | None = None) -> list[str]:
+def create(
+    dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH, ci_template: str | None = None
+) -> list[str]:
     """Version a local-only working copy for sharing and, given `url`,
     publish it there and make it the product repository's `.criterion`
     submodule. Without a URL the deployment stays strictly local: the first
@@ -663,11 +841,15 @@ def create(dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH
     if is_submodule(project):
         raise CriterionError(".criterion is already a submodule of this project")
     if not link.is_symlink():
-        raise CriterionError(".criterion is not a symlink to an agent-owned working copy; "
-                             "move an in-project working copy into agent-owned space first")
+        raise CriterionError(
+            ".criterion is not a symlink to an agent-owned working copy; "
+            "move an in-project working copy into agent-owned space first"
+        )
     if url is None and run(wc, "rev-parse", "--git-dir", check=False).returncode == 0 and remote_url(wc):
-        raise CriterionError(f"the working copy already has a criterion repository ({remote_url(wc)}) — "
-                             "`catalyst criterion create <url>` to make it the .criterion submodule")
+        raise CriterionError(
+            f"the working copy already has a criterion repository ({remote_url(wc)}) — "
+            "`catalyst criterion create <url>` to make it the .criterion submodule"
+        )
     notes = _prepare(dep, url, branch, ci_template)
     if url is None:
         return notes + _record_local(dep, branch)
@@ -685,7 +867,7 @@ def _prepare(dep: Deployment, url: str | None, branch: str, ci_template: str | N
     wc = dep.root
     notes = []
     if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
-        run(wc, "init", "-q")                # not `init -b`: that needs git >= 2.28
+        run(wc, "init", "-q")  # not `init -b`: that needs git >= 2.28
         run(wc, "symbolic-ref", "HEAD", f"refs/heads/{branch}")
         notes.append(f"initialised the working copy as a git repository (branch {branch})")
     dep.pointer["criterion_branch"] = branch
@@ -701,14 +883,25 @@ def _prepare(dep: Deployment, url: str | None, branch: str, ci_template: str | N
         notes.append(f"wrote {GATE_HASH} (CI runs the base branch's checker only if it matches)")
     if written:
         from catalyst import journal
+
         where = f"to {url}" if url else "locally, until a criterion repository is given"
-        journal.append(dep, journal.AppendRequest(
-            command="catalyst criterion create", action="create",
-            artifact="shared deployment: merge attributes and CI", targets=[],
-            intent=[f"Versioning the working copy for sharing ({where}): the journal and "
+        journal.append(
+            dep,
+            journal.AppendRequest(
+                command="catalyst criterion create",
+                action="create",
+                artifact="shared deployment: merge attributes and CI",
+                targets=[],
+                intent=[
+                    f"Versioning the working copy for sharing ({where}): the journal and "
                     "regenerated indexes merge by union, and the criterion repository's CI runs "
-                    "catalyst check and the integrity check on every pull request."],
-            files=[str(wc / w) for w in written], actor=_actor(dep), allow_unchanged=True))
+                    "catalyst check and the integrity check on every pull request."
+                ],
+                files=[str(wc / w) for w in written],
+                actor=_actor(dep),
+                allow_unchanged=True,
+            ),
+        )
     if dirty(wc):
         run(wc, "add", "-A")
         run(wc, *_ident(wc, _actor(dep)), "commit", "-q", "-m", "Publish the catalyst working copy")
@@ -729,15 +922,27 @@ def _record_local(dep: Deployment, branch: str) -> list[str]:
         project_file.write(pointer_path, pointer)
         run(project, "add", pointer_path.name, check=False)
         from catalyst import journal
-        journal.append(dep, journal.AppendRequest(
-            command="catalyst criterion create", action="update", artifact="criterion branch", targets=[],
-            intent=[f"The pointer names the shared branch ({branch}) the working copy will be published on."],
-            files=[str(pointer_path)], actor=_actor(dep), allow_unchanged=True))
+
+        journal.append(
+            dep,
+            journal.AppendRequest(
+                command="catalyst criterion create",
+                action="update",
+                artifact="criterion branch",
+                targets=[],
+                intent=[f"The pointer names the shared branch ({branch}) the working copy will be published on."],
+                files=[str(pointer_path)],
+                actor=_actor(dep),
+                allow_unchanged=True,
+            ),
+        )
         run(wc, "add", "-A")
         run(wc, *_ident(wc, _actor(dep)), "commit", "-q", "-m", "Journal the criterion branch")
         notes.append(f"recorded criterion_branch ({branch}) in {pointer_path.name} (staged, not committed)")
-    notes.append(f"the working copy is versioned locally on branch {branch}, with no criterion repository: "
-                 "`catalyst criterion push`, `sync` or `join` ask for its URL when first run (or take --url)")
+    notes.append(
+        f"the working copy is versioned locally on branch {branch}, with no criterion repository: "
+        "`catalyst criterion push`, `sync` or `join` ask for its URL when first run (or take --url)"
+    )
     return notes
 
 
@@ -747,9 +952,12 @@ def _unignore(project: Path) -> str | None:
     if not gitignore.is_file():
         return None
     old = gitignore.read_text(encoding="utf-8")
-    lines = [line for line in old.splitlines()
-             if line.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
-             and not line.startswith("# catalyst working copy:")]
+    lines = [
+        line
+        for line in old.splitlines()
+        if line.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
+        and not line.startswith("# catalyst working copy:")
+    ]
     gitignore.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
     return old
 
@@ -758,11 +966,22 @@ def _record_shared(project: Path, url: str, branch: str) -> Path:
     """Record the sharing in the pointer and stage the product files."""
     pointer_path = project_file.find(project)
     pointer = project_file.read(pointer_path)
-    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
-                    "updated": datetime.date.today().isoformat()})
+    pointer.update(
+        {
+            "repoed": True,
+            "catalyst_repo_url": url,
+            "criterion_branch": branch,
+            "updated": datetime.date.today().isoformat(),
+        }
+    )
     project_file.write(pointer_path, pointer)
-    run(project, "add", pointer_path.name, str(repo_place(project)[0] / ".gitmodules"),
-        *([".gitignore"] if (project / ".gitignore").is_file() else []))
+    run(
+        project,
+        "add",
+        pointer_path.name,
+        str(repo_place(project)[0] / ".gitmodules"),
+        *([".gitignore"] if (project / ".gitignore").is_file() else []),
+    )
     return pointer_path
 
 
@@ -807,26 +1026,42 @@ def _publish(dep: Deployment, url: str, branch: str) -> list[str]:
         link.symlink_to(agent_owned)
         if old_gitignore is not None:
             gitignore.write_text(old_gitignore, encoding="utf-8")
-        raise CriterionError(f"adding the submodule failed, so nothing changed in the project "
-                             f"(the working copy is still at {agent_owned}, now also on {url}): {exc}") from exc
+        raise CriterionError(
+            f"adding the submodule failed, so nothing changed in the project "
+            f"(the working copy is still at {agent_owned}, now also on {url}): {exc}"
+        ) from exc
     notes.append("added .criterion as a submodule of the product repository (staged, not committed)")
     pointer_path = _record_shared(project, url, branch)
     from catalyst import journal
     from catalyst.deployment import load
+
     shared = load(project)
     actor = _actor(shared)
-    journal.append(shared, journal.AppendRequest(
-        command="catalyst criterion create", action="update", artifact="deployment shared", targets=[],
-        intent=[f"The working copy is now the .criterion submodule of {url}; the pointer records the "
-                "sharing and .gitignore no longer ignores .criterion."],
-        files=[str(project / p) for p in (pointer_path.name, ".gitmodules", ".gitignore")
-               if (project / p).is_file()],
-        actor=actor, allow_unchanged=True))
+    journal.append(
+        shared,
+        journal.AppendRequest(
+            command="catalyst criterion create",
+            action="update",
+            artifact="deployment shared",
+            targets=[],
+            intent=[
+                f"The working copy is now the .criterion submodule of {url}; the pointer records the "
+                "sharing and .gitignore no longer ignores .criterion."
+            ],
+            files=[
+                str(project / p) for p in (pointer_path.name, ".gitmodules", ".gitignore") if (project / p).is_file()
+            ],
+            actor=actor,
+            allow_unchanged=True,
+        ),
+    )
     run(wc, "add", "-A")
     run(wc, *_ident(wc, actor), "commit", "-q", "-m", "Journal the sharing of the deployment")
     run(wc, "push", "-q", "--", "origin", f"HEAD:refs/heads/{branch}")
-    notes.append("journaled the product files it changed (pointer, .gitmodules, .gitignore); share the "
-                 "product repository's journal pins with `catalyst journal pin --share` when you push it")
+    notes.append(
+        "journaled the product files it changed (pointer, .gitmodules, .gitignore); share the "
+        "product repository's journal pins with `catalyst journal pin --share` when you push it"
+    )
     notes.append(f"updated {pointer_path.name} (repoed, catalyst_repo_url, criterion_branch)")
     notes.append(f"the old agent-owned copy at {agent_owned} is no longer used; remove it once satisfied")
     return notes
@@ -857,21 +1092,38 @@ def _publish_home(dep: Deployment, url: str, branch: str) -> list[str]:
         notes.append(f"journal pins not shared yet: {exc}")
     pointer_path = project_file.find(project)
     pointer = project_file.read(pointer_path)
-    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
-                    "updated": datetime.date.today().isoformat()})
+    pointer.update(
+        {
+            "repoed": True,
+            "catalyst_repo_url": url,
+            "criterion_branch": branch,
+            "updated": datetime.date.today().isoformat(),
+        }
+    )
     project_file.write(pointer_path, pointer)
     in_repo = run(project, "rev-parse", "--git-dir", check=False).returncode == 0
     if in_repo:
         run(project, "add", "--", pointer_path.name, check=False)
     from catalyst import journal
     from catalyst.deployment import load
+
     shared = load(project)
-    journal.append(shared, journal.AppendRequest(
-        command="catalyst criterion create", action="update", artifact="deployment shared", targets=[],
-        intent=[f"The criterion is shared through {url}; catalyst.toml records the remote, and a collaborator "
-                "joins with `catalyst criterion join`."],
-        files=[str(pointer_path)] if in_repo else [str(wc / "version.txt")], actor=_actor(shared),
-        allow_unchanged=True))
+    journal.append(
+        shared,
+        journal.AppendRequest(
+            command="catalyst criterion create",
+            action="update",
+            artifact="deployment shared",
+            targets=[],
+            intent=[
+                f"The criterion is shared through {url}; catalyst.toml records the remote, and a collaborator "
+                "joins with `catalyst criterion join`."
+            ],
+            files=[str(pointer_path)] if in_repo else [str(wc / "version.txt")],
+            actor=_actor(shared),
+            allow_unchanged=True,
+        ),
+    )
     run(wc, "add", "-A")
     run(wc, *_ident(wc, _actor(shared)), "commit", "-q", "-m", "Journal the sharing of the criterion")
     run(wc, "push", "-q", "--", "origin", f"HEAD:refs/heads/{branch}")
@@ -895,17 +1147,24 @@ def join_home(project_root: Path, url: str | None = None, runtime: bool = True) 
     target = project_file.home_criterion(name)
     if target.exists() and any(target.iterdir()):
         if remote_url(target) != url:
-            raise CriterionError(f"{target} exists with another remote ({remote_url(target)}) — "
-                                 "a different project with the same name?")
+            raise CriterionError(
+                f"{target} exists with another remote ({remote_url(target)}) — a different project with the same name?"
+            )
         if dirty(target):
-            raise CriterionError(f"{len(dirty(target))} uncommitted change(s) in {target} — commit or discard them first")
+            raise CriterionError(
+                f"{len(dirty(target))} uncommitted change(s) in {target} — commit or discard them first"
+            )
         run(target, "fetch", "-q", "--prune", "origin")
         guard_branch_reset(target, branch)
         run(target, "checkout", "-q", "-B", branch, f"origin/{branch}")
     else:
         target.parent.mkdir(parents=True, exist_ok=True)
-        res = subprocess.run(["git", "clone", "-q", "-b", branch, "--", url, str(target)],
-                             capture_output=True, text=True, encoding="utf-8")
+        res = subprocess.run(
+            ["git", "clone", "-q", "-b", branch, "--", url, str(target)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
         if res.returncode != 0:
             raise CriterionError(f"cloning {url} ({branch}) failed: {res.stderr.strip()}")
     share_pins(target, publish=False)
@@ -913,6 +1172,7 @@ def join_home(project_root: Path, url: str | None = None, runtime: bool = True) 
         import tempfile
 
         from catalyst import runtime as rt
+
         with tempfile.TemporaryDirectory() as tmp:
             pyz = rt.own_pyz(Path(tmp))
             rt.install_into(target, rt.pyz_version(pyz), pyz)
@@ -935,18 +1195,20 @@ def _add_submodule(project_root: Path, url: str) -> None:
     branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
     link = project_root / ".criterion"
     if link.is_symlink():
-        link.unlink()                          # a dangling link to another machine's working copy
+        link.unlink()  # a dangling link to another machine's working copy
     elif link.exists():
         raise CriterionError(".criterion exists and is not a submodule — move it out of the way first")
     if not run(project_root, "ls-remote", "--heads", "--", url, branch, check=False).stdout.strip():
-        raise CriterionError(f"{url} has no '{branch}' branch — publish a working copy there first "
-                             "(`catalyst criterion create <url>` where it lives)")
+        raise CriterionError(
+            f"{url} has no '{branch}' branch — publish a working copy there first "
+            "(`catalyst criterion create <url>` where it lives)"
+        )
     _unignore(project_root)
     run(project_root, "submodule", "add", "-b", branch, "--", url, ".criterion")
     _record_shared(project_root, url, branch)
 
 
-def join(project_root: Path, url: str | None = None) -> str:
+def join(project_root: Path, url: str | None = None, runtime: bool = True) -> str:
     """Check out the shared working copy in a clone of the product
     repository. A product with no `.criterion` submodule yet needs the
     criterion repository's URL: a local working copy on this machine is
@@ -957,16 +1219,19 @@ def join(project_root: Path, url: str | None = None) -> str:
         check_url(url)
     legacy = project_root / ".criterion"
     if (project_root / project_file.NAME).is_file() and not (legacy.is_symlink() or legacy.exists()):
-        return join_home(project_root, url)
+        return join_home(project_root, url, runtime=runtime)
     if not is_submodule(project_root):
         from catalyst.deployment import load
+
         link = project_root / ".criterion"
         if link.is_symlink() and link.exists():
             dep = load(project_root)
             if remote_url(dep.root):
-                raise CriterionError("this project has no .criterion submodule; its local working copy "
-                                     f"already has a criterion repository ({remote_url(dep.root)}) — "
-                                     "`catalyst criterion create <url>` to make it the submodule")
+                raise CriterionError(
+                    "this project has no .criterion submodule; its local working copy "
+                    f"already has a criterion repository ({remote_url(dep.root)}) — "
+                    "`catalyst criterion create <url>` to make it the submodule"
+                )
             ensure_remote(dep, url)
         else:
             if not url:
@@ -988,7 +1253,7 @@ def join(project_root: Path, url: str | None = None) -> str:
     share_pins(wc, publish=False)
     if run(project_root, "remote", "get-url", "origin", check=False).returncode == 0:
         try:
-            share_pins(project_root, publish=False)     # the product repository's journal blobs
+            share_pins(project_root, publish=False)  # the product repository's journal blobs
         except CriterionError:
             pass
     if added:
@@ -996,15 +1261,28 @@ def join(project_root: Path, url: str | None = None) -> str:
         # land with the next `catalyst criterion push`
         from catalyst import journal
         from catalyst.deployment import load
+
         shared = load(project_root)
-        journal.append(shared, journal.AppendRequest(
-            command="catalyst criterion join", action="update", artifact="deployment shared", targets=[],
-            intent=[f"This product now checks out the criterion repository {pointer.get('catalyst_repo_url')} "
-                    "as its .criterion submodule; the pointer records the sharing."],
-            files=[str(project_root / p) for p in (project_file.find(project_root).name,
-                                                   ".gitmodules", ".gitignore")
-                   if (project_root / p).is_file()],
-            actor=_actor(shared), allow_unchanged=True))
+        journal.append(
+            shared,
+            journal.AppendRequest(
+                command="catalyst criterion join",
+                action="update",
+                artifact="deployment shared",
+                targets=[],
+                intent=[
+                    f"This product now checks out the criterion repository {pointer.get('catalyst_repo_url')} "
+                    "as its .criterion submodule; the pointer records the sharing."
+                ],
+                files=[
+                    str(project_root / p)
+                    for p in (project_file.find(project_root).name, ".gitmodules", ".gitignore")
+                    if (project_root / p).is_file()
+                ],
+                actor=_actor(shared),
+                allow_unchanged=True,
+            ),
+        )
     return out(wc, "rev-parse", "--short", "HEAD")
 
 

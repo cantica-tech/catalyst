@@ -11,6 +11,7 @@ branches and remote. The project keeps one file: `<name>.catalyst` becomes
 `--name <new>` renames a home-store project: its criterion directory and
 the name in `catalyst.toml`.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -19,7 +20,6 @@ import subprocess
 from pathlib import Path
 
 import project_file
-
 from catalyst import journal
 from catalyst.deployment import load
 
@@ -47,6 +47,7 @@ def _rmtree(path: Path) -> None:
 
     if path.exists():
         import sys
+
         if sys.version_info >= (3, 12):
             shutil.rmtree(path, onexc=clear_and_retry)
         else:
@@ -62,8 +63,12 @@ def _drop_gitignore_line(project: Path) -> Path | None:
     if not ignore.is_file():
         return None
     lines = ignore.read_text(encoding="utf-8").splitlines()
-    kept = [l for l in lines if l.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
-            and not l.startswith("# catalyst working copy:")]
+    kept = [
+        l
+        for l in lines
+        if l.strip() not in ("/.criterion", ".criterion", "/.criterion/", ".criterion/")
+        and not l.startswith("# catalyst working copy:")
+    ]
     if kept == lines:
         return None
     ignore.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
@@ -87,9 +92,10 @@ def _move_submodule(project: Path, link: Path, target: Path) -> list[Path]:
     shutil.copytree(gitdir, target / ".git", symlinks=True)
     # the submodule's git data names its old worktree; edit the file itself
     # (any git command run on the repository would first try to enter it)
-    subprocess.run(["git", "config", "--file", str(target / ".git" / "config"), "--unset", "core.worktree"],
-                   capture_output=True)
-    _git(target, "status", "--porcelain")                       # the moved repository works
+    subprocess.run(
+        ["git", "config", "--file", str(target / ".git" / "config"), "--unset", "core.worktree"], capture_output=True
+    )
+    _git(target, "status", "--porcelain")  # the moved repository works
     _git(project, "submodule", "deinit", "-q", "-f", ".criterion")
     _git(project, "rm", "-q", "-f", ".criterion")
     _rmtree(gitdir)
@@ -116,8 +122,13 @@ def to_home(project: Path, runtime: bool = True, actor: str | None = None) -> tu
     target = project_file.home_criterion(name)
     link = project / project_file.LEGACY_DIRNAME
     source = data.get("agent-source")
-    current = (link if (link.is_symlink() or link.is_dir()) else
-               Path(str(source)).expanduser() if source and Path(str(source)).expanduser().is_dir() else None)
+    current = (
+        link
+        if (link.is_symlink() or link.is_dir())
+        else Path(str(source)).expanduser()
+        if source and Path(str(source)).expanduser().is_dir()
+        else None
+    )
     if current is None:
         if target.is_dir():
             raise MoveError(f"{name} is already in the home store ({target})")
@@ -135,12 +146,14 @@ def to_home(project: Path, runtime: bool = True, actor: str | None = None) -> tu
         steps.append(f"moved the criterion from agent space ({real}) to {target}; removed the .criterion symlink")
     elif link.is_dir() and (link / ".git").is_file():
         touched += _move_submodule(project, link, target)
-        steps.append(f"made the shared criterion a standalone repository at {target} (branches, remote and "
-                     "unpushed work kept); removed the .criterion submodule from the product (staged)")
+        steps.append(
+            f"made the shared criterion a standalone repository at {target} (branches, remote and "
+            "unpushed work kept); removed the .criterion submodule from the product (staged)"
+        )
     elif link.is_dir():
         shutil.move(str(link), str(target))
         steps.append(f"moved the in-project .criterion to {target}")
-    else:                                                        # pre-0.37.0 agent-source
+    else:  # pre-0.37.0 agent-source
         shutil.move(str(current), str(target))
         data.pop("agent-source", None)
         steps.append(f"moved the criterion from its agent-source ({current}) to {target}")
@@ -156,7 +169,7 @@ def to_home(project: Path, runtime: bool = True, actor: str | None = None) -> tu
         steps.append(f"{pointer.name} is now catalyst.toml")
     touched += [toml, pointer]
     if _is_repo(project):
-        for path in dict.fromkeys(touched):          # one by one: a path git never knew must not stop the rest
+        for path in dict.fromkeys(touched):  # one by one: a path git never knew must not stop the rest
             _git(project, "add", "-A", "--", str(path.relative_to(project)), check=False)
         steps.append("product changes staged, not committed")
     if runtime:
@@ -165,25 +178,37 @@ def to_home(project: Path, runtime: bool = True, actor: str | None = None) -> tu
         import tempfile
 
         from catalyst import runtime as rt
+
         with tempfile.TemporaryDirectory() as tmp:
             pyz = rt.own_pyz(Path(tmp))
             version = rt.pyz_version(pyz)
             venv, _ = rt.install_into(target, version, pyz)
         steps.append(f"filled the criterion's runtime {venv} (catalyst {version})")
     dep = load(project)
-    journal.append(dep, journal.AppendRequest(
-        command="catalyst move", action="update", artifact=f"criterion of {name}", targets=[],
-        intent=[f"Move the criterion into catalyst's home store ({target}): nothing of it stays in the "
-                "project but catalyst.toml (ADR-010)."],
-        files=[str(p) for p in dict.fromkeys(touched)] if _is_repo(project) else [str(target / "version.txt")],
-        actor=actor or str(data.get("created_by") or "catalyst"),
-        allow_unchanged=True, tier="chore"))
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst move",
+            action="update",
+            artifact=f"criterion of {name}",
+            targets=[],
+            intent=[
+                f"Move the criterion into catalyst's home store ({target}): nothing of it stays in the "
+                "project but catalyst.toml (ADR-010)."
+            ],
+            files=[str(p) for p in dict.fromkeys(touched)] if _is_repo(project) else [str(target / "version.txt")],
+            actor=actor or str(data.get("created_by") or "catalyst"),
+            allow_unchanged=True,
+            tier="chore",
+        ),
+    )
     steps.append("journaled the move")
     return target, steps
 
 
 def rename(project: Path, new: str, actor: str | None = None) -> tuple[Path, list[str]]:
     from catalyst.init import NAME_RE
+
     project = project.resolve()
     if not NAME_RE.match(new):
         raise MoveError(f"'{new}' must be letters, digits, '.', '_' or '-'")
@@ -204,10 +229,18 @@ def rename(project: Path, new: str, actor: str | None = None) -> tuple[Path, lis
     if _is_repo(project):
         _git(project, "add", "--", project_file.NAME, check=False)
     dep = load(project)
-    journal.append(dep, journal.AppendRequest(
-        command="catalyst move", action="update", artifact=f"project {old} -> {new}", targets=[],
-        intent=[f"Rename the project {old} to {new}: its criterion moves to {target}."],
-        files=[str(toml)] if _is_repo(project) else [str(target / "version.txt")],
-        actor=actor or str(data.get("created_by") or "catalyst"),
-        allow_unchanged=True, tier="chore"))
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst move",
+            action="update",
+            artifact=f"project {old} -> {new}",
+            targets=[],
+            intent=[f"Rename the project {old} to {new}: its criterion moves to {target}."],
+            files=[str(toml)] if _is_repo(project) else [str(target / "version.txt")],
+            actor=actor or str(data.get("created_by") or "catalyst"),
+            allow_unchanged=True,
+            tier="chore",
+        ),
+    )
     return target, [f"renamed {old} to {new}; the criterion is {target}", "catalyst.toml staged, not committed"]

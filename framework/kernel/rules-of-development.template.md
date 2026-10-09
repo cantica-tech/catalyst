@@ -137,8 +137,8 @@ one another.
   not "empty is fine," since a project with nobody registered has nobody
   to sign work. Both files are managed only by the `/user-*`/`/role-*`
   commands (§2, §4), never hand-edited. See `INVARIANTS.md` INV-16.
-- **This is a hard requirement.** `development/journal.jsonl` always
-  exists (empty is fine). Once a line is appended it is never edited,
+- **This is a hard requirement.** The journal (`development/journal/`
+  shards; `development/journal.jsonl` before kernel 0.50) always exists. Once a line is appended it is never edited,
   deleted, or reordered — stricter than every other "never hand-edited"
   rule above, since even the commands that write to it only ever append.
   See `INVARIANTS.md` INV-17 and §9.
@@ -360,7 +360,7 @@ the seven currently exist anywhere.
   §4 — kernel and active-module entries alike. `/help` with no argument delegates here for its command listing
   rather than re-describing it.
 - `/journal [--since <date>] [--artifact <id>] [--actor <name>] [--rule
-  <id>]` — read-only: filter and report `development/journal.jsonl`
+  <id>]` — read-only: filter and report the journal's
   entries. Never writes to the journal (see §9).
 - `/journal-restore <timestamp>` — read-only: reconstruct the tree as it
   stood at `<timestamp>` into a side directory with
@@ -497,7 +497,8 @@ When the user enters `/criterion create <url>`: confirm the user wants
 this deployment shared, and that the criterion repository at `<url>`
 exists (empty, or holding this working copy's own history) — creating it
 on a hosting service is externally visible, so ask before doing it. Run
-`catalyst criterion create <url>` (`--branch <name>` only if the user
+`catalyst criterion create <url> --yes` once they agreed (without `--yes`
+it publishes nothing and exits `3`; `--branch <name>` only if the user
 wants a shared branch other than `criterion`). If it refuses because the
 remote branch holds history the working copy lacks, report it: that is
 someone else's work or another deployment, never something to overwrite.
@@ -518,7 +519,10 @@ machine holds the local working copy, publishes it there. If the joining person 
 `/criterion push` like any other change.
 
 When the user enters `/criterion push <message>`: resolve the signer
-(§2) and run `catalyst criterion push -m "<message>" --as <signer>`.
+(§2) and run `catalyst criterion push -m "<message>" --as <signer>`. It
+prints what it would publish (uncommitted changes, local commits, and
+whether they join the open pull request or start one) and exits `3`: show
+that to the user, and only on their assent (INV-4) re-run it with `--yes`.
 Report the pull request (or the branch to open one from). If the push
 stops on a conflict, report the conflicting files and stop: nothing was
 pushed. Never resolve the conflict by applying an edit of your own. You
@@ -760,8 +764,8 @@ other.
 
 ## 9. Journaling
 
-`development/journal.jsonl` is an append-only, transaction-log-grade
-record — see `Rules-of-Rules.md` §12 for the full entry schema (exact
+The journal (`development/journal/`, INV-17) is an append-only,
+transaction-log-grade record — see `Rules-of-Rules.md` §12 for the full entry schema (exact
 before/after git blob pointers per file, project-root-relative paths, one
 or more `intent` statements, the `targets` rule IDs, the `writer`) and the
 point-in-time restore mechanism (`/journal-restore`, materializes a

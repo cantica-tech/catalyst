@@ -1,11 +1,12 @@
 """The kernel's prose surface is frozen until R2 (roadmap R1.6, ADR-017)."""
+
 import json
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import check_frozen_surface as freeze  # noqa: E402
+import check_frozen_surface as freeze
 
 
 def test_surface_matches_the_frozen_snapshot():

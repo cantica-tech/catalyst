@@ -8,17 +8,16 @@ module. Each member's `catalyst.toml` names it (`workspace = "<name>"`), and
 loading a member also loads the workspace's rules, domains and users,
 read-only (`corpus._inherit_workspace`).
 """
+
 from __future__ import annotations
 
 import datetime
 import json
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
 import project_file
-
 from catalyst import journal
 from catalyst.deployment import load_working_copy
 from catalyst.ids import generate_userid
@@ -36,7 +35,7 @@ def _strip_jsonc(text: str) -> str:
         if in_str:
             out.append(ch)
             if ch == "\\":
-                out.append(text[i + 1:i + 2])
+                out.append(text[i + 1 : i + 2])
                 i += 2
                 continue
             if ch == '"':
@@ -66,7 +65,7 @@ def read(workspace_file: Path) -> tuple[str, list[Path]]:
         data = json.loads(_strip_jsonc(workspace_file.read_text(encoding="utf-8")))
     except (OSError, ValueError) as exc:
         raise WorkspaceError(f"cannot read {workspace_file}: {exc}") from exc
-    name = workspace_file.name[:-len(".code-workspace")]
+    name = workspace_file.name[: -len(".code-workspace")]
     base = workspace_file.resolve().parent
     folders = []
     for entry in data.get("folders", []) if isinstance(data, dict) else []:
@@ -96,11 +95,17 @@ def _skeleton(root: Path, kernel: Path, user: dict) -> list[Path]:
     write("IAM/users/users.json", json.dumps({"users": [user]}, indent=2) + "\n")
     roles = kernel / "templates" / "roles.template.json"
     write("IAM/roles/roles.json", roles.read_text(encoding="utf-8") if roles.is_file() else '{"roles": []}\n')
-    write("development/journal.jsonl", "")
-    write("version.txt", (kernel.parent.parent / "version.txt").read_text(encoding="utf-8")
-          if (kernel.parent.parent / "version.txt").is_file() else "0.0.0\n")
-    write("README.md", "# Workspace criterion\n\nShared by the workspace's member projects (their "
-          "`catalyst.toml` names it): rules and domains, users and roles. Read-only from a member.\n")
+    write(
+        "version.txt",
+        (kernel.parent.parent / "version.txt").read_text(encoding="utf-8")
+        if (kernel.parent.parent / "version.txt").is_file()
+        else "0.0.0\n",
+    )
+    write(
+        "README.md",
+        "# Workspace criterion\n\nShared by the workspace's member projects (their "
+        "`catalyst.toml` names it): rules and domains, users and roles. Read-only from a member.\n",
+    )
     write(".gitignore", "/.venv\n")
     return written
 
@@ -114,9 +119,15 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
         raise WorkspaceError(f"a workspace criterion named '{name}' already exists ({root})")
     projects = members(workspace_file)
     root.mkdir(parents=True, exist_ok=True)
-    user = {"name": user_name, "git_username": git_username or user_name, "roles": ["Admin"],
-            "registered": datetime.date.today().isoformat(), "active": True, "notes": "",
-            "userid": generate_userid(set())}
+    user = {
+        "name": user_name,
+        "git_username": git_username or user_name,
+        "roles": ["Admin"],
+        "registered": datetime.date.today().isoformat(),
+        "active": True,
+        "notes": "",
+        "userid": generate_userid(set()),
+    }
     written = _skeleton(root, kernel, user)
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True, capture_output=True)
     steps = [f"created the workspace criterion {root}"]
@@ -131,16 +142,41 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
         project_file.write(toml, data)
         steps.append(f"{project.name}: catalyst.toml names workspace '{name}' (not committed)")
     dep = load_working_copy(root)
-    journal.append(dep, journal.AppendRequest(
-        command="catalyst workspace init", action="create", artifact=f"workspace {name}", targets=[],
-        intent=[f"Create the meta criterion of the VS Code workspace {workspace_file.name}: the rules, domains, "
-                f"users and roles its {len(projects)} member project(s) share."],
-        files=[str(p) for p in written if p.name != "journal.jsonl"], actor=git_username or user_name,
-        allow_unchanged=True, tier="chore"))
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst workspace init",
+            action="create",
+            artifact=f"workspace {name}",
+            targets=[],
+            intent=[
+                f"Create the meta criterion of the VS Code workspace {workspace_file.name}: the rules, domains, "
+                f"users and roles its {len(projects)} member project(s) share."
+            ],
+            files=[str(p) for p in written],
+            actor=git_username or user_name,
+            allow_unchanged=True,
+            tier="chore",
+        ),
+    )
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(root), "-c", f"user.name={user_name}", "-c",
-                    f"user.email={(git_username or 'catalyst')}@catalyst.invalid", "commit", "-q", "-m",
-                    f"catalyst workspace init: {name}"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            f"user.name={user_name}",
+            "-c",
+            f"user.email={(git_username or 'catalyst')}@catalyst.invalid",
+            "commit",
+            "-q",
+            "-m",
+            f"catalyst workspace init: {name}",
+        ],
+        check=True,
+        capture_output=True,
+    )
     return root, steps
 
 
@@ -150,6 +186,11 @@ def status(workspace_file: Path) -> dict:
     rows = []
     for folder in folders:
         data = project_file.read_dir(folder)
-        rows.append({"folder": str(folder), "project": project_file.project_name(data),
-                     "member": project_file.workspace_of(data) == name})
+        rows.append(
+            {
+                "folder": str(folder),
+                "project": project_file.project_name(data),
+                "member": project_file.workspace_of(data) == name,
+            }
+        )
     return {"workspace": name, "criterion": str(root) if root.is_dir() else None, "folders": rows}

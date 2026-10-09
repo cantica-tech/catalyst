@@ -9,6 +9,7 @@ file a project has.
 Stdlib only. `tomllib` (Python 3.11+) is imported only when a TOML file is
 read, so a legacy JSON pointer still works on an older Python.
 """
+
 from __future__ import annotations
 
 import json
@@ -17,8 +18,10 @@ from typing import Any
 
 NAME = "catalyst.toml"
 LEGACY_SUFFIX = ".catalyst"
-HEADER = ("# catalyst project file: names this project's criterion "
-          "($HOME/.catalyst/projects/<project_name>/criterion). Never a path.\n")
+HEADER = (
+    "# catalyst project file: names this project's criterion "
+    "($HOME/.catalyst/projects/<project_name>/criterion). Never a path.\n"
+)
 
 
 def find(directory: Path) -> Path | None:
@@ -49,6 +52,7 @@ def read(path: Path) -> dict[str, Any]:
         text = path.read_text(encoding="utf-8")
         if path.name == NAME:
             import tomllib
+
             data = tomllib.loads(text)
         else:
             data = json.loads(text)
@@ -69,7 +73,7 @@ def _toml_value(value: Any) -> str:
         return str(value)
     if isinstance(value, list):
         return "[" + ", ".join(_toml_value(v) for v in value) + "]"
-    return json.dumps(str(value), ensure_ascii=False)     # a TOML basic string
+    return json.dumps(str(value), ensure_ascii=False)  # a TOML basic string
 
 
 def dumps_toml(data: dict[str, Any]) -> str:
@@ -97,6 +101,7 @@ LEGACY_DIRNAME = ".criterion"
 def home() -> Path:
     """catalyst's own space: `$CATALYST_HOME`, else `$HOME/.catalyst`."""
     import os
+
     override = os.environ.get("CATALYST_HOME")
     return Path(override).expanduser() if override else Path.home() / ".catalyst"
 

@@ -41,9 +41,11 @@ first user, and, afterwards, its first rules.
    in the project where this guide is being run. If it exists, read its
    `name` value; if it does not, ask the user for the project name and use
    the current project root directory name as the default.
+
    ```yaml
    name: "project-name"
    ```
+
    The `name` must be a simple project identifier, not a full path or a
    nested object; the pointer becomes `<name>.catalyst`. `catalyst init`
    builds the standard layout (step 3); an optional `layout` key left in an
@@ -99,7 +101,7 @@ first user, and, afterwards, its first rules.
    - writes `IAM/users/` and `IAM/roles/` with their templates, registers
      the first user with a fresh userid as Admin, and seeds `roles.json`
      from the kernel's default role mapping (INV-16, INV-26);
-   - writes an empty `development/journal.jsonl`, `version.txt`,
+   - writes `version.txt`,
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
      root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
      and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
@@ -120,6 +122,7 @@ first user, and, afterwards, its first rules.
    §8, INV-22; `ARTIFACT-LAYOUT.md`).
 
    The resulting working copy (the module's folders vary by module):
+
    ```
    <agent-owned location>/.criterion/     # reached as <project root>/.criterion
      .git/                  # the working copy's own history
@@ -160,8 +163,9 @@ first user, and, afterwards, its first rules.
      development/
        <folder>/            # a module entity type with `location: development`
        meta-tags/           # templates/, README.md, meta-tags.md
-       journal.jsonl
+       journal/             # <actor>@<machine>/<YYYY-MM>.jsonl shards (INV-17)
    ```
+
    The framework only cares that the chain from every active-module
    artifact to its grounding type (a kernel rule) to a domain stays intact
    (INV-5), not the folder names. The module's meta-rules
@@ -344,9 +348,11 @@ after the fact.
    is a good source), citing the rule IDs from step 4.
 6. Add a one-line header to each of your project's rule and process files
    noting which template in this framework they instantiate, e.g.:
+
    ```
    > Instantiates [the catalyst framework rules template](../../framework/kernel/rules-of-rules.template.md).
    ```
+
    This keeps the project's concrete process traceable back to the
    generic framework as the framework itself evolves.
 

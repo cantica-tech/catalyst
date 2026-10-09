@@ -11,6 +11,7 @@ changes, the chore tier). Merge commits are not checked.
 copy (a CI checkout of a local-only deployment), `--pattern-only` accepts any
 well-formed ID.
 """
+
 from __future__ import annotations
 
 import re
@@ -23,8 +24,12 @@ from catalyst.journal import revisions
 
 # an entity ID (ITEM-000001[-userid]) or a rule ID (br-AUTH-000001[-userid]);
 # nothing else that merely looks like word-digits (paths, versions)
-TOKEN_RE = re.compile(r"\b([A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{3,6}(?:-[A-Za-z0-9]{8})?)\b")
-FULL_SHAPE = re.compile(r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?)$")
+TOKEN_RE = re.compile(
+    r"\b([A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{3,6}(?:-[A-Za-z0-9]{8})?)\b"
+)
+FULL_SHAPE = re.compile(
+    r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?)$"
+)
 CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
 HOOK = """#!/usr/bin/env python3
 # Installed by `catalyst hook install`: every commit cites an artifact or rule ID,
@@ -80,7 +85,7 @@ def cited(message: str) -> list[str]:
 def resolves(corpus: Corpus, token: str, all_ids: set[str]) -> bool:
     if token in all_ids:
         return True
-    return any(i.startswith(token + "-") for i in all_ids)     # short form of a full ID
+    return any(i.startswith(token + "-") for i in all_ids)  # short form of a full ID
 
 
 def check_message(message: str, corpus: Corpus | None) -> str | None:
@@ -109,13 +114,16 @@ def check_message(message: str, corpus: Corpus | None) -> str | None:
     return "cites no artifact or rule ID (or mark it `chore:`)"
 
 
-def commits(repo: Path, rev_range: str | list[str],
-            options: tuple[str, ...] = ()) -> list[tuple[str, list[str], str]]:
+def commits(repo: Path, rev_range: str | list[str], options: tuple[str, ...] = ()) -> list[tuple[str, list[str], str]]:
     """`rev_range`: user-supplied revisions, never options (`revisions`);
     `options`: the caller's own `git log` options (e.g. `--since=`)."""
     revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
-    res = subprocess.run(["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", *options, *revs],
-                         capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(
+        ["git", "-C", str(repo), "log", "--format=%H%x00%P%x00%B%x1e", *options, *revs],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
     out = []
@@ -131,8 +139,12 @@ def commits(repo: Path, rev_range: str | list[str],
 def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]]:
     """Each commit's changed files, relative to the repository top."""
     revs = revisions([rev_range] if isinstance(rev_range, str) else rev_range)
-    res = subprocess.run(["git", "-C", str(repo), "log", "--no-renames", "--name-only", "-z",
-                          "--format=%x1e%H", *revs], capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(
+        ["git", "-C", str(repo), "log", "--no-renames", "--name-only", "-z", "--format=%x1e%H", *revs],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {rev_range}")
     out: dict[str, list[str]] = {}
@@ -144,8 +156,7 @@ def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]
     return out
 
 
-def trace(repo: Path, rev_range: str, corpus: Corpus | None,
-          scoped: bool = False) -> tuple[int, list[Failure]]:
+def trace(repo: Path, rev_range: str, corpus: Corpus | None, scoped: bool = False) -> tuple[int, list[Failure]]:
     """Check each non-merge commit's message. `scoped`: only commits that
     change a file this deployment governs, or no file at all
     (fw-STRUCTURE-000017) — another project's commits in a shared
@@ -153,18 +164,20 @@ def trace(repo: Path, rev_range: str, corpus: Corpus | None,
     checked, failures = 0, []
     files: dict[str, list[str]] = {}
     prefix = ""
+    from catalyst.scope import governs
+
     if scoped:
-        from catalyst.scope import governs
         files = changed_files(repo, rev_range)
-        prefix = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-prefix"],
-                                capture_output=True, text=True, encoding="utf-8").stdout.strip()
+        prefix = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
+        ).stdout.strip()
     for sha, parents, body in commits(repo, rev_range):
         if len(parents) > 1:
-            continue                                  # merges carry their parents' trace
+            continue  # merges carry their parents' trace
         if scoped and files.get(sha):
-            mine = [f[len(prefix):] for f in files[sha] if f.startswith(prefix)]
+            mine = [f[len(prefix) :] for f in files[sha] if f.startswith(prefix)]
             if not any(governs(repo, f) for f in mine):
-                continue                              # changes only other projects' files
+                continue  # changes only other projects' files
         checked += 1
         reason = check_message(body, corpus)
         if reason:
@@ -173,15 +186,20 @@ def trace(repo: Path, rev_range: str, corpus: Corpus | None,
 
 
 def install_hook(project_root: Path) -> Path:
-    git_dir = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir"],
-                             capture_output=True, text=True, encoding="utf-8")
+    git_dir = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if git_dir.returncode != 0:
         raise ValueError(f"{project_root} is not a git repository")
     hook = Path(git_dir.stdout.strip()) / "hooks" / "commit-msg"
     if hook.exists() and "catalyst hook install" not in hook.read_text(encoding="utf-8", errors="ignore"):
         raise ValueError(f"{hook} exists and was not written by catalyst — merge it by hand")
-    prefix = subprocess.run(["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
-                            capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    prefix = subprocess.run(
+        ["git", "-C", str(project_root), "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
+    ).stdout.strip()
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(HOOK.replace("{router}", f"{prefix}.criterion/bin/catalyst.pyz"), encoding="utf-8")
     hook.chmod(0o755)
@@ -196,11 +214,17 @@ def route(top: Path, message_file: Path, cli: list[str]) -> int:
     import sys
 
     from catalyst.scope import owner
-    res = subprocess.run(["git", "-C", str(top), "diff", "--cached", "--name-only", "-z"],
-                         capture_output=True, text=True, encoding="utf-8")
+
+    res = subprocess.run(
+        ["git", "-C", str(top), "diff", "--cached", "--name-only", "-z"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     staged = [p for p in res.stdout.split("\0") if p]
     owners = sorted({o for o in (owner(top, p) for p in staged) if o is not None})
     import project_file
+
     if not owners and project_file.is_project(Path(top)):
         owners = [Path(top).absolute()]
     status = 0
@@ -209,8 +233,9 @@ def route(top: Path, message_file: Path, cli: list[str]) -> int:
         criterion = project_file.resolve(o)
         if criterion is not None:
             from catalyst.runtime import venv_python
+
             python, vendored = venv_python(criterion / ".venv"), criterion / "bin" / "catalyst.pyz"
-            if python.exists():                  # the project's own runtime
+            if python.exists():  # the project's own runtime
                 command = [str(python), "-m", "catalyst"]
             elif vendored.is_file():
                 command = [sys.executable, str(vendored)]

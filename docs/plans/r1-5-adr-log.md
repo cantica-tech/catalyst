@@ -5,6 +5,7 @@ window, creating a reference for R2–R7 and post-1.0 evolution.
 
 **Why:** Catalyst has accumulated 40+ design decisions across rules, module
 format, product naming, and infrastructure. An ADR log:
+
 - Preserves rationale (why, not just what).
 - Guides future contributors (unpack the "why" before changing things).
 - Tracks trade-offs and open questions.
@@ -103,6 +104,7 @@ What we decided to do (and why this option over alternatives).
 ### Phase 1: Extract Existing Decisions
 
 Read and summarize:
+
 1. `framework/kernel/INVARIANTS.md` (INV-01 through INV-30 → ADRs)
 2. `framework/kernel/BOOTSTRAP.md` (hard rules 1–9)
 3. `framework/kernel/Rules-of-Rules.md` (meta-rules, §1–3)
@@ -119,6 +121,7 @@ Read and summarize:
 **Template:** Use marker above; one file per decision.
 
 **Priority order** (for initial write-up):
+
 1. Core model (ADR-01 through -05)
 2. Store & migration (ADR-09 through -11)
 3. Product & brand (ADR-12 through -14)
@@ -178,6 +181,7 @@ This folder documents design decisions made in the catalyst refactor (R0–R7).
 ### Grounded Docs
 
 Once written, ADRs should be linked from:
+
 - `framework/kernel/INVARIANTS.md` (replace INV-NN with ADR-NN references)
 - `framework/kernel/BOOTSTRAP.md` (hard rules → ADR references)
 - Migration documents (e.g., `0.46.0/r0-decisions-*.md` → ADR-01, -02)
@@ -238,6 +242,7 @@ baseline infrastructure.
 ### Questions Parking Lot
 
 From `10-questions-and-decisions.md`, deferred to later phases:
+
 - Module release coupling (SE 2.4.0 ↔ kernel 0.46.0 version strategy) → ADR when R3 multi-module is ready
 - RECON close rule (confirmation flow for `/reconcile close`) → ADR when R2 verb spec is finalized
 - Plugin architecture (isolation, permissions) → ADR post-1.0

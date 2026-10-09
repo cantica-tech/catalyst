@@ -397,8 +397,10 @@ value reflects who signed it under the mapping in effect at the time.
 
 ## 12. `rr-META-012` The journal is transaction-log-grade, not a changelog
 
-`development/journal.jsonl` — one JSON object per line, strictly
-append-only. A "changelog" narrates what happened; this journal is
+`development/journal/` — one JSON object per line, strictly append-only,
+in one shard per actor, machine and month (`<actor>@<machine>/<YYYY-MM>.jsonl`;
+a deployment made before kernel 0.50 also keeps `development/journal.jsonl`,
+read and never written). A "changelog" narrates what happened; this journal is
 precise enough to **replay**: every entry carries exact content pointers,
 not just prose, so a point in time is mechanically reconstructable, not
 just describable. Entries are written with `catalyst journal append`
@@ -718,6 +720,7 @@ courtesy as `/criterion create`:
 ### Agent switching procedure
 
 When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
+
 1. Resolve the running agent's own owned location (local-only, above) (or the in-project fallback `.criterion/`).
 2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
 3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`. A shared deployment's `.criterion` is a submodule inside the project (§13): skip steps 2–3 for it.
@@ -860,7 +863,7 @@ the same shape for its own `rules-of-work-items.md` (§8, INV-22).
 - `development/` — `meta-tags/` promoted to a full artifact-type folder
   (previously meta-tags lived as loose files directly under
   `development/`), plus any module artifact-type folders the active
-  module places here; `README.md`, `journal.jsonl` (and any generated
+  module places here; `README.md`, the journal (and any generated
   report the module adds) stay flat, cross-cutting, not artifact types
   themselves.
 - `work-items/` — **not part of the core layout** (§8, INV-22). Only
@@ -1171,7 +1174,7 @@ every free-text citation in `## Related`/`## Notes`/prose — there is no
 dedicated cross-reference-checking script today (`/check-rules` and
 `/audit` are agent-judgment procedures), so this is the agent's
 responsibility to verify by direct search, not something CI catches
-automatically. A rename must never touch `development/journal.jsonl`
+automatically. A rename must never touch the journal
 (INV-17 — append-only; historical entries correctly keep citing the
 pre-rename form forever), nor hand-edit any machine-regenerated report
 (INV-14) — regenerate it with its own command after the rename instead.

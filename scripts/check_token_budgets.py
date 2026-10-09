@@ -10,6 +10,7 @@ a deliberate budget. Moving the baseline is a reviewed change:
 Items the environment cannot measure (command specs need a deployment's
 .criterion) are skipped, never failed.
 """
+
 from __future__ import annotations
 
 import json
@@ -17,11 +18,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from measure_tokens import ROOT, measure_all  # noqa: E402
+from measure_tokens import ROOT, measure_all
 
 BASELINE = ROOT / "docs" / "BUDGETS-BASELINE.json"
-TOLERANCE = 0.05   # 5% growth per item
-SLACK = 25         # tokens: absorbs one-line edits in small files
+TOLERANCE = 0.05  # 5% growth per item
+SLACK = 25  # tokens: absorbs one-line edits in small files
 
 
 def check() -> list[str]:
@@ -32,8 +33,10 @@ def check() -> list[str]:
         if base is None:
             problems.append(f"{item.name}: {item.tokens:,} tokens, no baseline entry")
         elif item.tokens > base["tokens"] * (1 + TOLERANCE) + SLACK:
-            problems.append(f"{item.name}: {base['tokens']:,} -> {item.tokens:,} tokens "
-                            f"(+{item.tokens - base['tokens']:,}, over {TOLERANCE:.0%})")
+            problems.append(
+                f"{item.name}: {base['tokens']:,} -> {item.tokens:,} tokens "
+                f"(+{item.tokens - base['tokens']:,}, over {TOLERANCE:.0%})"
+            )
     return problems
 
 
@@ -42,8 +45,7 @@ def main() -> int:
     for p in problems:
         print(f"token budget exceeded: {p}", file=sys.stderr)
     if problems:
-        print("If the growth is intended: python3 scripts/measure_tokens.py --write-baseline",
-              file=sys.stderr)
+        print("If the growth is intended: python3 scripts/measure_tokens.py --write-baseline", file=sys.stderr)
         return 1
     print("token budgets: within baseline")
     return 0

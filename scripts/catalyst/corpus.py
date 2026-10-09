@@ -7,6 +7,7 @@ Markdown files named `<PREFIX>-NNNNNN-<summary>.md` whose fields live in a
 `naming: free-form`, e.g. a roadmap whose items are table rows) are read as
 row tables instead.
 """
+
 from __future__ import annotations
 
 import json
@@ -14,12 +15,13 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from catalyst.deployment import Deployment
 from check_deployment import (
-    RULE_HEADING_RE, TEMPLATE_RE, TEMPLATES_CATALOG_RE,
+    RULE_HEADING_RE,
+    TEMPLATE_RE,
+    TEMPLATES_CATALOG_RE,
 )
 from module_loader import ETD
-
-from catalyst.deployment import Deployment
 
 FIELD_ROW_RE = re.compile(r"^\|\s*\*\*(.+?)\*\*\s*\|")
 TICKED_RE = re.compile(r"`([^`]+)`")
@@ -60,7 +62,7 @@ class Rule:
     file: Path
     line: int
     retired: bool = False
-    inherited: bool = False         # from the project's workspace criterion (R3.1b), read-only
+    inherited: bool = False  # from the project's workspace criterion (R3.1b), read-only
 
 
 @dataclass
@@ -69,7 +71,7 @@ class Artifact:
     prefix: str
     file: Path
     title: str
-    fields: dict[str, str] = field(default_factory=dict)   # raw name -> raw value
+    fields: dict[str, str] = field(default_factory=dict)  # raw name -> raw value
 
     def get(self, name: str) -> str | None:
         want = norm_field(name)
@@ -85,10 +87,10 @@ class Corpus:
     indexed_rules: set[str] = field(default_factory=set)
     domains: set[str] = field(default_factory=set)
     users: list[dict] = field(default_factory=list)
-    artifacts: dict[str, list[Artifact]] = field(default_factory=dict)   # id -> defs
+    artifacts: dict[str, list[Artifact]] = field(default_factory=dict)  # id -> defs
     by_prefix: dict[str, list[Artifact]] = field(default_factory=dict)
     index_rows: dict[str, dict[str, str]] = field(default_factory=dict)  # prefix -> id -> file
-    row_items: dict[str, set[str]] = field(default_factory=dict)         # prefix -> ids
+    row_items: dict[str, set[str]] = field(default_factory=dict)  # prefix -> ids
 
     def all_ids(self) -> set[str]:
         ids = set(self.rules) | set(self.artifacts)
@@ -112,12 +114,15 @@ def _rules(root: Path) -> tuple[dict[str, list[Rule]], set[str]]:
         return found, indexed
     index = rules_dir / "rules.md"
     if index.is_file():
-        indexed = set(re.findall(r"`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`",
-                                 index.read_text(encoding="utf-8")))
+        indexed = set(re.findall(r"`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", index.read_text(encoding="utf-8")))
     for f in sorted(rules_dir.rglob("*.md")):
-        if (f.name == "rules.md" or TEMPLATE_RE.match(f.name)
-                or TEMPLATES_CATALOG_RE.match(f.name) or "domains" in f.relative_to(rules_dir).parts
-                or "templates" in f.relative_to(rules_dir).parts):
+        if (
+            f.name == "rules.md"
+            or TEMPLATE_RE.match(f.name)
+            or TEMPLATES_CATALOG_RE.match(f.name)
+            or "domains" in f.relative_to(rules_dir).parts
+            or "templates" in f.relative_to(rules_dir).parts
+        ):
             continue
         lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
         current: Rule | None = None
@@ -213,6 +218,7 @@ def _inherit_workspace(dep: Deployment, corpus: Corpus) -> None:
     catalyst.toml) also sees the workspace criterion's rules, domains, users
     and roles, read-only; its own entries win on a clash (R3.1b)."""
     import project_file
+
     name = project_file.workspace_of(dep.pointer or {})
     root = project_file.workspace_criterion(name) if name else None
     if root is None or not root.is_dir() or root == dep.root:
@@ -226,8 +232,9 @@ def _inherit_workspace(dep: Deployment, corpus: Corpus) -> None:
             corpus.indexed_rules.add(rid)
     corpus.domains |= _domains(root)
     known = {str(u.get(k, "")).lower() for u in corpus.users for k in ("name", "git_username", "userid")}
-    corpus.users += [u for u in _users(root)
-                     if not {str(u.get(k, "")).lower() for k in ("name", "git_username", "userid")} & known]
+    corpus.users += [
+        u for u in _users(root) if not {str(u.get(k, "")).lower() for k in ("name", "git_username", "userid")} & known
+    ]
 
 
 def load_corpus(dep: Deployment) -> Corpus:

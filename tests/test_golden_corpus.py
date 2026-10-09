@@ -2,6 +2,7 @@
 corpus captured locally is sound. Corpora hold private governance data, so they
 are captured locally (scripts/capture_golden_corpus.py) and never committed;
 the checks on real corpora skip when none is captured."""
+
 import json
 import sys
 import tarfile
@@ -12,7 +13,7 @@ import pytest
 from catalyst_fixtures import make_project, write
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import capture_golden_corpus as corpus  # noqa: E402
+import capture_golden_corpus as corpus
 
 CAPTURED = sorted(corpus.FIXTURES.glob("*-golden-corpus.tar.gz"))
 

@@ -10,6 +10,7 @@ matching field keeps what the old row held, and a row whose file is gone is
 kept as it was — regenerating never drops information, and never frees an
 ID for reuse (`validate` reports such rows as index-orphan errors).
 """
+
 from __future__ import annotations
 
 import re
@@ -43,14 +44,13 @@ def _split(text: str) -> tuple[list[str], list[str] | None, list[str], list[str]
     after it). The ID table is the first whose header has an `ID` column."""
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if (line.startswith("|") and i + 1 < len(lines)
-                and re.match(r"^\|\s*:?-{3,}", lines[i + 1])):
+        if line.startswith("|") and i + 1 < len(lines) and re.match(r"^\|\s*:?-{3,}", lines[i + 1]):
             header = cells(line)
             j = i + 2
             while j < len(lines) and lines[j].startswith("|"):
                 j += 1
             if any(norm_field(h) == "id" for h in header):
-                return lines[:i], header, lines[i + 2:j], lines[j:]
+                return lines[:i], header, lines[i + 2 : j], lines[j:]
     return lines, None, [], []
 
 
@@ -62,7 +62,7 @@ def _cell(art: Artifact, column: str, old: str | None) -> str:
         return art.title
     raw = art.get(column)
     if raw is None:
-        return old or ""          # no such field: keep what the index held
+        return old or ""  # no such field: keep what the index held
     if is_empty(raw):
         return ""
     values = ref_values(raw) if "`" in raw else [raw.strip()]
@@ -87,7 +87,7 @@ def render(existing: str, title: str, arts: list[Artifact]) -> str:
     else:
         before, header, old_rows, after = [f"# {title} index", ""], None, [], []
     if existing and header is None and not arts:
-        return existing        # an empty index without a table stays as written
+        return existing  # an empty index without a table stays as written
     columns = header or DEFAULT_COLUMNS
     id_col = next(i for i, c in enumerate(columns) if norm_field(c) == "id")
     old: dict[str, list[str]] = {}
@@ -97,11 +97,19 @@ def render(existing: str, title: str, arts: list[Artifact]) -> str:
         if rid:
             old[rid] = row
     current = {a.id for a in arts}
-    entries = [(a.id, "| " + " | ".join(
-        _cell(a, c, old.get(a.id, [None] * len(columns))[i] if i < len(old.get(a.id, [])) else None)
-        for i, c in enumerate(columns)) + " |") for a in arts]
-    entries += [(rid, line) for line in old_rows
-                if (rid := _row_id(cells(line), id_col)) and rid not in current]
+    entries = [
+        (
+            a.id,
+            "| "
+            + " | ".join(
+                _cell(a, c, old.get(a.id, [None] * len(columns))[i] if i < len(old.get(a.id, [])) else None)
+                for i, c in enumerate(columns)
+            )
+            + " |",
+        )
+        for a in arts
+    ]
+    entries += [(rid, line) for line in old_rows if (rid := _row_id(cells(line), id_col)) and rid not in current]
     rows = [f"| {' | '.join(columns)} |", f"|{'|'.join('---' for _ in columns)}|"]
     rows += [line for _, line in sorted(entries, key=lambda e: _number(e[0]))]
     if arts:

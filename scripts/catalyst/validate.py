@@ -9,15 +9,15 @@ values, a one-sided back-reference, a reference to the wrong type, index
 drift that `catalyst index regen` repairs); `--strict` turns them into
 errors.
 """
+
 from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
 
-from module_loader import ETD, FieldDefinition
-
 from catalyst.corpus import Artifact, Corpus, is_empty, norm_field, ref_values
 from catalyst.deployment import Deployment
+from module_loader import ETD, FieldDefinition
 
 ERROR, WARNING = "error", "warning"
 SIGNER_FIELD = "Signed-off-by"
@@ -59,14 +59,22 @@ class Validator:
         for rule_id, defs in sorted(self.corpus.rules.items()):
             if len(defs) > 1:
                 places = ", ".join(f"{self.rel(d.file)}:{d.line}" for d in defs)
-                self.add(ERROR, "duplicate-id", self.rel(defs[0].file),
-                         f"rule `{rule_id}` is defined {len(defs)} times ({places})")
+                self.add(
+                    ERROR,
+                    "duplicate-id",
+                    self.rel(defs[0].file),
+                    f"rule `{rule_id}` is defined {len(defs)} times ({places})",
+                )
             d = defs[0]
             if d.file.name == "Rules-of-Rules.md" and rule_id.startswith("rr-META-"):
-                continue    # meta-rules are self-governing, never in rules.md
+                continue  # meta-rules are self-governing, never in rules.md
             if self.corpus.indexed_rules and rule_id not in self.corpus.indexed_rules:
-                self.add(ERROR, "rule-unindexed", f"{self.rel(d.file)}:{d.line}",
-                         f"rule `{rule_id}` is not listed in rules/rules.md (INV-8)")
+                self.add(
+                    ERROR,
+                    "rule-unindexed",
+                    f"{self.rel(d.file)}:{d.line}",
+                    f"rule `{rule_id}` is not listed in rules/rules.md (INV-8)",
+                )
 
     # --- artifacts -----------------------------------------------------
     def resolve(self, value: str, target: str | None) -> tuple[bool, str | None]:
@@ -87,19 +95,27 @@ class Validator:
     def check_ref_field(self, art: Artifact, fd: FieldDefinition, raw: str) -> list[str]:
         values = ref_values(raw)
         if fd.kind == "ref" and len(values) > 1:
-            self.add(WARNING, "cardinality", self.rel(art.file),
-                     f"`{fd.name}` holds {len(values)} values; the ETD declares a single ref")
+            self.add(
+                WARNING,
+                "cardinality",
+                self.rel(art.file),
+                f"`{fd.name}` holds {len(values)} values; the ETD declares a single ref",
+            )
         for v in values:
             ok, kind = self.resolve(v, fd.target_type)
             if not ok:
-                self.add(ERROR, "dangling-ref", self.rel(art.file),
-                         f"`{fd.name}` cites `{v}`, which resolves to nothing")
+                self.add(
+                    ERROR, "dangling-ref", self.rel(art.file), f"`{fd.name}` cites `{v}`, which resolves to nothing"
+                )
             elif fd.target_type and kind not in fd.target_type.split("|"):
-                self.add(WARNING, "ref-type", self.rel(art.file),
-                         f"`{fd.name}` cites `{v}` (a {kind}); the ETD expects {fd.target_type}")
+                self.add(
+                    WARNING,
+                    "ref-type",
+                    self.rel(art.file),
+                    f"`{fd.name}` cites `{v}` (a {kind}); the ETD expects {fd.target_type}",
+                )
             elif kind == "rule" and self.corpus.rules[v][0].retired:
-                self.add(WARNING, "retired-target", self.rel(art.file),
-                         f"`{fd.name}` cites retired rule `{v}`")
+                self.add(WARNING, "retired-target", self.rel(art.file), f"`{fd.name}` cites retired rule `{v}`")
         return values
 
     def check_artifact(self, art: Artifact, etd: ETD) -> None:
@@ -108,11 +124,11 @@ class Validator:
         id_re = re.compile(rf"^{re.escape(etd.id_prefix)}-(\d{{6}})-({self.userid_alt})$")
         m = id_re.match(art.id)
         if not m:
-            self.add(ERROR, "id-shape", where,
-                     f"ID `{art.id}` is not {etd.id_prefix}-NNNNNN-<registered userid>")
+            self.add(ERROR, "id-shape", where, f"ID `{art.id}` is not {etd.id_prefix}-NNNNNN-<registered userid>")
         elif not art.file.name.startswith(f"{etd.id_prefix}-{m.group(1)}-"):
-            self.add(ERROR, "id-shape", where,
-                     f"filename does not start with {etd.id_prefix}-{m.group(1)}- (ID `{art.id}`)")
+            self.add(
+                ERROR, "id-shape", where, f"filename does not start with {etd.id_prefix}-{m.group(1)}- (ID `{art.id}`)"
+            )
         # declared fields
         grounded = etd.grounding == "none"
         # "**Closed**", "Closed ✅", "`Closed`" all mean Closed
@@ -127,14 +143,22 @@ class Validator:
                 if fd.required:
                     self.add(ERROR, "required-field", where, f"required field `{fd.name}` is missing or empty")
                 elif fd.required_when_closed and closed:
-                    self.add(ERROR, "closed-incomplete", where,
-                             f"`{fd.name}` must be filled before a {etd.name.lower()} is {status}")
+                    self.add(
+                        ERROR,
+                        "closed-incomplete",
+                        where,
+                        f"`{fd.name}` must be filled before a {etd.name.lower()} is {status}",
+                    )
                 continue
             if fd.kind == "enum" and fd.allowed_values:
                 allowed = {a.lower() for a in fd.allowed_values}
                 if raw.strip().strip("`").lower() not in allowed:
-                    self.add(WARNING, "enum-value", where,
-                             f"`{fd.name}` is '{raw.strip()}', not one of {', '.join(fd.allowed_values)}")
+                    self.add(
+                        WARNING,
+                        "enum-value",
+                        where,
+                        f"`{fd.name}` is '{raw.strip()}', not one of {', '.join(fd.allowed_values)}",
+                    )
             if fd.kind in ("ref", "ref-list"):
                 values = self.check_ref_field(art, fd, raw)
                 if etd.grounding_field and norm_field(fd.name) == norm_field(etd.grounding_field):
@@ -142,9 +166,13 @@ class Validator:
                 if fd.backref:
                     self.check_backref(art, fd, values)
         if etd.grounding in ("required", "inherited") and not grounded:
-            self.add(ERROR, "ungrounded", where,
-                     f"no resolvable `{etd.grounding_field}` — every {etd.name.lower()} must ground "
-                     f"({etd.grounding}) to a documented rule (INV-5)")
+            self.add(
+                ERROR,
+                "ungrounded",
+                where,
+                f"no resolvable `{etd.grounding_field}` — every {etd.name.lower()} must ground "
+                f"({etd.grounding}) to a documented rule (INV-5)",
+            )
         # signer
         signer = art.get(SIGNER_FIELD)
         if signer is None or is_empty(signer):
@@ -157,15 +185,20 @@ class Validator:
             for target in self.corpus.artifacts.get(v, []):
                 raw = target.get(fd.backref or "")
                 if raw is None or art.id not in ref_values(raw):
-                    self.add(WARNING, "backref", self.rel(art.file),
-                             f"`{fd.name}` cites `{v}`, whose `{fd.backref}` does not cite `{art.id}` back")
+                    self.add(
+                        WARNING,
+                        "backref",
+                        self.rel(art.file),
+                        f"`{fd.name}` cites `{v}`, whose `{fd.backref}` does not cite `{art.id}` back",
+                    )
 
     def check_artifacts(self) -> None:
         for art_id, defs in sorted(self.corpus.artifacts.items()):
             if len(defs) > 1:
                 places = ", ".join(self.rel(d.file) for d in defs)
-                self.add(ERROR, "duplicate-id", self.rel(defs[0].file),
-                         f"`{art_id}` is defined {len(defs)} times ({places})")
+                self.add(
+                    ERROR, "duplicate-id", self.rel(defs[0].file), f"`{art_id}` is defined {len(defs)} times ({places})"
+                )
         for prefix, arts in sorted(self.corpus.by_prefix.items()):
             etd = self.dep.etds[prefix]
             for art in arts:
@@ -176,15 +209,17 @@ class Validator:
             index_rel = self.rel(folder / f"{folder.name}.md") if folder else prefix
             for art_id, name in files.items():
                 if art_id not in rows:
-                    self.add(WARNING, "index-drift", index_rel,
-                             f"`{art_id}` ({name}) is not registered — run `catalyst index regen`")
+                    self.add(
+                        WARNING,
+                        "index-drift",
+                        index_rel,
+                        f"`{art_id}` ({name}) is not registered — run `catalyst index regen`",
+                    )
                 elif rows[art_id] != name:
-                    self.add(WARNING, "index-drift", index_rel,
-                             f"`{art_id}` links {rows[art_id]}, the file is {name}")
+                    self.add(WARNING, "index-drift", index_rel, f"`{art_id}` links {rows[art_id]}, the file is {name}")
             for art_id in rows:
                 if art_id not in files:
-                    self.add(ERROR, "index-orphan", index_rel,
-                             f"registers `{art_id}`, which has no file")
+                    self.add(ERROR, "index-orphan", index_rel, f"registers `{art_id}`, which has no file")
 
     def run(self) -> list[Finding]:
         self.check_rules()

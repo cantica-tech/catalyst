@@ -15,6 +15,7 @@ findings files only; the artifacts an accepted finding becomes are written
 by the orchestrating session, after the user's decision. `problems()` is
 the one set of checks `close` and `catalyst check` both apply.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -31,11 +32,11 @@ from catalyst.scope import governs
 
 PREFIX = "ANALYSIS"
 KINDS = ("domain", "rule", "defect")
-STATUSES = ("holds", "partial", "missing")        # a rule: implemented / buggy or incomplete / not implemented
+STATUSES = ("holds", "partial", "missing")  # a rule: implemented / buggy or incomplete / not implemented
 CONFIDENCE = ("high", "medium", "low")
 MODES = ("bootstrap", "incremental")
 PHASES = ("Extracting", "Reconciling", "Deciding", "Closed", "Abandoned")
-AGREED = "both passes"                            # the verification of an agreed finding
+AGREED = "both passes"  # the verification of an agreed finding
 
 
 class AnalysisError(Exception):
@@ -86,11 +87,11 @@ def _git(repo: Path, *args: str) -> str:
 
 def _set_field(md: Path, name: str, value: str) -> None:
     text = md.read_text(encoding="utf-8")
-    new, n = re.subn(rf"^(\| \*\*{re.escape(name)}\*\* \| )[^|\n]*?( \|)$", rf"\g<1>{value}\g<2>",
-                     text, count=1, flags=re.M)
+    new, n = re.subn(
+        rf"^(\| \*\*{re.escape(name)}\*\* \| )[^|\n]*?( \|)$", rf"\g<1>{value}\g<2>", text, count=1, flags=re.M
+    )
     if n == 0:
-        new, n = re.subn(rf"^(\| \*\*{re.escape(name)}\*\* \|)\s*\|$", rf"\g<1> {value} |", text, count=1,
-                         flags=re.M)
+        new, n = re.subn(rf"^(\| \*\*{re.escape(name)}\*\* \|)\s*\|$", rf"\g<1> {value} |", text, count=1, flags=re.M)
     if n == 0:
         raise AnalysisError(f"{md.name} has no `{name}` field")
     md.write_text(new, encoding="utf-8")
@@ -101,8 +102,9 @@ def phase(art: Artifact) -> str:
 
 
 # --- the findings format ---------------------------------------------------
-def validate_findings(findings, *, inventory: set[str], rules: set[str], domains: set[str],
-                      reconciled: bool = False) -> list[str]:
+def validate_findings(
+    findings, *, inventory: set[str], rules: set[str], domains: set[str], reconciled: bool = False
+) -> list[str]:
     """Problems with a list of findings (a pass's, or the reconciler's).
     A defect names the rule it breaks: an existing rule ID, or the id of a
     rule finding in the same list."""
@@ -149,8 +151,9 @@ def validate_findings(findings, *, inventory: set[str], rules: set[str], domains
         if kind == "defect":
             breaks = f.get("breaks")
             if not breaks:
-                problems.append(f"{where}: a defect names the rule it `breaks` (an existing rule ID, "
-                                "or a rule finding's id)")
+                problems.append(
+                    f"{where}: a defect names the rule it `breaks` (an existing rule ID, or a rule finding's id)"
+                )
             elif breaks not in rules and breaks not in rule_findings:
                 problems.append(f"{where}: `breaks` {breaks} is neither an existing rule nor a rule finding")
         if reconciled:
@@ -177,8 +180,9 @@ def similarity(a: dict, b: dict) -> float:
         return 0.0
     if a.get("kind") == "domain" and a.get("code") and a.get("code") == b.get("code"):
         return 1.0
-    text = difflib.SequenceMatcher(None, _norm(f"{a.get('title')} {a.get('statement')}"),
-                                   _norm(f"{b.get('title')} {b.get('statement')}")).ratio()
+    text = difflib.SequenceMatcher(
+        None, _norm(f"{a.get('title')} {a.get('statement')}"), _norm(f"{b.get('title')} {b.get('statement')}")
+    ).ratio()
     pa, pb = _paths(a), _paths(b)
     overlap = len(pa & pb) / len(pa | pb) if pa | pb else 0.0
     return 0.6 * text + 0.4 * overlap
@@ -191,8 +195,7 @@ def diff(a: list[dict], b: list[dict]) -> dict:
     """Pair each finding of pass A with at most one of pass B, best match
     first, and classify: agreed, conflicting (matched, but a different
     status or a different broken rule), A-only, B-only."""
-    scored = sorted(((similarity(x, y), i, j) for i, x in enumerate(a) for j, y in enumerate(b)),
-                    reverse=True)
+    scored = sorted(((similarity(x, y), i, j) for i, x in enumerate(a) for j, y in enumerate(b)), reverse=True)
     used_a: set[int] = set()
     used_b: set[int] = set()
     agreed, conflicting = [], []
@@ -212,9 +215,12 @@ def diff(a: list[dict], b: list[dict]) -> dict:
             conflicting.append({**pair, "reason": "; ".join(reasons)})
         else:
             agreed.append(pair)
-    return {"agreed": agreed, "conflicting": conflicting,
-            "a_only": [x["id"] for i, x in enumerate(a) if i not in used_a],
-            "b_only": [y["id"] for j, y in enumerate(b) if j not in used_b]}
+    return {
+        "agreed": agreed,
+        "conflicting": conflicting,
+        "a_only": [x["id"] for i, x in enumerate(a) if i not in used_a],
+        "b_only": [y["id"] for j, y in enumerate(b) if j not in used_b],
+    }
 
 
 def coverage(recon: dict, a: list[dict], b: list[dict], d: dict) -> list[str]:
@@ -244,10 +250,14 @@ def coverage(recon: dict, a: list[dict], b: list[dict], d: dict) -> list[str]:
             problems.append(f"{s} is accounted for {n} times")
     plain = {frozenset((f"A:{p['a']}", f"B:{p['b']}")) for p in d.get("agreed", [])}
     for f in recon.get("findings") or []:
-        if frozenset(f.get("sources") or []) not in plain and \
-                str(f.get("verification") or "").strip().lower() in ("", AGREED):
-            problems.append(f"finding {f.get('id')}: found by one pass or contested — say how it was "
-                            "verified against the code in `verification`")
+        if frozenset(f.get("sources") or []) not in plain and str(f.get("verification") or "").strip().lower() in (
+            "",
+            AGREED,
+        ):
+            problems.append(
+                f"finding {f.get('id')}: found by one pass or contested — say how it was "
+                "verified against the code in `verification`"
+            )
     return problems
 
 
@@ -280,6 +290,7 @@ def _slug(text: str) -> str:
 
 def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str | None = None) -> Context:
     from catalyst.ids import next_entity_id
+
     if mode not in MODES:
         raise AnalysisError(f"mode must be one of {', '.join(MODES)}")
     if dep.standalone:
@@ -291,7 +302,7 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
     for line in listed:
         meta, path = line.split("\t", 1)
         if not governs(project, path):
-            continue                          # the working copy, a nested deployment, opted out
+            continue  # the working copy, a nested deployment, opted out
         files[path] = meta.split()[1]
     if not files:
         raise AnalysisError(f"no tracked file in {' '.join(scope)}")
@@ -303,7 +314,8 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
     slug = _slug(name or " ".join(scope))
     md = folder(dep) / f"{art_id.rsplit('-', 1)[0]}-{art_id.rsplit('-', 1)[1]}-{slug}.md"
     today = datetime.date.today().isoformat()
-    md.write_text(f"""# `{art_id}` — {name or 'analysis of ' + ' '.join(scope)}
+    md.write_text(
+        f"""# `{art_id}` — {name or "analysis of " + " ".join(scope)}
 
 | Field | Value |
 |---|---|
@@ -312,11 +324,11 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
 | **Filename** | `{md.name}` |
 | **Status** | Extracting |
 | **Mode** | {mode} |
-| **Scope** | {' '.join(scope)} |
+| **Scope** | {" ".join(scope)} |
 | **Code state** | {head} |
 | **Opened** | {today} |
 | **Closed** | |
-| **Signed-off-by** | {signer.get('name')} |
+| **Signed-off-by** | {signer.get("name")} |
 
 ## Passes
 
@@ -334,18 +346,25 @@ Two independent, blind passes (`ANALYSIS-PLAYBOOK.md`), recorded with
 ## Summary
 
 *(at close)*
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
     existing = {}
     if mode == "incremental":
         existing = {
             "rules": sorted(corpus.rules),
             "domains": sorted(corpus.domains),
-            "grounded": sorted(a.id for prefix, arts in corpus.by_prefix.items()
-                               if dep.etds[prefix].grounding == "required" for a in arts),
+            "grounded": sorted(
+                a.id
+                for prefix, arts in corpus.by_prefix.items()
+                if dep.etds[prefix].grounding == "required"
+                for a in arts
+            ),
         }
-    _write(reports(dep, art_id) / "inventory.json",
-           {"analysis": art_id, "mode": mode, "scope": scope, "code_state": head, "files": files,
-            "existing": existing})
+    _write(
+        reports(dep, art_id) / "inventory.json",
+        {"analysis": art_id, "mode": mode, "scope": scope, "code_state": head, "files": files, "existing": existing},
+    )
     return context(dep, art_id)
 
 
@@ -360,8 +379,9 @@ def record(ctx: Context, which: str, data: dict, replace: bool = False) -> list[
     if target.exists() and not replace:
         raise AnalysisError(f"pass {which} is already recorded")
     findings = data.get("findings") if isinstance(data, dict) else None
-    problems = validate_findings(findings, inventory=ctx.inventory, rules=set(ctx.corpus.rules),
-                                 domains=ctx.corpus.domains)
+    problems = validate_findings(
+        findings, inventory=ctx.inventory, rules=set(ctx.corpus.rules), domains=ctx.corpus.domains
+    )
     if problems:
         raise AnalysisError(f"pass {which} rejected:\n  " + "\n  ".join(problems))
     warnings = []
@@ -384,6 +404,7 @@ def _canon(findings) -> str:
         if out.get("breaks") in titles:
             out["breaks"] = titles[out["breaks"]]
         return out
+
     return json.dumps(sorted(json.dumps(strip(f), sort_keys=True) for f in findings or []))
 
 
@@ -405,8 +426,13 @@ def reconcile(ctx: Context, data: dict) -> None:
     a, b, d = ctx.load("A.json"), ctx.load("B.json"), ctx.load("diff.json")
     if not isinstance(data, dict):
         raise AnalysisError("the reconciled file is an object with `findings` and `dropped`")
-    problems = validate_findings(data.get("findings"), inventory=ctx.inventory, rules=set(ctx.corpus.rules),
-                                 domains=ctx.corpus.domains, reconciled=True)
+    problems = validate_findings(
+        data.get("findings"),
+        inventory=ctx.inventory,
+        rules=set(ctx.corpus.rules),
+        domains=ctx.corpus.domains,
+        reconciled=True,
+    )
     problems += coverage(data, a["findings"], b["findings"], d)
     if problems:
         raise AnalysisError("reconciliation rejected:\n  " + "\n  ".join(problems))
@@ -422,8 +448,9 @@ def _artifact_exists(corpus: Corpus, kind: str, ref: str) -> bool:
     return ref in corpus.artifacts
 
 
-def decide(ctx: Context, finding: str, verdict: str, signer: dict, artifact: str | None = None,
-           reason: str | None = None) -> None:
+def decide(
+    ctx: Context, finding: str, verdict: str, signer: dict, artifact: str | None = None, reason: str | None = None
+) -> None:
     if phase(ctx.art) != "Deciding":
         raise AnalysisError(f"{ctx.art.id} is {phase(ctx.art)}: decisions come after reconciliation")
     recon = ctx.load("reconciled.json")
@@ -437,12 +464,17 @@ def decide(ctx: Context, finding: str, verdict: str, signer: dict, artifact: str
         if not artifact:
             raise AnalysisError(f"an accepted {kind} names the artifact it became (--artifact) — write it first")
         if not _artifact_exists(ctx.corpus, kind, artifact):
-            raise AnalysisError(f"{artifact} does not exist in the deployment (a {kind} becomes "
-                                f"{'a registered DOMAIN code' if kind == 'domain' else 'a rule ID' if kind == 'rule' else 'an artifact'})")
+            raise AnalysisError(
+                f"{artifact} does not exist in the deployment (a {kind} becomes "
+                f"{'a registered DOMAIN code' if kind == 'domain' else 'a rule ID' if kind == 'rule' else 'an artifact'})"
+            )
     decisions = ctx.load("decisions.json") or {"decisions": {}}
     decisions["decisions"][finding] = {
-        "verdict": verdict, "artifact": artifact, "reason": reason,
-        "by": signer.get("name"), "at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "verdict": verdict,
+        "artifact": artifact,
+        "reason": reason,
+        "by": signer.get("name"),
+        "at": datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds"),
     }
     _write(ctx.dir / "decisions.json", decisions)
 
@@ -499,9 +531,12 @@ def close(ctx: Context) -> dict:
     accepted = sorted({d["artifact"] for d in decided.values() if d["verdict"] == "accept"})
     summary = "; ".join(f"{k}: {c['accept']} accepted, {c['reject']} rejected" for k, c in sorted(counts.items()))
     text = ctx.art.file.read_text(encoding="utf-8")
-    text = text.replace("## Summary\n\n*(at close)*",
-                        f"## Summary\n\n{summary or 'no findings'}.\n\nArtifacts: "
-                        + (", ".join(f"`{x}`" for x in accepted) or "none") + ".")
+    text = text.replace(
+        "## Summary\n\n*(at close)*",
+        f"## Summary\n\n{summary or 'no findings'}.\n\nArtifacts: "
+        + (", ".join(f"`{x}`" for x in accepted) or "none")
+        + ".",
+    )
     ctx.art.file.write_text(text, encoding="utf-8")
     return counts
 
@@ -512,8 +547,9 @@ def abandon(ctx: Context, reason: str) -> None:
     _set_field(ctx.art.file, "Status", "Abandoned")
     _set_field(ctx.art.file, "Closed", datetime.date.today().isoformat())
     text = ctx.art.file.read_text(encoding="utf-8")
-    ctx.art.file.write_text(text.replace("## Summary\n\n*(at close)*", f"## Summary\n\nAbandoned: {reason}"),
-                            encoding="utf-8")
+    ctx.art.file.write_text(
+        text.replace("## Summary\n\n*(at close)*", f"## Summary\n\nAbandoned: {reason}"), encoding="utf-8"
+    )
 
 
 def files_of(ctx: Context) -> list[Path]:

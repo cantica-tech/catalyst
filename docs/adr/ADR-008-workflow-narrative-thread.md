@@ -8,6 +8,7 @@
 ## Context
 
 Early discussions about how workflows should be represented in catalyst considered two models:
+
 1. **Workflow as state machine:** Strict state definitions with allowed transitions (e.g., bug status goes from Open → In-Progress → Closed, with explicit rules about what can transition to what)
 2. **Workflow as narrative thread:** A sequence of status changes that tells a story about the artifact's lifecycle, with looser constraints
 
@@ -18,6 +19,7 @@ The planning document references this decision in the workflow ETD specification
 ## Decision
 
 **Workflows are narrative threads, not state machines.** An artifact's status changes tell the story of its lifecycle:
+
 - Status changes are logged chronologically in the artifact record
 - Constraints exist (e.g., cannot revert a closed bug to open without a reason), but they are permissive rather than prohibitive
 - The sequence of statuses is the narrative; tools help ensure logical progression but do not block it

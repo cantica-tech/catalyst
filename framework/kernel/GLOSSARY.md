@@ -108,7 +108,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   `INVARIANTS.md` (the kernel's) or the active module's
   `INVARIANTS.module.md`. Numbers are never reused; a number that moved to
   the module keeps a placeholder in the kernel.
-- **Journal.** `development/journal.jsonl`: an append-only,
+- **Journal.** `development/journal/` (one shard per actor, machine and
+  month; `development/journal.jsonl` before kernel 0.50): an append-only,
   transaction-log-grade record of every change — actor, command, action,
   artifact, target rules, intent, tier, and each touched file's git blob
   hash before and after. Written only by `catalyst journal append`; never

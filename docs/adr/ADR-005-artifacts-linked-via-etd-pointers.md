@@ -8,10 +8,12 @@
 ## Context
 
 As the catalyst framework scaled to support multiple process modules and artifact types, the need arose to create bidirectional traceability between:
+
 - Active-module artifacts (created by users during development work)
 - The grounding rules that govern those artifacts (kernel rules defining process constraints)
 
 The framework required a consistent, machine-readable way to link artifacts to rules that:
+
 - Could be embedded in artifact definitions without cluttering them
 - Would survive migrations and schema changes
 - Could be validated and audited
@@ -26,6 +28,7 @@ The `etd:` (Entity Type Definition) pointing mechanism emerged as the solution, 
 Each artifact type definition includes an `etd:` field pointing to the kernel rule (by rule ID, e.g., `etd: rr-ARTIFACT-001`) that governs that artifact type. This creates an explicit link from the module artifact upward to its kernel grounding.
 
 Examples:
+
 - A bug artifact type definition includes `etd: rr-ARTIFACT-005` (the rule that defines what a bug is)
 - A requirement artifact includes `etd: rr-ARTIFACT-003` (the rule governing requirements)
 

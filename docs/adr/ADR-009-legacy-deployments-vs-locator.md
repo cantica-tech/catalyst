@@ -8,6 +8,7 @@
 ## Context
 
 The catalyst framework evolved its deployment model over time. Prior to R3, deployments were stored and managed using:
+
 - A symlink (`.criterion` → agent-owned `.criterion/` directory or git submodule)
 - A pointer file (`.catalyst` containing metadata)
 - A git submodule (for shared deployments)

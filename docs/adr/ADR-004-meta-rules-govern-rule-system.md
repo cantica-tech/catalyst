@@ -8,6 +8,7 @@
 ## Context
 
 As the catalyst framework's rule system grew, questions arose about how rules themselves should be governed:
+
 - Who creates new rules?
 - How are rule IDs assigned?
 - What makes a rule valid?
@@ -21,6 +22,7 @@ Rather than having these be implicit conventions, they needed to be explicit, do
 **Meta-rules (rr-\* prefix, located in `Rules-of-Rules.md`) govern the rule system itself.**
 
 Meta-rules include:
+
 - How rules are created, numbered, and named (rr-META-001, rr-META-002, etc.)
 - Requirements for rule documents (formatting, ID sequences, domain coverage)
 - Rules about how other rules can reference each other

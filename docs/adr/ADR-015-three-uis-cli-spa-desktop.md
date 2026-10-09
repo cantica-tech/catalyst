@@ -8,6 +8,7 @@
 ## Context
 
 As the catalyst framework evolved, multiple interfaces for interacting with the system were proposed:
+
 1. **CLI:** Command-line interface (exists; the primary user interface today)
 2. **SPA:** Single-page application (web-based interface; planned for R6)
 3. **Desktop:** Electron or native desktop application (planned for R6)
