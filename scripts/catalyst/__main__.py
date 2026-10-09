@@ -370,6 +370,36 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+def cmd_mcp(args) -> int:
+    """`mcp`: the stdio MCP server agents register at user level (R3.1c)."""
+    from catalyst import mcp
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    return mcp.run(start)
+
+
+def cmd_agent(args) -> int:
+    """`agent install|uninstall|status`: catalyst in an agent, at user level (R3.1c)."""
+    from catalyst import agents
+
+    try:
+        if args.agent_command == "status":
+            rows = agents.status()
+            if args.json:
+                print(json.dumps(rows, indent=2))
+            else:
+                for row in rows:
+                    parts = ", ".join(f"{k} {'yes' if v else 'unknown' if v is None else 'no'}"
+                                      for k, v in row["parts"].items())
+                    print(f"{row['agent']:<12} {'installed' if row['installed'] else '-':<10} {parts}")
+            return 0
+        print("\n".join(agents.run(args.agent, install=args.agent_command == "install")))
+        return 0
+    except agents.AgentError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+
+
 AGENT_BINARIES = {"claude-code": "claude"}   # an agent id whose CLI binary has another name
 
 
@@ -631,18 +661,30 @@ def cmd_hook(args) -> int:
 
     # Fail closed: Claude Code ignores every exit but 2, so a crash here must
     # block the stop (with its reason) instead of switching enforcement off.
+    from catalyst.check import hook_block, hook_input
     try:
+        data = hook_input()
         try:
-            dep = open_deployment(args)
+            dep = open_deployment(_hook_project(args, data))
         except WorkingCopyMissing as exc:
-            print(f"catalyst: {exc}", file=sys.stderr)
-            return 2
+            return hook_block(f"catalyst: {exc}", args.format)
         except DeploymentNotFound:
             return 0
-        return hook_stop(dep, strict=args.strict)
+        return hook_stop(dep, data, strict=args.strict, fmt=args.format)
     except Exception as exc:  # noqa: BLE001
-        print(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", file=sys.stderr)
-        return 2
+        return hook_block(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", args.format)
+
+
+def _hook_project(args, data: dict):
+    """The project a hook runs for: --project, else the directory the agent
+    names in the hook's input (`cwd`; Cursor's `workspace_roots`), else ours."""
+    if args.project or getattr(args, "working_copy", None):
+        return args
+    roots = data.get("workspace_roots")
+    named = data.get("cwd") or (roots[0] if isinstance(roots, list) and roots else None)
+    if isinstance(named, str) and named:
+        args.project = Path(named)
+    return args
 
 
 def _ask_url(exc) -> str:
@@ -860,17 +902,24 @@ def cmd_init(args) -> int:
 def cmd_hook_start(args) -> int:
     """SessionStart hook: print the deployment's invariants (kernel, then
     module) so every session starts grounded. Never blocks a session."""
+    from catalyst.check import hook_input
+
+    data = hook_input() if args.format != "text" else {}
     try:
-        dep = open_deployment(args)
+        dep = open_deployment(_hook_project(args, data))
     except WorkingCopyMissing as exc:
-        print(f"catalyst: {exc}")
-        return 0
+        text = f"catalyst: {exc}"
     except DeploymentNotFound:
         return 0
-    for name in ("INVARIANTS.md", "INVARIANTS.module.md"):
-        path = dep.root / name
-        if path.is_file():
-            print(path.read_text(encoding="utf-8", errors="replace"))
+    else:
+        text = "\n".join(path.read_text(encoding="utf-8", errors="replace")
+                         for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md") if path.is_file())
+    if args.format == "text":
+        print(text)
+    elif args.format == "cursor":
+        print(json.dumps({"additional_context": text}))
+    else:      # Codex, Copilot (CLI and VS Code), Gemini CLI, Claude Code
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}}))
     return 0
 
 
@@ -968,8 +1017,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("hook", help="entry points for agent hooks")
     hk = p.add_subparsers(dest="hook_command", required=True)
-    q = hk.add_parser("stop", help="end-of-turn hook: exit 2 with failures on stderr")
+    q = hk.add_parser("stop", help="end-of-turn hook: block the stop with the failures")
     q.add_argument("--strict", action="store_true")
+    q.add_argument("--format", choices=("exit2", "json", "gemini", "cursor"), default="exit2",
+                   help="how to block: exit 2 + stderr (Claude Code), decision JSON (Codex, Copilot), "
+                        "Gemini CLI's, Cursor's follow-up message")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("commit-msg", help="git commit-msg hook: the message must trace to the chain")
     q.add_argument("message_file")
@@ -979,6 +1031,8 @@ def build_parser() -> argparse.ArgumentParser:
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("start", help="session-start hook: print the deployment's invariants")
+    q.add_argument("--format", choices=("text", "json", "cursor"), default="text",
+                   help="plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's")
     q.set_defaults(func=cmd_hook_start)
 
     p = sub.add_parser("report", help="usage report: actors, tiers, traced commits, open artifacts")
@@ -1215,6 +1269,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_where)
+
+    p = sub.add_parser("agent", help="wire catalyst into an agent at user level (MCP server, hooks), never a project")
+    ags = p.add_subparsers(dest="agent_command", required=True)
+    for verb, text in (("install", "add catalyst to the agent's user-level configuration"),
+                       ("uninstall", "remove catalyst's entries from it")):
+        q = ags.add_parser(verb, help=text)
+        q.add_argument("agent", choices=("claude-code", "copilot", "vscode", "cursor", "codex", "gemini"))
+        q.set_defaults(func=cmd_agent)
+    q = ags.add_parser("status", help="which agents have catalyst")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_agent)
+
+    p = sub.add_parser("mcp", help="serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants")
+    p.set_defaults(func=cmd_mcp)
 
     p = sub.add_parser("task", help="run a criterion task (Taskfile.common.yml) from the project's root")
     p.add_argument("name", nargs="?", help="the task, i.e. the command name (none: list them)")

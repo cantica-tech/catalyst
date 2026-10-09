@@ -140,7 +140,9 @@ def main():
     cwd, pwd = os.getcwd(), os.environ.get("PWD")
     # PWD keeps the path as the shell sees it (through symlinks), but only when it is this directory
     start = Path(pwd if pwd and os.path.realpath(pwd) == os.path.realpath(cwd) else cwd)
-    for d in (start, *start.parents):
+    # `mcp` serves every project on the machine (each tool call runs that project's own catalyst):
+    # it always runs the newest runtime
+    for d in (() if sys.argv[1:2] == ["mcp"] else (start, *start.parents)):
         name, found = project_name(d)
         if not found:
             continue
@@ -154,7 +156,7 @@ def main():
         sys.exit(f"catalyst: {d} has no reachable criterion (expected {criterion})")
     runtimes = sorted((home / "runtimes").glob("*/"), key=lambda p: [int(n) for n in re.findall(r"\d+", p.name)])
     py = python_of(runtimes[-1]) if runtimes else None
-    if py:                               # outside any project (e.g. `catalyst init`): the newest runtime
+    if py:                               # outside any project (e.g. `catalyst init`), or `mcp`: the newest runtime
         os.execv(str(py), [str(py), "-m", "catalyst", *sys.argv[1:]])
     sys.exit("catalyst: no project here and no runtime installed (`catalyst runtime install`)")
 

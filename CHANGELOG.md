@@ -14,6 +14,16 @@ messages.
   and roles) and registers the member projects (`workspace = "<name>"` in
   their `catalyst.toml`); a member sees the workspace's rules and users,
   read-only. `catalyst where` names the workspace.
+- catalyst touches no project file but `catalyst.toml` (owner requirement,
+  2026-10-09; INV-6): no root `Taskfile.yml` include any more. The criterion's
+  `Taskfile.common.yml` runs on its own with `catalyst task <command> -- <args>`;
+  each task runs from the caller's directory.
+- Any agent, at user level (roadmap R3.1c): `catalyst mcp` serves the
+  project's commands as MCP prompts (and a `command` tool), the CLI as a tool
+  and the invariants as instructions; `catalyst agent install|uninstall|status
+  <agent>` registers it, with the end-of-turn check, for Claude Code, Copilot
+  (CLI and VS Code), Cursor, Codex and Gemini CLI. `hook stop|start --format`
+  speak each agent's hook format.
 
 ## 0.48.0 — 2026-10-09
 

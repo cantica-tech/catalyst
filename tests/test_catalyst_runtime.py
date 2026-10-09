@@ -80,3 +80,16 @@ def test_outside_any_project_the_launcher_uses_the_newest_runtime(tmp_path, pyz)
     out = subprocess.run([sys.executable, str(launcher), "--version"], capture_output=True, text=True,
                          encoding="utf-8", cwd=tmp_path, env=env)
     assert out.returncode == 0 and out.stdout.startswith("catalyst "), out.stderr
+
+
+def test_mcp_always_runs_the_newest_runtime(tmp_path, pyz):
+    project, _ = _home_project(tmp_path)          # its criterion has no runtime of its own
+    rt.ensure_runtime("1.0.0", pyz)
+    launcher = rt.install_launcher()
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PWD"] = str(project)
+    run = lambda *args: subprocess.run([sys.executable, str(launcher), *args], capture_output=True, text=True,
+                                       encoding="utf-8", cwd=project, env=env, input="")
+    assert run("where").returncode != 0
+    out = run("mcp")
+    assert out.returncode == 0 and out.stdout == "", out.stderr

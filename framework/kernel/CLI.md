@@ -228,7 +228,7 @@ promotes them to errors:
 | `retired-target` | A reference cites a retired rule. |
 | `index-drift` | An artifact is missing from its index, or its row links another filename. `catalyst index regen` repairs it. |
 
-### `catalyst hook stop [--strict]`
+### `catalyst hook stop [--strict] [--format exit2|json|gemini|cursor]`
 
 The same pass as `check`, shaped for an agent's end-of-turn hook: it
 exits `2` with the failures on stderr so the agent keeps working until
@@ -239,13 +239,56 @@ deployment it exits `0`. It fails closed: an unexpected error inside the
 hook (a corrupt journal, say) exits `2` with the reason, never `1`,
 which agents treat as non-blocking. See [Hooks](#hooks).
 
-### `catalyst hook start`
+`--format` says how to block, in the agent's terms: `exit2` (the default,
+Claude Code) as above; `json` prints `{"decision": "block", "reason": ...}`
+and exits `0` (Codex, Copilot CLI and VS Code, Claude Code); `gemini` the
+same with `"deny"` (Gemini CLI's end-of-turn hook); `cursor`
+`{"followup_message": ...}`. The project is the hook input's `cwd` (or
+Cursor's `workspace_roots`) when `--project` is not given.
+
+### `catalyst hook start [--format text|json|cursor]`
 
 The agent's session-start hook: prints the working copy's `INVARIANTS.md`
 and, when the module ships one, `INVARIANTS.module.md` (both copied there
 by `init`), so a deployed project's sessions start grounded. It never
 blocks a session: it always exits `0`, prints nothing outside a
 deployment, and one line when the working copy is unreachable.
+`--format json` wraps the text as `hookSpecificOutput.additionalContext`
+(Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
+
+### `catalyst mcp`
+
+A stdio MCP server, for any agent that speaks the Model Context Protocol;
+registered once per machine at user level (`catalyst agent install`), it
+writes nothing into a project. It serves the project of the client's roots,
+else `CLAUDE_PROJECT_DIR`, else its working directory, else a tool call's
+`cwd`:
+
+- **prompts** — one per command of the composed `CODE-OF-CONDUCT.md` §4,
+  read when listed (module commands included, named by nothing else); each
+  returns the command's `catalyst spec` and its arguments. Clients that split
+  typed arguments on whitespace (Claude Code) get word slots, joined back;
+- **tools** — `catalyst` (`args`, optional `cwd`) runs the CLI through the
+  launcher in the project's root, so each project runs its own pinned
+  version; `command` (`name`, `arguments`, `cwd`) returns a command's
+  procedure, or the list, for clients without MCP prompts;
+- **instructions** — the deployment's invariants, as `hook start` prints them.
+
+Through the launcher, `mcp` always runs the newest installed runtime.
+
+### `catalyst agent install|uninstall <agent>`, `catalyst agent status`
+
+Wires catalyst into an agent at user level — never into a project — or
+removes it: `claude-code` (`claude mcp add --scope user` and the Stop hook
+in `~/.claude/settings.json`), `copilot` (`~/.copilot/mcp-config.json`,
+`~/.copilot/hooks/catalyst.json` — read by VS Code's agent too), `vscode`
+(the user profile's `mcp.json`), `cursor` (`~/.cursor/mcp.json`,
+`hooks.json`), `codex` (`[mcp_servers.catalyst]` in `~/.codex/config.toml`,
+`~/.codex/hooks.json`), `gemini` (`~/.gemini/settings.json`). Only
+catalyst's entries change (found by the launcher path); each file is backed
+up once as `<file>.before-catalyst`; a file that is not plain JSON is left
+alone and the snippet to add is printed. `agents/claude-code/plugin` is the
+same wiring as a Claude Code plugin. `status` reports each agent.
 
 ### What a deployment governs
 
