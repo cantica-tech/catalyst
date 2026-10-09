@@ -1,6 +1,7 @@
 """`catalyst mcp`: catalyst served to any agent over MCP (roadmap R3.1c)."""
 import io
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -90,9 +91,10 @@ def test_the_server_speaks_on_stdout_only(tmp_path):
     messages = [_init(), {"jsonrpc": "2.0", "id": 2, "method": "prompts/list"}]
     done = subprocess.run([sys.executable, "-m", "catalyst", "--project", str(project), "mcp"],
                           input="".join(json.dumps(m) + "\n" for m in messages), capture_output=True, text=True,
-                          env={"PYTHONPATH": str(SCRIPTS), "PATH": ""}, timeout=60, check=True)
+                          env={**os.environ, "PYTHONPATH": str(SCRIPTS)}, timeout=60, check=True)
     replies = [json.loads(line) for line in done.stdout.splitlines()]
-    assert [r["id"] for r in replies] == [1, 2] and len(replies[1]["result"]["prompts"]) == 2
+    assert [r["id"] for r in replies] == [1, 2], replies
+    assert len(replies[1]["result"]["prompts"]) == 2, replies
 
 
 def test_a_project_directory_named_by_the_client_is_used(tmp_path, monkeypatch):
