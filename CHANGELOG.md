@@ -42,6 +42,8 @@ The criterion in catalyst's home store (migration `0.48.0/criterion-in-catalyst-
   home store and fills its runtime; product CI clones it into its own
   `$CATALYST_HOME`. The commit-msg hook runs each project's own runtime
   through the launcher. The submodule model stays for one minor.
+- Windows: `catalyst move` removes the product's old submodule git data even
+  though git writes its object files read-only.
 
 ## 0.47.0 — 2026-10-08
 
