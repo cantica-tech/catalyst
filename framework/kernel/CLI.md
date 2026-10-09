@@ -699,12 +699,40 @@ finding or a missing artifact, is an error.
 
 ### `catalyst criterion <subcommand>`
 
-Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). A shared
-deployment's working copy is a git submodule of the product repository
-at `.criterion`, checked out from a dedicated criterion repository on
-its **shared branch** (the pointer's `criterion_branch`, default
-`criterion`). Contributors land changes through pull requests against
-that branch.
+Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). The criterion
+repository has a **shared branch** (`criterion_branch`, default
+`criterion`); contributors land changes through pull requests against it.
+
+**In the home store (ADR-010, the default since R3.1)** the criterion is its
+own repository at `$CATALYST_HOME/projects/<name>/criterion`; nothing of it
+is in the product:
+
+- `create <url>` pushes the criterion there and records `repoed`,
+  `catalyst_repo_url` and `criterion_branch` in `catalyst.toml` (staged,
+  journaled). No submodule, no `.gitignore` change.
+- `join [<url>]` clones the criterion repository named in `catalyst.toml`
+  (or `<url>`) into this machine's home store on the shared branch, or
+  brings an existing clone up to date; a same-named criterion with another
+  remote is refused. It fills the criterion's runtime.
+- `push`, `sync`, `status` (mode `home`), `integrity` and `protect` work on
+  the criterion as below.
+- **Product CI** clones it into its own home store, then runs its CLI:
+
+  ```yaml
+  - env:
+      CATALYST_HOME: ${{ runner.temp }}/catalyst
+    run: |
+      read -r name url branch < <(python3 -c 'import tomllib; d = tomllib.load(open("catalyst.toml", "rb")); print(d["project_name"], d["catalyst_repo_url"], d.get("criterion_branch") or "criterion")')
+      git clone -q -b "$branch" "$url" "$CATALYST_HOME/projects/$name/criterion"
+      python3 "$CATALYST_HOME/projects/$name/criterion/bin/catalyst.pyz" trace "$range"
+  ```
+
+  (a private criterion repository needs a read-only deploy key or token
+  for the clone).
+
+**Legacy, for one minor:** a shared deployment whose working copy is a git
+submodule of the product repository at `.criterion` keeps working as
+described below; `catalyst move --to-home` turns it into the form above.
 
 Every subcommand fails with exit `1` and a reason on stderr when git
 fails or a precondition does not hold; nothing is half-applied in the

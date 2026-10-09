@@ -137,7 +137,9 @@ def python_of(venv):
 
 
 def main():
-    start = Path(os.environ.get("PWD") or os.getcwd())
+    cwd, pwd = os.getcwd(), os.environ.get("PWD")
+    # PWD keeps the path as the shell sees it (through symlinks), but only when it is this directory
+    start = Path(pwd if pwd and os.path.realpath(pwd) == os.path.realpath(cwd) else cwd)
     for d in (start, *start.parents):
         name, found = project_name(d)
         if not found:

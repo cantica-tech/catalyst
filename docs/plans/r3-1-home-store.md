@@ -11,7 +11,7 @@ minor (ADR-009) and moved with `catalyst move`.
 
 ## Stages (each tested, each shippable)
 
-Progress: **A, B done** (`e6d6c50`); **C done** (`dadedc1`); **D done** (`f465a2d`); **E done** (`catalyst move`). Next: move the real deployments, then F.
+Progress: **A, B done** (`e6d6c50`); **C done** (`dadedc1`); **D done** (`f465a2d`); **E done** (`17a73fa`, `1c98f5d`; catalyst's own deployment moved, `46883e4`); **F done** (sharing in the home store, the hook). Next: the UI repo (its resolver, CI, hooks), then its move; G; H.
 
 | # | Stage | Content | Done when |
 |---|---|---|---|

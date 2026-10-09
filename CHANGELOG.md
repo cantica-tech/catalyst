@@ -34,6 +34,12 @@ messages.
   directory or shared submodule) into the home store, keeping its history,
   branches and remote; `catalyst move --name <new>` renames a project
   (roadmap R2 W5).
+- Sharing in the home store (R3.1 stage F): `catalyst criterion create <url>`
+  pushes the criterion and records its remote in `catalyst.toml` (no
+  submodule); `catalyst criterion join` clones it into the collaborator's own
+  home store and fills its runtime; product CI clones it into its own
+  `$CATALYST_HOME`. The commit-msg hook runs each project's own runtime
+  through the launcher. The submodule model stays for one minor.
 
 ## 0.47.0 — 2026-10-08
 
