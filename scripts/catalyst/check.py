@@ -153,15 +153,41 @@ def unrecorded_changes(dep: Deployment) -> list[str]:
     return sorted(p for p in present if p not in last)
 
 
-def hook_stop(dep: Deployment, stdin=None, strict: bool = False) -> int:
-    """Exit 2 with the failures on stderr so the agent keeps working; let
-    the stop through when a Stop hook already blocked this stop, so an
+HOOK_FORMATS = ("exit2", "json", "gemini", "cursor")
+
+
+def hook_input(stdin=None) -> dict:
+    """The JSON an agent hands its hooks on stdin ({} when none)."""
+    try:
+        data = json.loads((stdin or sys.stdin).read() or "{}")
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def hook_block(reason: str, fmt: str = "exit2") -> int:
+    """Keep the agent working, in the agent's own terms: Claude Code reads
+    exit 2 and stderr; Codex, Copilot (CLI and VS Code) and Claude Code read
+    `decision: block`; Gemini CLI `decision: deny`; Cursor a follow-up message."""
+    if fmt == "exit2":
+        print(reason, file=sys.stderr)
+        return 2
+    payload = ({"followup_message": reason} if fmt == "cursor" else
+               {"decision": "deny" if fmt == "gemini" else "block", "reason": reason})
+    print(json.dumps(payload))
+    return 0
+
+
+def hook_stop(dep: Deployment, data: dict | None = None, strict: bool = False, fmt: str = "exit2") -> int:
+    """Block the stop with the failures so the agent keeps working; let
+    the stop through when a stop hook already blocked this stop, so an
     unfixable failure can't loop the session. A check that crashes is a
     failure too (fail closed): Claude Code ignores any exit but 2."""
-    try:
-        hook_input = json.loads((stdin or sys.stdin).read() or "{}")
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        hook_input = {}
+    data = hook_input() if data is None else data
+    if dep.pointer.get("governance") == "suspended":     # catalyst.toml: the owner suspended enforcement
+        print("catalyst: governance suspended in catalyst.toml — not checking (`catalyst check` still reports)",
+              file=sys.stderr)
+        return 0
     try:
         report = run(dep)
     except Exception as exc:  # noqa: BLE001 — any crash must block, not switch enforcement off
@@ -169,8 +195,7 @@ def hook_stop(dep: Deployment, stdin=None, strict: bool = False) -> int:
     if not report.failing(strict):
         return 0
     body = report.text() if strict else "\n".join(f"ERROR   {e}" for e in report.errors)
-    if isinstance(hook_input, dict) and hook_input.get("stop_hook_active"):
+    if data.get("stop_hook_active"):
         print(f"catalyst checks still failing (not blocking again):\n{body}", file=sys.stderr)
         return 0
-    print(f"catalyst checks failed — fix these before stopping:\n{body}", file=sys.stderr)
-    return 2
+    return hook_block(f"catalyst checks failed — fix these before stopping:\n{body}", fmt)

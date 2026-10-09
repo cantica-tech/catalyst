@@ -356,14 +356,78 @@ def cmd_where(args) -> int:
             "legacy" if criterion is not None else "missing")
     out = {"project": str(project), "file": project_file.find(project).name, "name": name,
            "criterion": str(criterion) if criterion else None, "kind": kind,
-           "expected": str(home) if home else None}
+           "expected": str(home) if home else None, "workspace": project_file.workspace_of(data)}
+    if out["workspace"]:
+        out["workspace_criterion"] = str(project_file.workspace_criterion(out["workspace"]))
     if args.json:
         print(json.dumps(out, indent=2))
     else:
         print(f"project    {out['project']} ({out['file']}, name {name})")
         print(f"criterion  {out['criterion'] or 'not found'} ({kind})"
               + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else ""))
+        if out["workspace"]:
+            print(f"workspace  {out['workspace']} ({out['workspace_criterion']})")
     return 0 if criterion is not None else 1
+
+
+def cmd_mcp(args) -> int:
+    """`mcp`: the stdio MCP server agents register at user level (R3.1c)."""
+    from catalyst import mcp
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    return mcp.run(start)
+
+
+def cmd_agent(args) -> int:
+    """`agent install|uninstall|status`: catalyst in an agent, at user level (R3.1c)."""
+    from catalyst import agents
+
+    try:
+        if args.agent_command == "status":
+            rows = agents.status()
+            if args.json:
+                print(json.dumps(rows, indent=2))
+            else:
+                for row in rows:
+                    parts = ", ".join(f"{k} {'yes' if v else 'unknown' if v is None else 'no'}"
+                                      for k, v in row["parts"].items())
+                    print(f"{row['agent']:<12} {'installed' if row['installed'] else '-':<10} {parts}")
+            return 0
+        print("\n".join(agents.run(args.agent, install=args.agent_command == "install")))
+        return 0
+    except agents.AgentError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+
+
+AGENT_BINARIES = {"claude-code": "claude"}   # an agent id whose CLI binary has another name
+
+
+def cmd_task(args) -> int:
+    """`task <name> [-- args]`: run one of the criterion's Taskfile.common.yml
+    tasks from the project's root. catalyst never touches the project's own
+    Taskfile; its tasks are reached through this verb (or `task -t`)."""
+    import shutil
+
+    import project_file
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    criterion = project_file.resolve(project) if project else None
+    taskfile = criterion / "Taskfile.common.yml" if criterion else None
+    if taskfile is None or not taskfile.is_file():
+        print(f"catalyst: no criterion Taskfile.common.yml for {start}", file=sys.stderr)
+        return 1
+    binary = shutil.which("task")
+    if binary is None:
+        print("catalyst: Task (https://taskfile.dev) is not on PATH", file=sys.stderr)
+        return 1
+    agent = project_file.read_dir(project).get("agent") or "claude-code"
+    agent_cmd = os.environ.get("AGENT_CMD") or f"{AGENT_BINARIES.get(agent, agent)} -p"
+    rest = args.task_args[1:] if args.task_args[:1] == ["--"] else args.task_args
+    command = [binary, "-t", str(taskfile)]
+    command += [args.name, f"AGENT_CMD={agent_cmd}", *(["--", *rest] if rest else [])] if args.name else ["--list"]
+    return subprocess.run(command, cwd=project, check=False).returncode
 
 
 def cmd_runtime(args) -> int:
@@ -393,6 +457,7 @@ def cmd_runtime(args) -> int:
     try:
         with tempfile.TemporaryDirectory() as tmp:
             pyz = rt.own_pyz(Path(tmp))
+            version = rt.pyz_version(pyz)       # a build from source is not its release
             runtime_dir = rt.ensure_runtime(version, pyz)
             launcher = rt.install_launcher()
             lines = [f"runtime {version}: {runtime_dir}", f"launcher: {launcher} (put {launcher.parent} on PATH)"]
@@ -429,6 +494,39 @@ def cmd_move(args) -> int:
         return 1
     for step in steps:
         print(f"- {step}")
+    return 0
+
+
+def cmd_workspace(args) -> int:
+    """`workspace init|status` (R3.1b): a VS Code workspace's meta criterion."""
+    from module_loader import REPO_ROOT
+
+    from catalyst import workspace as ws
+    from catalyst.init import git_user_name
+
+    path = Path(os.path.abspath(args.file))
+    try:
+        if args.workspace_command == "init":
+            kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
+            user = args.user or git_user_name(path.parent)
+            if not user:
+                print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
+                return 2
+            _, steps = ws.init(path, kernel, user, args.git_username)
+            for step in steps:
+                print(f"- {step}")
+            return 0
+        out = ws.status(path)
+    except (ws.WorkspaceError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(out, indent=2))
+    else:
+        print(f"workspace  {out['workspace']}  ({out['criterion'] or 'no criterion yet: catalyst workspace init'})")
+        for row in out["folders"]:
+            mark = "member" if row["member"] else ("project, not a member" if row["project"] else "no catalyst")
+            print(f"  {row['folder']}  {row['project'] or ''}  [{mark}]")
     return 0
 
 
@@ -564,18 +662,30 @@ def cmd_hook(args) -> int:
 
     # Fail closed: Claude Code ignores every exit but 2, so a crash here must
     # block the stop (with its reason) instead of switching enforcement off.
+    from catalyst.check import hook_block, hook_input
     try:
+        data = hook_input()
         try:
-            dep = open_deployment(args)
+            dep = open_deployment(_hook_project(args, data))
         except WorkingCopyMissing as exc:
-            print(f"catalyst: {exc}", file=sys.stderr)
-            return 2
+            return hook_block(f"catalyst: {exc}", args.format)
         except DeploymentNotFound:
             return 0
-        return hook_stop(dep, strict=args.strict)
+        return hook_stop(dep, data, strict=args.strict, fmt=args.format)
     except Exception as exc:  # noqa: BLE001
-        print(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", file=sys.stderr)
-        return 2
+        return hook_block(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", args.format)
+
+
+def _hook_project(args, data: dict):
+    """The project a hook runs for: --project, else the directory the agent
+    names in the hook's input (`cwd`; Cursor's `workspace_roots`), else ours."""
+    if args.project or getattr(args, "working_copy", None):
+        return args
+    roots = data.get("workspace_roots")
+    named = data.get("cwd") or (roots[0] if isinstance(roots, list) and roots else None)
+    if isinstance(named, str) and named:
+        args.project = Path(named)
+    return args
 
 
 def _ask_url(exc) -> str:
@@ -751,8 +861,7 @@ def cmd_criterion(args) -> int:
 def cmd_init(args) -> int:
     from module_loader import REPO_ROOT
 
-    from catalyst.init import (InitError, InitRequest, default_commands_dir, git_user_name, init,
-                               local_modules)
+    from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
 
     kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
     if not (kernel / "rules-of-rules.template.md").is_file():
@@ -777,33 +886,39 @@ def cmd_init(args) -> int:
         steps = init(InitRequest(
             project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
             module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
-            test_locations=args.test_locations, at=args.at, agent=args.agent,
-            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid,
+            test_locations=args.test_locations, at=args.at, agent=args.agent, userid=args.userid,
             runtime=not args.no_runtime))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     for step in steps:
         print(f"- {step}")
-    print("Next: write the first rules (catalyst id next-rule), then `catalyst check`. Nothing was committed "
-          "in the project repository.")
+    print("Next: `catalyst agent install <agent>` once per machine, then the first rules (catalyst id next-rule) "
+          "and `catalyst check`. Nothing was committed in the project repository.")
     return 0
 
 
 def cmd_hook_start(args) -> int:
     """SessionStart hook: print the deployment's invariants (kernel, then
     module) so every session starts grounded. Never blocks a session."""
+    from catalyst.check import hook_input
+
+    data = hook_input() if args.format != "text" else {}
     try:
-        dep = open_deployment(args)
+        dep = open_deployment(_hook_project(args, data))
     except WorkingCopyMissing as exc:
-        print(f"catalyst: {exc}")
-        return 0
+        text = f"catalyst: {exc}"
     except DeploymentNotFound:
         return 0
-    for name in ("INVARIANTS.md", "INVARIANTS.module.md"):
-        path = dep.root / name
-        if path.is_file():
-            print(path.read_text(encoding="utf-8", errors="replace"))
+    else:
+        text = "\n".join(path.read_text(encoding="utf-8", errors="replace")
+                         for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md") if path.is_file())
+    if args.format == "text":
+        print(text)
+    elif args.format == "cursor":
+        print(json.dumps({"additional_context": text}))
+    else:      # Codex, Copilot (CLI and VS Code), Gemini CLI, Claude Code
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}}))
     return 0
 
 
@@ -885,9 +1000,8 @@ def build_parser() -> argparse.ArgumentParser:
                    "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)")
     p.add_argument("--no-runtime", action="store_true",
                    help="do not fill the criterion's .venv now (`catalyst runtime install` later)")
-    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
-    p.add_argument("--commands-dir", type=Path, help="write command files here (default: the agent's, "
-                   "e.g. .claude/commands for claude-code)")
+    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code (recorded in "
+                   "catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level)")
     p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
                    "(default: this checkout's)")
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
@@ -901,8 +1015,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("hook", help="entry points for agent hooks")
     hk = p.add_subparsers(dest="hook_command", required=True)
-    q = hk.add_parser("stop", help="end-of-turn hook: exit 2 with failures on stderr")
+    q = hk.add_parser("stop", help="end-of-turn hook: block the stop with the failures")
     q.add_argument("--strict", action="store_true")
+    q.add_argument("--format", choices=("exit2", "json", "gemini", "cursor"), default="exit2",
+                   help="how to block: exit 2 + stderr (Claude Code), decision JSON (Codex, Copilot), "
+                        "Gemini CLI's, Cursor's follow-up message")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("commit-msg", help="git commit-msg hook: the message must trace to the chain")
     q.add_argument("message_file")
@@ -912,6 +1029,8 @@ def build_parser() -> argparse.ArgumentParser:
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("start", help="session-start hook: print the deployment's invariants")
+    q.add_argument("--format", choices=("text", "json", "cursor"), default="text",
+                   help="plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's")
     q.set_defaults(func=cmd_hook_start)
 
     p = sub.add_parser("report", help="usage report: actors, tiers, traced commits, open artifacts")
@@ -1139,7 +1258,8 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--base-kernel", type=Path,
                        help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)")
         q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
-        q.add_argument("--commands-dir", type=Path, help="the project's command files (default: the agent's)")
+        q.add_argument("--commands-dir", type=Path, help="where an older catalyst wrote the project's command files, "
+                       "to retire them (default: .claude/commands)")
         q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
@@ -1148,6 +1268,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_where)
+
+    p = sub.add_parser("agent", help="wire catalyst into an agent at user level (MCP server, hooks), never a project")
+    ags = p.add_subparsers(dest="agent_command", required=True)
+    for verb, text in (("install", "add catalyst to the agent's user-level configuration"),
+                       ("uninstall", "remove catalyst's entries from it")):
+        q = ags.add_parser(verb, help=text)
+        q.add_argument("agent", choices=("claude-code", "copilot", "vscode", "cursor", "codex", "gemini"))
+        q.set_defaults(func=cmd_agent)
+    q = ags.add_parser("status", help="which agents have catalyst")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_agent)
+
+    p = sub.add_parser("mcp", help="serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants")
+    p.set_defaults(func=cmd_mcp)
+
+    p = sub.add_parser("task", help="run a criterion task (Taskfile.common.yml) from the project's root")
+    p.add_argument("name", nargs="?", help="the task, i.e. the command name (none: list them)")
+    p.add_argument("task_args", nargs=argparse.REMAINDER, help="-- <arguments> for the command")
+    p.set_defaults(func=cmd_task)
 
     p = sub.add_parser("runtime", help="the per-version runtime, the launcher, the criterion's .venv")
     rs = p.add_subparsers(dest="runtime_command", required=True)
@@ -1165,6 +1304,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
     p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
     p.set_defaults(func=cmd_move)
+
+    p = sub.add_parser("workspace", help="a VS Code workspace's meta criterion: shared rules, users, roles")
+    wss = p.add_subparsers(dest="workspace_command", required=True)
+    q = wss.add_parser("init", help="create the meta criterion and make the folders with a catalyst.toml members")
+    q.add_argument("file", help="the <name>.code-workspace file")
+    q.add_argument("--user", help="the first user, Admin (default: git config user.name)")
+    q.add_argument("--git-username")
+    q.add_argument("--kernel", type=Path, help="framework/kernel (default: this checkout's)")
+    q.set_defaults(func=cmd_workspace)
+    q = wss.add_parser("status", help="the workspace's criterion and which folders are members")
+    q.add_argument("file", help="the <name>.code-workspace file")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_workspace)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

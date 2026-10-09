@@ -36,11 +36,6 @@ This folder contains the reusable document templates that seed the deployed cata
   Notes, one row per template version. This is where the hard rule's
   "timestamped" requirement is actually satisfied — the template files
   themselves carry no date, this table does.
-- [`slash-command.template.md`](slash-command.template.md) — the shape
-  every deployed `.claude/commands/<name>.md` file follows, one per
-  command in `../rules-of-development.template.md` §4. See `CLAUDE.md`'s
-  "Slash commands" entry and `INSTANTIATION-GUIDE.md` §1 step 5 — this is
-  required as part of instantiation, not an optional extra.
 - [`roles.template.json`](roles.template.json) — copy to
   `IAM/roles/roles.json` on first deploy (`INVARIANTS.md` INV-16), filled
   in with its default agile-role mapping (phrased generically; the active

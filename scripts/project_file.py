@@ -110,6 +110,16 @@ def home_criterion(name: str) -> Path:
     return home() / "projects" / name / "criterion"
 
 
+def workspace_criterion(name: str) -> Path:
+    """A VS Code workspace's meta criterion (ADR-010, roadmap R3.1b)."""
+    return home() / "workspaces" / name / "criterion"
+
+
+def workspace_of(data: dict[str, Any]) -> str | None:
+    name = data.get("workspace")
+    return str(name) if name else None
+
+
 def resolve(project_root: Path) -> Path | None:
     """The criterion of the project at `project_root`: its home store
     (`$CATALYST_HOME/projects/<name>/criterion`) when it exists; else, for a

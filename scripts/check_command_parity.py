@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
-"""Validate .claude/commands/*.md and Taskfile.common.yml against
+"""Validate Taskfile.common.yml and the active module's commands against
 CODE-OF-CONDUCT.md's §4 command list.
 
-CLAUDE.md's own instructions require one native command file, and one
-Taskfile task, per §4 entry, kept in sync so a deployment's actual command
-set never silently drifts from its own documented spec. Nothing previously
-checked this mechanically.
-
-`.claude/commands/` lives in the outer project repo (forced there by Claude
-Code's own fixed discovery path); `Taskfile.common.yml` lives inside the
-resolved deployment root instead, alongside CODE-OF-CONDUCT.md (INV-6 — it's
-generated framework machinery, not product code, so it belongs in
-agent-owned space like everything else there). Both are resolved via the
-same pointer-file mechanism check_deployment.py already implements
+§4 is the canonical command set: agents receive it from `catalyst mcp`
+(one prompt per §4 command, read at runtime), so no per-agent command file
+exists to drift. What can still drift is checked here: the criterion's
+`Taskfile.common.yml` (one task per §4 command) and the module manifest
+(every command a module registers must be in the composed §4). Both are
+resolved via the pointer-file mechanism check_deployment.py implements
 (`find_deploy_root`).
-
-`dogfood.md` is the one documented exception for commands:
-catalyst-development-only, deliberately absent from §4 (Rules-of-Rules.md
-§13). Its Taskfile counterpart lives in the project's own root `Taskfile.yml`,
-never in the deployed `Taskfile.common.yml`, so no exception is needed there.
 
 Exit 0 = clean (including when no deployment resolves, unless `--require`,
 as CI passes), exit 1 = drift found (or nothing to check under `--require`).
@@ -33,11 +23,8 @@ from module_loader import load_module
 
 from check_deployment import REQUIRE_FLAG, find_deploy_root, find_project_root
 
-ROOT = Path(__file__).resolve().parent.parent
-COMMANDS_DIR = ROOT / ".claude" / "commands"
-DOGFOOD_EXCEPTION = "dogfood"
 # Taskfile.common.yml utility tasks that are not slash commands: `catalyst`
-# passes its arguments to the vendored CLI (.criterion/bin/catalyst.pyz).
+# passes its arguments to the catalyst CLI (the launcher).
 UTILITY_TASKS = {"catalyst"}
 
 SECTION_HEADING_RE = re.compile(r"^## \d+\. ")
@@ -78,12 +65,6 @@ def extract_section4_commands(coc_text: str) -> set[str] | None:
     return names
 
 
-def find_command_files(commands_dir: Path) -> set[str]:
-    if not commands_dir.is_dir():
-        return set()
-    return {f.stem for f in commands_dir.glob("*.md")} - {DOGFOOD_EXCEPTION}
-
-
 def extract_taskfile_commands(taskfile_text: str) -> set[str] | None:
     """Top-level task names under Taskfile.common.yml's `tasks:` block.
     Returns None if no `tasks:` block is found at all (reported distinctly
@@ -109,54 +90,18 @@ def extract_taskfile_commands(taskfile_text: str) -> set[str] | None:
     return names
 
 
-def check_module_manifest_parity(project_root: Path | None, commands_dir: Path) -> list[str]:
+def check_module_manifest_parity(project_root: Path | None, code_of_conduct: Path) -> list[str]:
     """Every command the project's active module registers (module.yaml
-    `commands:`) with a spec_path has a .claude/commands/<name>.md or, failing
-    that, the module's own spec file. No-op when no module is declared or
-    found."""
+    `commands:`) is in the composed §4. No-op when no module is declared or
+    found, or when §4 cannot be read (reported by the Taskfile check)."""
     if project_root is None:
         return []
     module = load_module(project_root)
-    if module is None or not module.commands:
+    if module is None or not module.commands or not code_of_conduct.is_file():
         return []
-    file_names = find_command_files(commands_dir)
-    errors: list[str] = []
-    for cmd_name in sorted(module.commands):
-        if cmd_name in file_names or cmd_name == DOGFOOD_EXCEPTION:
-            continue
-        spec = module.commands[cmd_name].spec_path
-        if not spec or (module.path is not None and (module.path / spec).is_file()):
-            continue
-        errors.append(
-            f"module parity: module '{module.id}' registers /{cmd_name} but "
-            f"neither .claude/commands/{cmd_name}.md nor {spec} exists"
-        )
-    return errors
-
-
-def check_command_parity(commands_dir: Path, code_of_conduct: Path) -> list[str]:
-    if not code_of_conduct.is_file():
-        return [f"command parity: {code_of_conduct} is missing"]
-
-    coc_names = extract_section4_commands(
-        code_of_conduct.read_text(encoding="utf-8", errors="ignore")
-    )
-    if coc_names is None:
-        return [f"command parity: {code_of_conduct} has no '## 4.' section"]
-
-    file_names = find_command_files(commands_dir)
-    errors: list[str] = []
-    for name in sorted(coc_names - file_names):
-        errors.append(
-            f"command parity: CODE-OF-CONDUCT.md §4 references /{name} but "
-            f".claude/commands/{name}.md is missing"
-        )
-    for name in sorted(file_names - coc_names):
-        errors.append(
-            f"command parity: .claude/commands/{name}.md exists but is not "
-            f"referenced in CODE-OF-CONDUCT.md §4"
-        )
-    return errors
+    coc_names = extract_section4_commands(code_of_conduct.read_text(encoding="utf-8", errors="ignore")) or set()
+    return [f"module parity: module '{module.id}' registers /{name} but CODE-OF-CONDUCT.md §4 does not "
+            "list it" for name in sorted(set(module.commands) - coc_names)]
 
 
 def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
@@ -210,15 +155,11 @@ def main(argv: list[str] | None = None) -> int:
               "parity validation")
         return 0
 
-    # Taskfile.common.yml lives inside the resolved deployment root
-    # (agent-owned space, INV-6), never the outer project tree — unlike
-    # COMMANDS_DIR, which Claude Code's own fixed discovery path forces
-    # to stay project-root.
-    taskfile_path = root / "Taskfile.common.yml"
-
-    errors = check_command_parity(COMMANDS_DIR, root / "CODE-OF-CONDUCT.md")
-    errors += check_taskfile_parity(taskfile_path, root / "CODE-OF-CONDUCT.md")
-    errors += check_module_manifest_parity(find_project_root(Path.cwd()), COMMANDS_DIR)
+    # Taskfile.common.yml lives inside the resolved deployment root (INV-6),
+    # never the project tree.
+    coc = root / "CODE-OF-CONDUCT.md"
+    errors = check_taskfile_parity(root / "Taskfile.common.yml", coc)
+    errors += check_module_manifest_parity(find_project_root(Path.cwd()), coc)
 
     if errors:
         print(f"command parity validation FAILED ({len(errors)} issue(s)):")

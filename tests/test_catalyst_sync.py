@@ -20,12 +20,11 @@ def _release(tmp: Path, version: str, kernel: Path = KERNEL) -> Path:
     out = tmp / f"kernel-{version}"
     shutil.copytree(kernel, out)
     (out / "manifest.json").write_text(json.dumps({"version": version}), encoding="utf-8")
-    shutil.copytree(KERNEL.parent.parent / ".claude" / "commands", out / "commands")
     return out
 
 
 def _deployment(tmp_path):
-    req = request(tmp_path, commands_dir=Path(".claude/commands"))
+    req = request(tmp_path)
     init(req)
     subprocess.run(["git", "-C", str(req.project / ".criterion"), "add", "-A"], check=True)
     subprocess.run(["git", "-C", str(req.project / ".criterion"), "-c", "user.name=t", "-c", "user.email=t@t",
@@ -45,21 +44,18 @@ def test_plan_lists_the_changes_and_apply_makes_them_then_nothing_is_left(tmp_pa
     rod = new / "rules-of-development.template.md"
     rod.write_text(rod.read_text(encoding="utf-8") + "\n<!-- a change in 9.9.9 -->\n", encoding="utf-8")
     (new / "INVARIANTS.md").write_text((new / "INVARIANTS.md").read_text(encoding="utf-8") + "\n", encoding="utf-8")
-    status = new / "commands" / "status.md"
-    status.write_text(status.read_text(encoding="utf-8") + "\nNew line.\n", encoding="utf-8")
 
     dep = load(project)
     src = sync.Sources(dep, new, None, base, None)
     p = sync.plan(dep, src, sync.commands_dir(dep, None))
     kinds = {(a.kind, a.change) for a in p.actions}
     assert ("document", "update") in kinds and ("invariants", "update") in kinds
-    assert ("command", "update") in kinds and ("version", "update") in kinds
+    assert ("version", "update") in kinds
     _, touched = sync.apply(dep, src, sync.commands_dir(dep, None), "ada", [])
     src.close()
     root = project / ".criterion"
     assert (root / "version.txt").read_text(encoding="utf-8").strip() == "9.9.9"
     assert "a change in 9.9.9" in (root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
-    assert (project / ".claude" / "commands" / "status.md").read_text(encoding="utf-8").endswith("New line.\n")
     assert json.loads(next(project.glob("*.catalyst")).read_text(encoding="utf-8"))["kernel_version"] == "9.9.9"
     last = json.loads((root / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()[-1])
     assert last["command"] == "/sync-framework" and last["artifact"].startswith("kernel 9.9.9")
@@ -70,20 +66,41 @@ def test_plan_lists_the_changes_and_apply_makes_them_then_nothing_is_left(tmp_pa
     src.close()
 
 
-def test_a_locally_edited_command_file_is_reported_not_overwritten(tmp_path):
+def test_the_agent_files_catalyst_once_wrote_into_the_project_are_retired(tmp_path):
     project, deployed = _deployment(tmp_path)
     base = _release(tmp_path, deployed)
+    (base / "commands").mkdir()
+    (base / "commands" / "status.md").write_text("as released\n", encoding="utf-8")
     new = _release(tmp_path, "9.9.9")
-    (new / "commands" / "status.md").write_text("release text\n", encoding="utf-8")
-    mine = project / ".claude" / "commands" / "status.md"
-    mine.write_text("my own edit\n", encoding="utf-8")
+    commands = project / ".claude" / "commands"
+    commands.mkdir(parents=True)
+    (commands / "status.md").write_text("as released\n", encoding="utf-8")                  # shipped copy
+    (commands / "check-rules.md").write_text("First run `catalyst spec check-rules`.\n", encoding="utf-8")
+    (commands / "user-add.md").write_text("my own procedure\n", encoding="utf-8")            # edited
+    (commands / "dogfood.md").write_text("not catalyst's\n", encoding="utf-8")
+    settings = project / ".claude" / "settings.json"
+    settings.write_text(json.dumps({"hooks": {
+        "Stop": [{"hooks": [{"type": "command", "command": '"$HOME/.catalyst/bin/catalyst" hook stop'}]}],
+        "SessionStart": [{"hooks": [{"type": "command", "command": "python3 .criterion/bin/catalyst.pyz hook start"}]},
+                         {"hooks": [{"type": "command", "command": "echo mine"}]}]},
+        "permissions": {"allow": ["Bash(ls)"]}}), encoding="utf-8")
+    subprocess.run(["git", "-C", str(project), "add", ".claude"], check=True)       # tracked, as init left them
+    subprocess.run(["git", "-C", str(project), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "wiring"],
+                   check=True)
     dep = load(project)
     src = sync.Sources(dep, new, None, base, None)
     p = sync.plan(dep, src, sync.commands_dir(dep, None))
-    assert any(a.kind == "command" and a.change == "conflict" and a.target.endswith("status.md") for a in p.actions)
+    changes = {(a.kind, a.target): a.change for a in p.actions if a.kind in ("command", "agent-hook")}
+    assert changes == {("command", ".claude/commands/status.md"): "remove",
+                       ("command", ".claude/commands/check-rules.md"): "remove",
+                       ("command", ".claude/commands/user-add.md"): "conflict",
+                       ("agent-hook", ".claude/settings.json"): "remove"}
     sync.apply(dep, src, sync.commands_dir(dep, None), "ada", [])
     src.close()
-    assert mine.read_text(encoding="utf-8") == "my own edit\n"
+    assert sorted(f.name for f in commands.iterdir()) == ["dogfood.md", "user-add.md"]
+    assert json.loads(settings.read_text(encoding="utf-8")) == {
+        "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo mine"}]}]},
+        "permissions": {"allow": ["Bash(ls)"]}}
 
 
 def test_migrations_between_the_versions_are_listed_in_order(tmp_path):

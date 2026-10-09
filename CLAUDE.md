@@ -32,57 +32,41 @@ own runtime, and `catalyst.toml` is the only file added to the project; a
 the criterion. Add
 `--module-dir <dir>` when the module is not checked out next to the project
 or catalyst as `catalyst-<module-id>`, and one `--rule-doc` per rule
-document. Then merge `agents/claude-code/settings.template.json` into the
-project's `.claude/settings.json` (its hooks), and carry on with the
-judgment steps of `BOOTSTRAP.md` §2.
+document. Once per machine, `catalyst agent install claude-code` wires
+Claude Code at user level (the `catalyst mcp` server and the Stop hook;
+`agents/claude-code/plugin` is the same as a plugin) — nothing goes into
+the project. Then carry on with the judgment steps of `BOOTSTRAP.md` §2.
 
 Capabilities you have (use them per `BOOTSTRAP.md §1`):
 - **Sub-agents:** use `Agent` calls with `run_in_background: true`, launched in
   the same message so they run in parallel, `subagent_type: general-purpose`,
   and `model: opus` for the long reading passes in `ANALYSIS-PLAYBOOK.md`.
 - **Persistent memory:** record the deployment target note there.
-- **Slash commands:** one native command file per entry in
-  `CODE-OF-CONDUCT.md` §4 (the deployed copy of
-  `framework/kernel/rules-of-development.template.md` §4, with the active
-  module's `code-of-conduct.module.md` §4 inserted at its end — that's the
-  canonical, complete list; never hand-maintain a shortlist elsewhere, it
-  drifts out of sync with the real command set). `catalyst init
-  --agent claude-code` writes them into `.claude/commands/`: the kernel's from this
-  repository's `.claude/commands/` (never `/dogfood`), the module's from its
-  `commands/`. For each command:
-  - Path: `.claude/commands/<name>.md`, in the **target project's** root
-    — not this framework repository. Every alias a command declares gets
-    its own file too.
-  - Shape: follow
-    `framework/kernel/templates/slash-command.template.md` — minimal
-    frontmatter (`description`, `argument-hint` only; don't reach for
-    less-certain frontmatter fields without verifying the running Claude
-    Code version actually supports them first), with a body that reads
-    the command's spec with `catalyst spec <name>` (only that command's
-    part of the deployed `CODE-OF-CONDUCT.md` §4, the canonical text)
-    rather than duplicating its behavior inline, so the command stays
-    correct across a `/sync-framework` without needing its own edit.
+- **Slash commands:** the commands of `CODE-OF-CONDUCT.md` §4 (the
+  deployed copy of `framework/kernel/rules-of-development.template.md` §4,
+  with the active module's `code-of-conduct.module.md` §4 inserted at its
+  end — the canonical, complete list; never hand-maintain a shortlist
+  elsewhere) reach you as the prompts of the user-level `catalyst mcp`
+  server: `/check-rules` is `/catalyst:check-rules`. Each returns the
+  command's `catalyst spec <name>`, read at runtime, so it stays correct
+  across a `/sync-framework`. Never write command files into a project;
+  `catalyst sync apply` retires the unedited ones older versions wrote.
+  This repository keeps only `.claude/commands/dogfood.md`
+  (catalyst-development-only).
 - **Taskfiles:** `catalyst init` composes `Taskfile.common.yml` **inside
-  `.criterion/`** (agent-owned space per INV-6 — never the target
-  project's own tree, unlike `.claude/commands/` which stays project-root
-  only because Claude Code's own fixed discovery path forces it there) from
+  the criterion** from
   `framework/kernel/templates/Taskfile.common.template.yml` plus the
   module's `Taskfile.module.yml` — one task per entry in
   `CODE-OF-CONDUCT.md` §4, same canonical-list rule as slash commands
-  (`scripts/check_command_parity.py` diffs it the same way). catalyst is
-  agent-agnostic, so each task is a thin `{{.AGENT_CMD}} "/<name>
-  {{.CLI_ARGS}}"` dispatch, never a hardcoded `claude -p` and never a
-  duplicated command behavior inline in the task. You still create the
-  project's own root `Taskfile.yml`: it resolves `AGENT_CMD` from the
-  `*.catalyst` pointer's `agent` field and includes
-  `.criterion/Taskfile.common.yml` with `optional: true` and
-  `flatten: true` (task names stay bare — `task check-rules`, not
-  `task common:check-rules`), plus that project's own operations
-  (install/lint/test/build/...). See `INSTANTIATION-GUIDE.md` §1 step 5
-  for the exact block.
-- **Hooks:** if `.claude/settings.json` is present, its `SessionStart` hook
-  re-injects `INVARIANTS.md` and its `Stop` hook runs the deployment validator —
-  the enforcement layer of the anti-drift architecture. You do not need to
-  simulate these; the harness runs them.
+  (`scripts/check_command_parity.py` checks it). Each task is
+  a thin `{{.AGENT_CMD}} "/<name> {{.CLI_ARGS}}"` dispatch run from the
+  caller's directory. Never create or edit the project's own
+  `Taskfile.yml`: `catalyst task <name> -- <args>` runs a common task from
+  the project's root, and `catalyst task` lists them.
+- **Hooks:** `catalyst agent install claude-code` registers
+  `catalyst hook stop` as the user-level Stop hook (it exits `0` outside a
+  deployment); the server's instructions carry the invariants. You do not
+  need to simulate these; the harness runs them. Never add catalyst hooks
+  to a project's `.claude/settings.json`.
 
 Everything else: `BOOTSTRAP.md`.

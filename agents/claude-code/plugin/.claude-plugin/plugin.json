@@ -1,0 +1,23 @@
+{
+  "name": "catalyst",
+  "description": "catalyst for Claude Code, at user level: the catalyst MCP server (the project's commands as prompts, the CLI as a tool, the invariants as instructions) and the end-of-turn deployment check. Writes nothing into a project.",
+  "author": {"name": "cantica-tech"},
+  "mcpServers": {
+    "catalyst": {
+      "command": "${HOME}/.catalyst/bin/catalyst",
+      "args": ["mcp"]
+    }
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.catalyst/bin/catalyst\" hook stop"
+          }
+        ]
+      }
+    ]
+  }
+}

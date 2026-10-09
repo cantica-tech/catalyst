@@ -82,3 +82,39 @@ def test_stop_hook_fails_closed_when_the_deployment_cannot_be_read(tmp_path, mon
     assert _stop(project, monkeypatch) == 2
     err = capsys.readouterr().err
     assert "catalyst hook stop" in err and "unreadable pointer" in err
+
+
+def test_stop_and_start_hooks_speak_each_agents_format(tmp_path, monkeypatch, capsys):
+    import io
+    from catalyst.__main__ import main
+    project = make_project(tmp_path, git=True)
+    (project / ".criterion" / "development" / "journal.jsonl").write_bytes(b'{"a": "\xff"}\n')
+    write(project / ".criterion" / "INVARIANTS.md", "# Invariants\n\n- INV-1\n")
+    monkeypatch.chdir(tmp_path)                       # the project comes from the hook's input
+    named = json.dumps({"cwd": str(project)})
+    for fmt, decision in (("json", "block"), ("gemini", "deny")):
+        monkeypatch.setattr("sys.stdin", io.StringIO(named))
+        assert main(["hook", "stop", "--format", fmt]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert out["decision"] == decision and "UnicodeDecodeError" in out["reason"]
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"workspace_roots": [str(project)]})))
+    assert main(["hook", "stop", "--format", "cursor"]) == 0
+    assert "UnicodeDecodeError" in json.loads(capsys.readouterr().out)["followup_message"]
+    monkeypatch.setattr("sys.stdin", io.StringIO(named))
+    assert main(["hook", "start", "--format", "json"]) == 0
+    assert "INV-1" in json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
+    assert main(["hook", "stop", "--format", "json"]) == 0 and capsys.readouterr().out == ""   # no project
+
+
+def test_a_suspended_governance_never_blocks_the_stop(tmp_path, monkeypatch, capsys):
+    project = make_project(tmp_path, git=True)
+    monkeypatch.chdir(project)
+    (project / ".criterion" / "development" / "journal.jsonl").write_bytes(b'{"a": "\xff"}\n')
+    assert _stop(project, monkeypatch) == 2
+    capsys.readouterr()
+    pointer = project / "app.catalyst"
+    pointer.write_text(json.dumps({**json.loads(pointer.read_text(encoding="utf-8")), "governance": "suspended"}),
+                       encoding="utf-8")
+    assert _stop(project, monkeypatch) == 0
+    assert "suspended" in capsys.readouterr().err

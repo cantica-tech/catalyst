@@ -215,7 +215,10 @@ catalyst's documents are written to be agent-agnostic: they detect what the
 running agent can do and fall back when a capability is absent. Only
 **Claude Code** is supported and tested today. Other agents can follow
 `AGENT.md` or `SYSTEM.md`, and the `catalyst` CLI works from any shell, but
-those paths are untested. catalyst installs only when you ask
+those paths are untested. An agent is wired once per machine, at user
+level — `catalyst agent install <agent>` registers the `catalyst mcp`
+server (the commands as prompts) and the end-of-turn hook — and catalyst
+writes no file into a project but `catalyst.toml`. catalyst installs only when you ask
 (`catalyst init`, INV-2), and stays grounded across long runs through
 explicit anti-drift mechanisms (an invariants file, deployment ledgers, a
 re-ground cadence and an end-of-turn `catalyst check`) rather than trusting

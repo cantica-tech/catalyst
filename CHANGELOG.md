@@ -6,6 +6,28 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.49.0 — 2026-10-09
+
+Agents at user level, nothing in a project but `catalyst.toml` (migration
+`0.49.0/agents-at-user-level.md`). Pairs with software-engineering 2.6.0.
+
+- VS Code workspaces (roadmap R3.1b): `catalyst workspace init|status
+  <name>.code-workspace` creates the meta criterion
+  `$CATALYST_HOME/workspaces/<name>/criterion` (shared rules, domains, users
+  and roles) and registers the member projects (`workspace = "<name>"` in
+  their `catalyst.toml`); a member sees the workspace's rules and users,
+  read-only. `catalyst where` names the workspace.
+- catalyst touches no project file but `catalyst.toml` (owner requirement,
+  2026-10-09; INV-6): no root `Taskfile.yml` include any more. The criterion's
+  `Taskfile.common.yml` runs on its own with `catalyst task <command> -- <args>`;
+  each task runs from the caller's directory.
+- Any agent, at user level (roadmap R3.1c): `catalyst mcp` serves the
+  project's commands as MCP prompts (and a `command` tool), the CLI as a tool
+  and the invariants as instructions; `catalyst agent install|uninstall|status
+  <agent>` registers it, with the end-of-turn check, for Claude Code, Copilot
+  (CLI and VS Code), Cursor, Codex and Gemini CLI. `hook stop|start --format`
+  speak each agent's hook format.
+
 ## 0.48.0 — 2026-10-09
 
 The criterion in catalyst's home store (migration `0.48.0/criterion-in-catalyst-home.md`).
