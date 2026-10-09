@@ -23,6 +23,13 @@ messages.
   per catalyst version once, copies it into the criterion's `.venv`, and
   installs the `catalyst` launcher, which runs the project's own runtime.
 - **Python 3.11 or later** (was 3.9): the criterion's runtime brings it.
+- `init` installs into the home store: the criterion at
+  `$CATALYST_HOME/projects/<name>/criterion` with its runtime, `catalyst.toml`
+  the only file added to the project (no symlink, no `.gitignore` entry); a
+  name already used on the machine is refused. `--at` (agent-owned space and
+  a `.criterion` symlink) remains for one minor; the in-project fallback is
+  gone. Hooks call the launcher (`agents/claude-code/settings.template.json`).
+  INV-6 and the install docs say so.
 
 ## 0.47.0 — 2026-10-08
 

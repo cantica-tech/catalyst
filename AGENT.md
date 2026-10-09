@@ -13,15 +13,14 @@ rough edges, and report them.
 Assume nothing beyond repo file read/write. Work through `BOOTSTRAP.md §1` and
 pick a fallback for every capability you cannot confirm:
 - No parallel sub-agents → run analysis passes sequentially, context-isolated.
-- No persistent memory tool → no problem: `<app-name>.catalyst` (project
-  root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the
-  working copy) are the durable record regardless — read them fresh each
+- No persistent memory tool → no problem: `catalyst.toml` (project root,
+  always tracked) and the criterion's `DEPLOYMENT.md` (`catalyst where`
+  finds it) are the durable record regardless — read them fresh each
   session instead of relying on a memory-tool cache.
 - No slash-command UI → expose the framework commands as named procedures you
   recognize when the user types the same token in plain text.
 
 Install only when the user asks (INV-2): `catalyst init` from the project
-root, per `BOOTSTRAP.md` §2, with no `--at` if you have no owned space of your
-own (the in-project fallback) and no `--commands-dir`.
+root, per `BOOTSTRAP.md` §2, with no `--commands-dir`.
 
 Everything else: `BOOTSTRAP.md`.

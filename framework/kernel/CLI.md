@@ -88,7 +88,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ```
 catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
-              [--at <dir>] [--agent <id>] [--commands-dir <dir>]
+              [--agent <id>] [--commands-dir <dir>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
 
@@ -110,10 +110,13 @@ decides its inputs and does the judgment steps after it.
   ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
   document, `<name>-rules.md`, prefix `br`.
 - `--test-locations` fills `{{TEST_LOCATIONS}}` in `Rules-of-Rules.md` §2.
-- `--at <dir>` builds the working copy in agent-owned space and links
-  `<project root>/.criterion` to it. `<dir>` is the `.criterion` directory
-  itself (`<agent's per-project directory>/.criterion`), never its parent.
-  Without it, `.criterion/` is a real directory in the project. Either way `/.criterion` is gitignored (INV-6).
+- The criterion goes to `$CATALYST_HOME/projects/<name>/criterion` (default
+  `$HOME/.catalyst`) and `catalyst.toml` is the only file added to the project
+  (INV-6); a name already used on this machine is refused. Its runtime fills
+  the criterion's `.venv` (`--no-runtime` defers it to `catalyst runtime
+  install`). Legacy, for one minor: `--at <dir>` builds it in agent-owned
+  space behind a gitignored `.criterion` symlink and a `<name>.catalyst`
+  pointer.
 - `--agent` is recorded in the pointer's `agent` field.
 - `--commands-dir <dir>` (relative to the project; default: the agent's,
   `.claude/commands` for `claude-code`) receives one command
@@ -125,8 +128,9 @@ decides its inputs and does the judgment steps after it.
   required when running a vendored `catalyst.pyz`.
 
 It refuses (exit `1`, nothing written) if the project already has a
-`*.catalyst` pointer or a `.criterion` — one holding only the install
-ledger (`.ledger/`) is adopted — or the `--at` directory is not empty. On success it prints one line per step, commits nothing in the
+`catalyst.toml` (or legacy pointer) or a `.criterion` — one holding only the
+install ledger (`.ledger/`) is moved into the criterion — or the criterion's
+directory is not empty. On success it prints one line per step, commits nothing in the
 project repository, gives the working copy its own git history, and
 journals the install as the first entry. The pointer's `journal_since` is
 the project's `HEAD` at install (`""` with no commit yet): the baseline

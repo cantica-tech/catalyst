@@ -62,7 +62,7 @@ def test_a_missing_criterion_names_where_it_was_expected(tmp_path, monkeypatch):
     from catalyst.deployment import WorkingCopyMissing
     monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
     (tmp_path / "app.catalyst").write_text(json.dumps({"project_name": "app"}), encoding="utf-8")
-    with pytest.raises(WorkingCopyMissing, match="projects/app/criterion"):
+    with pytest.raises(WorkingCopyMissing, match=r"projects[\\/]app[\\/]criterion"):
         load(tmp_path)
 
 

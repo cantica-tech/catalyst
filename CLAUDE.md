@@ -21,18 +21,15 @@ root:
 ```
 python3 <catalyst>/dist/catalyst.pyz init --kernel <catalyst>/framework/kernel \
     --name <name> --module <module-id> --git-username <u> \
-    --rule-doc <file>:<prefix> \
-    --at ~/.claude/projects/<project-slug>/.criterion --agent claude-code
+    --rule-doc <file>:<prefix> --agent claude-code
 ```
 
 (from a catalyst checkout, `task catalyst -- --project <target root> init
 ...` runs the same from source; `task build:cli` builds `dist/catalyst.pyz`).
-`~/.claude/projects/<project-slug>/` is the directory Claude Code already
-keeps for the target project — the parent of its auto-memory `memory/`
-directory — so the working copy lives in agent-owned space and the project
-reaches it through the gitignored `.criterion` symlink `init` creates.
-`--at` is always the `.criterion` directory itself, never that parent; a
-`.criterion` holding only the deployment ledger (`.ledger/`) is adopted. Add
+The criterion goes to `$HOME/.catalyst/projects/<name>/criterion` with its
+own runtime, and `catalyst.toml` is the only file added to the project; a
+`.criterion` holding only the deployment ledger (`.ledger/`) is moved into
+the criterion. Add
 `--module-dir <dir>` when the module is not checked out next to the project
 or catalyst as `catalyst-<module-id>`, and one `--rule-doc` per rule
 document. Then merge `agents/claude-code/settings.template.json` into the

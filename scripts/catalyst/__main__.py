@@ -754,7 +754,8 @@ def cmd_init(args) -> int:
             project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
             module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
             test_locations=args.test_locations, at=args.at, agent=args.agent,
-            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid))
+            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid,
+            runtime=not args.no_runtime))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -856,8 +857,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
                    help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
     p.add_argument("--test-locations", help="where the project's tests live (Rules-of-Rules §2)")
-    p.add_argument("--at", type=Path, help="agent-owned location for the working copy "
-                   "(the agent's shim says where); default: .criterion in the project")
+    p.add_argument("--at", type=Path, help="legacy: an agent-owned location reached through a .criterion "
+                   "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)")
+    p.add_argument("--no-runtime", action="store_true",
+                   help="do not fill the criterion's .venv now (`catalyst runtime install` later)")
     p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
     p.add_argument("--commands-dir", type=Path, help="write command files here (default: the agent's, "
                    "e.g. .claude/commands for claude-code)")
