@@ -127,9 +127,11 @@ def project_name(directory):
         m = re.search(r'^(?:project_name|name)\s*=\s*"((?:[^"\\]|\\.)*)"', toml.read_text(encoding="utf-8"), re.M)
         return (m.group(1) if m else None), True
     for pointer in sorted(directory.glob("*.catalyst")):
+        if not pointer.is_file():
+            continue  # $HOME/.catalyst, catalyst's own home, is a directory, never a pointer
         try:
             return json.loads(pointer.read_text(encoding="utf-8")).get("project_name"), True
-        except ValueError:
+        except (ValueError, OSError):
             pass
     return None, False
 

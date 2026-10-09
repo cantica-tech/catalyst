@@ -89,13 +89,16 @@ def test_outside_any_project_the_launcher_uses_the_newest_runtime(tmp_path, pyz)
     rt.ensure_runtime("1.10.0", pyz)
     launcher = rt.install_launcher()
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    env["PWD"] = str(tmp_path)
+    work = tmp_path / "user" / "work"  # under a home whose `.catalyst` directory is no pointer
+    (tmp_path / "user" / ".catalyst").mkdir(parents=True)
+    work.mkdir()
+    env["PWD"] = str(work)
     out = subprocess.run(
         [sys.executable, str(launcher), "--version"],
         capture_output=True,
         text=True,
         encoding="utf-8",
-        cwd=tmp_path,
+        cwd=work,
         env=env,
     )
     assert out.returncode == 0 and out.stdout.startswith("catalyst "), out.stderr
@@ -129,13 +132,16 @@ def test_newest_runtime_is_by_version_then_build_time_never_by_build_hash(tmp_pa
     rt.ensure_runtime("1.2.0+gd48e5a5", pyz)
     launcher = rt.install_launcher()
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    env["PWD"] = str(tmp_path)
+    work = tmp_path / "user" / "work"  # under a home whose `.catalyst` directory is no pointer
+    (tmp_path / "user" / ".catalyst").mkdir(parents=True)
+    work.mkdir()
+    env["PWD"] = str(work)
     out = subprocess.run(
         [sys.executable, str(launcher), "--version"],
         capture_output=True,
         text=True,
         encoding="utf-8",
-        cwd=tmp_path,
+        cwd=work,
         env=env,
     )
     assert out.returncode == 0 and out.stdout.startswith("catalyst "), out.stderr
