@@ -27,7 +27,7 @@ Input: $ARGUMENTS
    unconditionally, even if they already look correct, since this
    command exists precisely for when the automatic per-session check
    missed a mismatch or only partially applied it. The pointer holds no
-   path, and `Taskfile.yml` needs no edit.
+   path, and catalyst never touches the project's `Taskfile.yml`.
 6. Refresh persistent framework memory with the new agent name, resolved
    working-copy location, and date.
 7. Report what changed (or that everything already matched).

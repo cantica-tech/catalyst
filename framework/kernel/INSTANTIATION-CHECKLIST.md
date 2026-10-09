@@ -63,11 +63,8 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] No command files (other agents): each command of the composed
       `CODE-OF-CONDUCT.md` §4 exposed as a named procedure and listed in
       the deployed `README.md` (`BOOTSTRAP.md §1`)
-- [ ] Project root `Taskfile.yml` exists, resolving the deployed agent's CLI
-      binary from the `*.catalyst` pointer, with
-      `includes: common: {taskfile: .criterion/Taskfile.common.yml, optional: true, flatten: true, vars: {AGENT_CMD: ...}}`
-      and no machine-specific path (see `INSTANTIATION-GUIDE.md` §1 step 5
-      for the full snippet) plus this project's own operational tasks
+- [ ] The project's own `Taskfile.yml` untouched (none created, none
+      edited); `catalyst task` lists the criterion's common tasks
 - [ ] `catalyst hook install` offered; run only on the user's assent (it
       writes `.git/hooks/commit-msg`); an existing foreign hook left for
       the user to merge

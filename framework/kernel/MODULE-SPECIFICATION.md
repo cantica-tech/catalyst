@@ -260,7 +260,9 @@ reuses it.
 
 A `tasks:` block with one thin dispatch task per module command, in the same
 shape as the kernel's `templates/Taskfile.common.template.yml`. Its tasks are
-appended to the deployed `Taskfile.common.yml`.
+appended to the criterion's `Taskfile.common.yml`, each given
+`dir: '{{.USER_WORKING_DIR}}'` by the composer; `catalyst task` runs them.
+They never reach the project's own `Taskfile.yml`.
 
 ### 6.6 Migrations (`migrations/`)
 

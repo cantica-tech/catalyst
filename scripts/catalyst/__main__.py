@@ -370,6 +370,36 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+AGENT_BINARIES = {"claude-code": "claude"}   # an agent id whose CLI binary has another name
+
+
+def cmd_task(args) -> int:
+    """`task <name> [-- args]`: run one of the criterion's Taskfile.common.yml
+    tasks from the project's root. catalyst never touches the project's own
+    Taskfile; its tasks are reached through this verb (or `task -t`)."""
+    import shutil
+
+    import project_file
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    criterion = project_file.resolve(project) if project else None
+    taskfile = criterion / "Taskfile.common.yml" if criterion else None
+    if taskfile is None or not taskfile.is_file():
+        print(f"catalyst: no criterion Taskfile.common.yml for {start}", file=sys.stderr)
+        return 1
+    binary = shutil.which("task")
+    if binary is None:
+        print("catalyst: Task (https://taskfile.dev) is not on PATH", file=sys.stderr)
+        return 1
+    agent = project_file.read_dir(project).get("agent") or "claude-code"
+    agent_cmd = os.environ.get("AGENT_CMD") or f"{AGENT_BINARIES.get(agent, agent)} -p"
+    rest = args.task_args[1:] if args.task_args[:1] == ["--"] else args.task_args
+    command = [binary, "-t", str(taskfile)]
+    command += [args.name, f"AGENT_CMD={agent_cmd}", *(["--", *rest] if rest else [])] if args.name else ["--list"]
+    return subprocess.run(command, cwd=project, check=False).returncode
+
+
 def cmd_runtime(args) -> int:
     """`runtime install|status` (R3.1a): the per-version runtime, the
     launcher, and the project's criterion .venv."""
@@ -1185,6 +1215,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_where)
+
+    p = sub.add_parser("task", help="run a criterion task (Taskfile.common.yml) from the project's root")
+    p.add_argument("name", nargs="?", help="the task, i.e. the command name (none: list them)")
+    p.add_argument("task_args", nargs=argparse.REMAINDER, help="-- <arguments> for the command")
+    p.set_defaults(func=cmd_task)
 
     p = sub.add_parser("runtime", help="the per-version runtime, the launcher, the criterion's .venv")
     rs = p.add_subparsers(dest="runtime_command", required=True)

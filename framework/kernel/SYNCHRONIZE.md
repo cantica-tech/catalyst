@@ -244,14 +244,13 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
      command's spec in the composed §4 — an unchanged command's file
      is project-owned content like any other synced file, not something to
      overwrite wholesale on every sync. Same treatment for
-     `Taskfile.common.yml` (deployed inside `.criterion/`, not the project
-     tree — INV-6) against `templates/Taskfile.common.template.yml` plus
+     `Taskfile.common.yml` (in the criterion, not the project tree —
+     INV-6) against `templates/Taskfile.common.template.yml` plus
      the module's `Taskfile.module.yml`: add any task missing relative to
      §4, refresh a task's `desc`/dispatched command only if this kernel or
      module version changed that command's §4 spec.
-     The project's own root `Taskfile.yml` (its `includes:` plus its
-     project-specific tasks) is project-owned content, never overwritten by
-     a sync.
+     The project's own `Taskfile.yml`, if it has one, is never read or
+     written by a sync: catalyst never touches it.
 8. Update the deployed framework's `version.txt` to the latest released
    version once synchronization is complete, journal the sync with
    `catalyst journal append --command /sync-framework --action sync`, and

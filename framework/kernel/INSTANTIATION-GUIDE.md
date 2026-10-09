@@ -180,43 +180,11 @@ first user, and, afterwards, its first rules.
    exposes each command of the composed `CODE-OF-CONDUCT.md` §4 as a named
    procedure and lists them in the deployed `README.md` (`BOOTSTRAP.md` §1)
    — the composed §4 is the canonical list; never re-enumerate a subset of
-   it anywhere else. Create the project's own root `Taskfile.yml` if none
-   exists yet, including `.criterion/Taskfile.common.yml` through the
-   project-root `.criterion` path (INV-6), so the same relative path works
-   on every machine and for every agent and no machine-specific path ever
-   lands in this tracked file. The include is `optional: true`, so the
-   project's own tasks still run on a clone where `.criterion` isn't set up
-   yet:
-   ```yaml
-   version: "3"
-
-   vars:
-     # Resolves the deployed agent's CLI binary from the pointer's "agent"
-     # field. "claude-code" is the one known id whose CLI binary name
-     # differs from the id itself; any other agent id is assumed to
-     # already be its own binary name. Falls back to "claude" when no
-     # pointer/field is found.
-     AGENT_ID:
-       sh: |
-         f=$(ls *.catalyst 2>/dev/null | head -1)
-         [ -n "$f" ] && grep -oE '"agent"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | sed -E 's/.*"([^"]*)"$/\1/'
-     AGENT_BIN: '{{if eq .AGENT_ID "claude-code"}}claude{{else if .AGENT_ID}}{{.AGENT_ID}}{{else}}claude{{end}}'
-     # Full override escape hatch for an agent needing different flags
-     # than `<bin> -p "<prompt>"` entirely (e.g. a non-Claude CLI).
-     AGENT_CMD: '{{.AGENT_CMD_OVERRIDE | default (printf "%s -p" .AGENT_BIN)}}'
-
-   includes:
-     common:
-       # The criterion's common tasks, in catalyst's space (INV-6).
-       # Optional, so a clone without a criterion still runs its own tasks.
-       taskfile: '{{env "CATALYST_HOME" | default (printf "%s/.catalyst" (env "HOME"))}}/projects/<name>/criterion/Taskfile.common.yml'
-       optional: true
-       flatten: true
-       vars:
-         AGENT_CMD: '{{.AGENT_CMD}}'
-   ```
-   Add that project's own operational tasks in this same root
-   `Taskfile.yml`, alongside — never inside — the included common tasks.
+   it anywhere else. Never create or edit the project's own `Taskfile.yml`
+   (or any other file of the project but `catalyst.toml`): the composed
+   `Taskfile.common.yml` stays in the criterion and runs on its own, from
+   the project's root, with `catalyst task <command> -- <arguments>`
+   (`catalyst task` alone lists them).
 
    **Offer the commit-msg hook.** Every product commit must cite an
    artifact or rule ID, or start `chore:` (INV-5, `CODE-OF-CONDUCT.md` §9).

@@ -332,8 +332,8 @@ the seven currently exist anywhere.
   overwriting the destination — never a partial merge), repoints the
   `.criterion` symlink, updates `<app-name>.catalyst` (`agent`,
   `updated`) unconditionally, and refreshes persistent framework memory.
-  No `Taskfile.yml` edit: it reaches the working copy through the
-  symlink.
+  No `Taskfile.yml` edit: catalyst never touches the project's
+  Taskfile.
 - `/status` — update an artifact or work item's `Status` field, then
   regenerate indexes and journal the change. Refuses a `RECON-` case:
   its `Status` changes only through `/reconcile` (role-gated).

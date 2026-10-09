@@ -7,7 +7,8 @@ the active module's contributions (MODULE-SPECIFICATION.md §6).
 - rules/Rules-of-Rules.md: the kernel's rules-of-rules template, with the
   module's meta-rule sections appended under `### From module <id>` (§6.1).
 - ACCESS-CONTROL.md: the kernel's, verbatim.
-- Taskfile.common.yml: the kernel's template tasks, then the module's (§6.5).
+- Taskfile.common.yml: the kernel's template tasks, then the module's (§6.5),
+  each run from the caller's directory (`dir: '{{.USER_WORKING_DIR}}'`).
 
 Every composed document resolves the instantiation placeholders
 (`{{RULES_DIR}}`, `{{RULE_DOCS_LIST}}`, `{{TEST_LOCATIONS}}`; the others
@@ -22,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 SHORT_META_RE = re.compile(r"\brr-META-0(\d{2})(?![\d-])")
+TASK_RE = re.compile(r"^  [A-Za-z0-9_-]+:\n(?!    dir:)", re.M)
 PARAMS_FILE = "composition.json"          # the parameters a deployment was composed with
 
 
@@ -144,6 +146,9 @@ def taskfile(kernel: Path, module: Path | None, p: Params) -> str:
         tasks = mod[m.end():] if m else ""
         if tasks.strip():
             text += f"\n\n  # --- From module {p.module_id} " + "-" * 20 + "\n" + tasks.rstrip("\n")
+    # the file sits in the criterion and is run on its own: a task works in
+    # the project it was called from, not in the criterion
+    text = TASK_RE.sub(lambda m: m.group(0) + "    dir: '{{.USER_WORKING_DIR}}'\n", text)
     return text + "\n"
 
 

@@ -22,7 +22,7 @@ is shorthand for one of:
 
 | Where | Command |
 |---|---|
-| A deployed project | `python3 .criterion/bin/catalyst.pyz <args>`, or `task catalyst -- <args>` through the deployed `Taskfile.common.yml` |
+| A deployed project | `$CATALYST_HOME/bin/catalyst <args>`, the launcher (`runtime install`); a legacy deployment: `python3 .criterion/bin/catalyst.pyz <args>` |
 | catalyst's own repository | `task catalyst -- <args>`, or `PYTHONPATH=scripts python3 -m catalyst <args>` |
 
 `.criterion/bin/catalyst.pyz` is a single-file zipapp. It ships inside
@@ -393,6 +393,16 @@ With `--working-copy` there is no product repository: commits are `0`.
   and copies the runtime into the criterion's `.venv` (git-ignored). The
   launcher runs the `.venv` of the project it is called from — no activation
   — or a legacy deployment's vendored CLI. `runtime status` reports all three.
+
+### `catalyst task [<name> [-- <arguments>]]`
+
+Runs one of the criterion's `Taskfile.common.yml` tasks (one per command of
+`CODE-OF-CONDUCT.md` §4) with [Task](https://taskfile.dev), from the
+project's root; with no name, lists them. catalyst never creates, includes
+or edits a project's own `Taskfile.yml`. `AGENT_CMD` (the agent's
+non-interactive command) comes from `catalyst.toml`'s `agent` —
+`claude-code` runs `claude -p` — unless the `AGENT_CMD` environment
+variable is set. Exit: Task's own, or `1` without a criterion or Task.
 
 ### `catalyst workspace init|status <name>.code-workspace`
 

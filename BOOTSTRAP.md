@@ -130,8 +130,8 @@ work against). Then:
 4. **Finish the judgment work** per `INSTANTIATION-GUIDE.md` §1: register the
    agent's hooks where it supports them — `catalyst hook start` at session
    start, so later sessions are grounded without this repository, and
-   `catalyst hook stop` at the end of each turn (the shim says how) — add the project's root
-   `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
+   `catalyst hook stop` at the end of each turn (the shim says how) — never
+   touching the project's own `Taskfile.yml`, then the path's first rules — **greenfield** (no code yet:
    stack, tooling, dev environment and CI decided as the first rules, §3) or
    **retrofit** (existing code: rules gathered incrementally, optionally
    bootstrapped with `/run-analysis --bootstrap`, §4) — and

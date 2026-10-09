@@ -17,8 +17,7 @@ same pointer-file mechanism check_deployment.py already implements
 
 `dogfood.md` is the one documented exception for commands:
 catalyst-development-only, deliberately absent from §4 (Rules-of-Rules.md
-§13). Its Taskfile counterpart lives in the project's own root `Taskfile.yml`,
-never in the deployed `Taskfile.common.yml`, so no exception is needed there.
+§13). It has no Taskfile counterpart, so no exception is needed there.
 
 Exit 0 = clean (including when no deployment resolves, unless `--require`,
 as CI passes), exit 1 = drift found (or nothing to check under `--require`).

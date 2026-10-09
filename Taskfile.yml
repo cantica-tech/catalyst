@@ -1,43 +1,11 @@
 # catalyst's own operations. Mirrors .github/workflows/*.yml exactly, so
 # `task check:all` (or `task ci`) is what CI runs, runnable locally.
 #
-# Catalyst-operation dispatch tasks (check-rules, sync-framework, and the
-# active module's commands, ...) come from Taskfile.common.yml, deployed inside .criterion/ (agent-owned
-# space, INV-6 — not this repo's own tree) from framework/kernel/
-# templates/Taskfile.common.template.yml, refreshed by /sync-framework, not
-# hand-edited here. See framework/kernel/migrations/0.19.0/
-# taskfile-into-criterion.md for why it moved out of this repo's own root.
+# catalyst never adds to or edits a project's Taskfile, this one included:
+# its commands run from the criterion's own Taskfile.common.yml, with
+# `catalyst task <command> -- <args>`.
 
 version: "3"
-
-vars:
-  # Resolves the deployed agent's CLI binary from the pointer's "agent"
-  # field. "claude-code" is the one known id whose CLI binary name differs
-  # from the id itself; any other agent id is assumed to already be its
-  # own binary name. Falls back to "claude" — today's only known agent —
-  # when no pointer/field is found.
-  AGENT_ID:
-    sh: |
-      f=$(ls *.catalyst 2>/dev/null | head -1)
-      [ -n "$f" ] && grep -oE '"agent"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -1 | sed -E 's/.*"([^"]*)"$/\1/'
-  AGENT_BIN: '{{if eq .AGENT_ID "claude-code"}}claude{{else if .AGENT_ID}}{{.AGENT_ID}}{{else}}claude{{end}}'
-  # Full override escape hatch for an agent needing different flags than
-  # `<bin> -p "<prompt>"` entirely (e.g. a non-Claude CLI).
-  AGENT_CMD: '{{.AGENT_CMD_OVERRIDE | default (printf "%s -p" .AGENT_BIN)}}'
-
-includes:
-  # Catalyst-operation dispatch tasks, from the working copy reached through
-  # .criterion — a gitignored symlink into agent-owned space (INV-6).
-  # Optional, so a clone without a working copy (CI, a new contributor)
-  # still runs this project's own tasks.
-  common:
-    taskfile: .criterion/Taskfile.common.yml
-    optional: true
-    flatten: true
-    # this repository runs the CLI from source (the `catalyst` task below)
-    excludes: [catalyst]
-    vars:
-      AGENT_CMD: '{{.AGENT_CMD}}'
 
 tasks:
   install:
@@ -113,8 +81,3 @@ tasks:
       vars: [PUBLISH_DIR]
     cmds:
       - python3 scripts/package_release.py --publish-dir "{{.PUBLISH_DIR}}" --push
-
-  dogfood:
-    desc: "Vet this repository against its own rules (catalyst-development-only)"
-    cmds:
-      - '{{.AGENT_CMD}} "/dogfood {{.CLI_ARGS}}"'

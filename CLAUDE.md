@@ -63,23 +63,15 @@ Capabilities you have (use them per `BOOTSTRAP.md §1`):
     rather than duplicating its behavior inline, so the command stays
     correct across a `/sync-framework` without needing its own edit.
 - **Taskfiles:** `catalyst init` composes `Taskfile.common.yml` **inside
-  `.criterion/`** (agent-owned space per INV-6 — never the target
-  project's own tree, unlike `.claude/commands/` which stays project-root
-  only because Claude Code's own fixed discovery path forces it there) from
+  the criterion** from
   `framework/kernel/templates/Taskfile.common.template.yml` plus the
   module's `Taskfile.module.yml` — one task per entry in
   `CODE-OF-CONDUCT.md` §4, same canonical-list rule as slash commands
-  (`scripts/check_command_parity.py` diffs it the same way). catalyst is
-  agent-agnostic, so each task is a thin `{{.AGENT_CMD}} "/<name>
-  {{.CLI_ARGS}}"` dispatch, never a hardcoded `claude -p` and never a
-  duplicated command behavior inline in the task. You still create the
-  project's own root `Taskfile.yml`: it resolves `AGENT_CMD` from the
-  `*.catalyst` pointer's `agent` field and includes
-  `.criterion/Taskfile.common.yml` with `optional: true` and
-  `flatten: true` (task names stay bare — `task check-rules`, not
-  `task common:check-rules`), plus that project's own operations
-  (install/lint/test/build/...). See `INSTANTIATION-GUIDE.md` §1 step 5
-  for the exact block.
+  (`scripts/check_command_parity.py` diffs it the same way). Each task is
+  a thin `{{.AGENT_CMD}} "/<name> {{.CLI_ARGS}}"` dispatch run from the
+  caller's directory. Never create or edit the project's own
+  `Taskfile.yml`: `catalyst task <name> -- <args>` runs a common task from
+  the project's root, and `catalyst task` lists them.
 - **Hooks:** if `.claude/settings.json` is present, its `SessionStart` hook
   re-injects `INVARIANTS.md` and its `Stop` hook runs the deployment validator —
   the enforcement layer of the anti-drift architecture. You do not need to
