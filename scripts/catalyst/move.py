@@ -142,10 +142,16 @@ def to_home(project: Path, runtime: bool = True, actor: str | None = None) -> tu
             _git(project, "add", "-A", "--", str(path.relative_to(project)), check=False)
         steps.append("product changes staged, not committed")
     if runtime:
+        # the catalyst doing the move knows the home store; a legacy deployment's
+        # vendored CLI may predate it, so the runtime comes from this one
+        import tempfile
+
         from catalyst import runtime as rt
-        version = (target / "version.txt").read_text(encoding="utf-8").strip()
-        venv, _ = rt.install_into(target, version, target / "bin" / "catalyst.pyz")
-        steps.append(f"filled the criterion's runtime {venv}")
+        with tempfile.TemporaryDirectory() as tmp:
+            pyz = rt.own_pyz(Path(tmp))
+            version = rt.pyz_version(pyz)
+            venv, _ = rt.install_into(target, version, pyz)
+        steps.append(f"filled the criterion's runtime {venv} (catalyst {version})")
     dep = load(project)
     journal.append(dep, journal.AppendRequest(
         command="catalyst move", action="update", artifact=f"criterion of {name}", targets=[],

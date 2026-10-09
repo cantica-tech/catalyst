@@ -83,3 +83,15 @@ def test_a_name_already_taken_is_refused(tmp_path):
     with pytest.raises(move.MoveError, match="another project is named 'app'"):
         move.to_home(second, runtime=False)
     assert (second / ".criterion").is_dir()                               # untouched
+
+
+@pytest.mark.skipif(shutil.which("uv") is None and sys.version_info < (3, 11), reason="a runtime needs uv or 3.11+")
+def test_the_moved_criterion_runs_from_its_own_runtime(tmp_path):
+    import os
+    from catalyst import runtime as rt
+    project = make_project(tmp_path / "w", git=True)
+    target, _ = move.to_home(project)
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    out = subprocess.run([str(rt.venv_python(target / ".venv")), "-m", "catalyst", "where", "--json"],
+                         capture_output=True, text=True, encoding="utf-8", cwd=project, env=env)
+    assert out.returncode == 0 and '"kind": "home"' in out.stdout, out.stderr

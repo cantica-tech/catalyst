@@ -180,3 +180,13 @@ def own_pyz(tmp: Path) -> Path:
             return candidate
     import package_release
     return package_release.build_cli(Path(package_release.ROOT), tmp / "catalyst.pyz")
+
+
+def pyz_version(pyz: Path) -> str:
+    """The version a catalyst.pyz reports (`X.Y.Z[+g<sha>[.dirty]]`): the
+    runtime's label, so a development build never shares a release's runtime."""
+    res = subprocess.run([sys.executable, str(pyz), "--version"], capture_output=True, text=True,
+                         encoding="utf-8", env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"})
+    if res.returncode != 0 or not res.stdout.startswith("catalyst "):
+        raise RuntimeError_(f"{pyz} does not run: {res.stderr.strip()}")
+    return res.stdout.split()[1]
