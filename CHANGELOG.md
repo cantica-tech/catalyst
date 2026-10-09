@@ -18,6 +18,14 @@ messages.
   catalyst's home, never in `catalyst.toml`; `catalyst task` dispatches to it.
   The agent switching procedure and `/switch-agent` reduce to that command;
   `catalyst where` replaces the memory note.
+- A faster end-of-turn check (part of roadmap R3.8): the journal is read and
+  its blobs looked up once per run, legacy paths are normalised once, and
+  files committed as journaled are compared with HEAD in one batch — `catalyst
+  check` takes about 1 s instead of 2 s (catalyst-ui) and 10 s (a deployment
+  with a long legacy journal).
+- Fixed: in a project below its repository's top level (a monorepo), the
+  journal read every product file as deleted (`git hash-object --stdin-paths`
+  resolves paths from the top level).
 
 ## 0.50.0 — 2026-10-09
 
