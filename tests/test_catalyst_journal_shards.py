@@ -133,3 +133,20 @@ def test_ids_and_the_structure_check_read_every_shard(project):
     shard.write_text(shard.read_text(encoding="utf-8") + "{not json\n", encoding="utf-8")
     name = shard.relative_to(dep.root / "development").as_posix()
     assert any(f"{name}:2 is not valid JSON" in e for e in check_journal_exists(dep.root))
+
+
+def test_files_committed_as_journaled_are_found_in_one_batch_in_a_monorepo(tmp_path, monkeypatch):
+    """check's `_matching_head` asks git once per repository, and finds HEAD's
+    blobs for a project below the repository's top level."""
+    from catalyst.check import _matching_head
+
+    mono = tmp_path / "mono"
+    project = make_project(mono)  # mono/app, its .criterion inside
+    git(mono, "init", "-q")
+    write(project / "src" / "same.py", "same\n")
+    write(project / "src" / "edited.py", "v1\n")
+    git(mono, "add", "-A")
+    git(mono, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
+    write(project / "src" / "edited.py", "v2\n")
+    dep = load(project)
+    assert _matching_head(dep, {"src/same.py", "src/edited.py", "src/gone.py"}) == {"src/same.py"}

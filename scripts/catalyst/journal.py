@@ -308,26 +308,55 @@ def write(dep: Deployment, entry: dict) -> str:
     return rel
 
 
+_NORMAL: dict[tuple, str] = {}
+
+
 def entry_path(dep: Deployment, entry: dict, f: dict) -> str:
     """A file's canonical path: as written when the entry is CLI-written
-    (already canonical), else normalised from its legacy form."""
+    (already canonical), else normalised from its legacy form (once per
+    process: every reader of the journal asks for the same entries)."""
     if str(entry.get("writer", "")).startswith("catalyst/"):
         return str(f["path"])
-    return normalise(dep, str(f["path"]), (f.get("before"), f.get("after")))
+    key = (str(dep.root), str(dep.project_root), str(f["path"]), f.get("before"), f.get("after"))
+    if key not in _NORMAL:
+        _NORMAL[key] = normalise(dep, str(f["path"]), (f.get("before"), f.get("after")))
+    return _NORMAL[key]
+
+
+_CHECKED: dict[tuple, list] = {}
+
+
+def read_checked(dep: Deployment) -> list[tuple[str, dict | None, str]]:
+    """`read`, with every blob the entries name looked up in one
+    `cat-file --batch-check` per repository; kept for the process while no
+    source changes (check, verify and unrecorded all read the journal)."""
+    stamps = []
+    for rel in sources(dep):
+        try:
+            st = (dep.root / rel).stat()
+            stamps.append((rel, st.st_size, st.st_mtime_ns))
+        except OSError:
+            stamps.append((rel, -1, -1))
+    key = (str(dep.root), str(dep.project_root), tuple(stamps))
+    if key not in _CHECKED:
+        entries = read(dep)
+        shas = {
+            f.get(k)
+            for _, e, _ in entries
+            for f in (e or {}).get("files", []) or []
+            if isinstance(f, dict)
+            for k in ("before", "after")
+        }
+        for repo in (dep.root, dep.project_root):
+            prefetch(repo, shas)
+        _CHECKED.clear()  # one deployment's journal at a time
+        _CHECKED[key] = entries
+    return _CHECKED[key]
 
 
 def last_after(dep: Deployment) -> dict[str, str | None]:
     last: dict[str, str | None] = {}
-    entries = read(dep)
-    shas = {
-        f.get(k)
-        for _, e, _ in entries
-        for f in (e or {}).get("files", []) or []
-        if isinstance(f, dict)
-        for k in ("before", "after")
-    }
-    for repo in (dep.root, dep.project_root):
-        prefetch(repo, shas)
+    entries = read_checked(dep)
     for _, entry, _ in entries:
         for f in (entry or {}).get("files", []) or []:
             # a superseded file is history recorded after the fact, not the file's current state
@@ -375,8 +404,11 @@ def current_hashes(repo: Path, rels: list[str]) -> dict[str, str | None]:
     present = [r for r in rels if (repo / r).is_file()]
     out: dict[str, str | None] = dict.fromkeys(rels)
     if present:
+        # absolute paths: --stdin-paths reads them from the repository's top level, not
+        # from -C, which is wrong for a project below the top level (a monorepo)
         res = proc.run(
-            ["git", "-C", str(repo), "hash-object", "--stdin-paths"], input="".join(f"{r}\n" for r in present)
+            ["git", "-C", str(repo), "hash-object", "--stdin-paths"],
+            input="".join(f"{(repo / r).resolve()}\n" for r in present),
         )
         if res.returncode == 0:
             out.update(zip(present, res.stdout.split()))
@@ -536,16 +568,7 @@ def verify(dep: Deployment) -> list[Issue]:
     def level(strict: bool) -> str:
         return "error" if strict else "warning"
 
-    entries = read(dep)
-    shas = {
-        f.get(k)
-        for _, e, _ in entries
-        for f in (e or {}).get("files", []) or []
-        if isinstance(f, dict)
-        for k in ("before", "after")
-    }
-    for repo in (dep.root, dep.project_root):
-        prefetch(repo, shas)
+    entries = read_checked(dep)
 
     for n, entry, _ in entries:
         if entry is None:

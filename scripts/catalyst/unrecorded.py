@@ -97,7 +97,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 
 def recorded(dep: Deployment) -> Journaled:
     j = Journaled()
-    for _, entry, _ in journal.read(dep):
+    for _, entry, _ in journal.read_checked(dep):
         if entry is None:
             continue
         for f in entry.get("files", []) or []:

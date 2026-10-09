@@ -74,8 +74,11 @@ def run(dep: Deployment) -> Report:
     # beta's level — not also as an `unjournaled` error
     committed_by_hand = {path for c in manual for path, _, _ in c.changes}
     legacy = 0
-    for i in journal.verify(dep):
-        if i.code == "unjournaled" and i.path in committed_by_hand and _matches_head(dep, i.path):
+    issues = journal.verify(dep)
+    candidates = {i.path for i in issues if i.code == "unjournaled" and i.path in committed_by_hand}
+    as_committed = _matching_head(dep, candidates)
+    for i in issues:
+        if i.code == "unjournaled" and i.path in as_committed:
             continue
         if i.level == "note":
             continue  # history (e.g. merged concurrent edits), not a problem
@@ -150,14 +153,42 @@ def merge_integrity(dep: Deployment) -> list[str]:
     return problems
 
 
-def _matches_head(dep: Deployment, path: str) -> bool:
-    """The file's working-tree content is what HEAD commits (edited, then committed as is)."""
-    where = journal.locate(dep, path)
-    if where is None:
-        return False
-    repo, rel = where
-    current = journal.current_hashes(repo, [rel]).get(rel)
-    return current is not None and current == journal.head_blob(repo, rel)
+def _matching_head(dep: Deployment, paths) -> set[str]:
+    """Of these journal paths, those whose working-tree content is what HEAD
+    commits (edited, then committed as is): one `hash-object` and one
+    `cat-file --batch-check` per repository, whatever the number of files."""
+    import subprocess
+
+    by_repo: dict[Path, dict[str, str]] = {}
+    for path in paths:
+        where = journal.locate(dep, path) if path else None
+        if where is not None:
+            by_repo.setdefault(where[0], {})[where[1]] = path
+    found = set()
+    for repo, rels in by_repo.items():
+        current = journal.current_hashes(repo, list(rels))
+        names = list(rels)
+        prefix = subprocess.run(  # a project below the repository's top level
+            ["git", "-C", str(repo), "rev-parse", "--show-prefix"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        ).stdout.strip()
+        res = subprocess.run(
+            ["git", "-C", str(repo), "cat-file", "--batch-check=%(objectname)"],
+            input="".join(f"HEAD:{prefix}{rel}\n" for rel in names),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        lines = res.stdout.splitlines() if res.returncode == 0 else []
+        for rel, line in zip(names, lines, strict=False):  # no lines when git failed
+            head = line.strip() if not line.endswith("missing") else None
+            if current.get(rel) is not None and current.get(rel) == head:
+                found.add(rels[rel])
+    return found
 
 
 def unrecorded_changes(dep: Deployment) -> list[str]:

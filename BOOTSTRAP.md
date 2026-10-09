@@ -87,10 +87,10 @@ sub-agents → analysis passes will be sequential"), then continue.
 ### 1.1 Switching agents
 
 The criterion's place does not depend on the agent (hard rule 6): a new agent
-only sets `agent` and `updated` in `catalyst.toml` and refreshes its memory
-note. A legacy deployment (`.criterion` symlink into another agent's space)
-is moved once with `catalyst move --to-home`; until then `/switch-agent`
-handles it as before.
+runs `catalyst open --agent <agent-id>`, which records it for this user in
+catalyst's home — never in `catalyst.toml`. A legacy deployment (`.criterion`
+symlink into another agent's space) is moved once with
+`catalyst move --to-home`.
 
 ---
 

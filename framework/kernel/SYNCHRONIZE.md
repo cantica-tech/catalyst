@@ -570,6 +570,13 @@ converted: new entries go to `development/journal/` shards, an existing
 `development/journal.jsonl` is read and never written. Contributors to a
 shared criterion upgrade together.
 
+### From `0.50.x`: `catalyst open`
+
+Target version `0.51.0`. No layout change and no migration: re-vendor the
+CLI and recompose (`catalyst sync apply`), then `catalyst open` on each
+machine. Each user's agent now comes from `catalyst open --agent <id>` (kept
+in catalyst's home); `catalyst.toml`'s `agent` stays the project's default.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current
