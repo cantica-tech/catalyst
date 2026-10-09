@@ -3,7 +3,8 @@
   "include": ["scripts", "tests"],
   "exclude": ["**/node_modules", "**/.venv", "dist", "out", "framework/kernel/plugins/repository"],
   "extraPaths": ["scripts", "tests"],
-  "//": "Ratchet (2026-10-09, standards v0.1.0): 169 findings that predate the standard, reported as warnings; each rule goes back to error once its findings are fixed.",
+  // Ratchet (2026-10-09, standards v0.1.0): 169 findings that predate the standard, reported as warnings;
+  // each rule goes back to error once its findings are fixed.
   "reportArgumentType": "warning",
   "reportOptionalMemberAccess": "warning",
   "reportOptionalSubscript": "warning",
