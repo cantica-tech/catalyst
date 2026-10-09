@@ -9,7 +9,7 @@ messages.
 ## 0.49.0 — 2026-10-09
 
 Agents at user level, nothing in a project but `catalyst.toml` (migration
-`0.49.0/agents-at-user-level.md`). Pairs with software-engineering 2.6.0.
+`0.49.0/agents-at-user-level.md`). Process modules drop their command files with it (see the release notes).
 
 - VS Code workspaces (roadmap R3.1b): `catalyst workspace init|status
   <name>.code-workspace` creates the meta criterion
