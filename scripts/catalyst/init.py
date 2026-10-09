@@ -38,17 +38,8 @@ KERNEL_TYPES = {  # kernel entity folders, their template source and index
 }
 
 
-AGENT_COMMANDS_DIRS = {"claude-code": ".claude/commands"}   # where an agent reads command files
-
-
 class InitError(Exception):
     pass
-
-
-def default_commands_dir(agent: str) -> Path | None:
-    """The command-file directory the agent reads, or None when it has none we know of."""
-    rel = AGENT_COMMANDS_DIRS.get(agent)
-    return Path(rel) if rel else None
 
 
 def git_user_name(project: Path) -> str | None:
@@ -84,7 +75,6 @@ class InitRequest:
     test_locations: str | None = None
     at: Path | None = None             # legacy agent-owned location; None = the home store (ADR-010)
     agent: str = "unknown"
-    commands_dir: Path | None = None   # write command files here (e.g. .claude/commands)
     userid: str | None = None          # fixed first userid (reproducible examples); else drawn
     runtime: bool = True               # fill the home criterion's .venv (R3.1a)
 
@@ -464,8 +454,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         if "/.criterion" not in lines:
             _write(gitignore, "\n".join(lines + ["/.criterion"]))
         steps.append(f"wrote {pointer_path.name} (legacy); .criterion links to {root}; /.criterion gitignored")
-    if req.commands_dir is not None:
-        steps.append(_write_commands(req, module_src, root, created))
+    steps.append("wrote no agent files into the project: `catalyst agent install <agent>` wires an agent once "
+                 "per machine, at user level")
 
     # --- the working copy's own history, and the first journal entry ------
     if home_store and req.runtime:
@@ -484,9 +474,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         command="catalyst init", action="create", artifact=f"deployment of {req.name}", targets=[],
         intent=[f"Install catalyst (kernel {version}, module {manifest.id} {manifest.version}) into "
                 f"{req.name}, on the user's explicit request (INV-2)."],
-        files=([str(pointer_path)] + ([str(project / ".gitignore")] if not home_store else []) +
-               ([str(p) for p in sorted((req.project / req.commands_dir).glob("*.md"))]
-                if req.commands_dir is not None else [])
+        files=([str(pointer_path)] + ([str(project / ".gitignore")] if not home_store else [])
                if _is_repo(project) else []) +
               [str(root / "CODE-OF-CONDUCT.md"), str(root / "rules" / "Rules-of-Rules.md"),
                str(root / "IAM" / "users" / "users.json")],
@@ -501,53 +489,6 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
 # go into the product repository's object store, kept by a ref of their own.
 PRODUCT_GIT_NOTICE = ("note: wrote the journaled product files' blobs into the product repository's .git, "
                       "kept by the ref refs/catalyst/journal (no commit, no branch, nothing pushed)")
-
-
-def kernel_command_files(kernel: Path) -> list[Path]:
-    """The kernel's command files: `commands/` of a kernel release, else the
-    catalyst checkout's `.claude/commands/` — never `/dogfood`."""
-    for folder in (kernel / "commands", kernel.parent.parent / ".claude" / "commands"):
-        if folder.is_dir():
-            return sorted(p for p in folder.glob("*.md") if p.stem != "dogfood")
-    return []
-
-
-def _write_commands(req: InitRequest, module_src: Path, root: Path, created: list[Path]) -> str:
-    """One command file per command in the composed CODE-OF-CONDUCT §4
-    (aliases included): the module's own files, the kernel's from a catalyst
-    checkout when present, else a thin file pointing at `catalyst spec`."""
-    from catalyst.spec import parse
-    dest = req.commands_dir if req.commands_dir.is_absolute() else req.project / req.commands_dir
-    missing = dest
-    while not missing.parent.exists():          # track the highest folder this creates
-        missing = missing.parent
-    if not dest.exists():
-        created.append(missing)
-    dest.mkdir(parents=True, exist_ok=True)
-    s = parse((root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8"))
-    names = sorted(set(s.bullets) | set(s.aliases))
-    module_cmds = {p.stem: p for p in (module_src / "commands").glob("*.md")}
-    kernel_cmds = {p.stem: p for p in kernel_command_files(req.kernel)}
-    copied = generated = 0
-    for name in names:
-        target = dest / f"{name}.md"
-        if target.exists():
-            continue
-        created.append(target)
-        src = module_cmds.get(name) or kernel_cmds.get(name)
-        if src is not None:
-            shutil.copyfile(src, target)
-            copied += 1
-            continue
-        primary = s.aliases.get(name, name)
-        bullet = (s.bullets.get(primary) or [""])[0]
-        summary = bullet.split("—", 1)[1].strip().split(".")[0].replace("\n", " ") if "—" in bullet else primary
-        summary = re.sub(r"\s+", " ", summary).replace('"', "'")
-        target.write_text(f'---\ndescription: "{summary}"\n---\n\nFirst run `catalyst spec {name}` and follow '
-                          "it. Sources: `.criterion/CODE-OF-CONDUCT.md` §4 (canonical).\n\nInput: $ARGUMENTS\n",
-                          encoding="utf-8")
-        generated += 1
-    return f"wrote {copied + generated} command files into {dest} ({generated} generated from §4)"
 
 
 def _is_repo(path: Path) -> bool:

@@ -11,7 +11,7 @@ minor (ADR-009) and moved with `catalyst move`.
 
 ## Stages (each tested, each shippable)
 
-Progress: **A, B done** (`e6d6c50`); **C done** (`dadedc1`); **D done** (`f465a2d`); **E done** (`17a73fa`, `1c98f5d`; catalyst's own deployment moved, `46883e4`); **F done** (`1697ea7`). The UI's resolver reads `catalyst.toml` and the home store (UI `76476c7`). Next: **H, release 0.48.0** — the UI's move needs a released CLI that knows the home store (its CI runs it) — then the UI: sync to 0.48.0, `catalyst move --to-home`, its CI clones the criterion into `$CATALYST_HOME`, its hooks call the launcher, in one change; then G.
+Progress: **A–F done**; **H done: 0.48.0 released and published** (2026-10-09). Moved to the home store: catalyst's own deployment (`46883e4`) and the UI repo (UI `29b7661`, criterion PR #25; its CI clones the criterion into `$CATALYST_HOME` and passes). **G done** (`catalyst workspace`). Next: the UI's own "join a repoed deployment" command should call `catalyst criterion join`.
 
 | # | Stage | Content | Done when |
 |---|---|---|---|

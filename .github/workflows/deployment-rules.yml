@@ -45,7 +45,7 @@ jobs:
             git -C "$proj" commit -q --allow-empty -m "scratch project"
             (cd "$proj" && python3 -m catalyst init --kernel "$GITHUB_WORKSPACE/framework/kernel" \
               --name ci --module "$id" --module-dir "$dir" --user "CI" --git-username catalyst-ci \
-              --at "$RUNNER_TEMP/deployments/$id/wc" --agent claude-code --commands-dir .claude/commands)
+              --at "$RUNNER_TEMP/deployments/$id/wc" --agent claude-code)
             echo "::group::$id"
             (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_deployment.py" --require)
             (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_command_parity.py" --require)

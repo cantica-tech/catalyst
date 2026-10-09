@@ -60,6 +60,7 @@ class Rule:
     file: Path
     line: int
     retired: bool = False
+    inherited: bool = False         # from the project's workspace criterion (R3.1b), read-only
 
 
 @dataclass
@@ -207,11 +208,34 @@ def _row_items(folder: Path, prefix: str) -> set[str]:
     return ids
 
 
+def _inherit_workspace(dep: Deployment, corpus: Corpus) -> None:
+    """A member of a VS Code workspace (`workspace = "<name>"` in its
+    catalyst.toml) also sees the workspace criterion's rules, domains, users
+    and roles, read-only; its own entries win on a clash (R3.1b)."""
+    import project_file
+    name = project_file.workspace_of(dep.pointer or {})
+    root = project_file.workspace_criterion(name) if name else None
+    if root is None or not root.is_dir() or root == dep.root:
+        return
+    rules, indexed = _rules(root)
+    for rid, defs in rules.items():
+        if rid not in corpus.rules:
+            for rule in defs:
+                rule.inherited = True
+            corpus.rules[rid] = defs
+            corpus.indexed_rules.add(rid)
+    corpus.domains |= _domains(root)
+    known = {str(u.get(k, "")).lower() for u in corpus.users for k in ("name", "git_username", "userid")}
+    corpus.users += [u for u in _users(root)
+                     if not {str(u.get(k, "")).lower() for k in ("name", "git_username", "userid")} & known]
+
+
 def load_corpus(dep: Deployment) -> Corpus:
     corpus = Corpus()
     corpus.rules, corpus.indexed_rules = _rules(dep.root)
     corpus.domains = _domains(dep.root)
     corpus.users = _users(dep.root)
+    _inherit_workspace(dep, corpus)
     file_re_cache: dict[str, re.Pattern] = {}
     for prefix, etd in dep.etds.items():
         folder = dep.folder(etd)

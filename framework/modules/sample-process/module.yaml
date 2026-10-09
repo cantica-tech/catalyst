@@ -13,4 +13,3 @@ entity_types:
 commands:
   - name: create-policy
     description: Create a new policy document
-    spec_path: commands/create-policy.md

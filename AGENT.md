@@ -18,9 +18,11 @@ pick a fallback for every capability you cannot confirm:
   finds it) are the durable record regardless — read them fresh each
   session instead of relying on a memory-tool cache.
 - No slash-command UI → expose the framework commands as named procedures you
-  recognize when the user types the same token in plain text.
+  recognize when the user types the same token in plain text (the
+  `catalyst mcp` server's `command` tool returns each one's procedure).
 
 Install only when the user asks (INV-2): `catalyst init` from the project
-root, per `BOOTSTRAP.md` §2, with no `--commands-dir`.
+root, per `BOOTSTRAP.md` §2. Wiring an agent is per machine, at user level
+(`catalyst agent install <agent>`), never in the project.
 
 Everything else: `BOOTSTRAP.md`.

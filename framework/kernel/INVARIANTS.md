@@ -77,7 +77,9 @@ one-line placeholder; numbers are never reused.
   `$HOME/.catalyst`); a VS Code workspace's meta criterion is
   `$HOME/.catalyst/workspaces/<name>/criterion`. Nothing of it sits in the
   project: the project tracks only `catalyst.toml` (project root), which
-  names the project and pins versions and never holds a path. It is found
+  names the project and pins versions and never holds a path. catalyst
+  creates or edits no other project file — no Taskfile, no code artifact.
+  It is found
   the same way by every agent, the UI, hooks and CI (`catalyst where`), and
   runs from its own `.venv` (`catalyst runtime install`). Shared (INV-18),
   the criterion is its own git repository with a remote. Legacy

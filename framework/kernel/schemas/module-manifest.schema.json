@@ -64,13 +64,12 @@
         "type": "object",
         "required": [
           "name",
-          "description",
-          "spec_path"
+          "description"
         ],
         "properties": {
           "name": {
             "type": "string",
-            "description": "Slash command name without leading slash."
+            "description": "Slash command name without leading slash; its text is the module's CODE-OF-CONDUCT §4 entry."
           },
           "description": {
             "type": "string",
@@ -82,7 +81,7 @@
           },
           "spec_path": {
             "type": "string",
-            "description": "Path to command specification file relative to module root."
+            "description": "Deprecated (0.49.0, unused): agents get the command from the composed CODE-OF-CONDUCT §4."
           }
         },
         "additionalProperties": false

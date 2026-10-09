@@ -95,7 +95,7 @@ schedule from `06`, owner decisions from `10-questions-and-decisions.md` and the
 | K-31 | Rules of rules (`rr-META-NNN`) | 01a §1.1 K-31 | kernel docs/brief | Merge | Merges into the Handbook, IDs on every rule (07 §8, §9) | R4.2 |
 | K-32 | Code of conduct (rules of development) | 01a §1.1 K-32 | kernel docs/brief | Merge | Merges into the Handbook (07 §8); §4 command list → `commands.yaml` registry (06 §R2) | R4.2 |
 | K-33 | Per-command spec | 01a §1.1 K-33 | kernel CLI | Keep | `catalyst spec <cmd>` ≤ 1.5k tokens (07 §2, §13) | R0.1 (done), R1.1 |
-| K-34 | Slash-command files | 01a §1.1 K-34 | user/agent shim | Merge | Merges into generated agent adapters from one registry (07 §5.4) | R4.5 |
+| K-34 | Slash-command files | 01a §1.1 K-34 | user/agent shim | Merge | Merges into generated agent adapters from one registry (07 §5.4); served as `catalyst mcp` prompts from the composed §4, wired per machine by `catalyst agent install` — no command files in the project | R3.1c (done), R4.5 |
 | K-35 | Taskfile dispatch | 01a §1.1 K-35 | kernel CLI | Keep | Generated Taskfile snippet from the command list, optional (07 §12); `commands.yaml` registry (06 §R2) | — |
 | K-36 | Users registry | 01a §1.1 K-36 | kernel CLI | Keep | `catalyst user …` (07 §12) | R2 W3 |
 | K-37 | Roles and access control | 01a §1.1 K-37 | kernel CLI | Keep | `catalyst role …` (07 §12); advisory role check demoted or mechanised | R2 W3, R4.6 |

@@ -1,41 +1,34 @@
 # Common Taskfile — deployed asset, not hand-edited per project.
 #
-# Copy this file into the deployment's real working copy, `.criterion/`
-# (agent-owned space per INV-6 — never inside the developed project's own
-# tree, the same way rules/, IAM/, etc. live there), once per
-# project (including this framework's own self-deployment), and refresh
-# it from here on `/sync-framework`. See `INSTANTIATION-GUIDE.md` §1 step
-# 5, `INSTANTIATION-CHECKLIST.md`'s Discoverability section, and
-# `SYNCHRONIZE.md`'s synchronization checklist — this template exists
-# because those require it, the same way `templates/slash-command.
-# template.md` backs `.claude/commands/*.md` (which stays project-root,
-# unlike this file — that's forced by Claude Code's own fixed discovery
-# path, an external constraint this file has none of).
+# Composed into the criterion (`$CATALYST_HOME/projects/<name>/criterion/
+# Taskfile.common.yml`, never the project's own tree — INV-6) on
+# instantiation and refreshed on `/sync-framework`. catalyst never adds to
+# or edits a project's own Taskfile: this file is run on its own, from the
+# project's root, with `catalyst task <command-name> -- <arguments>` (or
+# `task -t <criterion>/Taskfile.common.yml ...`). Every task runs in the
+# directory it was called from (`USER_WORKING_DIR`), not in the criterion.
 #
 # One task per kernel command in the deployed `CODE-OF-CONDUCT.md` §4; the
 # active module's own tasks (its `Taskfile.module.yml`, one per module
 # command) are appended to the `tasks:` block below on deployment and on
 # `/sync-framework` (`MODULE-SPECIFICATION.md` §6.5). The deployed §4 is the
 # canonical list — `scripts/check_command_parity.py` diffs this file
-# against it, the same drift check already applied to `.claude/commands/`.
-# Each task is a thin, non-interactive dispatch to the actual slash
-# command, so day-to-day catalyst operations are scriptable from a shell
-# or CI job without an interactive session.
+# against it. Each task is a thin, non-interactive dispatch to the actual
+# slash command, so day-to-day catalyst operations are scriptable from a
+# shell or CI job without an interactive session.
 #
-# Usage: task <command-name> -- <arguments>
-#   e.g. task meta-tag -- <artifact-id>
-#        task user-add -- olivier admin
+# Usage: catalyst task <command-name> -- <arguments>
+#   e.g. catalyst task meta-tag -- <artifact-id>
+#        catalyst task user-add -- olivier admin
 #
-# Agent-generic dispatch: catalyst doesn't assume Claude Code — the
-# `*.catalyst` pointer's own "agent" field says which agent runs a given
-# deployment. This file deliberately carries no vars of its own: every
-# task consumes `{{.AGENT_CMD}}`, passed in from the project's own root
-# `Taskfile.yml` via `includes: common: {..., vars: {AGENT_CMD: ...}}`
-# (see `INSTANTIATION-GUIDE.md` §1 step 5 for that resolution logic) —
-# a var declared here instead would take precedence over the passed-in
-# one per Task's own `includes` semantics, silently defeating it.
+# Agent-generic dispatch: `AGENT_CMD` is the agent's non-interactive
+# command. `catalyst task` passes it from `catalyst.toml`'s "agent" field;
+# set it yourself (`AGENT_CMD="<bin> -p"`) when calling `task` directly.
 
 version: "3"
+
+vars:
+  AGENT_CMD: '{{.AGENT_CMD | default "claude -p"}}'
 
 tasks:
   user-add:
@@ -169,8 +162,8 @@ tasks:
       - '{{.AGENT_CMD}} "/help {{.CLI_ARGS}}"'
 
   # Not a slash command: a direct pass-through to the catalyst CLI
-  # (framework/kernel/CLI.md), vendored at .criterion/bin/catalyst.pyz.
+  # (framework/kernel/CLI.md), through the launcher in $CATALYST_HOME/bin.
   catalyst:
     desc: "Run the catalyst CLI: task catalyst -- <args>"
     cmds:
-      - python3 .criterion/bin/catalyst.pyz {{.CLI_ARGS}}
+      - python3 "{{env "CATALYST_HOME" | default (printf "%s/.catalyst" (env "HOME"))}}/bin/catalyst" {{.CLI_ARGS}}

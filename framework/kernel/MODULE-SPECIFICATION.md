@@ -47,8 +47,6 @@ catalyst-<module-id>/
 │   └── <entity>.template.md
 ├── definitions/                # Versioned prose definition per entity type (§6.3)
 │   └── <entity>/DEFINITION-<PREFIX>-v1.md
-├── commands/                   # Slash-command specs
-│   └── <command>.md
 ├── rules-of-rules.module.md    # Module meta-rules (§6.1)
 ├── code-of-conduct.module.md   # Module document types and commands (§6.2)
 ├── INVARIANTS.module.md        # Module invariants (§6.4)
@@ -73,7 +71,7 @@ catalyst-<module-id>/
 | `grounding_type` | `string` | Yes | The kernel entity the module's artifacts ground to (for example `rule`). |
 | `kernel_version` | `string` | No | The kernel versions the module works with, as a version specifier (for example `>=0.42.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. |
 | `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
-| `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`, `spec_path`). |
+| `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
 | `definitions` | `list[object]` | No | Entity definitions (`entity_type`, `path`). |
 | `required_paths` | `list[object]` | No | Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`. |
@@ -99,7 +97,6 @@ commands:
   - name: create-item
     description: Create a new item
     argument_hint: "[<rule-id>]"
-    spec_path: commands/create-item.md
 
 templates:
   - entity_type: ITEM
@@ -242,8 +239,9 @@ Two sections, `## 3. Standard document types` and
 `## 4. Slash-command entry points`. Each is inserted at the end of the
 matching section of the deployed `CODE-OF-CONDUCT.md`. Every command bullet in
 the module's §4 must match an entry in `module.yaml`'s `commands`; the deployed
-§4 (kernel plus module) is the canonical command list that command files and
-Taskfile tasks are checked against (`scripts/check_command_parity.py`).
+§4 (kernel plus module) is the canonical command list: the `catalyst mcp`
+server's prompts are read from it, and the Taskfile tasks are checked against
+it (`scripts/check_command_parity.py`).
 
 ### 6.3 Definitions (`definitions/`)
 
@@ -260,7 +258,9 @@ reuses it.
 
 A `tasks:` block with one thin dispatch task per module command, in the same
 shape as the kernel's `templates/Taskfile.common.template.yml`. Its tasks are
-appended to the deployed `Taskfile.common.yml`.
+appended to the criterion's `Taskfile.common.yml`, each given
+`dir: '{{.USER_WORKING_DIR}}'` by the composer; `catalyst task` runs them.
+They never reach the project's own `Taskfile.yml`.
 
 ### 6.6 Migrations (`migrations/`)
 

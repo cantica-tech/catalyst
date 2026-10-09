@@ -22,7 +22,7 @@ is shorthand for one of:
 
 | Where | Command |
 |---|---|
-| A deployed project | `python3 .criterion/bin/catalyst.pyz <args>`, or `task catalyst -- <args>` through the deployed `Taskfile.common.yml` |
+| A deployed project | `$CATALYST_HOME/bin/catalyst <args>`, the launcher (`runtime install`); a legacy deployment: `python3 .criterion/bin/catalyst.pyz <args>` |
 | catalyst's own repository | `task catalyst -- <args>`, or `PYTHONPATH=scripts python3 -m catalyst <args>` |
 
 `.criterion/bin/catalyst.pyz` is a single-file zipapp. It ships inside
@@ -88,7 +88,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ```
 catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
-              [--agent <id>] [--commands-dir <dir>] [--no-runtime]
+              [--agent <id>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
 
@@ -117,12 +117,9 @@ decides its inputs and does the judgment steps after it.
   install`). Legacy, for one minor: `--at <dir>` builds it in agent-owned
   space behind a gitignored `.criterion` symlink and a `<name>.catalyst`
   pointer.
-- `--agent` is recorded in the pointer's `agent` field.
-- `--commands-dir <dir>` (relative to the project; default: the agent's,
-  `.claude/commands` for `claude-code`) receives one command
-  file per command of the composed `CODE-OF-CONDUCT.md` §4: the kernel's
-  from the catalyst checkout's own command files (never `/dogfood`), then
-  the module's `commands/`.
+- `--agent` is recorded in the pointer's `agent` field. `init` writes no
+  agent file into the project: `catalyst agent install <agent>` wires the
+  agent once per machine, at user level.
 - `--kernel` is the `framework/kernel` directory of a catalyst checkout or
   kernel release. It defaults to the checkout the CLI runs from, so it is
   required when running a vendored `catalyst.pyz`.
@@ -158,7 +155,7 @@ Prints only what one command needs from the deployed `CODE-OF-CONDUCT.md`
 followed by a one-line reminder of the common ending (signer, IDs, index
 regeneration, journal). The canonical text is still §4; `spec` only
 selects it, so an agent reads a command's few hundred words instead of the
-whole document. Command files call it first (`templates/slash-command.template.md`);
+whole document. The `catalyst mcp` prompts return it for each command;
 the full document is read only when the spec points elsewhere or a
 judgment needs the Rules-of-Rules sections it cites. `<command>` may be
 given with or without its `/`; without one, `spec` lists every command.
@@ -228,7 +225,7 @@ promotes them to errors:
 | `retired-target` | A reference cites a retired rule. |
 | `index-drift` | An artifact is missing from its index, or its row links another filename. `catalyst index regen` repairs it. |
 
-### `catalyst hook stop [--strict]`
+### `catalyst hook stop [--strict] [--format exit2|json|gemini|cursor]`
 
 The same pass as `check`, shaped for an agent's end-of-turn hook: it
 exits `2` with the failures on stderr so the agent keeps working until
@@ -239,13 +236,59 @@ deployment it exits `0`. It fails closed: an unexpected error inside the
 hook (a corrupt journal, say) exits `2` with the reason, never `1`,
 which agents treat as non-blocking. See [Hooks](#hooks).
 
-### `catalyst hook start`
+While `catalyst.toml` says `governance = "suspended"` (an owner's
+decision), it reports that and exits `0` without checking.
+
+`--format` says how to block, in the agent's terms: `exit2` (the default,
+Claude Code) as above; `json` prints `{"decision": "block", "reason": ...}`
+and exits `0` (Codex, Copilot CLI and VS Code, Claude Code); `gemini` the
+same with `"deny"` (Gemini CLI's end-of-turn hook); `cursor`
+`{"followup_message": ...}`. The project is the hook input's `cwd` (or
+Cursor's `workspace_roots`) when `--project` is not given.
+
+### `catalyst hook start [--format text|json|cursor]`
 
 The agent's session-start hook: prints the working copy's `INVARIANTS.md`
 and, when the module ships one, `INVARIANTS.module.md` (both copied there
 by `init`), so a deployed project's sessions start grounded. It never
 blocks a session: it always exits `0`, prints nothing outside a
 deployment, and one line when the working copy is unreachable.
+`--format json` wraps the text as `hookSpecificOutput.additionalContext`
+(Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
+
+### `catalyst mcp`
+
+A stdio MCP server, for any agent that speaks the Model Context Protocol;
+registered once per machine at user level (`catalyst agent install`), it
+writes nothing into a project. It serves the project of the client's roots,
+else `CLAUDE_PROJECT_DIR`, else its working directory, else a tool call's
+`cwd`:
+
+- **prompts** — one per command of the composed `CODE-OF-CONDUCT.md` §4,
+  read when listed (module commands included, named by nothing else); each
+  returns the command's `catalyst spec` and its arguments. Clients that split
+  typed arguments on whitespace (Claude Code) get word slots, joined back;
+- **tools** — `catalyst` (`args`, optional `cwd`) runs the CLI through the
+  launcher in the project's root, so each project runs its own pinned
+  version; `command` (`name`, `arguments`, `cwd`) returns a command's
+  procedure, or the list, for clients without MCP prompts;
+- **instructions** — the deployment's invariants, as `hook start` prints them.
+
+Through the launcher, `mcp` always runs the newest installed runtime.
+
+### `catalyst agent install|uninstall <agent>`, `catalyst agent status`
+
+Wires catalyst into an agent at user level — never into a project — or
+removes it: `claude-code` (`claude mcp add --scope user` and the Stop hook
+in `~/.claude/settings.json`), `copilot` (`~/.copilot/mcp-config.json`,
+`~/.copilot/hooks/catalyst.json` — read by VS Code's agent too), `vscode`
+(the user profile's `mcp.json`), `cursor` (`~/.cursor/mcp.json`,
+`hooks.json`), `codex` (`[mcp_servers.catalyst]` in `~/.codex/config.toml`,
+`~/.codex/hooks.json`), `gemini` (`~/.gemini/settings.json`). Only
+catalyst's entries change (found by the launcher path); each file is backed
+up once as `<file>.before-catalyst`; a file that is not plain JSON is left
+alone and the snippet to add is printed. `agents/claude-code/plugin` is the
+same wiring as a Claude Code plugin. `status` reports each agent.
 
 ### What a deployment governs
 
@@ -394,6 +437,33 @@ With `--working-copy` there is no product repository: commits are `0`.
   launcher runs the `.venv` of the project it is called from — no activation
   — or a legacy deployment's vendored CLI. `runtime status` reports all three.
 
+### `catalyst task [<name> [-- <arguments>]]`
+
+Runs one of the criterion's `Taskfile.common.yml` tasks (one per command of
+`CODE-OF-CONDUCT.md` §4) with [Task](https://taskfile.dev), from the
+project's root; with no name, lists them. catalyst never creates, includes
+or edits a project's own `Taskfile.yml`. `AGENT_CMD` (the agent's
+non-interactive command) comes from `catalyst.toml`'s `agent` —
+`claude-code` runs `claude -p` — unless the `AGENT_CMD` environment
+variable is set. Exit: Task's own, or `1` without a criterion or Task.
+
+### `catalyst workspace init|status <name>.code-workspace`
+
+A VS Code workspace is a `<name>.code-workspace` file (comments and trailing
+commas allowed); its members are its folders holding a `catalyst.toml`.
+
+- `init` creates the meta criterion `$CATALYST_HOME/workspaces/<name>/criterion`
+  — rules and domains, users and roles (the first user, Admin: `--user`,
+  default `git config user.name`), its own journal and git repository, no
+  process module — and writes `workspace = "<name>"` into each member's
+  `catalyst.toml` (not committed). A member of another workspace is left
+  alone; a workspace name already used on the machine is refused.
+- `status` lists the folders and which are members.
+
+A member also sees the workspace's rules, domains and users, read-only: its
+artifacts may target a workspace rule, and a workspace user may sign. Its own
+entries win on a clash. `catalyst where` names the workspace.
+
 ### `catalyst move --to-home | --name <new>`
 
 - `--to-home` moves a legacy deployment into the home store
@@ -419,11 +489,12 @@ the deployed version; `--base-kernel` names it otherwise.
 
 - `plan` lists what would change — CLI, invariants, the kernel documents
   copied as they are (`ANALYSIS-PLAYBOOK.md`, `definitions/README.md`), module
-  tree, governing documents (recompose), command files (`--commands-dir`, default the
-  agent's), definitions of new types, versions — and the kernel and module
+  tree, governing documents (recompose), the agent files an older catalyst wrote
+  into the project to retire (`.claude/commands/`, or `--commands-dir`, and the
+  hooks in `.claude/settings.json`), definitions of new types, versions — and the kernel and module
   migrations between the two versions, in order. It writes nothing.
-- `apply` does it and journals one `/sync-framework` entry. A command file
-  or kernel document edited locally is reported, never overwritten; a recompose conflict stops
+- `apply` does it and journals one `/sync-framework` entry. A command file catalyst wrote
+  but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
   The migrations' judgment steps stay with the agent.
 
@@ -953,10 +1024,9 @@ An agent that supports a session-start hook registers
 `catalyst hook start` as that hook, so every session starts from the
 invariants. An agent that supports an end-of-turn hook registers
 `catalyst hook stop` as that hook, so every turn ends with a deployment
-that passes `catalyst check`. How to register it is agent-specific: the
-agent's shim says how (for example, a settings template under
-`agents/<agent>/` in this repository, merged into the project's agent
-settings at install). An agent without hook support runs `catalyst check`
+that passes `catalyst check`. `catalyst agent install <agent>` registers
+both, in the agent's own format (`--format`), at user level — never in
+the project. An agent without hook support runs `catalyst check`
 at the end of every artifact-changing command instead
 (`CODE-OF-CONDUCT.md` §4).
 
