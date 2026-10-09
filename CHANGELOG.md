@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- VS Code workspaces (roadmap R3.1b): `catalyst workspace init|status
+  <name>.code-workspace` creates the meta criterion
+  `$CATALYST_HOME/workspaces/<name>/criterion` (shared rules, domains, users
+  and roles) and registers the member projects (`workspace = "<name>"` in
+  their `catalyst.toml`); a member sees the workspace's rules and users,
+  read-only. `catalyst where` names the workspace.
+
 ## 0.48.0 — 2026-10-09
 
 The criterion in catalyst's home store (migration `0.48.0/criterion-in-catalyst-home.md`).

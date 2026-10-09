@@ -356,13 +356,17 @@ def cmd_where(args) -> int:
             "legacy" if criterion is not None else "missing")
     out = {"project": str(project), "file": project_file.find(project).name, "name": name,
            "criterion": str(criterion) if criterion else None, "kind": kind,
-           "expected": str(home) if home else None}
+           "expected": str(home) if home else None, "workspace": project_file.workspace_of(data)}
+    if out["workspace"]:
+        out["workspace_criterion"] = str(project_file.workspace_criterion(out["workspace"]))
     if args.json:
         print(json.dumps(out, indent=2))
     else:
         print(f"project    {out['project']} ({out['file']}, name {name})")
         print(f"criterion  {out['criterion'] or 'not found'} ({kind})"
               + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else ""))
+        if out["workspace"]:
+            print(f"workspace  {out['workspace']} ({out['workspace_criterion']})")
     return 0 if criterion is not None else 1
 
 
@@ -429,6 +433,39 @@ def cmd_move(args) -> int:
         return 1
     for step in steps:
         print(f"- {step}")
+    return 0
+
+
+def cmd_workspace(args) -> int:
+    """`workspace init|status` (R3.1b): a VS Code workspace's meta criterion."""
+    from module_loader import REPO_ROOT
+
+    from catalyst import workspace as ws
+    from catalyst.init import git_user_name
+
+    path = Path(os.path.abspath(args.file))
+    try:
+        if args.workspace_command == "init":
+            kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
+            user = args.user or git_user_name(path.parent)
+            if not user:
+                print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
+                return 2
+            _, steps = ws.init(path, kernel, user, args.git_username)
+            for step in steps:
+                print(f"- {step}")
+            return 0
+        out = ws.status(path)
+    except (ws.WorkspaceError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(out, indent=2))
+    else:
+        print(f"workspace  {out['workspace']}  ({out['criterion'] or 'no criterion yet: catalyst workspace init'})")
+        for row in out["folders"]:
+            mark = "member" if row["member"] else ("project, not a member" if row["project"] else "no catalyst")
+            print(f"  {row['folder']}  {row['project'] or ''}  [{mark}]")
     return 0
 
 
@@ -1165,6 +1202,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
     p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
     p.set_defaults(func=cmd_move)
+
+    p = sub.add_parser("workspace", help="a VS Code workspace's meta criterion: shared rules, users, roles")
+    wss = p.add_subparsers(dest="workspace_command", required=True)
+    q = wss.add_parser("init", help="create the meta criterion and make the folders with a catalyst.toml members")
+    q.add_argument("file", help="the <name>.code-workspace file")
+    q.add_argument("--user", help="the first user, Admin (default: git config user.name)")
+    q.add_argument("--git-username")
+    q.add_argument("--kernel", type=Path, help="framework/kernel (default: this checkout's)")
+    q.set_defaults(func=cmd_workspace)
+    q = wss.add_parser("status", help="the workspace's criterion and which folders are members")
+    q.add_argument("file", help="the <name>.code-workspace file")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_workspace)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

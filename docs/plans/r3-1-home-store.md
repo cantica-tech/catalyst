@@ -11,7 +11,7 @@ minor (ADR-009) and moved with `catalyst move`.
 
 ## Stages (each tested, each shippable)
 
-Progress: **A–F done**; **H done: 0.48.0 released and published** (2026-10-09). Moved to the home store: catalyst's own deployment (`46883e4`) and the UI repo (UI `29b7661`, criterion PR #25; its CI clones the criterion into `$CATALYST_HOME` and passes). Next: **G** (workspace criterion); the UI's own "join a repoed deployment" command should call `catalyst criterion join`.
+Progress: **A–F done**; **H done: 0.48.0 released and published** (2026-10-09). Moved to the home store: catalyst's own deployment (`46883e4`) and the UI repo (UI `29b7661`, criterion PR #25; its CI clones the criterion into `$CATALYST_HOME` and passes). **G done** (`catalyst workspace`). Next: the UI's own "join a repoed deployment" command should call `catalyst criterion join`.
 
 | # | Stage | Content | Done when |
 |---|---|---|---|

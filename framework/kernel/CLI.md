@@ -394,6 +394,23 @@ With `--working-copy` there is no product repository: commits are `0`.
   launcher runs the `.venv` of the project it is called from — no activation
   — or a legacy deployment's vendored CLI. `runtime status` reports all three.
 
+### `catalyst workspace init|status <name>.code-workspace`
+
+A VS Code workspace is a `<name>.code-workspace` file (comments and trailing
+commas allowed); its members are its folders holding a `catalyst.toml`.
+
+- `init` creates the meta criterion `$CATALYST_HOME/workspaces/<name>/criterion`
+  — rules and domains, users and roles (the first user, Admin: `--user`,
+  default `git config user.name`), its own journal and git repository, no
+  process module — and writes `workspace = "<name>"` into each member's
+  `catalyst.toml` (not committed). A member of another workspace is left
+  alone; a workspace name already used on the machine is refused.
+- `status` lists the folders and which are members.
+
+A member also sees the workspace's rules, domains and users, read-only: its
+artifacts may target a workspace rule, and a workspace user may sign. Its own
+entries win on a clash. `catalyst where` names the workspace.
+
 ### `catalyst move --to-home | --name <new>`
 
 - `--to-home` moves a legacy deployment into the home store
