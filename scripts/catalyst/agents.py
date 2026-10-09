@@ -94,7 +94,8 @@ def changes(agent: str) -> list[Change]:
 
 # --- JSON files ---------------------------------------------------------------
 def _ours(item) -> bool:
-    return launcher() in json.dumps(item)
+    # the launcher's path as it reads inside JSON text (a Windows path's backslashes are escaped)
+    return json.dumps(launcher())[1:-1] in json.dumps(item)
 
 
 def _load(file: Path) -> dict:
