@@ -37,25 +37,16 @@ These are non-negotiable and apply for the entire session. They are restated in
    never-reused ID — extended upward through
    `epic → story → task →` only when an agile project-management plugin
    is active (`work-items/` doesn't exist otherwise).
-6. **Working copy outside the product tree; one tracked pointer.** The
-   working-copy directory is always named `.criterion/`, reached through
-   `<project root>/.criterion`. **Local-only** (the default), it builds
-   in **agent-owned space** you compute from your own conventions (§1),
-   never written into a tracked file, and `.criterion` is a gitignored
-   symlink you create or repair (§1.1). **Shared** (opt-in,
-   `/criterion`, INV-18), `.criterion` is a git submodule of the product
-   repository pointing at the criterion repository: the product tracks
-   only `.gitmodules` and the gitlink, and contributors land changes
-   through pull requests — never a merge applied by the agent. Either
-   way the project tracks `<app-name>.catalyst` at its root, which holds
-   no path. No agent owned-space concept (or no symlinks on this
-   platform) → build `.criterion/` directly inside the target project
-   instead, gitignored there, never committed. On starting catalyst,
-   always check `.criterion` and whether the agent has changed: if so,
-   mirror a local-only `.criterion/` into your own owned location,
-   repoint the symlink, update `agent` and `updated` in
-   `<app-name>.catalyst`, and refresh memory. Pre-0.37.0 pointers may
-   still carry `agent-source`; tools honor it until migrated.
+6. **The criterion lives in catalyst's space; one tracked file.** A
+   project's criterion is `$HOME/.catalyst/projects/<name>/criterion`
+   (`CATALYST_HOME` overrides); nothing of it sits in the project, which
+   tracks only `catalyst.toml` (names the project, never a path). Every
+   agent finds it the same way (`catalyst where`) and runs it through the
+   launcher `$HOME/.catalyst/bin/catalyst`. Shared (opt-in, `/criterion`,
+   INV-18), the criterion is its own git repository with a remote, and
+   contributors land changes through pull requests — never a merge applied
+   by the agent. Legacy deployments (`<app-name>.catalyst` + `.criterion`)
+   are read for one minor; `catalyst move` moves them.
 7. **Descriptive naming.** Every rule, dev artifact, and domain file is named
    `<id>-<short-summary>.md`. Bare-ID filenames are not acceptable.
 8. **Plugins are gated.** A plugin is never loaded unless explicitly activated
@@ -85,8 +76,7 @@ consistent.
 | Capability | If present | Fallback if absent |
 |---|---|---|
 | **Parallel sub-agents** (background workers) | Use them for the four-eyes analysis passes and audits. | Run each pass sequentially as separate, context-isolated turns; do not let one pass see the other's output before reconciliation. |
-| **Agent-owned per-project storage** (a data directory this agent already maintains per project, outside the project's own tree — e.g. Claude Code's per-project config space) | Build `.criterion/` there — the location is computed per machine from this agent's own conventions (its shim, e.g. `CLAUDE.md`, says how), never recorded in `<app-name>.catalyst` — and link it into the project as a `.criterion` symlink at the project root, with `/.criterion` in the project's `.gitignore` (hard rule 6). | Build `.criterion/` directly inside the target project instead (also the fallback on a platform without symlinks), and add `/.criterion` to that project's own `.gitignore` — never committed. |
-| **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved working-copy location, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `<app-name>.catalyst` (project root, always tracked) and `.criterion/DEPLOYMENT.md` (inside the working copy) are read fresh each session regardless; sharing is recorded in the pointer (`repoed`, `catalyst_repo_url`, `criterion_branch`) and `.gitmodules` (`Rules-of-Rules.md` §13). |
+| **Persistent memory store** | Additionally cache the deployment note there for fast recall (framework name, deployed project, resolved working-copy location, date — see `INSTANTIATION-GUIDE.md` §6). Optional: a nice-to-have, not load-bearing. | No problem: `catalyst.toml` (project root, always tracked) and the criterion's `DEPLOYMENT.md` are read fresh each session regardless (`catalyst where` finds the criterion). |
 | **Slash commands** (every command in the deployment's `CODE-OF-CONDUCT.md` §4 — kernel, active module and activated plugins; `catalyst spec` lists them. Never keep a copy of that list here or anywhere else) | Register/expose them as the framework defines. | Expose each as a named procedure you recognize when the user types the same token in plain text, and list them in the deployed `README.md`. |
 | **`/dogfood`** — not part of the set above | Only ever exposed when working on catalyst's own repository (`framework/` present), never materialized into a deployed project. See `Rules-of-Rules.md` §13. | Same — this one has no deployed fallback, because it has nothing to run against outside catalyst's own repo. |
 | **Repo file read/write** | — | This is the baseline requirement. If you cannot read and write files in the target repo, stop: catalyst cannot be installed. |
@@ -94,32 +84,13 @@ consistent.
 State, in one line to the user, which mode you resolved to (e.g. "running without
 sub-agents → analysis passes will be sequential"), then continue.
 
-### 1.1 Agent Switch Handling
+### 1.1 Switching agents
 
-When an agent starts a session or assumes governance of a project previously managed by another agent:
-1. Read `<app-name>.catalyst` at the project root.
-2. Compare the running agent's identifier (`agent`, e.g. `copilot`, `claude-code`, etc.) against `<app-name>.catalyst`'s `agent` field.
-3. If they differ:
-   - If a local-only `.criterion/` working copy exists at the old location (the
-     current symlink's target, or a legacy pointer's `agent-source`), mirror
-     it into the running agent's own owned location (§1): the new location
-     must end up an exact copy of the old one — nothing added, nothing left
-     over — overwriting whatever is already there if needed.
-   - Update `<app-name>.catalyst`: set `agent` to the running agent's name and `updated` to the current date (`YYYY-MM-DD`). Nothing else — the pointer holds no path.
-   - Update Framework Memory / Deployment Target Note in persistent memory with the current agent name, resolved working-copy location, and date.
-4. Either way, check `<project root>/.criterion`: if it is missing, or is a
-   symlink pointing anywhere but the running agent's own owned location,
-   (re)create it there. A real `.criterion/` directory is the in-project
-   fallback, and a submodule is a shared deployment (hard rule 6) —
-   leave either. Make sure `/.criterion` is in the project's
-   `.gitignore`. A pointer that still carries `agent-source` predates
-   0.37.0: honor it as the old location above, and offer the 0.37.0
-   migration (`/sync-framework`).
-
-If this automatic check is ever skipped or only partially applies (e.g. a
-compacted session drops it, or the working copy gets mirrored but the pointer's
-`agent` field doesn't), `/switch-agent [agent-id]` runs the same procedure
-on demand — see `CODE-OF-CONDUCT.md` §4.
+The criterion's place does not depend on the agent (hard rule 6): a new agent
+only sets `agent` and `updated` in `catalyst.toml` and refreshes its memory
+note. A legacy deployment (`.criterion` symlink into another agent's space)
+is moved once with `catalyst move --to-home`; until then `/switch-agent`
+handles it as before.
 
 ---
 
@@ -133,8 +104,8 @@ and `framework/kernel/INSTANTIATION-CHECKLIST.md` (the tickable version you
 work against). Then:
 
 1. **Ledger.** Create the deployment ledger from the checklist (§3), every
-   item `[ ] pending`. `catalyst init` adopts a `.criterion` that holds
-   only that `.ledger/`.
+   item `[ ] pending`. `catalyst init` moves a project `.criterion` that
+   holds only that `.ledger/` into the criterion.
 2. **Resolve the inputs** — judgment, asked of the user when not evident:
    - the project name: from a project-local `dev-instructions.yaml`'s `name`
      if present (deleted after a successful install), else ask, defaulting
@@ -145,17 +116,14 @@ work against). Then:
      natural seam of the project (`INSTANTIATION-GUIDE.md` §1);
    - the first user's git username (the name defaults to `git config
      user.name`), who becomes Admin;
-   - the working-copy directory in agent-owned space (§1; the agent's shim
-     says how to compute it) — the `.criterion` directory itself, e.g.
-     `<agent project dir>/.criterion`, never its parent — or none for the
-     in-project fallback.
 3. **Run `catalyst init`** from the project root with those inputs
    (`--name`, `--module`, `--git-username`, `--rule-doc <file>:<prefix>`
-   per document, `--at <working-copy dir>`, `--agent <id>`). It builds the
+   per document, `--agent <id>`). It builds the
    whole skeleton: composed governing documents, the seeded module, every
    entity folder with its index and templates catalog, frozen definitions,
    the first user with a userid, the journal, the vendored CLI, the
-   `<app-name>.catalyst` pointer and the gitignored `.criterion` symlink.
+   criterion in `$HOME/.catalyst/projects/<name>/criterion` with its own
+   runtime, and `catalyst.toml` — the only file it adds to the project.
    It also copies `INVARIANTS.md` into the working copy, for the
    session-start hook of step 4 to re-inject.
    It refuses if catalyst is already installed.
@@ -182,7 +150,7 @@ A long install or analysis run will dilute these instructions out of your contex
 unless you re-anchor. Two mechanisms, both mandatory:
 
 **Deployment ledger.** Copy `framework/kernel/templates/ledger.template.md`
-to `.criterion/.ledger/<task>.todo.md` in the target repo. Read it before each
+to `.criterion/.ledger/<task>.todo.md` in the target repo (`init` moves it into the criterion). Read it before each
 unit of work; after each unit, mark the item done/blocked and append any newly
 discovered subtasks. This turns "remembering the steps" into a written, inspectable
 record you can self-correct against.

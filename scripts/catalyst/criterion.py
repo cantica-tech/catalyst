@@ -32,6 +32,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import project_file
+
 from catalyst import proc
 from catalyst.deployment import Deployment
 
@@ -204,6 +206,13 @@ def is_submodule(project_root: Path) -> bool:
     res = subprocess.run(["git", "config", "-f", str(gm), "--get-regexp", r"submodule\..*\.path"],
                          capture_output=True, text=True, encoding="utf-8")
     return any(line.split()[-1] == f"{prefix}.criterion" for line in res.stdout.splitlines())
+
+
+def in_home(dep: Deployment) -> bool:
+    """The deployment's criterion is in catalyst's home store (ADR-010): its
+    own repository, shared through a remote, with no submodule."""
+    name = project_file.project_name(dep.pointer)
+    return bool(name) and not dep.standalone and dep.root == project_file.home_criterion(name)
 
 
 def dirty(wc: Path) -> list[str]:
@@ -419,7 +428,7 @@ class Status:
 
 def status(dep: Deployment, fetch: bool = False) -> Status:
     wc = dep.root
-    mode = "submodule" if is_submodule(dep.project_root) else "local"
+    mode = ("home" if in_home(dep) else "submodule" if is_submodule(dep.project_root) else "local")
     if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
         return Status(mode, None, shared_branch(dep), None, [], None, None)
     remote = run(wc, "remote", "get-url", "origin", check=False).stdout.strip() or None
@@ -645,6 +654,11 @@ def create(dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH
     check_branch(branch)
     if url is not None:
         check_url(url)
+    if in_home(dep):
+        if url is None and run(wc, "rev-parse", "--git-dir", check=False).returncode == 0 and remote_url(wc):
+            raise CriterionError(f"the criterion already has a repository ({remote_url(wc)})")
+        notes = _prepare(dep, url, branch, ci_template)
+        return notes + (_record_local(dep, branch) if url is None else _publish_home(dep, url, branch))
     link = project / ".criterion"
     if is_submodule(project):
         raise CriterionError(".criterion is already a submodule of this project")
@@ -708,11 +722,11 @@ def _record_local(dep: Deployment, branch: str) -> list[str]:
     notes = []
     if run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip() != branch:
         run(wc, "checkout", "-q", "-B", branch)
-    pointer_path = next(project.glob("*.catalyst"))
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer_path = project_file.find(project)
+    pointer = project_file.read(pointer_path)
     if pointer.get("criterion_branch", DEFAULT_BRANCH) != branch or "criterion_branch" not in pointer:
         pointer.update({"criterion_branch": branch, "updated": datetime.date.today().isoformat()})
-        pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+        project_file.write(pointer_path, pointer)
         run(project, "add", pointer_path.name, check=False)
         from catalyst import journal
         journal.append(dep, journal.AppendRequest(
@@ -742,11 +756,11 @@ def _unignore(project: Path) -> str | None:
 
 def _record_shared(project: Path, url: str, branch: str) -> Path:
     """Record the sharing in the pointer and stage the product files."""
-    pointer_path = next(project.glob("*.catalyst"))
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    pointer_path = project_file.find(project)
+    pointer = project_file.read(pointer_path)
     pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
                     "updated": datetime.date.today().isoformat()})
-    pointer_path.write_text(json.dumps(pointer, indent=2) + "\n", encoding="utf-8")
+    project_file.write(pointer_path, pointer)
     run(project, "add", pointer_path.name, str(repo_place(project)[0] / ".gitmodules"),
         *([".gitignore"] if (project / ".gitignore").is_file() else []))
     return pointer_path
@@ -818,6 +832,93 @@ def _publish(dep: Deployment, url: str, branch: str) -> list[str]:
     return notes
 
 
+def _push_branch(wc: Path, url: str, branch: str) -> None:
+    if run(wc, "remote", "get-url", "origin", check=False).returncode == 0:
+        run(wc, "remote", "set-url", "--", "origin", url)
+    else:
+        run(wc, "remote", "add", "--", "origin", url)
+    if run(wc, "ls-remote", "--heads", "--", "origin", branch).stdout.strip():
+        run(wc, "fetch", "-q", "--", "origin", branch)
+        if run(wc, "merge-base", "--is-ancestor", f"origin/{branch}", "HEAD", check=False).returncode != 0:
+            raise CriterionError(f"{url} already has a '{branch}' branch this criterion does not contain")
+    run(wc, "push", "-q", "-u", "--", "origin", f"HEAD:refs/heads/{branch}")
+
+
+def _publish_home(dep: Deployment, url: str, branch: str) -> list[str]:
+    """Share a home-store criterion: push it to `url` and record the remote in
+    catalyst.toml. No submodule — a collaborator's `catalyst criterion join`
+    clones it into their own home store."""
+    project, wc = dep.project_root, dep.root
+    _push_branch(wc, url, branch)
+    notes = [f"pushed the criterion to {url} ({branch})"]
+    try:
+        share_pins(wc)
+    except CriterionError as exc:
+        notes.append(f"journal pins not shared yet: {exc}")
+    pointer_path = project_file.find(project)
+    pointer = project_file.read(pointer_path)
+    pointer.update({"repoed": True, "catalyst_repo_url": url, "criterion_branch": branch,
+                    "updated": datetime.date.today().isoformat()})
+    project_file.write(pointer_path, pointer)
+    in_repo = run(project, "rev-parse", "--git-dir", check=False).returncode == 0
+    if in_repo:
+        run(project, "add", "--", pointer_path.name, check=False)
+    from catalyst import journal
+    from catalyst.deployment import load
+    shared = load(project)
+    journal.append(shared, journal.AppendRequest(
+        command="catalyst criterion create", action="update", artifact="deployment shared", targets=[],
+        intent=[f"The criterion is shared through {url}; catalyst.toml records the remote, and a collaborator "
+                "joins with `catalyst criterion join`."],
+        files=[str(pointer_path)] if in_repo else [str(wc / "version.txt")], actor=_actor(shared),
+        allow_unchanged=True))
+    run(wc, "add", "-A")
+    run(wc, *_ident(wc, _actor(shared)), "commit", "-q", "-m", "Journal the sharing of the criterion")
+    run(wc, "push", "-q", "--", "origin", f"HEAD:refs/heads/{branch}")
+    notes.append(f"recorded the remote in {pointer_path.name} (staged, not committed)")
+    return notes
+
+
+def join_home(project_root: Path, url: str | None = None, runtime: bool = True) -> str:
+    """Join a shared home-store deployment on this machine: clone its criterion
+    repository into `$CATALYST_HOME/projects/<name>/criterion` (or bring an
+    existing clone up to date), on the shared branch, with its runtime."""
+    pointer = project_file.read_dir(project_root)
+    name = project_file.project_name(pointer)
+    if not name:
+        raise CriterionError("the project file names no project")
+    url = url or pointer.get("catalyst_repo_url")
+    if not url:
+        raise NeedsURL("catalyst.toml names no criterion repository")
+    check_url(url)
+    branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
+    target = project_file.home_criterion(name)
+    if target.exists() and any(target.iterdir()):
+        if remote_url(target) != url:
+            raise CriterionError(f"{target} exists with another remote ({remote_url(target)}) — "
+                                 "a different project with the same name?")
+        if dirty(target):
+            raise CriterionError(f"{len(dirty(target))} uncommitted change(s) in {target} — commit or discard them first")
+        run(target, "fetch", "-q", "--prune", "origin")
+        guard_branch_reset(target, branch)
+        run(target, "checkout", "-q", "-B", branch, f"origin/{branch}")
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        res = subprocess.run(["git", "clone", "-q", "-b", branch, "--", url, str(target)],
+                             capture_output=True, text=True, encoding="utf-8")
+        if res.returncode != 0:
+            raise CriterionError(f"cloning {url} ({branch}) failed: {res.stderr.strip()}")
+    share_pins(target, publish=False)
+    if runtime:
+        import tempfile
+
+        from catalyst import runtime as rt
+        with tempfile.TemporaryDirectory() as tmp:
+            pyz = rt.own_pyz(Path(tmp))
+            rt.install_into(target, rt.pyz_version(pyz), pyz)
+    return out(target, "rev-parse", "--short", "HEAD")
+
+
 def _users(dep: Deployment) -> list[dict]:
     try:
         data = json.loads((dep.root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
@@ -830,7 +931,7 @@ def _add_submodule(project_root: Path, url: str) -> None:
     """Add an existing criterion repository as the product's `.criterion`
     submodule, on the pointer's shared branch (staged, not committed)."""
     check_url(url)
-    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    pointer = project_file.read_dir(project_root)
     branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
     link = project_root / ".criterion"
     if link.is_symlink():
@@ -854,6 +955,9 @@ def join(project_root: Path, url: str | None = None) -> str:
     added = False
     if url is not None:
         check_url(url)
+    legacy = project_root / ".criterion"
+    if (project_root / project_file.NAME).is_file() and not (legacy.is_symlink() or legacy.exists()):
+        return join_home(project_root, url)
     if not is_submodule(project_root):
         from catalyst.deployment import load
         link = project_root / ".criterion"
@@ -871,7 +975,7 @@ def join(project_root: Path, url: str | None = None) -> str:
             added = True
     run(project_root, "submodule", "update", "--init", ".criterion")
     wc = project_root / ".criterion"
-    pointer = json.loads(next(project_root.glob("*.catalyst")).read_text(encoding="utf-8"))
+    pointer = project_file.read_dir(project_root)
     branch = check_branch(str(pointer.get("criterion_branch") or DEFAULT_BRANCH))
     run(wc, "fetch", "-q", "--prune", "origin")
     if run(wc, "rev-parse", "-q", "--verify", f"origin/{branch}", check=False).returncode != 0:
@@ -897,7 +1001,7 @@ def join(project_root: Path, url: str | None = None) -> str:
             command="catalyst criterion join", action="update", artifact="deployment shared", targets=[],
             intent=[f"This product now checks out the criterion repository {pointer.get('catalyst_repo_url')} "
                     "as its .criterion submodule; the pointer records the sharing."],
-            files=[str(project_root / p) for p in (next(project_root.glob("*.catalyst")).name,
+            files=[str(project_root / p) for p in (project_file.find(project_root).name,
                                                    ".gitmodules", ".gitignore")
                    if (project_root / p).is_file()],
             actor=_actor(shared), allow_unchanged=True))

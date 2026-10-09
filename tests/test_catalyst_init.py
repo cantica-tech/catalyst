@@ -76,11 +76,25 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     assert json.loads(entries[0])["command"] == "catalyst init"
 
 
-def test_init_in_project_fallback_and_no_git(tmp_path):
-    req = request(tmp_path, at=None)
+def test_init_puts_the_criterion_in_the_home_store_and_one_file_in_the_project(tmp_path):
+    import project_file
+    req = request(tmp_path, at=None, runtime=False)
+    before = {p.name for p in req.project.iterdir()}
+    init(req)
+    assert {p.name for p in req.project.iterdir()} - before == {"catalyst.toml"}
+    root = project_file.home_criterion("app")
+    dep = load(req.project)
+    assert dep.root == root and (root / "version.txt").is_file()
+    assert run_checks(dep).errors == []
+    with pytest.raises(InitError, match="already exists"):                    # one name per machine
+        (tmp_path / "other").mkdir()
+        init(request(tmp_path / "other", at=None, runtime=False))
+
+
+def test_init_without_git_works_in_the_home_store(tmp_path):
+    req = request(tmp_path, at=None, runtime=False)
     subprocess.run(["rm", "-rf", str(req.project / ".git")], check=True)
     init(req)
-    assert (req.project / ".criterion").is_dir() and not (req.project / ".criterion").is_symlink()
     assert run_checks(load(req.project)).errors == []
 
 
@@ -231,12 +245,14 @@ def test_a_ledger_only_in_project_criterion_is_adopted_and_moved_to_the_working_
     assert run_checks(load(req.project)).errors == []
 
 
-def test_a_ledger_only_in_project_criterion_is_kept_without_at(tmp_path):
-    req = request(tmp_path, at=None)
+def test_a_ledger_only_in_project_criterion_moves_into_the_home_store(tmp_path):
+    import project_file
+    req = request(tmp_path, at=None, runtime=False)
     _ledger(req.project / ".criterion")
     init(req)
-    assert (req.project / ".criterion" / ".ledger" / "install.todo.md").is_file()
-    assert (req.project / ".criterion" / "CODE-OF-CONDUCT.md").is_file()
+    home = project_file.home_criterion("app")
+    assert (home / ".ledger" / "install.todo.md").is_file() and (home / "CODE-OF-CONDUCT.md").is_file()
+    assert not (req.project / ".criterion").exists()
 
 
 def test_a_ledger_only_target_is_adopted(tmp_path):
@@ -323,8 +339,8 @@ def test_session_start_hook_is_silent_outside_a_deployment(tmp_path, capsys):
 def test_settings_template_has_session_start_and_stop_hooks():
     settings = json.loads((REPO / "agents" / "claude-code" / "settings.template.json").read_text(encoding="utf-8"))
     start = settings["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert start == "python3 .criterion/bin/catalyst.pyz hook start"
-    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == "python3 .criterion/bin/catalyst.pyz hook stop"
+    assert start == '"$HOME/.catalyst/bin/catalyst" hook start'          # the launcher (R3.1a)
+    assert settings["hooks"]["Stop"][0]["hooks"][0]["command"] == '"$HOME/.catalyst/bin/catalyst" hook stop'
 
 
 def test_init_announces_its_writes_into_the_product_repository(tmp_path):
@@ -377,3 +393,14 @@ def test_an_unknown_agent_gets_no_command_files(tmp_path):
     from catalyst.init import default_commands_dir
     assert default_commands_dir("claude-code") == Path(".claude/commands")
     assert default_commands_dir("unknown") is None
+
+
+@pytest.mark.skipif(__import__("shutil").which("uv") is None and __import__("sys").version_info < (3, 11),
+                    reason="a runtime needs uv or Python 3.11+")
+def test_init_fills_the_criterions_runtime(tmp_path):
+    import project_file
+    from catalyst import runtime as rt
+    init(request(tmp_path, at=None))
+    venv = project_file.home_criterion("app") / ".venv"
+    assert rt.installed_version(venv) and rt.venv_python(venv).exists()
+    assert "/.venv" in (venv.parent / ".gitignore").read_text(encoding="utf-8").splitlines()

@@ -24,13 +24,10 @@ from drifting. The guide holds the rationale; this holds the checks.
       unless it sits next to the project or catalyst as `catalyst-<id>`)
 - [ ] First user's git username confirmed, name from `git config user.name`
       (registered as Admin, INV-16)
-- [ ] Agent-owned location resolved (`BOOTSTRAP.md §1`, the agent's shim) —
-      computed per machine and never recorded in a tracked file — or the
-      in-project fallback chosen (INV-6)
 
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
 - [ ] `catalyst init --name <name> --module <id> [--user <name>]
-      --git-username <u> --rule-doc <file>:<prefix> ... [--at <dir>/.criterion]
+      --git-username <u> --rule-doc <file>:<prefix> ...
       --agent <id> [--commands-dir <dir>] [--test-locations <where>]
       [--kernel <dir>] [--module-dir <dir>]` run from the project root and
       exited `0`; its report shows each of:
@@ -49,10 +46,10 @@ from drifting. The guide holds the rationale; this holds the checks.
         `IAM/roles/roles.json` (INV-16, INV-26)
       - empty `development/journal.jsonl` (INV-17), `version.txt`,
         `DEPLOYMENT.md`, root `README.md`, `bin/catalyst.pyz`
-      - `<app-name>.catalyst` at the project root (no path, INV-6;
-        `journal_since` = the project's `HEAD`),
-        `.criterion` symlink (unless in-project fallback), `/.criterion`
-        in the project's `.gitignore`
+      - the criterion at `$HOME/.catalyst/projects/<name>/criterion` with its
+        `.venv` runtime, and `catalyst.toml` at the project root — the only
+        file added to the project (no path, INV-6; `journal_since` = the
+        project's `HEAD`)
       - command files, one per command of the composed §4, if
         `--commands-dir` was given
       - the working copy's git history initialised and the install journaled

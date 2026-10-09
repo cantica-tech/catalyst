@@ -6,6 +6,43 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.48.0 — 2026-10-09
+
+The criterion in catalyst's home store (migration `0.48.0/criterion-in-catalyst-home.md`).
+
+- `catalyst sync plan|apply` (roadmap R2 W4): the mechanical half of
+  `/sync-framework` from a checkout or a release zip — CLI, invariants,
+  module tree, recompose, changed command files (local edits reported, never
+  overwritten), definitions of new types, versions, one journal entry — and
+  the migrations to run, in order. `/sync-framework` runs it.
+- Kernel release archives carry the command files and `agents/`, so an
+  install or sync from a release has them.
+- The criterion's place (roadmap R3.1, ADR-010): `catalyst.toml` at the
+  project root (a legacy `<name>.catalyst` is still read) and
+  `$CATALYST_HOME/projects/<name>/criterion` (default `$HOME/.catalyst`),
+  else a legacy `.criterion`; `catalyst where` reports which.
+- A runtime per criterion: `catalyst runtime install|status` builds a runtime
+  per catalyst version once, copies it into the criterion's `.venv`, and
+  installs the `catalyst` launcher, which runs the project's own runtime.
+- **Python 3.11 or later** (was 3.9): the criterion's runtime brings it.
+- `init` installs into the home store: the criterion at
+  `$CATALYST_HOME/projects/<name>/criterion` with its runtime, `catalyst.toml`
+  the only file added to the project (no symlink, no `.gitignore` entry); a
+  name already used on the machine is refused. `--at` (agent-owned space and
+  a `.criterion` symlink) remains for one minor; the in-project fallback is
+  gone. Hooks call the launcher (`agents/claude-code/settings.template.json`).
+  INV-6 and the install docs say so.
+- `catalyst move --to-home` moves a legacy deployment (symlink, in-project
+  directory or shared submodule) into the home store, keeping its history,
+  branches and remote; `catalyst move --name <new>` renames a project
+  (roadmap R2 W5).
+- Sharing in the home store (R3.1 stage F): `catalyst criterion create <url>`
+  pushes the criterion and records its remote in `catalyst.toml` (no
+  submodule); `catalyst criterion join` clones it into the collaborator's own
+  home store and fills its runtime; product CI clones it into its own
+  `$CATALYST_HOME`. The commit-msg hook runs each project's own runtime
+  through the launcher. The submodule model stays for one minor.
+
 ## 0.47.0 — 2026-10-08
 
 Verbs replace procedures (migration `0.47.0/verbs-replace-procedures.md`).

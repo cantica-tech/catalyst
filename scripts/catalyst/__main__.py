@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 from catalyst import version_string
-from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
+from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
 from catalyst.analysis import AnalysisError
@@ -304,6 +304,134 @@ def cmd_admin(args) -> int:
     return 0
 
 
+def cmd_sync(args) -> int:
+    """`sync plan|apply` (R2 W4): the mechanical half of /sync-framework."""
+    from catalyst import sync
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    try:
+        src = sync.Sources(dep, args.kernel, args.module, args.base_kernel, args.cli)
+    except sync.SyncError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    try:
+        commands = sync.commands_dir(dep, args.commands_dir)
+        if args.sync_command == "plan":
+            p = sync.plan(dep, src, commands)
+            print(json.dumps(p.as_dict(), indent=2) if args.json else sync.render(p), end="" if not args.json else "\n")
+            return 0
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        p, touched = sync.apply(dep, src, commands, str(signer.get("git_username") or signer.get("name")),
+                                args.intent or [])
+    except (sync.SyncError, IdError, JournalError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        src.close()
+    if args.json:
+        print(json.dumps({**p.as_dict(), "touched": [str(t) for t in touched]}, indent=2))
+    else:
+        sys.stdout.write(sync.render(p, applied=True))
+        print("Next: the migrations' judgment steps above, a DEPLOYMENT.md history line, then `catalyst check`.")
+    return 0
+
+
+def cmd_where(args) -> int:
+    """Where the project's criterion is (roadmap R3.1): the project file, its
+    name, and the criterion it resolves to — the home store, or legacy."""
+    import project_file
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 1
+    data = project_file.read_dir(project)
+    name = project_file.project_name(data)
+    criterion = project_file.resolve(project)
+    home = project_file.home_criterion(name) if name else None
+    kind = ("home" if criterion is not None and criterion == home else
+            "legacy" if criterion is not None else "missing")
+    out = {"project": str(project), "file": project_file.find(project).name, "name": name,
+           "criterion": str(criterion) if criterion else None, "kind": kind,
+           "expected": str(home) if home else None}
+    if args.json:
+        print(json.dumps(out, indent=2))
+    else:
+        print(f"project    {out['project']} ({out['file']}, name {name})")
+        print(f"criterion  {out['criterion'] or 'not found'} ({kind})"
+              + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else ""))
+    return 0 if criterion is not None else 1
+
+
+def cmd_runtime(args) -> int:
+    """`runtime install|status` (R3.1a): the per-version runtime, the
+    launcher, and the project's criterion .venv."""
+    import tempfile
+
+    import project_file
+    from catalyst import runtime as rt
+    from catalyst import version_string
+
+    version = version_string()
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    criterion = project_file.resolve(project) if project else None
+    name = project_file.project_name(project_file.read_dir(project)) if project else None
+    home_store = criterion is not None and name is not None and criterion == project_file.home_criterion(name)
+    if args.runtime_command == "status":
+        out = {"version": version, "home": str(project_file.home()),
+               "runtimes": sorted(p.name for p in rt.runtimes().glob("*") if (p / rt.MARKER).is_file()),
+               "launcher": str(project_file.home() / "bin" / "catalyst"),
+               "launcher_installed": (project_file.home() / "bin" / "catalyst").is_file(),
+               "criterion": str(criterion) if criterion else None,
+               "criterion_runtime": rt.installed_version(criterion / ".venv") if criterion else None}
+        print(json.dumps(out, indent=2) if args.json else "\n".join(f"{k:<20}{v}" for k, v in out.items()))
+        return 0
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            pyz = rt.own_pyz(Path(tmp))
+            runtime_dir = rt.ensure_runtime(version, pyz)
+            launcher = rt.install_launcher()
+            lines = [f"runtime {version}: {runtime_dir}", f"launcher: {launcher} (put {launcher.parent} on PATH)"]
+            if home_store:
+                venv, changed = rt.install_into(criterion, version, pyz)
+                lines.append(f"criterion runtime: {venv} ({'installed' if changed else 'already ' + version})")
+            elif criterion is not None:
+                lines.append("legacy deployment (.criterion in the project): no .venv; `catalyst move --to-home` first")
+    except (rt.RuntimeError_, OSError, subprocess.CalledProcessError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
+def cmd_move(args) -> int:
+    """`move --to-home | --name <new>` (R2 W5): legacy deployment to the home
+    store, or rename a project."""
+    import project_file
+    from catalyst import move
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 1
+    try:
+        if args.name:
+            _, steps = move.rename(project, args.name, actor=args.as_user)
+        else:
+            _, steps = move.to_home(project, runtime=not args.no_runtime, actor=args.as_user)
+    except (move.MoveError, JournalError, OSError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    for step in steps:
+        print(f"- {step}")
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -553,9 +681,10 @@ def cmd_criterion(args) -> int:
     sub = args.criterion_command
     if sub == "join":
         start = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
-        project = next((d for d in (start, *start.parents) if any(d.glob("*.catalyst"))), None)
+        import project_file
+        project = project_file.find_up(start)
         if project is None:
-            raise DeploymentNotFound(f"no *.catalyst pointer at or above {start}")
+            raise DeploymentNotFound(f"no catalyst.toml (or legacy *.catalyst pointer) at or above {start}")
         try:
             head = cr.join(project, args.url)
         except cr.NeedsURL as exc:
@@ -649,7 +778,8 @@ def cmd_init(args) -> int:
             project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
             module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
             test_locations=args.test_locations, at=args.at, agent=args.agent,
-            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid))
+            commands_dir=args.commands_dir or default_commands_dir(args.agent), userid=args.userid,
+            runtime=not args.no_runtime))
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -751,8 +881,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
                    help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
     p.add_argument("--test-locations", help="where the project's tests live (Rules-of-Rules §2)")
-    p.add_argument("--at", type=Path, help="agent-owned location for the working copy "
-                   "(the agent's shim says where); default: .criterion in the project")
+    p.add_argument("--at", type=Path, help="legacy: an agent-owned location reached through a .criterion "
+                   "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)")
+    p.add_argument("--no-runtime", action="store_true",
+                   help="do not fill the criterion's .venv now (`catalyst runtime install` later)")
     p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code")
     p.add_argument("--commands-dir", type=Path, help="write command files here (default: the agent's, "
                    "e.g. .claude/commands for claude-code)")
@@ -995,6 +1127,44 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="definition")
+
+    p = sub.add_parser("sync", help="synchronize the deployment with a kernel (and module) release")
+    sy = p.add_subparsers(dest="sync_command", required=True)
+    for verb, text in (("plan", "list what a sync would change, and the migrations to run"),
+                       ("apply", "do the mechanical half of /sync-framework, then journal it")):
+        q = sy.add_parser(verb, help=text)
+        q.add_argument("--kernel", type=Path, required=True,
+                       help="the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip")
+        q.add_argument("--module", type=Path, help="the target module: its directory or release zip")
+        q.add_argument("--base-kernel", type=Path,
+                       help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)")
+        q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
+        q.add_argument("--commands-dir", type=Path, help="the project's command files (default: the agent's)")
+        q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+        q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+        q.add_argument("--json", action="store_true")
+        q.set_defaults(func=cmd_sync)
+
+    p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_where)
+
+    p = sub.add_parser("runtime", help="the per-version runtime, the launcher, the criterion's .venv")
+    rs = p.add_subparsers(dest="runtime_command", required=True)
+    q = rs.add_parser("install", help="build this version's runtime, install the launcher, fill the criterion's .venv")
+    q.set_defaults(func=cmd_runtime)
+    q = rs.add_parser("status", help="runtimes, launcher and the criterion's runtime version")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_runtime)
+
+    p = sub.add_parser("move", help="move a legacy deployment into $HOME/.catalyst, or rename a project")
+    mg = p.add_mutually_exclusive_group(required=True)
+    mg.add_argument("--to-home", action="store_true",
+                    help="symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion")
+    mg.add_argument("--name", help="rename a home-store project")
+    p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
+    p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
+    p.set_defaults(func=cmd_move)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

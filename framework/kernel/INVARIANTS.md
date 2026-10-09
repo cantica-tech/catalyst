@@ -71,30 +71,19 @@ one-line placeholder; numbers are never reused.
   granularity: every product commit cites an artifact or rule ID that
   resolves in the deployment, or its subject starts `chore:`; merges are
   not checked (`catalyst hook commit-msg`, `catalyst trace`, `CLI.md`).
-- **INV-6 — Working copy outside the product tree; one tracked pointer.**
-  The deployment's working copy is a directory named `.criterion/`, and
-  the project reaches it through one path, `<project root>/.criterion`.
-  **Local-only** (the default), it lives in **agent-owned space** —
-  computed per machine from the running agent's conventions
-  (`Rules-of-Rules.md` §14), never recorded in a tracked file — and
-  `.criterion` is a gitignored symlink to it, which the agent creates or
-  repairs at install, `/project import` and every session start.
-  **Shared** (INV-18), `.criterion` is a git submodule of the product
-  repository pointing at the criterion repository: the product tracks
-  only `.gitmodules` and the gitlink, never the working copy's content.
-  Either way the project tracks `<app-name>.catalyst` (JSON, project
-  root, committed), which holds no path. Fallback for an agent with no
-  owned-space concept, or a platform without symlinks: `.criterion/` is
-  a real directory in the project, gitignored, never committed. When
-  switching agents, the newly active agent mirrors a local-only
-  `.criterion/` into its own owned location (exact copy, overwriting the
-  destination — never a partial merge), repoints the symlink, updates
-  `<app-name>.catalyst`'s `agent` and `updated`, and updates its
-  persistent framework memory note. Pre-0.37.0 pointers may still carry
-  `agent-source`; tools honor it until migrated. `/project
-  create`/`remove`/`export`/`import` (INV-19) manage the lifecycle;
-  `Rules-of-Rules.md` §14 has the one-time migration off the pre-pointer
-  model.
+- **INV-6 — The criterion lives in catalyst's space; one tracked file.**
+  A project's criterion (its working copy) is
+  `$HOME/.catalyst/projects/<name>/criterion` (`CATALYST_HOME` overrides
+  `$HOME/.catalyst`); a VS Code workspace's meta criterion is
+  `$HOME/.catalyst/workspaces/<name>/criterion`. Nothing of it sits in the
+  project: the project tracks only `catalyst.toml` (project root), which
+  names the project and pins versions and never holds a path. It is found
+  the same way by every agent, the UI, hooks and CI (`catalyst where`), and
+  runs from its own `.venv` (`catalyst runtime install`). Shared (INV-18),
+  the criterion is its own git repository with a remote. Legacy
+  deployments — `<app-name>.catalyst` with a `.criterion` symlink, directory
+  or submodule, or a pre-0.37.0 `agent-source` — are read for one minor and
+  moved with `catalyst move`.
 - **INV-7 — Descriptive naming.** Every rule, dev-artifact, and domain file is
   `<id>-<short-summary>.md` (sub-domain: `<prefix>-<PARENT>.<SUB>-<summary>.md`).
   Bare-ID filenames are invalid.

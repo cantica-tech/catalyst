@@ -51,12 +51,17 @@ def cli_near(rel):
         d = os.path.dirname(d)
 
 
+# the launcher runs each project's own catalyst (its criterion's .venv); a
+# legacy deployment's vendored CLI otherwise
+home = os.environ.get("CATALYST_HOME") or os.path.join(os.path.expanduser("~"), ".catalyst")
+launcher = os.path.join(home, "bin", "catalyst")
 router = os.path.join(top, ROUTER)
-cli = router if os.path.isfile(router) else next((c for c in map(cli_near, staged + [""]) if c), None)
+cli = (launcher if os.path.isfile(launcher) else router if os.path.isfile(router)
+       else next((c for c in map(cli_near, staged + [""]) if c), None))
 if cli is None:
     sys.exit(0)
 sys.exit(subprocess.run([sys.executable, cli, "--project", top, "hook", "commit-msg", "--route",
-                         os.path.abspath(sys.argv[1])]).returncode)
+                         os.path.abspath(sys.argv[1])], cwd=top).returncode)
 """
 
 
@@ -195,12 +200,20 @@ def route(top: Path, message_file: Path, cli: list[str]) -> int:
                          capture_output=True, text=True, encoding="utf-8")
     staged = [p for p in res.stdout.split("\0") if p]
     owners = sorted({o for o in (owner(top, p) for p in staged) if o is not None})
-    if not owners and any(Path(top).glob("*.catalyst")):
+    import project_file
+    if not owners and project_file.is_project(Path(top)):
         owners = [Path(top).absolute()]
     status = 0
     for o in owners:
-        vendored = o / ".criterion" / "bin" / "catalyst.pyz"
-        command = [sys.executable, str(vendored)] if vendored.is_file() else cli
+        command = cli
+        criterion = project_file.resolve(o)
+        if criterion is not None:
+            from catalyst.runtime import venv_python
+            python, vendored = venv_python(criterion / ".venv"), criterion / "bin" / "catalyst.pyz"
+            if python.exists():                  # the project's own runtime
+                command = [str(python), "-m", "catalyst"]
+            elif vendored.is_file():
+                command = [sys.executable, str(vendored)]
         done = subprocess.run([*command, "--project", str(o), "hook", "commit-msg", str(message_file)])
         status = max(status, done.returncode)
     return status
