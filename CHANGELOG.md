@@ -6,7 +6,7 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased (0.50.0)
+## 0.50.0 — 2026-10-09
 
 The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).
 
