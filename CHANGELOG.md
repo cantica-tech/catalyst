@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.51.0 — 2026-10-10
+
+`catalyst open`, a faster end-of-turn check; no layout change (no migration).
 
 - `catalyst open` (roadmap R3.5): the one step after `git clone` and the start
   of every session — clones a criterion missing on this machine from the
@@ -26,6 +28,8 @@ messages.
 - Fixed: in a project below its repository's top level (a monorepo), the
   journal read every product file as deleted (`git hash-object --stdin-paths`
   resolves paths from the top level).
+- Migration 0.50.0 now says the upgrade's own pull request fails the
+  criterion's base-branch gate once: review it and merge it by hand.
 
 ## 0.50.0 — 2026-10-09
 
