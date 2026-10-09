@@ -137,8 +137,8 @@ one another.
   not "empty is fine," since a project with nobody registered has nobody
   to sign work. Both files are managed only by the `/user-*`/`/role-*`
   commands (§2, §4), never hand-edited. See `INVARIANTS.md` INV-16.
-- **This is a hard requirement.** `development/journal.jsonl` always
-  exists (empty is fine). Once a line is appended it is never edited,
+- **This is a hard requirement.** The journal (`development/journal/`
+  shards; `development/journal.jsonl` before kernel 0.50) always exists. Once a line is appended it is never edited,
   deleted, or reordered — stricter than every other "never hand-edited"
   rule above, since even the commands that write to it only ever append.
   See `INVARIANTS.md` INV-17 and §9.
@@ -360,7 +360,7 @@ the seven currently exist anywhere.
   §4 — kernel and active-module entries alike. `/help` with no argument delegates here for its command listing
   rather than re-describing it.
 - `/journal [--since <date>] [--artifact <id>] [--actor <name>] [--rule
-  <id>]` — read-only: filter and report `development/journal.jsonl`
+  <id>]` — read-only: filter and report the journal's
   entries. Never writes to the journal (see §9).
 - `/journal-restore <timestamp>` — read-only: reconstruct the tree as it
   stood at `<timestamp>` into a side directory with
@@ -760,8 +760,8 @@ other.
 
 ## 9. Journaling
 
-`development/journal.jsonl` is an append-only, transaction-log-grade
-record — see `Rules-of-Rules.md` §12 for the full entry schema (exact
+The journal (`development/journal/`, INV-17) is an append-only,
+transaction-log-grade record — see `Rules-of-Rules.md` §12 for the full entry schema (exact
 before/after git blob pointers per file, project-root-relative paths, one
 or more `intent` statements, the `targets` rule IDs, the `writer`) and the
 point-in-time restore mechanism (`/journal-restore`, materializes a

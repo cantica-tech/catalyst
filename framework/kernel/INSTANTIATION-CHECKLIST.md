@@ -47,7 +47,7 @@ from drifting. The guide holds the rationale; this holds the checks.
         `definitions/README.md` — frozen from here on (INV-23)
       - `IAM/users/users.json` with the first user (userid, Admin) and
         `IAM/roles/roles.json` (INV-16, INV-26)
-      - empty `development/journal.jsonl` (INV-17), `version.txt`,
+      - the journal's first entry, the install (INV-17), `version.txt`,
         `DEPLOYMENT.md`, root `README.md`, `bin/catalyst.pyz`
       - the criterion at `$HOME/.catalyst/projects/<name>/criterion` with its
         `.venv` runtime, and `catalyst.toml` at the project root — the only

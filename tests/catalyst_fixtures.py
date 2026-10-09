@@ -175,6 +175,15 @@ def make_project(tmp: Path, git: bool = False) -> Path:
     return project
 
 
+def journal_entries(root: Path) -> list[dict]:
+    """A criterion's journal entries (legacy file and shards), in journal order."""
+    from types import SimpleNamespace
+
+    from catalyst import journal
+
+    return [e for _, e, _ in journal.read(SimpleNamespace(root=root)) if e is not None]
+
+
 def git_init(repo: Path) -> None:
     run = lambda *a: subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True)
     run("init", "-q")

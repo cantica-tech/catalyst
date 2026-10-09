@@ -11,6 +11,7 @@ from catalyst import sync
 from catalyst.__main__ import main
 from catalyst.deployment import load
 from catalyst.init import init
+from catalyst_fixtures import journal_entries
 from test_catalyst_init import KERNEL, request
 
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -71,7 +72,7 @@ def test_plan_lists_the_changes_and_apply_makes_them_then_nothing_is_left(tmp_pa
     assert (root / "version.txt").read_text(encoding="utf-8").strip() == "9.9.9"
     assert "a change in 9.9.9" in (root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
     assert json.loads(next(project.glob("*.catalyst")).read_text(encoding="utf-8"))["kernel_version"] == "9.9.9"
-    last = json.loads((root / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    last = journal_entries(root)[-1]
     assert last["command"] == "/sync-framework" and last["artifact"].startswith("kernel 9.9.9")
 
     dep = load(project)

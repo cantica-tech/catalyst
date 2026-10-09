@@ -69,7 +69,11 @@ def _summary(project: Path, files: list[tuple[str, Path]]) -> dict:
         "format": pointer.get("format", ""),
         "working_copy_head": sha if own_repo else None,
         "files": len(names),
-        "journal_entries": len([l for l in read("development/journal.jsonl").splitlines() if l.strip()]),
+        "journal_entries": sum(
+            len([l for l in read(n).splitlines() if l.strip()])
+            for n in names
+            if n == "development/journal.jsonl" or (n.startswith("development/journal/") and n.endswith(".jsonl"))
+        ),
         "users": count("IAM/users/users.json", "users"),
         "roles": count("IAM/roles/roles.json", "roles"),
         "markdown_per_folder": dict(sorted(folders.items())),

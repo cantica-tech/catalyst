@@ -16,7 +16,6 @@ extend-exclude = ["framework/kernel/plugins/repository/*"]   # plugin submodules
 "scripts/catalyst/criterion.py" = ["N818", "PLW1510", "SIM105"]
 "scripts/catalyst/deployment.py" = ["N818", "PTH100", "PTH109", "PTH117"]
 "scripts/catalyst/edit.py" = ["RUF005"]
-"scripts/catalyst/ids.py" = ["PLW1510", "PTH105", "SIM105"]
 "scripts/catalyst/init.py" = ["PLW0603", "PLW1510", "PTH100", "RUF005", "S110", "SIM105"]
 "scripts/catalyst/journal.py" = ["B905", "PLW1510", "PTH100", "PTH109"]
 "scripts/catalyst/mcp.py" = ["RUF012"]

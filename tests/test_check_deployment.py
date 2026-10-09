@@ -707,7 +707,7 @@ def test_check_journal_exists_missing(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     (root / "development" / "journal.jsonl").unlink()
     errors = cd.check_journal_exists(root)
-    assert any("INV-17" in e and "development/journal.jsonl is missing" in e for e in errors)
+    assert any("INV-17" in e and "the journal is missing" in e for e in errors)
 
 
 def test_check_journal_exists_empty_file_is_valid(tmp_path: Path):

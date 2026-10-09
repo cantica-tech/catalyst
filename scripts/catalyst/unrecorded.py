@@ -1,10 +1,13 @@
 """Changes made outside catalyst: committed (or staged) product changes the
 journal does not record.
 
-The journal records every file's content as a git blob hash (`after`). A
-product commit that changes a file to a blob no journal entry records was
-written without catalyst — by hand, with git — and is an *unrecorded
-change*. Only history after the deployment's baseline is checked: the
+The journal records every file's content as a git blob hash (`after`), in
+order: each file has a chain of journaled states. A product commit's change
+to a file is recorded when its result is a state the chain reaches after the
+commit's starting state; anything else — a blob no entry records, or a
+return to an older state — was written without catalyst (by hand, with git)
+and is an *unrecorded change*. Content decides, never clocks: committing
+before journaling, rebases and skewed machines change nothing. Only history after the deployment's baseline is checked: the
 pointer's `journal_since` (a commit; empty means the whole history), set by
 `catalyst init` and by migration 0.42.0. Merge commits carry their parents'
 changes and are skipped; the working copy (`.criterion`) is never a product
@@ -22,7 +25,6 @@ means reverting it.
 
 from __future__ import annotations
 
-import json
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -51,28 +53,33 @@ class Commit:
 
 @dataclass
 class Journaled:
-    """What the journal records, per product path: its states in order (time,
-    after) and the commits adopted for it."""
+    """What the journal records, per product path: its states in journal
+    order, every blob it names (before or after), and the commits adopted
+    for it."""
 
-    states: dict[str, list[tuple[float, str | None]]] = field(default_factory=dict)
+    states: dict[str, list[str | None]] = field(default_factory=dict)
+    seen: dict[str, set[str | None]] = field(default_factory=dict)
     adopted: set[tuple[str, str]] = field(default_factory=set)
 
-    def latest(self, path: str, at: float | None = None) -> tuple[float, str | None] | None:
-        found = None
-        for t, after in self.states.get(path, []):
-            if at is None or t <= at:
-                found = (t, after)
-        return found
+    def latest(self, path: str) -> tuple[bool, str | None]:
+        """(journaled at all, its last journaled state)."""
+        chain = self.states.get(path)
+        return (True, chain[-1]) if chain else (False, None)
+
+    def add(self, path: str, before: str | None, after: str | None) -> None:
+        self.states.setdefault(path, []).append(after)
+        self.seen.setdefault(path, set()).update({before, after})
 
     def records(self, commit: Commit, change: tuple[str, str | None, str | None]) -> bool:
         """A commit's change is recorded when that commit was adopted for the
-        path, or when its result is the path's latest journaled state as of the
-        commit (a revert to an older state is not)."""
-        path, _, after = change
+        path, or when the path's chain reaches the change's result after its
+        starting state (so a revert to an older state is not)."""
+        path, before, after = change
         if (path, commit.sha) in self.adopted:
             return True
-        state = self.latest(path, commit.time)
-        return state is not None and state[1] == after
+        chain = self.states.get(path, [])
+        start = chain.index(before) + 1 if before is not None and before in chain else 0
+        return after in chain[start:]
 
 
 def level(dep: Deployment) -> str:
@@ -91,8 +98,6 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
 def recorded(dep: Deployment) -> Journaled:
     j = Journaled()
     for _, entry, _ in journal.read(dep):
-        t = journal._entry_time(entry) if entry else None
-        stamp = t.timestamp() if t else 0.0
         for f in (entry or {}).get("files", []) or []:
             if not (isinstance(f, dict) and "path" in f):
                 continue
@@ -100,9 +105,7 @@ def recorded(dep: Deployment) -> Journaled:
             if entry.get("commit"):
                 j.adopted.add((path, str(entry["commit"])))
             if not f.get("superseded"):
-                j.states.setdefault(path, []).append((stamp, f.get("after")))
-    for states in j.states.values():
-        states.sort(key=lambda s: s[0])
+                j.add(path, f.get("before"), f.get("after"))
     return j
 
 
@@ -228,8 +231,8 @@ def staged(dep: Deployment) -> list[tuple[str, str | None, str | None]]:
     for c in _parse_raw([t for t in res.stdout.split("\x00") if t]):
         if not governs(dep.project_root, c[0]):
             continue  # a nested deployment's, or opted out
-        state = journaled.latest(c[0])  # as of now: the commit being made
-        if state is None or state[1] != c[2]:
+        known, state = journaled.latest(c[0])  # the commit being made: the chain's end
+        if not known or state != c[2]:
             out.append(c)
     return out
 
@@ -258,15 +261,20 @@ def adopt(
     journal chain has not moved past the commit continues it (`before` its
     last journaled state, else the parent's blob); a file journaled again
     since the commit is recorded as history only (`superseded`, the parent's
-    blob as `before`), so it never becomes the file's current state. Returns
-    the entries written."""
+    blob as `before`), so it never becomes the file's current state —
+    "since" read from content: the chain has moved on from the parent and
+    already went through the commit's result. Returns the entries written."""
     if not intent or not all(i.strip() for i in intent):
         raise journal.JournalError("at least one non-empty --intent is required: why the change was made")
     if tier is not None and tier not in journal.TIERS:
         raise journal.JournalError(f"tier '{tier}' is not one of {', '.join(journal.TIERS)}")
     if dep.standalone:
         raise journal.JournalError("a standalone working copy has no product history to adopt")
-    targets = targets or []
+    with journal.journal_lock(dep):
+        return _adopt(dep, revs, intent, tier, targets or [], artifact, actor)
+
+
+def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
     journaled = recorded(dep)
     written = []
     single = not any(".." in r for r in revs)  # named commits, not ranges: just those
@@ -275,17 +283,17 @@ def adopt(
         missing = unrecorded_in(c, journaled)
         if not missing:
             continue
-        stamp = journal.now()
         files = []
         for path, parent, after in missing:
-            last = journaled.latest(path)
-            if last is not None and last[0] > c.time:
+            known, last = journaled.latest(path)
+            if known and last != parent and after in journaled.seen.get(path, set()):
                 files.append({"path": path, "before": parent, "after": after, "superseded": True})
                 continue
-            files.append({"path": path, "before": last[1] if last is not None else parent, "after": after})
-            journaled.states.setdefault(path, []).append((journal.parse_time(stamp).timestamp(), after))
+            before = last if known else parent
+            files.append({"path": path, "before": before, "after": after})
+            journaled.add(path, before, after)
         entry = {
-            "timestamp": stamp,
+            "timestamp": journal.now(),
             "actor": actor or c.author,
             "command": "/adopt",
             "action": "update",
@@ -300,10 +308,7 @@ def adopt(
         if tier:
             entry["tier"] = tier
         journal.pin(dep.project_root, {a for _, _, a in missing if a})
-        path = journal.journal_path(dep)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        journal.write(dep, entry)
         journaled.adopted.update((p, c.sha) for p, _, _ in missing)
         written.append(entry)
     return written

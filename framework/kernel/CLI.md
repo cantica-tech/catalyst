@@ -620,7 +620,9 @@ catalyst journal append --command <cmd> --action <action> --artifact <id|descrip
                         [--as <user>] [--allow-unchanged] [--json]
 ```
 
-Appends one entry to `development/journal.jsonl` with the real UTC time,
+Appends one entry to the signer's shard
+(`development/journal/<actor>@<machine>/<YYYY-MM>.jsonl`), under the
+criterion's journal lock, with the real UTC time,
 the signer as `actor`, and each file's `before`/`after` git blob hashes
 (`Rules-of-Rules.md` §12). Write the files first, then append.
 
@@ -955,7 +957,8 @@ write access can push to the shared branch directly.
 
 `create` and `push` keep one block in the working copy's `.gitattributes`,
 headed by a `# catalyst:` comment, marking `merge=union` for the files
-that are append-only or regenerated: `development/journal.jsonl` and
+that are append-only or regenerated: the journal (its shards and the
+legacy `development/journal.jsonl`) and
 every per-file entity type's `<folder>/<folder>.md` index
 (`rules/rules.md` is hand-maintained, so concurrent edits to it conflict
 instead). A union merge keeps both sides' lines; `push` then regenerates

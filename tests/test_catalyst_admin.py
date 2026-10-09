@@ -8,7 +8,7 @@ from catalyst import admin
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
-from catalyst_fixtures import USER, USERID, make_project, write
+from catalyst_fixtures import USER, USERID, journal_entries, make_project, write
 
 ITEM = f"ITEM-000001-{USERID}"
 
@@ -24,8 +24,7 @@ def _users(project):
 
 
 def _last_entry(project):
-    lines = (project / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
-    return json.loads(lines[-1])
+    return journal_entries(project / ".criterion")[-1]
 
 
 def test_roles_then_users_with_every_refusal(tmp_path):

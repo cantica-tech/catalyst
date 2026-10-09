@@ -6,6 +6,23 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased (0.50.0)
+
+The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).
+
+- Journal shards: each actor on each machine appends to its own
+  `development/journal/<actor>@<machine>/<YYYY-MM>.jsonl`, so a shared
+  criterion merges without conflicts; `development/journal.jsonl` is read,
+  never written. `init` and `workspace init` no longer create it.
+- Appends and adoptions run under the criterion's journal lock (the ID lock's
+  mechanism, now `catalyst.lock`).
+- The shards read in causal order: each file's chain decides, timestamps only
+  break ties. Issues and `journal show --json` name an entry `<source>:<line>`
+  (`at`).
+- Unrecorded changes are decided by content hashes, never by clocks:
+  committing before journaling, rebases and skewed machines no longer produce
+  false reports.
+
 ## 0.49.0 — 2026-10-09
 
 Agents at user level, nothing in a project but `catalyst.toml` (migration

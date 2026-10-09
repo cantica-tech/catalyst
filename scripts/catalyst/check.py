@@ -81,9 +81,7 @@ def run(dep: Deployment) -> Report:
         if i.legacy and i.level != "error":
             legacy += 1
             continue
-        (report.errors if i.level == "error" else report.warnings).append(
-            f"journal {i.code}: line {i.line}: {i.message}"
-        )
+        (report.errors if i.level == "error" else report.warnings).append(f"journal {i.code}: {i.at}: {i.message}")
     if legacy:
         report.warnings.append(f"journal: {legacy} warning(s) on pre-CLI entries (`catalyst journal verify --legacy`)")
     for path in unrecorded_changes(dep):

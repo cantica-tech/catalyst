@@ -10,7 +10,7 @@ from catalyst import compose
 from catalyst.check import run as run_checks
 from catalyst.deployment import load
 from catalyst.init import InitError, InitRequest, init
-from catalyst_fixtures import ITEM_SCHEMA, MODULE_YAML, SUB_SCHEMA, write
+from catalyst_fixtures import ITEM_SCHEMA, MODULE_YAML, SUB_SCHEMA, journal_entries, write
 
 REPO = Path(__file__).resolve().parent.parent
 KERNEL = REPO / "framework" / "kernel"
@@ -87,8 +87,8 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     assert (root / "analyses" / "analyses.md").is_file()
     assert (root / "analyses" / "templates" / "TEMPLATE-ANALYSIS-v1.md").is_file()
     assert (root / "definitions" / "analysis.md").is_file()
-    entries = (root / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
-    assert json.loads(entries[0])["command"] == "catalyst init"
+    assert journal_entries(root)[0]["command"] == "catalyst init"
+    assert not (root / "development" / "journal.jsonl").exists()  # shards only since 0.50
 
 
 def test_init_puts_the_criterion_in_the_home_store_and_one_file_in_the_project(tmp_path):

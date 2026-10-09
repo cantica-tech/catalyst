@@ -397,8 +397,10 @@ value reflects who signed it under the mapping in effect at the time.
 
 ## 12. `rr-META-012` The journal is transaction-log-grade, not a changelog
 
-`development/journal.jsonl` — one JSON object per line, strictly
-append-only. A "changelog" narrates what happened; this journal is
+`development/journal/` — one JSON object per line, strictly append-only,
+in one shard per actor, machine and month (`<actor>@<machine>/<YYYY-MM>.jsonl`;
+a deployment made before kernel 0.50 also keeps `development/journal.jsonl`,
+read and never written). A "changelog" narrates what happened; this journal is
 precise enough to **replay**: every entry carries exact content pointers,
 not just prose, so a point in time is mechanically reconstructable, not
 just describable. Entries are written with `catalyst journal append`
@@ -861,7 +863,7 @@ the same shape for its own `rules-of-work-items.md` (§8, INV-22).
 - `development/` — `meta-tags/` promoted to a full artifact-type folder
   (previously meta-tags lived as loose files directly under
   `development/`), plus any module artifact-type folders the active
-  module places here; `README.md`, `journal.jsonl` (and any generated
+  module places here; `README.md`, the journal (and any generated
   report the module adds) stay flat, cross-cutting, not artifact types
   themselves.
 - `work-items/` — **not part of the core layout** (§8, INV-22). Only
@@ -1172,7 +1174,7 @@ every free-text citation in `## Related`/`## Notes`/prose — there is no
 dedicated cross-reference-checking script today (`/check-rules` and
 `/audit` are agent-judgment procedures), so this is the agent's
 responsibility to verify by direct search, not something CI catches
-automatically. A rename must never touch `development/journal.jsonl`
+automatically. A rename must never touch the journal
 (INV-17 — append-only; historical entries correctly keep citing the
 pre-rename form forever), nor hand-edit any machine-regenerated report
 (INV-14) — regenerate it with its own command after the rename instead.

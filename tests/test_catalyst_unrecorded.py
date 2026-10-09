@@ -154,7 +154,7 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     sha = manual_commit(proj)
     assert main(["journal", "adopt", sha[:10], "--intent", "hand-written greeting", "--tier", "chore"]) == 0
     assert "adopted" in capsys.readouterr().out
-    entry = [e for _, e, _ in j.read(load(proj)) if e][-1]
+    entry = [e for _, e, _ in j.read(load(proj)) if e and e.get("origin")][-1]
     assert entry["origin"] == "manual" and entry["commit"] == sha and entry["actor"] == "Ada Lovelace"
     assert entry["files"][0]["path"] == "src/app.py" and entry["files"][0]["before"] is None
     assert entry["tier"] == "chore" and entry["command"] == "/adopt"

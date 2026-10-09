@@ -497,12 +497,21 @@ def check_users_have_userid(root: Path) -> list[str]:
 
 
 def check_journal_exists(root: Path) -> list[str]:
-    """INV-17: development/journal.jsonl always exists; every non-blank
-    line is a well-formed, schema-complete entry."""
-    journal = root / "development" / "journal.jsonl"
-    if not journal.is_file():
-        return ["INV-17: development/journal.jsonl is missing — seed it (empty) from templates/journal.template.jsonl"]
+    """INV-17: the journal exists — its shards under development/journal/
+    and, in deployments made before kernel 0.50, development/journal.jsonl;
+    every non-blank line is a well-formed, schema-complete entry."""
+    legacy = root / "development" / "journal.jsonl"
+    shards = root / "development" / "journal"
+    sources = ([legacy] if legacy.is_file() else []) + (sorted(shards.rglob("*.jsonl")) if shards.is_dir() else [])
+    if not sources:
+        return ["INV-17: the journal is missing — neither development/journal/ nor development/journal.jsonl exists"]
+    errors: list[str] = []
+    for source in sources:
+        errors += _check_journal_source(source, source.relative_to(root / "development").as_posix())
+    return errors
 
+
+def _check_journal_source(journal: Path, name: str) -> list[str]:
     errors: list[str] = []
     text = journal.read_text(encoding="utf-8", errors="ignore")
     for lineno, raw in enumerate(text.splitlines(), start=1):
@@ -512,25 +521,25 @@ def check_journal_exists(root: Path) -> list[str]:
         try:
             entry = json.loads(line)
         except json.JSONDecodeError as exc:
-            errors.append(f"INV-17: journal.jsonl:{lineno} is not valid JSON: {exc}")
+            errors.append(f"INV-17: {name}:{lineno} is not valid JSON: {exc}")
             continue
         if not isinstance(entry, dict):
-            errors.append(f"INV-17: journal.jsonl:{lineno} is not a JSON object")
+            errors.append(f"INV-17: {name}:{lineno} is not a JSON object")
             continue
         for field in JOURNAL_REQUIRED_FIELDS:
             if field not in entry:
-                errors.append(f"INV-17: journal.jsonl:{lineno} missing field '{field}'")
+                errors.append(f"INV-17: {name}:{lineno} missing field '{field}'")
         files = entry.get("files")
         if isinstance(files, list):
             for f in files:
                 if not isinstance(f, dict) or "path" not in f:
-                    errors.append(f"INV-17: journal.jsonl:{lineno} has a files[] entry missing 'path'")
+                    errors.append(f"INV-17: {name}:{lineno} has a files[] entry missing 'path'")
                     continue
                 for side in ("before", "after"):
                     val = f.get(side)
                     if val is not None and not HASH_RE.match(str(val)):
                         errors.append(
-                            f"INV-17: journal.jsonl:{lineno} {f.get('path')} '{side}' is not a 40-hex git hash or null"
+                            f"INV-17: {name}:{lineno} {f.get('path')} '{side}' is not a 40-hex git hash or null"
                         )
     return errors
 

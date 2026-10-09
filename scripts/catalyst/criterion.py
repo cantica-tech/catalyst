@@ -248,7 +248,7 @@ def attribute_paths(dep: Deployment) -> list[str]:
     catalyst regenerates (rows from both sides are kept, then regenerated)."""
     # rules/rules.md is hand-maintained (not regenerated): concurrent edits
     # there must surface as conflicts, not as silently duplicated rows.
-    paths = ["development/journal.jsonl"]
+    paths = ["development/journal.jsonl", "development/journal/**/*.jsonl"]
     for etd in dep.etds.values():
         folder = dep.folder(etd)
         if folder is not None and etd.naming != "free-form":
@@ -391,13 +391,16 @@ class Facts:
     rows: set[str] = field(default_factory=set)  # registered in an index
 
 
+def _journal_source(name: str) -> bool:
+    """The legacy journal file or one of its shards (journal.py)."""
+    return name == "development/journal.jsonl" or (name.startswith("development/journal/") and name.endswith(".jsonl"))
+
+
 def facts_at(wc: Path, rev: str) -> Facts:
     """What a revision of the working copy records, read straight from git."""
     listing = run(wc, "ls-tree", "-r", "-z", "--name-only", rev).stdout
     names = [n for n in listing.split("\0") if n]
-    md = [n for n in names if n.endswith(".md")] + (
-        ["development/journal.jsonl"] if "development/journal.jsonl" in names else []
-    )
+    md = [n for n in names if n.endswith(".md") or _journal_source(n)]
     facts = Facts()
     if not md:
         return facts
@@ -422,8 +425,8 @@ def facts_at(wc: Path, rev: str) -> Facts:
         contents[name] = batch[body_start : body_start + size].decode("utf-8", errors="replace")
         pos = body_start + size + 1
     for name, text in contents.items():
-        if name == "development/journal.jsonl":
-            facts.journal = {line for line in text.splitlines() if line.strip()}
+        if _journal_source(name):
+            facts.journal |= {line for line in text.splitlines() if line.strip()}
             continue
         m = ARTIFACT_NAME_RE.search(name)
         if m:

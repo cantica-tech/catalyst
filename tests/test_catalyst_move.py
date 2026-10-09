@@ -1,6 +1,5 @@
 """`catalyst move` (roadmap R2 W5, R3.1 stage E)."""
 
-import json
 import shutil
 import subprocess
 import sys
@@ -12,14 +11,14 @@ from catalyst import move
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
 from catalyst.validate import ERROR, validate
-from catalyst_fixtures import make_project
+from catalyst_fixtures import journal_entries, make_project
 from test_catalyst_criterion import allow_file_submodules, git, world  # noqa: F401  (fixtures)
 
 pytestmark = pytest.mark.skipif(sys.version_info < (3, 11), reason="catalyst.toml needs Python 3.11+")
 
 
 def _entries(root):
-    return [json.loads(l) for l in (root / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()]
+    return journal_entries(root)
 
 
 def test_a_symlinked_working_copy_moves_home_with_its_history(tmp_path):

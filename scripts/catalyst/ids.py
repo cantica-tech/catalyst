@@ -11,18 +11,14 @@
 
 from __future__ import annotations
 
-import contextlib
-import hashlib
 import json
 import os
 import re
 import secrets
 import string
-import subprocess
-import tempfile
-import time
 from pathlib import Path
 
+from catalyst import journal, lock
 from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
@@ -75,9 +71,8 @@ def highest_number(dep: Deployment, corpus: Corpus, prefix: str) -> int:
                 numbers += [int(n) for n in pattern.findall(f.read_text(encoding="utf-8", errors="ignore"))]
     numbers += [int(m.group(1)) for i in corpus.artifacts if (m := pattern.match(i))]
     # the journal remembers every ID ever touched, even if its file is gone
-    journal = dep.root / "development" / "journal.jsonl"
-    if journal.is_file():
-        numbers += [int(n) for n in pattern.findall(journal.read_text(encoding="utf-8", errors="ignore"))]
+    for source in journal.sources(dep):
+        numbers += [int(n) for n in pattern.findall(source.read_text(encoding="utf-8", errors="ignore"))]
     return max(numbers)
 
 
@@ -110,8 +105,7 @@ def highest_rule_number(dep: Deployment, corpus: Corpus, domain: str) -> int:
         if rules_dir.is_dir()
         else []
     )
-    journal = dep.root / "development" / "journal.jsonl"
-    for f in texts + ([journal] if journal.is_file() else []):
+    for f in texts + journal.sources(dep):
         numbers += [int(n) for n in cited.findall(f.read_text(encoding="utf-8", errors="ignore"))]
     return max(numbers)
 
@@ -132,69 +126,14 @@ def next_rule_id(
 
 
 # --- allocation across processes ---------------------------------------------
-# Reservations and their lock live outside the tracked tree: in the working
-# copy's git directory (never committed, never pushed), else in the system's
-# temporary directory. The lock is a file created with O_CREAT|O_EXCL, which
-# is atomic on every OS (no fcntl, so it works on Windows too); a lock older
-# than LOCK_STALE seconds belongs to a crashed caller and is broken.
-LOCK_STALE = 30.0
-LOCK_WAIT = 60.0
-# On Windows a lock file being deleted by its holder is "delete pending": opening
-# or stat-ing it fails with PermissionError, which means busy, not forbidden.
-BUSY = (FileExistsError, PermissionError) if os.name == "nt" else (FileExistsError,)
-
-
+# Reservations sit beside the criterion's locks (catalyst.lock): in the working
+# copy's git directory, never committed, never pushed.
 def state_dir(dep: Deployment) -> Path:
-    res = subprocess.run(
-        ["git", "-C", str(dep.root), "rev-parse", "--git-path", "catalyst"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if res.returncode == 0 and res.stdout.strip():
-        path = Path(res.stdout.strip())
-        return path if path.is_absolute() else (dep.root / path).resolve()
-    digest = hashlib.sha256(str(dep.root.resolve()).encode()).hexdigest()[:16]
-    return Path(tempfile.gettempdir()) / f"catalyst-{digest}"
+    return lock.state_dir(dep.root)
 
 
-@contextlib.contextmanager
-def id_lock(dep: Deployment, wait: float = LOCK_WAIT, stale: float = LOCK_STALE):
-    folder = state_dir(dep)
-    folder.mkdir(parents=True, exist_ok=True)
-    lock = folder / "ids.lock"
-    deadline = time.monotonic() + wait
-    while True:
-        try:
-            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except BUSY:
-            try:
-                if time.time() - lock.stat().st_mtime > stale:
-                    lock.unlink()  # a crashed holder: break its lock
-                    continue
-            except FileNotFoundError:
-                continue  # released meanwhile
-            except BUSY:
-                pass  # being released (Windows): wait
-            if time.monotonic() > deadline:
-                raise IdError(
-                    f"the ID lock {lock} is held by another process — retry, or remove it "
-                    "if no catalyst command is running"
-                ) from None
-            time.sleep(0.02)
-            continue
-        try:
-            os.write(fd, f"{os.getpid()}\n".encode())
-        finally:
-            os.close(fd)
-        break
-    try:
-        yield
-    finally:
-        try:
-            lock.unlink()
-        except FileNotFoundError:
-            pass
+def id_lock(dep: Deployment, wait: float = lock.WAIT, stale: float = lock.STALE):
+    return lock.held(dep.root, "ids", wait=wait, stale=stale, error=IdError)
 
 
 def _reserve(dep: Deployment, key: str, highest_seen: int) -> int:
@@ -211,5 +150,5 @@ def _reserve(dep: Deployment, key: str, highest_seen: int) -> int:
     reserved[key] = number
     tmp = store.with_name(f"ids.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(reserved, indent=2, sort_keys=True), encoding="utf-8")
-    os.replace(tmp, store)
+    tmp.replace(store)
     return number

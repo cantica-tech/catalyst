@@ -444,8 +444,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     steps.append(f"registered {req.user} (userid {userid}) as the first, Admin user (INV-16)")
 
     # --- journal, version, docs, CLI --------------------------------------
-    (root / "development").mkdir(parents=True, exist_ok=True)
-    (root / "development" / "journal.jsonl").write_text("", encoding="utf-8")  # truly empty
+    (root / "development").mkdir(parents=True, exist_ok=True)  # the journal's shards go here
     _write(root / "version.txt", version)
     _write(
         root / "DEPLOYMENT.md",

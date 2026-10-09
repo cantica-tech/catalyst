@@ -127,8 +127,7 @@ def test_verify_flags_unjournaled_edits_and_chain_breaks(project):
         "writer": "catalyst/0",
         "files": [{"path": path, "before": "0" * 40, "after": None}],
     }
-    with j.journal_path(dep).open("a") as fh:
-        fh.write(json.dumps(bad) + "\n")
+    j.write(dep, bad)
     codes = {i.code for i in j.verify(dep) if i.level == "error"}
     assert {"chain", "missing-blob"} <= codes
 
@@ -145,7 +144,7 @@ def test_legacy_entries_only_warn(project):
         "intent": ["x"],
         "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}],
     }
-    j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    (dep.root / j.LEGACY).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
     issues = j.verify(dep)
     assert issues and all(i.level == "warning" and i.legacy for i in issues)
 
@@ -288,8 +287,7 @@ def test_restore_never_writes_outside_the_side_directory(project, tmp_path):
     entry = j.append(dep, req(["src/x.py"], action="create"))
     evil = dict(entry, writer="catalyst/0", timestamp=j.now())
     evil["files"] = [{"path": "../escaped.txt", "before": None, "after": entry["files"][0]["after"]}]
-    with j.journal_path(dep).open("a") as fh:
-        fh.write(json.dumps(evil) + "\n")
+    j.write(dep, evil)
     restored, missing = j.restore(dep, j.now(), tmp_path / "side")
     assert "../escaped.txt" in missing and not (tmp_path / "escaped.txt").exists()
 
@@ -342,7 +340,7 @@ def test_missing_before_inherited_from_a_legacy_entry_only_warns(project):
         "intent": ["x"],
         "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}],
     }
-    j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    (dep.root / j.LEGACY).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
     item(project).write_text("current\n", encoding="utf-8")
     j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
     assert [i for i in j.verify(dep) if i.level == "error"] == []

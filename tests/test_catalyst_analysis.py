@@ -13,7 +13,7 @@ from catalyst import analysis as an
 from catalyst.check import run as run_check
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
-from catalyst_fixtures import USER, USERID, make_project, write
+from catalyst_fixtures import USER, USERID, journal_entries, make_project, write
 
 RULE = f"br-AUTH-000001-{USERID}"
 ITEM = f"ITEM-000001-{USERID}"
@@ -243,8 +243,9 @@ def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
     assert main(["analysis", "close", aid]) == 0
     assert main(["analysis", "status", aid]) == 0
     assert "Closed" in capsys.readouterr().out
-    lines = (project / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
-    commands = [c for c in (json.loads(line)["command"] for line in lines) if c.startswith("catalyst analysis")]
+    commands = [
+        c for c in (e["command"] for e in journal_entries(project / ".criterion")) if c.startswith("catalyst analysis")
+    ]
     assert commands == ["catalyst analysis start"] + ["catalyst analysis record"] * 2 + [
         "catalyst analysis diff",
         "catalyst analysis reconcile",

@@ -17,7 +17,7 @@ from catalyst.corpus import load_corpus
 from catalyst.deployment import load
 from catalyst.ids import next_entity_id
 from catalyst.indexes import regenerate
-from catalyst_fixtures import USERID, artifact, git_init, make_project, write
+from catalyst_fixtures import USERID, artifact, git_init, journal_entries, make_project, write
 
 BOB_ID = "Bb4xR9pQ"
 NO_CHECK = lambda dep: ""  # structural checks are covered elsewhere
@@ -135,10 +135,7 @@ def test_create_publishes_and_makes_a_submodule(world):
     attrs = (ada / ".criterion" / ".gitattributes").read_text(encoding="utf-8")
     assert "development/journal.jsonl merge=union" in attrs and "items/items.md merge=union" in attrs
     assert (ada / ".criterion" / cr.CI_WORKFLOW).is_file()
-    entries = [
-        json.loads(l)
-        for l in (ada / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
-    ]
+    entries = journal_entries(ada / ".criterion")
     created = [e for e in entries if e["command"] == "catalyst criterion create"]
     assert {f["path"] for f in created[0]["files"]} == {".criterion/.gitattributes", f".criterion/{cr.CI_WORKFLOW}"}
     assert {f["path"] for f in created[1]["files"]} == {"app.catalyst", ".gitmodules", ".gitignore"}
@@ -233,7 +230,8 @@ def test_integrity_catches_a_merge_that_drops_a_journal_line(world):
     wc = world["ada"] / ".criterion"
     git(wc, "checkout", "-q", "criterion")
     git(wc, "merge", "-q", "--no-ff", "--no-commit", a.branch)
-    (wc / "development" / "journal.jsonl").write_text("", encoding="utf-8")  # a bad merge resolution
+    for shard in (wc / "development" / "journal").rglob("*.jsonl"):
+        shard.write_text("", encoding="utf-8")  # a bad merge resolution
     git(wc, "add", "-A")
     git(wc, "commit", "-q", "-m", "bad merge")
     problems = cr.integrity(wc)
@@ -265,8 +263,8 @@ def test_journal_blobs_travel_with_the_repository(world):
     fresh = world["tmp"] / "carol"
     subprocess.run(["git", "clone", "-q", "-b", "criterion", str(world["remote"]), str(fresh)], check=True)
     cr.share_pins(fresh, publish=False)
-    for line in (fresh / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines():
-        for f in json.loads(line)["files"]:
+    for entry in journal_entries(fresh):
+        for f in entry["files"]:
             if f["after"] and f["path"].startswith(".criterion/"):
                 assert j.blob_exists(fresh, f["after"]), f["path"]
     remote_pins = subprocess.run(
@@ -498,9 +496,7 @@ def test_join_asks_for_the_url_when_the_product_has_no_submodule(solo):
     staged = git(bob, "diff", "--cached", "--name-only").split()
     assert ".gitmodules" in staged and ".criterion" in staged
     assert "/.criterion" not in (bob / ".gitignore").read_text(encoding="utf-8")
-    last = json.loads(
-        (bob / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()[-1]
-    )
+    last = journal_entries(bob / ".criterion")[-1]
     assert last["command"] == "catalyst criterion join"
 
 

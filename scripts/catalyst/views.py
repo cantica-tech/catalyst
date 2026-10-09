@@ -139,7 +139,7 @@ def journal_entries(
 ) -> list[dict]:
     after = journal.parse_time(since) if since else None
     out = []
-    for line, entry, _ in journal.read(dep):
+    for at, entry, _ in journal.read(dep):
         if entry is None:
             continue
         when = journal._entry_time(entry)
@@ -151,7 +151,7 @@ def journal_entries(
             continue
         if rule and rule not in (entry.get("targets") or []):
             continue
-        out.append({"line": line, **entry})
+        out.append({"at": at, **entry})
     return sorted(out, key=lambda e: (journal._entry_time(e) is None, str(e.get("timestamp", ""))))
 
 

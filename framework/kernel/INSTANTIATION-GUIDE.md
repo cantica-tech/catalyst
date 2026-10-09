@@ -101,7 +101,7 @@ first user, and, afterwards, its first rules.
    - writes `IAM/users/` and `IAM/roles/` with their templates, registers
      the first user with a fresh userid as Admin, and seeds `roles.json`
      from the kernel's default role mapping (INV-16, INV-26);
-   - writes an empty `development/journal.jsonl`, `version.txt`,
+   - writes `version.txt`,
      `DEPLOYMENT.md` (project, kernel, module and version, installer) and a
      root `README.md`, copies `ANALYSIS-PLAYBOOK.md` and `INVARIANTS.md`,
      and vendors the CLI at `bin/catalyst.pyz` (`INVARIANTS.md` is what the
@@ -163,7 +163,7 @@ first user, and, afterwards, its first rules.
      development/
        <folder>/            # a module entity type with `location: development`
        meta-tags/           # templates/, README.md, meta-tags.md
-       journal.jsonl
+       journal/             # <actor>@<machine>/<YYYY-MM>.jsonl shards (INV-17)
    ```
 
    The framework only cares that the chain from every active-module

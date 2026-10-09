@@ -95,7 +95,6 @@ def _skeleton(root: Path, kernel: Path, user: dict) -> list[Path]:
     write("IAM/users/users.json", json.dumps({"users": [user]}, indent=2) + "\n")
     roles = kernel / "templates" / "roles.template.json"
     write("IAM/roles/roles.json", roles.read_text(encoding="utf-8") if roles.is_file() else '{"roles": []}\n')
-    write("development/journal.jsonl", "")
     write(
         "version.txt",
         (kernel.parent.parent / "version.txt").read_text(encoding="utf-8")
@@ -154,7 +153,7 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
                 f"Create the meta criterion of the VS Code workspace {workspace_file.name}: the rules, domains, "
                 f"users and roles its {len(projects)} member project(s) share."
             ],
-            files=[str(p) for p in written if p.name != "journal.jsonl"],
+            files=[str(p) for p in written],
             actor=git_username or user_name,
             allow_unchanged=True,
             tier="chore",

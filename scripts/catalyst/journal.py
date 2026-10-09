@@ -1,5 +1,14 @@
-"""The journal (`development/journal.jsonl`, Rules-of-Rules.md §12,
-INV-17): append, verify, restore, pin.
+"""The journal (Rules-of-Rules.md §12, INV-17): append, verify, restore, pin.
+
+It is sharded: each actor on each machine appends to its own file,
+`development/journal/<actor>@<machine>/<YYYY-MM>.jsonl` (the machine is a
+random id kept in `$CATALYST_HOME/machine`), so two people — or one person
+on two machines — never append to the same file and a shared criterion
+merges without conflicts. A deployment made before kernel 0.50 also keeps
+`development/journal.jsonl`, read as one more source and never written.
+The journal reads as every source merged by timestamp, each source keeping
+its own order. Appends run under the criterion's journal lock (`lock.py`),
+so concurrent sessions never compute a `before` from a stale state.
 
 Paths are relative to the project root; working-copy files start with
 `.criterion/` and are hashed into the working copy's own git repository,
@@ -23,18 +32,25 @@ point-in-time restore of those states).
 
 from __future__ import annotations
 
+import collections
 import datetime
 import json
 import os
+import re
+import secrets
+import string
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import __version__, proc
+import project_file
+from catalyst import __version__, lock, proc
 from catalyst.deployment import Deployment
 
-JOURNAL = "development/journal.jsonl"
+LEGACY = "development/journal.jsonl"  # before kernel 0.50: read, never written
+SHARDS = "development/journal"
+LOCK_STALE = 300.0  # an append hashes and pins every file it names
 PIN_REF = "refs/catalyst/journal"
 WC = ".criterion/"
 ACTIONS = ("create", "update", "close", "retire", "status-change", "sync")
@@ -159,25 +175,132 @@ def locate(dep: Deployment, path: str) -> tuple[Path, str] | None:
 
 
 # --- reading -------------------------------------------------------------
-def journal_path(dep: Deployment) -> Path:
-    return dep.root / JOURNAL
+def sources(dep: Deployment) -> list[Path]:
+    """Every file the journal is read from: the legacy single file first,
+    then each shard, in a stable order."""
+    legacy = dep.root / LEGACY
+    shards = dep.root / SHARDS
+    found = sorted(shards.rglob("*.jsonl"), key=lambda p: p.relative_to(shards).as_posix()) if shards.is_dir() else []
+    return ([legacy] if legacy.is_file() else []) + found
 
 
-def read(dep: Deployment) -> list[tuple[int, dict | None, str]]:
-    """(line number, entry or None if malformed, raw line)."""
-    path = journal_path(dep)
-    if not path.is_file():
-        return []
+def _source(dep: Deployment, path: Path) -> list[tuple[str, dict | None, str]]:
+    name = path.relative_to(dep.root / "development").as_posix()
     out = []
     for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
             continue
         try:
             entry = json.loads(line)
-            out.append((n, entry if isinstance(entry, dict) else None, line))
+            out.append((f"{name}:{n}", entry if isinstance(entry, dict) else None, line))
         except json.JSONDecodeError:
-            out.append((n, None, line))
+            out.append((f"{name}:{n}", None, line))
     return out
+
+
+def _changes(entry: dict | None) -> list[tuple[str, object, object]]:
+    return [
+        (str(f["path"]), f.get("before"), f.get("after"))
+        for f in (entry or {}).get("files", []) or []
+        if isinstance(f, dict) and "path" in f and not f.get("superseded")
+    ]
+
+
+def read(dep: Deployment) -> list[tuple[str, dict | None, str]]:
+    """(where, entry or None if malformed, raw line); `where` is
+    `<source>:<line>` (`journal.jsonl:12`, `journal/ada@k3j9q2/2026-10.jsonl:3`).
+
+    Sources are merged in causal order, never by clock alone: a source's own
+    order is kept, and the next entry is the earliest one ready — each of its
+    files starts from that file's state so far (`before` = the last `after`)
+    or, for a file not seen yet, from a state no pending entry produces. When
+    none is ready (merged concurrent work), the earliest of all. Timestamps
+    only break ties, so a skewed clock cannot reorder a chain."""
+    queues = [_source(dep, path) for path in sources(dep)]
+    if len(queues) == 1:
+        return queues[0]
+    floor = datetime.datetime.min.replace(tzinfo=datetime.UTC)
+    keyed = []
+    for i, rows in enumerate(queues):
+        last, out = floor, []
+        for row in rows:
+            t = _entry_time(row[1]) if row[1] else None
+            last = max(last, t) if t else last  # an unreadable timestamp sorts with the one before it
+            out.append(((last, i), row, _changes(row[1])))
+        keyed.append(out)
+    pending = collections.Counter((path, after) for rows in keyed for _, _, ch in rows for path, _, after in ch)
+    heads, state, merged = [0] * len(keyed), {}, []
+
+    def fits(path: str, before: object) -> bool:
+        if path in state:
+            return state[path] == before
+        return before is None or not pending[(path, before)]
+
+    while True:
+        ready, waiting = [], []
+        for i, rows in enumerate(keyed):
+            if heads[i] < len(rows):
+                key, _, changes = rows[heads[i]]
+                ok = all(fits(path, before) for path, before, _ in changes)
+                (ready if ok else waiting).append((key, i))
+        if not ready and not waiting:
+            return merged
+        _, i = min(ready or waiting)
+        _, row, changes = keyed[i][heads[i]]
+        heads[i] += 1
+        for path, _, after in changes:
+            state[path] = after
+            pending[(path, after)] -= 1
+        merged.append(row)
+
+
+# --- writing -------------------------------------------------------------
+def machine() -> str:
+    """This machine's id in shard names: random, created once in
+    `$CATALYST_HOME/machine`, never derived from the host name."""
+    path = project_file.home() / "machine"
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+        if re.fullmatch(r"[a-z0-9]{4,32}", value):
+            return value
+    except OSError:
+        pass
+    value = "".join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(6))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return machine()  # another process created it first
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(value + "\n")
+    return value
+
+
+def actor_slug(actor: str) -> str:
+    slug = re.sub(r"[^a-z0-9._-]+", "-", str(actor).strip().lower()).strip("-.")
+    return slug[:64] or "unknown"
+
+
+def shard(entry: dict) -> str:
+    """The shard an entry is appended to (relative to the criterion)."""
+    month = str(entry.get("timestamp", ""))[:7]
+    if not re.fullmatch(r"\d{4}-\d{2}", month):
+        month = now()[:7]
+    return f"{SHARDS}/{actor_slug(str(entry.get('actor', '')))}@{machine()}/{month}.jsonl"
+
+
+def journal_lock(dep: Deployment):
+    """Held around every append: read the last states, then write."""
+    return lock.held(dep.root, "journal", stale=LOCK_STALE, error=JournalError)
+
+
+def write(dep: Deployment, entry: dict) -> Path:
+    """Append one entry to its shard (call with the journal lock held)."""
+    path = dep.root / shard(entry)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    return path
 
 
 def entry_path(dep: Deployment, entry: dict, f: dict) -> str:
@@ -308,6 +431,12 @@ def head_blob(repo: Path, rel: str) -> str | None:
 
 
 def append(dep: Deployment, req: AppendRequest) -> dict:
+    _validate(req)
+    with journal_lock(dep):
+        return _append(dep, req)
+
+
+def _validate(req: AppendRequest) -> None:
     if req.action not in ACTIONS:
         raise JournalError(f"action '{req.action}' is not one of {', '.join(ACTIONS)}")
     if req.tier is not None and req.tier not in TIERS:
@@ -317,6 +446,9 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
     if not req.files:
         raise JournalError("at least one --file is required")
     parse_time(req.timestamp)
+
+
+def _append(dep: Deployment, req: AppendRequest) -> dict:
     previous = last_after(dep)
     files, to_pin, seen = [], {}, set()
     for raw in req.files:
@@ -354,10 +486,7 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
         entry["tier"] = req.tier
     for repo, shas in to_pin.items():  # pin first: a failed pin leaves no entry behind
         pin(repo, shas)
-    path = journal_path(dep)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    write(dep, entry)
     return entry
 
 
@@ -382,19 +511,19 @@ def unjournaled(dep: Deployment) -> list[str]:
 class Issue:
     level: str
     code: str
-    line: int
+    at: str  # `<source>:<line>`, "" when about the journal as a whole
     message: str
     legacy: bool = False  # about an entry not written by the catalyst CLI
     path: str | None = None  # the file an issue is about, when it is about one
 
     def __str__(self) -> str:
-        where = f"journal.jsonl:{self.line}" if self.line else "journal.jsonl"
+        where = self.at or "journal"
         return f"{self.level.upper():7} {self.code:18} {where}: {self.message}"
 
 
 def verify(dep: Deployment) -> list[Issue]:
     issues: list[Issue] = []
-    last: dict[str, tuple[str | None, int, bool]] = {}  # path -> (after, line, cli-written)
+    last: dict[str, tuple[str | None, str, bool]] = {}  # path -> (after, where, cli-written)
     seen: dict[str, set] = {}  # path -> every after recorded
     prev_t: datetime.datetime | None = None
     pins: dict[Path, set[str]] = {}
@@ -453,7 +582,7 @@ def verify(dep: Deployment) -> list[Issue]:
                             "note",
                             "concurrent-edit",
                             n,
-                            f"{path}: edited from an earlier state than line {last[path][1]} (merged work)",
+                            f"{path}: edited from an earlier state than {last[path][1]} (merged work)",
                             not cli,
                         )
                     )
@@ -463,8 +592,7 @@ def verify(dep: Deployment) -> list[Issue]:
                             level(cli),
                             "chain",
                             n,
-                            f"{path}: before {str(before)[:10]} != after {str(last[path][0])[:10]} "
-                            f"at line {last[path][1]}",
+                            f"{path}: before {str(before)[:10]} != after {str(last[path][0])[:10]} at {last[path][1]}",
                             not cli,
                         )
                     )
