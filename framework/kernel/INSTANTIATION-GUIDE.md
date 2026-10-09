@@ -391,8 +391,9 @@ Keep a compact note with at least:
 When this guide is used again for the same project, check memory first and
 reuse the existing note as the default project context. If a prior note
 already exists for that project, update it instead of creating a duplicate.
-When switching agents, update this persistent memory note alongside
-`catalyst.toml` (`agent`, `updated`).
+The note is a convenience: `catalyst where` and `catalyst open` are the
+record. When switching agents, run `catalyst open --agent <agent-id>` (it
+records the agent for this user, outside the project).
 This makes the association durable across sessions and keeps the project's
 instantiated ruleset available whenever the guide is used again.
 

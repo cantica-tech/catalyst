@@ -320,20 +320,15 @@ the seven currently exist anywhere.
   fresh `.criterion` symlink. Refuses if a deployment already exists here,
   unless `force` is given, in which case it overwrites the existing one
   — confirm explicitly first.
-- `/switch-agent [agent-id]` — force the agent-switch procedure (INV-6,
-  `Rules-of-Rules.md` §14's Agent switching procedure) to run now, regardless of whether the running agent's
-  identity already appears to match `<app-name>.catalyst`'s `agent`
-  field. The manual escape hatch for when the automatic per-session
-  check is skipped or only partially completes (e.g. the working copy
-  already mirrored but the pointer's `agent` field never updated to
-  match). Resolves the owned location of `<agent-id>` (defaulting to the
-  running agent's own identifier if omitted) per `Rules-of-Rules.md` §14,
-  mirrors `.criterion/` into it if it existed elsewhere (exact copy,
-  overwriting the destination — never a partial merge), repoints the
-  `.criterion` symlink, updates `<app-name>.catalyst` (`agent`,
-  `updated`) unconditionally, and refreshes persistent framework memory.
-  No `Taskfile.yml` edit: catalyst never touches the project's
-  Taskfile.
+- `/switch-agent [agent-id]` — record the agent this user works with:
+  `catalyst open --agent <agent-id>` (the running agent's own id when
+  omitted). It is kept in catalyst's home for this user
+  (`$CATALYST_HOME/projects/<name>/agent`), never in `catalyst.toml`, so
+  teammates on different agents never rewrite each other's project file;
+  `catalyst task` dispatches to it. Nothing moves: the criterion's place
+  does not depend on the agent. A legacy deployment (a `.criterion`
+  symlink into another agent's space) is moved once with
+  `catalyst move --to-home`.
 - `/status` — update an artifact or work item's `Status` field, then
   regenerate indexes and journal the change. Refuses a `RECON-` case:
   its `Status` changes only through `/reconcile` (role-gated).

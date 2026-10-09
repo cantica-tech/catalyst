@@ -371,7 +371,10 @@ def test_init_deploys_the_invariants_and_the_session_start_hook_prints_them(tmp_
     capsys.readouterr()
     assert main(["--project", str(req.project), "hook", "start"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith((KERNEL / "INVARIANTS.md").read_text(encoding="utf-8").splitlines()[0]) and "M-1." in out
+    report, _, rest = out.partition("\n# ")  # the open report, then the invariants
+    assert report.startswith("catalyst: app — criterion ")
+    assert ("# " + rest).startswith((KERNEL / "INVARIANTS.md").read_text(encoding="utf-8").splitlines()[0])
+    assert "M-1." in rest
     assert run_checks(load(req.project)).errors == []
 
 

@@ -115,6 +115,29 @@ def home_criterion(name: str) -> Path:
     return home() / "projects" / name / "criterion"
 
 
+def user_agent_file(name: str) -> Path:
+    """This user's agent for a project (`catalyst open --agent`): kept in
+    catalyst's home, never in the tracked project file, so teammates using
+    different agents never rewrite each other's catalyst.toml."""
+    return home() / "projects" / name / "agent"
+
+
+def agent_of(data: dict[str, Any]) -> str:
+    """The agent catalyst dispatches to for this user: their own choice
+    (`catalyst open --agent`), else the project file's `agent`, else
+    claude-code."""
+    name = project_name(data)
+    if name:
+        try:
+            chosen = user_agent_file(name).read_text(encoding="utf-8").strip()
+        except OSError:
+            chosen = ""
+        if chosen:
+            return chosen
+    agent = str(data.get("agent") or "")
+    return agent if agent and agent != "unknown" else "claude-code"
+
+
 def workspace_criterion(name: str) -> Path:
     """A VS Code workspace's meta criterion (ADR-010, roadmap R3.1b)."""
     return home() / "workspaces" / name / "criterion"

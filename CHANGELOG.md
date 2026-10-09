@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst open` (roadmap R3.5): the one step after `git clone` and the start
+  of every session — clones a criterion missing on this machine from the
+  repository `catalyst.toml` names (with the product's journal pins), fills
+  the criterion's runtime from its vendored CLI, installs the launcher, and
+  reports versions, the shared copy and what is left to do. `catalyst hook
+  start` leads with the same report, changing nothing.
+- The agent is each user's choice: `catalyst open --agent <id>` records it in
+  catalyst's home, never in `catalyst.toml`; `catalyst task` dispatches to it.
+  The agent switching procedure and `/switch-agent` reduce to that command;
+  `catalyst where` replaces the memory note.
+
 ## 0.50.0 — 2026-10-09
 
 The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).

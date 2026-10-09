@@ -445,6 +445,21 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+def cmd_open(args) -> int:
+    """`open` (R3.5): make the project ready on this machine and report it."""
+    import project_file
+    from catalyst.open import open_project
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 2
+    o = open_project(project, act=True, fetch=args.fetch, agent=args.agent)
+    print(json.dumps(o.as_dict(), indent=2) if args.json else o.render())
+    return 0 if o.ready else 1
+
+
 def cmd_mcp(args) -> int:
     """`mcp`: the stdio MCP server agents register at user level (R3.1c)."""
     from catalyst import mcp
@@ -498,7 +513,7 @@ def cmd_task(args) -> int:
     if binary is None:
         print("catalyst: Task (https://taskfile.dev) is not on PATH", file=sys.stderr)
         return 1
-    agent = project_file.read_dir(project).get("agent") or "claude-code"
+    agent = project_file.agent_of(project_file.read_dir(project))
     agent_cmd = os.environ.get("AGENT_CMD") or f"{AGENT_BINARIES.get(agent, agent)} -p"
     rest = args.task_args[1:] if args.task_args[:1] == ["--"] else args.task_args
     command = [binary, "-t", str(taskfile)]
@@ -1156,22 +1171,35 @@ def cmd_init(args) -> int:
 
 
 def cmd_hook_start(args) -> int:
-    """SessionStart hook: print the deployment's invariants (kernel, then
-    module) so every session starts grounded. Never blocks a session."""
+    """SessionStart hook: where the project stands (`catalyst open`, changing
+    nothing), then the deployment's invariants (kernel, then module), so
+    every session starts grounded. Never blocks a session."""
+    import project_file
     from catalyst.check import hook_input
+    from catalyst.open import open_project
 
     data = hook_input() if args.format != "text" else {}
-    try:
-        dep = open_deployment(_hook_project(args, data))
-    except WorkingCopyMissing as exc:
-        text = f"catalyst: {exc}"
-    except DeploymentNotFound:
+    args = _hook_project(args, data)
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
         return 0
+    try:
+        report = open_project(project, act=False).render()
+    except Exception as exc:  # a session must start whatever happens here
+        report = f"catalyst: could not read the project's state ({exc})"
+    try:
+        dep = open_deployment(args)
+    except (WorkingCopyMissing, DeploymentNotFound):
+        text = report
     else:
         text = "\n".join(
-            path.read_text(encoding="utf-8", errors="replace")
-            for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md")
-            if path.is_file()
+            [report]
+            + [
+                path.read_text(encoding="utf-8", errors="replace")
+                for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md")
+                if path.is_file()
+            ]
         )
     if args.format == "text":
         print(text)
@@ -1722,6 +1750,12 @@ def build_parser() -> argparse.ArgumentParser:
     q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
     q.add_argument("id")
     q.set_defaults(func=cmd_analysis)
+
+    p = sub.add_parser("open", help="make the project ready on this machine (join, runtime) and say where it stands")
+    p.add_argument("--fetch", action="store_true", help="fetch the shared copy first")
+    p.add_argument("--agent", help="record the agent this user works with (catalyst task dispatches to it)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_open)
 
     p = sub.add_parser("share", help="the criterion's sharing driver: info, status, pull, push")
     ss = p.add_subparsers(dest="share_command", required=True)

@@ -251,13 +251,36 @@ Cursor's `workspace_roots`) when `--project` is not given.
 
 ### `catalyst hook start [--format text|json|cursor]`
 
-The agent's session-start hook: prints the working copy's `INVARIANTS.md`
-and, when the module ships one, `INVARIANTS.module.md` (both copied there
-by `init`), so a deployed project's sessions start grounded. It never
-blocks a session: it always exits `0`, prints nothing outside a
-deployment, and one line when the working copy is unreachable.
+The agent's session-start hook: prints where the project stands (the
+report of [`catalyst open`](#catalyst-open---fetch---agent-id---json),
+changing nothing and touching no network), then the criterion's
+`INVARIANTS.md` and, when the module ships one, `INVARIANTS.module.md`, so a
+deployed project's sessions start grounded. It never blocks a session: it
+always exits `0`, prints nothing outside a project, and only the report
+(with `catalyst open` as its to-do) when the criterion is not on this
+machine.
 `--format json` wraps the text as `hookSpecificOutput.additionalContext`
 (Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
+
+### `catalyst open [--fetch] [--agent <id>] [--json]`
+
+Makes the project ready on this machine and says where it stands — the one
+step after `git clone` (roadmap R3.5). It writes only in catalyst's home,
+never in the project:
+
+- a criterion missing on this machine is cloned from the repository
+  `catalyst.toml` names (as `share join`), with the product's journal pins;
+- the criterion's runtime (`.venv`) is filled from its own vendored CLI when
+  missing or different, and the launcher is installed when missing;
+- `--agent <id>` records this user's agent (`$CATALYST_HOME/projects/<name>/agent`),
+  which `catalyst task` dispatches to — the whole agent switch;
+- `--fetch` fetches the shared copy (and the product's pins) first.
+
+It then reports the criterion, the kernel `catalyst.toml` pins against the
+criterion's, the runtime, the agent, the shared copy (ahead/behind, changes
+not published) and a to-do list of exact commands — a legacy deployment to
+move, a version drift, a pull to make. Exits `0` when nothing is left to do,
+`1` otherwise, `2` outside a project.
 
 ### `catalyst mcp`
 
