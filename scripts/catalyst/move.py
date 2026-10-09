@@ -35,6 +35,24 @@ def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProc
     return res
 
 
+def _rmtree(path: Path) -> None:
+    """Remove a directory, git object files included: git writes them
+    read-only, which Windows refuses to delete until the flag is cleared."""
+    import os
+    import stat
+
+    def clear_and_retry(func, target, _exc):
+        os.chmod(target, stat.S_IWRITE)
+        func(target)
+
+    if path.exists():
+        import sys
+        if sys.version_info >= (3, 12):
+            shutil.rmtree(path, onexc=clear_and_retry)
+        else:
+            shutil.rmtree(path, onerror=clear_and_retry)
+
+
 def _is_repo(path: Path) -> bool:
     return _git(path, "rev-parse", "--git-dir", check=False).returncode == 0
 
@@ -74,7 +92,7 @@ def _move_submodule(project: Path, link: Path, target: Path) -> list[Path]:
     _git(target, "status", "--porcelain")                       # the moved repository works
     _git(project, "submodule", "deinit", "-q", "-f", ".criterion")
     _git(project, "rm", "-q", "-f", ".criterion")
-    shutil.rmtree(gitdir, ignore_errors=True)
+    _rmtree(gitdir)
     touched = []
     gitmodules = project / ".gitmodules"
     if gitmodules.is_file():
