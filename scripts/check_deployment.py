@@ -22,6 +22,7 @@ Scope note: only checks the structural invariants that are machine-verifiable
 from the tree. Behavioural rules (INV-1..INV-4) are not checkable here and remain
 the agent's responsibility, re-grounded via INVARIANTS.md.
 """
+
 from __future__ import annotations
 
 import json
@@ -66,31 +67,59 @@ USERID_RE = re.compile(r"^[A-Za-z0-9]{8}$")
 # `## N. `id` Title` or `### `id` Title` — a rule heading, id capturing its
 # own trailing digits (group 2) and any suffix segments (group 3), the last
 # of which (once INV-26 applies) must be a userid.
-RULE_HEADING_RE = re.compile(
-    r"^#{2,3}\s+(?:\d+\.\s+)?`([a-z]+-[A-Z][A-Z0-9]*-(\d+)((?:-[a-zA-Z0-9]+)*))`"
-)
+RULE_HEADING_RE = re.compile(r"^#{2,3}\s+(?:\d+\.\s+)?`([a-z]+-[A-Z][A-Z0-9]*-(\d+)((?:-[a-zA-Z0-9]+)*))`")
 JOURNAL_REQUIRED_FIELDS = (
-    "timestamp", "actor", "command", "action", "artifact", "targets",
-    "intent", "files",
+    "timestamp",
+    "actor",
+    "command",
+    "action",
+    "artifact",
+    "targets",
+    "intent",
+    "files",
 )
 # Kernel index/fixed file names. Each entity type's own `<folder>.md` index
 # (kernel and active module alike) is added by DeploymentModel.
 INDEX_NAMES = {
-    "rules.md", "domains.md", "meta-tags.md", "epics.md", "stories.md",
-    "tasks.md", "spikes.md", "sprints.md", "boards.md", "workflows.md",
-    "tickets.md", "reconciliations.md", "analyses.md", "ANALYSIS-PLAYBOOK.md",
-    "README.md", "CODE-OF-CONDUCT.md", "version.txt",
-    "Rules-of-Rules.md", "rules-of-work-items.md", "DEPLOYMENT.md",
+    "rules.md",
+    "domains.md",
+    "meta-tags.md",
+    "epics.md",
+    "stories.md",
+    "tasks.md",
+    "spikes.md",
+    "sprints.md",
+    "boards.md",
+    "workflows.md",
+    "tickets.md",
+    "reconciliations.md",
+    "analyses.md",
+    "ANALYSIS-PLAYBOOK.md",
+    "README.md",
+    "CODE-OF-CONDUCT.md",
+    "version.txt",
+    "Rules-of-Rules.md",
+    "rules-of-work-items.md",
+    "DEPLOYMENT.md",
 }
 # Kernel directories walked by the INV-7 naming check. Entity folders (kernel
 # and active module) are added by DeploymentModel.
-KERNEL_CHECKED_DIRS = ("rules", "reconciliations", "workflows", "analyses", "IAM",
-                       "development", "work-items")
+KERNEL_CHECKED_DIRS = ("rules", "reconciliations", "workflows", "analyses", "IAM", "development", "work-items")
 # Kernel entity types that must each have a definitions/<type>.md (INV-23).
 KERNEL_ENTITY_TYPES = (
-    "rule", "domain", "user", "role", "reconciliation", "meta-tag",
-    "journal", "ledger", "slash-command", "templates-catalog", "workflow",
-    "entity", "analysis",
+    "rule",
+    "domain",
+    "user",
+    "role",
+    "reconciliation",
+    "meta-tag",
+    "journal",
+    "ledger",
+    "slash-command",
+    "templates-catalog",
+    "workflow",
+    "entity",
+    "analysis",
 )
 
 
@@ -98,6 +127,7 @@ KERNEL_ENTITY_TYPES = (
 class DeploymentModel:
     """What the checks need to know about entity types: the kernel's plus the
     active module's (if any)."""
+
     checked_dirs: tuple[str, ...] = KERNEL_CHECKED_DIRS
     index_names: set[str] = field(default_factory=lambda: set(INDEX_NAMES))
     entity_types: tuple[str, ...] = KERNEL_ENTITY_TYPES
@@ -151,9 +181,9 @@ def build_model(module: ModuleManifest | None = None) -> DeploymentModel:
             types.append(t)
     for req in module.required_paths:
         index_names.add(Path(req.path).name)
-    return DeploymentModel(tuple(dirs), index_names, tuple(types), free_form,
-                           tuple(module_folders), list(module.required_paths),
-                           module.id)
+    return DeploymentModel(
+        tuple(dirs), index_names, tuple(types), free_form, tuple(module_folders), list(module.required_paths), module.id
+    )
 
 
 def _resolve_pointer(pointer_path: Path) -> Path | None:
@@ -177,6 +207,7 @@ def find_project_root(start: Path) -> Path | None:
     reachable, or a legacy .criterion/ directory — where the active module
     is declared."""
     import project_file
+
     for base in (start, *start.parents):
         if project_file.is_project(base) and project_file.resolve(base) is not None:
             return base
@@ -191,6 +222,7 @@ def find_deploy_root(start: Path) -> Path | None:
     or the in-project directory), else a pre-0.37.0 pointer's legacy
     "agent-source" (INV-6)."""
     import project_file
+
     for base in (start, *start.parents):
         resolved = project_file.resolve(base)
         if resolved is not None:
@@ -210,9 +242,12 @@ def check_naming(root: Path, model: DeploymentModel | None = None) -> list[str]:
             continue
         for f in d.rglob("*.md"):
             name = f.name
-            if (name in model.index_names or TEMPLATE_RE.match(name)
-                    or FIXED_DOC_RE.match(name)
-                    or TEMPLATES_CATALOG_RE.match(name)):
+            if (
+                name in model.index_names
+                or TEMPLATE_RE.match(name)
+                or FIXED_DOC_RE.match(name)
+                or TEMPLATES_CATALOG_RE.match(name)
+            ):
                 continue
             # Every templates/ subdirectory (INV-20) accepts files only —
             # already covered by the two exemptions above (README.md via
@@ -223,8 +258,7 @@ def check_naming(root: Path, model: DeploymentModel | None = None) -> list[str]:
             if f.parent.name in model.free_form_folders:
                 continue
             if not NAME_RE.match(name) or BARE_ID_RE.search(name):
-                errors.append(f"INV-7 naming: {f.relative_to(root)} is not "
-                              f"<id>-<short-summary>.md")
+                errors.append(f"INV-7 naming: {f.relative_to(root)} is not <id>-<short-summary>.md")
     return errors
 
 
@@ -244,8 +278,7 @@ def check_single_rule_template(root: Path) -> list[str]:
     if not rules.is_dir():
         return ["INV-8: rules/ directory is missing"]
     templates_dir = rules / "templates"
-    hits = [f for f in rules.rglob("TEMPLATE-RULE*.md")
-            if re.match(r"^TEMPLATE-RULE(-v\d+)?\.md$", f.name)]
+    hits = [f for f in rules.rglob("TEMPLATE-RULE*.md") if re.match(r"^TEMPLATE-RULE(-v\d+)?\.md$", f.name)]
     errors = []
     if not hits:
         errors.append("INV-8: no TEMPLATE-RULE(-vN).md found")
@@ -268,14 +301,16 @@ def check_rule_indexing(root: Path) -> list[str]:
     index_text = global_index.read_text(encoding="utf-8", errors="ignore")
     errors = []
     for f in rules.rglob("*.md"):
-        if (f.name in INDEX_NAMES or TEMPLATE_RE.match(f.name)
-                or TEMPLATES_CATALOG_RE.match(f.name)
-                or _is_under_domains(f, rules)):
+        if (
+            f.name in INDEX_NAMES
+            or TEMPLATE_RE.match(f.name)
+            or TEMPLATES_CATALOG_RE.match(f.name)
+            or _is_under_domains(f, rules)
+        ):
             continue
         stem = f.stem
         if stem not in index_text and f.name not in index_text:
-            errors.append(f"INV-8 orphan: {f.relative_to(root)} not listed in "
-                          f"rules/rules.md")
+            errors.append(f"INV-8 orphan: {f.relative_to(root)} not listed in rules/rules.md")
     return errors
 
 
@@ -284,17 +319,18 @@ def check_required_headings(root: Path) -> list[str]:
     rules = root / "rules"
     errors = []
     for f in rules.rglob("*.md"):
-        if (f.name in INDEX_NAMES or TEMPLATE_RE.match(f.name)
-                or TEMPLATES_CATALOG_RE.match(f.name)
-                or _is_under_domains(f, rules)):
+        if (
+            f.name in INDEX_NAMES
+            or TEMPLATE_RE.match(f.name)
+            or TEMPLATES_CATALOG_RE.match(f.name)
+            or _is_under_domains(f, rules)
+        ):
             continue
         text = f.read_text(encoding="utf-8", errors="ignore")
         if "## Contents" not in text:
-            errors.append(f"INV-8 heading: {f.relative_to(root)} missing "
-                          f"'## Contents'")
+            errors.append(f"INV-8 heading: {f.relative_to(root)} missing '## Contents'")
         if "Linked Artifacts" not in text:
-            errors.append(f"INV-8 heading: {f.relative_to(root)} missing "
-                          f"'## Linked Artifacts — Quick Index'")
+            errors.append(f"INV-8 heading: {f.relative_to(root)} missing '## Linked Artifacts — Quick Index'")
     return errors
 
 
@@ -310,10 +346,7 @@ def _known_userids(root: Path) -> set[str]:
     except (json.JSONDecodeError, OSError):
         return set()
     users = data.get("users", []) if isinstance(data, dict) else []
-    return {
-        str(u["userid"]) for u in users
-        if isinstance(u, dict) and u.get("userid")
-    }
+    return {str(u["userid"]) for u in users if isinstance(u, dict) and u.get("userid")}
 
 
 def check_rule_id_shape(root: Path) -> list[str]:
@@ -333,13 +366,14 @@ def check_rule_id_shape(root: Path) -> list[str]:
     known_userids = _known_userids(root)
     errors: list[str] = []
     for f in rules.rglob("*.md"):
-        if (f.name == "rules.md" or TEMPLATE_RE.match(f.name)
-                or TEMPLATES_CATALOG_RE.match(f.name)
-                or _is_under_domains(f, rules)):
-            continue
-        for lineno, line in enumerate(
-            f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1
+        if (
+            f.name == "rules.md"
+            or TEMPLATE_RE.match(f.name)
+            or TEMPLATES_CATALOG_RE.match(f.name)
+            or _is_under_domains(f, rules)
         ):
+            continue
+        for lineno, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
             m = RULE_HEADING_RE.match(line)
             if not m:
                 continue
@@ -351,11 +385,9 @@ def check_rule_id_shape(root: Path) -> list[str]:
                 )
             parts = [p for p in suffixes.split("-") if p]
             userid = parts[-1] if parts else None
-            if (not userid or not USERID_RE.match(userid)
-                    or not any(c.isupper() for c in userid)):
+            if not userid or not USERID_RE.match(userid) or not any(c.isupper() for c in userid):
                 errors.append(
-                    f"INV-26 signer: {f.relative_to(root)}:{lineno} `{full_id}` "
-                    f"has no valid trailing userid suffix"
+                    f"INV-26 signer: {f.relative_to(root)}:{lineno} `{full_id}` has no valid trailing userid suffix"
                 )
             elif known_userids and userid not in known_userids:
                 errors.append(
@@ -394,8 +426,9 @@ def check_module_indexes(root: Path, model: DeploymentModel) -> list[str]:
     for folder in model.module_folders:
         d = _locate_folder(root, folder)
         if d is not None and not (d / f"{folder}.md").is_file():
-            errors.append(f"module index: {d.relative_to(root).as_posix()}/{folder}.md "
-                          f"is missing (module {model.module_id})")
+            errors.append(
+                f"module index: {d.relative_to(root).as_posix()}/{folder}.md is missing (module {model.module_id})"
+            )
     return errors
 
 
@@ -403,8 +436,7 @@ def check_workflows_index_exists(root: Path) -> list[str]:
     """INV-24: workflows/workflows.md index always exists (empty is fine)."""
     index = root / "workflows" / "workflows.md"
     if not index.is_file():
-        return ["INV-24: workflows/workflows.md is missing — seed "
-                "workflows/ from templates/workflow.template.md"]
+        return ["INV-24: workflows/workflows.md is missing — seed workflows/ from templates/workflow.template.md"]
     return []
 
 
@@ -416,12 +448,10 @@ def check_users_and_roles_exist(root: Path) -> list[str]:
     roles_path = root / "IAM" / "roles" / "roles.json"
 
     if not roles_path.is_file():
-        errors.append("INV-16: IAM/roles/roles.json is missing — seed it "
-                      "from templates/roles.template.json")
+        errors.append("INV-16: IAM/roles/roles.json is missing — seed it from templates/roles.template.json")
 
     if not users_path.is_file():
-        errors.append("INV-16: IAM/users/users.json is missing — seed it "
-                      "from templates/users.template.json")
+        errors.append("INV-16: IAM/users/users.json is missing — seed it from templates/users.template.json")
         return errors
 
     try:
@@ -432,8 +462,7 @@ def check_users_and_roles_exist(root: Path) -> list[str]:
 
     users = data.get("users", []) if isinstance(data, dict) else []
     if not any(isinstance(u, dict) and u.get("active") for u in users):
-        errors.append("INV-16: IAM/users/users.json has no active user — "
-                      "a project must have at least one (/user-add)")
+        errors.append("INV-16: IAM/users/users.json has no active user — a project must have at least one (/user-add)")
     return errors
 
 
@@ -456,16 +485,12 @@ def check_users_have_userid(root: Path) -> list[str]:
             continue
         name = u.get("name", "<unnamed>")
         userid = u.get("userid")
-        if (not userid or not USERID_RE.match(str(userid))
-                or not any(c.isupper() for c in str(userid))):
+        if not userid or not USERID_RE.match(str(userid)) or not any(c.isupper() for c in str(userid)):
             errors.append(
-                f"INV-26: user '{name}' has no valid 8-char alphanumeric "
-                f"userid (must contain an uppercase letter)"
+                f"INV-26: user '{name}' has no valid 8-char alphanumeric userid (must contain an uppercase letter)"
             )
         elif userid in seen:
-            errors.append(
-                f"INV-26: userid '{userid}' is assigned to more than one user"
-            )
+            errors.append(f"INV-26: userid '{userid}' is assigned to more than one user")
         else:
             seen.add(userid)
     return errors
@@ -476,8 +501,7 @@ def check_journal_exists(root: Path) -> list[str]:
     line is a well-formed, schema-complete entry."""
     journal = root / "development" / "journal.jsonl"
     if not journal.is_file():
-        return ["INV-17: development/journal.jsonl is missing — seed it "
-                "(empty) from templates/journal.template.jsonl"]
+        return ["INV-17: development/journal.jsonl is missing — seed it (empty) from templates/journal.template.jsonl"]
 
     errors: list[str] = []
     text = journal.read_text(encoding="utf-8", errors="ignore")
@@ -495,21 +519,18 @@ def check_journal_exists(root: Path) -> list[str]:
             continue
         for field in JOURNAL_REQUIRED_FIELDS:
             if field not in entry:
-                errors.append(f"INV-17: journal.jsonl:{lineno} missing "
-                              f"field '{field}'")
+                errors.append(f"INV-17: journal.jsonl:{lineno} missing field '{field}'")
         files = entry.get("files")
         if isinstance(files, list):
             for f in files:
                 if not isinstance(f, dict) or "path" not in f:
-                    errors.append(f"INV-17: journal.jsonl:{lineno} has a "
-                                  f"files[] entry missing 'path'")
+                    errors.append(f"INV-17: journal.jsonl:{lineno} has a files[] entry missing 'path'")
                     continue
                 for side in ("before", "after"):
                     val = f.get(side)
                     if val is not None and not HASH_RE.match(str(val)):
                         errors.append(
-                            f"INV-17: journal.jsonl:{lineno} {f.get('path')} "
-                            f"'{side}' is not a 40-hex git hash or null"
+                            f"INV-17: journal.jsonl:{lineno} {f.get('path')} '{side}' is not a 40-hex git hash or null"
                         )
     return errors
 
@@ -520,24 +541,23 @@ def check_definitions_exist(root: Path, model: DeploymentModel | None = None) ->
     model = model or build_model()
     definitions = root / "definitions"
     if not definitions.is_dir():
-        return ["INV-23: definitions/ is missing — seed it from "
-                "framework/kernel/definitions/"]
+        return ["INV-23: definitions/ is missing — seed it from framework/kernel/definitions/"]
 
     errors: list[str] = []
     for entity_type in model.entity_types:
         if not (definitions / f"{entity_type}.md").is_file():
-            source = ("framework/kernel/definitions" if entity_type in KERNEL_ENTITY_TYPES
-                      else f"the {model.module_id} module's definitions")
-            errors.append(
-                f"INV-23: definitions/{entity_type}.md is missing — seed it "
-                f"from {source}/{entity_type}/"
+            source = (
+                "framework/kernel/definitions"
+                if entity_type in KERNEL_ENTITY_TYPES
+                else f"the {model.module_id} module's definitions"
             )
+            errors.append(f"INV-23: definitions/{entity_type}.md is missing — seed it from {source}/{entity_type}/")
     return errors
-
 
 
 def _read_pointer_data(project_root: Path) -> dict:
     import project_file
+
     return project_file.read_dir(project_root)
 
 
@@ -558,8 +578,7 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     field = "kernel_version" if "kernel_version" in pointer else "framework_version"
     if declared and declared != deployed:
         errors.append(
-            f"version drift: the pointer's {field} is {declared} but "
-            f"{DEPLOY_DIRNAME}/version.txt is {deployed}"
+            f"version drift: the pointer's {field} is {declared} but {DEPLOY_DIRNAME}/version.txt is {deployed}"
         )
     kernel_file = project_root / "version.txt"
     if (project_root / "framework" / "kernel").is_dir() and kernel_file.is_file():
@@ -572,8 +591,9 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
     return errors
 
 
-def structural_errors(root: Path, project_root: Path | None,
-                      module: ModuleManifest | None = None) -> tuple[list[str], str]:
+def structural_errors(
+    root: Path, project_root: Path | None, module: ModuleManifest | None = None
+) -> tuple[list[str], str]:
     """Every structural check against the working copy at `root`, and the
     scope they ran with ("module <id>" or "kernel only"). `module` overrides
     the one the project declares (a bare working copy has no pointer)."""
@@ -614,14 +634,13 @@ def main(argv: list[str] | None = None) -> int:
     root = find_deploy_root(Path.cwd())
     if root is None:
         if REQUIRE_FLAG in argv:
-            print(f"catalyst deployment validation FAILED: no *{POINTER_SUFFIX} pointer with a reachable "
-                  f"working copy or {DEPLOY_DIRNAME}/ found from {Path.cwd()} ({REQUIRE_FLAG})")
+            print(
+                f"catalyst deployment validation FAILED: no *{POINTER_SUFFIX} pointer with a reachable "
+                f"working copy or {DEPLOY_DIRNAME}/ found from {Path.cwd()} ({REQUIRE_FLAG})"
+            )
             return 1
         # No deployment in this repo — nothing to validate, not a failure.
-        print(
-            f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; "
-            "skipping deployment validation"
-        )
+        print(f"no *{POINTER_SUFFIX} pointer or {DEPLOY_DIRNAME}/ found; skipping deployment validation")
         return 0
 
     errors, scope = structural_errors(root, find_project_root(Path.cwd()))

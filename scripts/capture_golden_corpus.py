@@ -15,6 +15,7 @@ bytes.
 
     python3 scripts/capture_golden_corpus.py --project <root> --name <name>
 """
+
 from __future__ import annotations
 
 import argparse
@@ -51,10 +52,11 @@ def _summary(project: Path, files: list[tuple[str, Path]]) -> dict:
     read = lambda rel: (wc / rel).read_text(encoding="utf-8") if (wc / rel).is_file() else ""
     count = lambda rel, key: len(json.loads(read(rel) or "{}").get(key, []))
     pointer = next((json.loads(p.read_text(encoding="utf-8")) for n, p in files if n.endswith(".catalyst")), {})
-    head = subprocess.run(["git", "-C", str(wc), "rev-parse", "--show-toplevel", "HEAD"],
-                          capture_output=True, text=True, encoding="utf-8")
+    head = subprocess.run(
+        ["git", "-C", str(wc), "rev-parse", "--show-toplevel", "HEAD"], capture_output=True, text=True, encoding="utf-8"
+    )
     top, _, sha = head.stdout.strip().partition("\n")
-    own_repo = head.returncode == 0 and Path(top).resolve() == wc.resolve()   # not an enclosing repo's
+    own_repo = head.returncode == 0 and Path(top).resolve() == wc.resolve()  # not an enclosing repo's
     folders: dict[str, int] = {}
     for n in names:
         parts = n.split("/")

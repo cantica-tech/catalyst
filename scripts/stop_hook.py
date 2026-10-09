@@ -16,6 +16,7 @@ every exit but 2.
 
 Exit 0 = all checks passed (or second consecutive block), exit 2 = block.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-SPEC_BUDGET = 1000     # words any one command may need from CODE-OF-CONDUCT §4
+SPEC_BUDGET = 1000  # words any one command may need from CODE-OF-CONDUCT §4
 
 CHECKS = [
     "check_deployment.py",
@@ -44,8 +45,7 @@ def run_checks(root: Path = ROOT) -> list[tuple[str, str]]:
     failures = []
     commands = [(check, [sys.executable, str(root / "scripts" / check)]) for check in CHECKS]
     commands.append(("catalyst check", [sys.executable, "-m", "catalyst", "check"]))
-    commands.append(("catalyst spec budget", [sys.executable, "-m", "catalyst", "spec", "--budget",
-                                              str(SPEC_BUDGET)]))
+    commands.append(("catalyst spec budget", [sys.executable, "-m", "catalyst", "spec", "--budget", str(SPEC_BUDGET)]))
     env = {**os.environ, "PYTHONPATH": str(root / "scripts")}
     for name, cmd in commands:
         res = subprocess.run(cmd, cwd=root, env=env, capture_output=True, text=True, encoding="utf-8")
@@ -66,17 +66,15 @@ def main() -> int:
     hook_input = read_hook_input()
     try:
         failures = run_checks()
-    except Exception as exc:  # noqa: BLE001 — fail closed: only exit 2 blocks the stop
+    except Exception as exc:
         failures = [("stop hook", f"crashed: {type(exc).__name__}: {exc}")]
     if not failures:
         return 0
     report = "\n\n".join(f"{check} FAILED:\n{output}" for check, output in failures)
     if hook_input.get("stop_hook_active"):
-        print(f"catalyst checks still failing (not blocking again):\n\n{report}",
-              file=sys.stderr)
+        print(f"catalyst checks still failing (not blocking again):\n\n{report}", file=sys.stderr)
         return 0
-    print(f"catalyst checks failed — fix these before stopping:\n\n{report}",
-          file=sys.stderr)
+    print(f"catalyst checks failed — fix these before stopping:\n\n{report}", file=sys.stderr)
     return 2
 
 

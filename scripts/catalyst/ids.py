@@ -8,6 +8,7 @@
 - userids: 8 characters drawn uniformly from [A-Za-z0-9] with a CSPRNG,
   redrawn from scratch if there is no uppercase letter or on any collision.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -80,8 +81,7 @@ def highest_number(dep: Deployment, corpus: Corpus, prefix: str) -> int:
     return max(numbers)
 
 
-def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict,
-                   reserve: bool = False) -> str:
+def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict, reserve: bool = False) -> str:
     """The next ID of an entity type. With `reserve`, the number is handed
     out once under the working copy's ID lock, so parallel callers (several
     sub-agents in one session) never get the same one."""
@@ -101,20 +101,24 @@ def highest_rule_number(dep: Deployment, corpus: Corpus, domain: str) -> int:
     prefix: defined, indexed, cited anywhere in a rule document (a retired
     or removed rule keeps its number) or remembered by the journal."""
     pattern = re.compile(rf"^[a-z]+-{re.escape(domain)}-(\d{{3,6}})")
-    ever = set(corpus.rules) | corpus.indexed_rules      # defined or merely indexed
+    ever = set(corpus.rules) | corpus.indexed_rules  # defined or merely indexed
     numbers = [0] + [int(m.group(1)) for r in ever if (m := pattern.match(r))]
     cited = re.compile(rf"(?<![A-Za-z0-9-])[a-z]+-{re.escape(domain)}-(\d{{3,6}})(?![0-9])")
     rules_dir = dep.root / "rules"
-    texts = [f for f in rules_dir.rglob("*.md") if "templates" not in f.relative_to(rules_dir).parts] \
-        if rules_dir.is_dir() else []
+    texts = (
+        [f for f in rules_dir.rglob("*.md") if "templates" not in f.relative_to(rules_dir).parts]
+        if rules_dir.is_dir()
+        else []
+    )
     journal = dep.root / "development" / "journal.jsonl"
     for f in texts + ([journal] if journal.is_file() else []):
         numbers += [int(n) for n in cited.findall(f.read_text(encoding="utf-8", errors="ignore"))]
     return max(numbers)
 
 
-def next_rule_id(dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str,
-                 signer: dict, reserve: bool = False) -> str:
+def next_rule_id(
+    dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str, signer: dict, reserve: bool = False
+) -> str:
     """The next rule ID in `domain` (numbers are unique within the DOMAIN,
     never reused). `reserve` as for next_entity_id."""
     if domain not in corpus.domains and domain != "META":
@@ -141,8 +145,12 @@ BUSY = (FileExistsError, PermissionError) if os.name == "nt" else (FileExistsErr
 
 
 def state_dir(dep: Deployment) -> Path:
-    res = subprocess.run(["git", "-C", str(dep.root), "rev-parse", "--git-path", "catalyst"],
-                         capture_output=True, text=True, encoding="utf-8")
+    res = subprocess.run(
+        ["git", "-C", str(dep.root), "rev-parse", "--git-path", "catalyst"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
     if res.returncode == 0 and res.stdout.strip():
         path = Path(res.stdout.strip())
         return path if path.is_absolute() else (dep.root / path).resolve()
@@ -162,15 +170,17 @@ def id_lock(dep: Deployment, wait: float = LOCK_WAIT, stale: float = LOCK_STALE)
         except BUSY:
             try:
                 if time.time() - lock.stat().st_mtime > stale:
-                    lock.unlink()            # a crashed holder: break its lock
+                    lock.unlink()  # a crashed holder: break its lock
                     continue
             except FileNotFoundError:
-                continue                     # released meanwhile
+                continue  # released meanwhile
             except BUSY:
-                pass                         # being released (Windows): wait
+                pass  # being released (Windows): wait
             if time.monotonic() > deadline:
-                raise IdError(f"the ID lock {lock} is held by another process — retry, or remove it "
-                              "if no catalyst command is running") from None
+                raise IdError(
+                    f"the ID lock {lock} is held by another process — retry, or remove it "
+                    "if no catalyst command is running"
+                ) from None
             time.sleep(0.02)
             continue
         try:

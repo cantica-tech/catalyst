@@ -1,0 +1,12 @@
+// markdownlint: the cantica-tech standard (.standards/, synced) plus this repository's ratchet.
+{
+  "config": {
+    "extends": ".standards/markdownlint.jsonc",
+    // Ratchet (2026-10-09, standards v0.1.0) — remove each line once fixed:
+    "MD040": false, // 21 fences without a language
+    "MD056": false, // 1 table with a short row
+    "MD001": false, // 1 heading level jump
+    "MD026": false  // 1 heading ending in a full stop (ACCESS-CONTROL.md, cited by name)
+  },
+  "ignores": ["**/node_modules/**", "what-is-going-on/**", "framework/kernel/plugins/repository/**"]
+}

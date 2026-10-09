@@ -19,6 +19,7 @@ pointer sets `"strict_journal": true`.
 after the fact (`origin: manual`, the git author as actor); rejecting one
 means reverting it.
 """
+
 from __future__ import annotations
 
 import json
@@ -26,8 +27,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import __version__
-from catalyst import journal
+from catalyst import __version__, journal
 from catalyst.deployment import Deployment
 from catalyst.scope import governs
 
@@ -42,7 +42,7 @@ class Commit:
     author: str
     subject: str
     changes: list[tuple[str, str | None, str | None]] = field(default_factory=list)  # path, before, after
-    time: float = 0.0                                                              # committer time
+    time: float = 0.0  # committer time
 
     @property
     def short(self) -> str:
@@ -53,6 +53,7 @@ class Commit:
 class Journaled:
     """What the journal records, per product path: its states in order (time,
     after) and the commits adopted for it."""
+
     states: dict[str, list[tuple[float, str | None]]] = field(default_factory=dict)
     adopted: set[tuple[str, str]] = field(default_factory=set)
 
@@ -75,7 +76,7 @@ class Journaled:
 
 
 def level(dep: Deployment) -> str:
-    """"error" once the deployment is out of the beta (a release format) or
+    """ "error" once the deployment is out of the beta (a release format) or
     opts in; "warning" while its format is a release candidate."""
     if dep.pointer.get("strict_journal") is True:
         return "error"
@@ -134,9 +135,20 @@ def commits(repo: Path, revs: list[str], walk: bool = True) -> list[Commit]:
     oldest first, with the product files each one changes; `walk=False`:
     only the named commits."""
     # --relative: paths from the project's own directory, as the journal records them
-    res = _git(repo, "log", "--reverse", "--no-merges", "--no-renames", "--relative", "--raw",
-               "--no-abbrev", "-z", "--format=%x1e%H%x00%an%x00%ct%x00%s",
-               *([] if walk else ["--no-walk"]), *journal.revisions(revs))
+    res = _git(
+        repo,
+        "log",
+        "--reverse",
+        "--no-merges",
+        "--no-renames",
+        "--relative",
+        "--raw",
+        "--no-abbrev",
+        "-z",
+        "--format=%x1e%H%x00%an%x00%ct%x00%s",
+        *([] if walk else ["--no-walk"]),
+        *journal.revisions(revs),
+    )
     if res.returncode != 0:
         raise ValueError(res.stderr.strip() or f"bad range {' '.join(revs)}")
     out = []
@@ -174,12 +186,14 @@ def baseline_missing(dep: Deployment) -> bool:
     checked."""
     base = baseline(dep)
     if base and base.startswith("-"):
-        return True                                  # never handed to git as an option
+        return True  # never handed to git as an option
     return bool(base) and _git(dep.project_root, "cat-file", "-e", f"{base}^{{commit}}").returncode != 0
 
 
-MISSING_BASELINE = ("the baseline `journal_since` is not in this clone (a shallow checkout, or rewritten "
-                    "history): changes outside catalyst are not checked — fetch the full history")
+MISSING_BASELINE = (
+    "the baseline `journal_since` is not in this clone (a shallow checkout, or rewritten "
+    "history): changes outside catalyst are not checked — fetch the full history"
+)
 
 
 def scoped(dep: Deployment, revs: list[str]) -> list[str]:
@@ -194,7 +208,7 @@ def since_baseline(dep: Deployment) -> list[Commit]:
     if dep.standalone or baseline(dep) is None or baseline_missing(dep):
         return []
     if _git(dep.project_root, "rev-parse", "--verify", "-q", "HEAD").returncode != 0:
-        return []                                    # no commits yet
+        return []  # no commits yet
     journaled = recorded(dep)
     out = []
     for c in commits(dep.project_root, scoped(dep, ["HEAD"])):
@@ -213,8 +227,8 @@ def staged(dep: Deployment) -> list[tuple[str, str | None, str | None]]:
     out = []
     for c in _parse_raw([t for t in res.stdout.split("\x00") if t]):
         if not governs(dep.project_root, c[0]):
-            continue                                 # a nested deployment's, or opted out
-        state = journaled.latest(c[0])               # as of now: the commit being made
+            continue  # a nested deployment's, or opted out
+        state = journaled.latest(c[0])  # as of now: the commit being made
         if state is None or state[1] != c[2]:
             out.append(c)
     return out
@@ -223,14 +237,22 @@ def staged(dep: Deployment) -> list[tuple[str, str | None, str | None]]:
 def describe(commit: Commit) -> str:
     paths = [p for p, _, _ in commit.changes]
     shown = ", ".join(paths[:3]) + (f" (+{len(paths) - 3} more)" if len(paths) > 3 else "")
-    return (f"{commit.short} by {commit.author} ({commit.subject[:50]!r}): {shown} not in the journal "
-            f"(`catalyst journal adopt {commit.short}`)")
+    return (
+        f"{commit.short} by {commit.author} ({commit.subject[:50]!r}): {shown} not in the journal "
+        f"(`catalyst journal adopt {commit.short}`)"
+    )
 
 
 # --- adopt ---------------------------------------------------------------
-def adopt(dep: Deployment, revs: list[str], intent: list[str], tier: str | None = None,
-          targets: list[str] | None = None, artifact: str | None = None,
-          actor: str | None = None) -> list[dict]:
+def adopt(
+    dep: Deployment,
+    revs: list[str],
+    intent: list[str],
+    tier: str | None = None,
+    targets: list[str] | None = None,
+    artifact: str | None = None,
+    actor: str | None = None,
+) -> list[dict]:
     """Record each commit's unrecorded changes as one journal entry, oldest
     first, the git author as actor unless `actor` is given. A file whose
     journal chain has not moved past the commit continues it (`before` its
@@ -247,7 +269,7 @@ def adopt(dep: Deployment, revs: list[str], intent: list[str], tier: str | None 
     targets = targets or []
     journaled = recorded(dep)
     written = []
-    single = not any(".." in r for r in revs)          # named commits, not ranges: just those
+    single = not any(".." in r for r in revs)  # named commits, not ranges: just those
     found = commits(dep.project_root, revs, walk=not single)
     for c in sorted(found, key=lambda c: c.time) if single else found:
         missing = unrecorded_in(c, journaled)
@@ -262,10 +284,19 @@ def adopt(dep: Deployment, revs: list[str], intent: list[str], tier: str | None 
                 continue
             files.append({"path": path, "before": last[1] if last is not None else parent, "after": after})
             journaled.states.setdefault(path, []).append((journal.parse_time(stamp).timestamp(), after))
-        entry = {"timestamp": stamp, "actor": actor or c.author, "command": "/adopt",
-                 "action": "update", "artifact": artifact or f"commit {c.short}", "targets": targets,
-                 "intent": intent, "files": files, "writer": f"catalyst/{__version__}",
-                 "origin": "manual", "commit": c.sha}
+        entry = {
+            "timestamp": stamp,
+            "actor": actor or c.author,
+            "command": "/adopt",
+            "action": "update",
+            "artifact": artifact or f"commit {c.short}",
+            "targets": targets,
+            "intent": intent,
+            "files": files,
+            "writer": f"catalyst/{__version__}",
+            "origin": "manual",
+            "commit": c.sha,
+        }
         if tier:
             entry["tier"] = tier
         journal.pin(dep.project_root, {a for _, _, a in missing if a})

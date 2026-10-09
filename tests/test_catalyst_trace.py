@@ -26,9 +26,9 @@ def commit(repo, message, name="f.txt"):
 
 def test_message_rules(project):
     corpus = load_corpus(load(project))
-    assert check_message(f"Fix login (ITEM-000001-{USERID})", corpus) is None       # full ID
-    assert check_message("Fix login\n\nITEM-000001", corpus) is None                 # short ID
-    assert check_message(f"Tighten br-AUTH-000001-{USERID}", corpus) is None         # a rule
+    assert check_message(f"Fix login (ITEM-000001-{USERID})", corpus) is None  # full ID
+    assert check_message("Fix login\n\nITEM-000001", corpus) is None  # short ID
+    assert check_message(f"Tighten br-AUTH-000001-{USERID}", corpus) is None  # a rule
     assert check_message("chore: reformat", corpus) is None
     assert check_message("chore(docs): typo", corpus) is None
     assert "no artifact" in check_message("Fix things", corpus)
@@ -44,7 +44,9 @@ def test_pattern_only_mode():
 
 def test_trace_a_range_skips_merges(project):
     commit(project, "chore: first")
-    base = subprocess.check_output(["git", "-C", str(project), "rev-parse", "HEAD"], text=True, encoding="utf-8").strip()
+    base = subprocess.check_output(
+        ["git", "-C", str(project), "rev-parse", "HEAD"], text=True, encoding="utf-8"
+    ).strip()
     commit(project, f"Work on ITEM-000001-{USERID}", "a.txt")
     commit(project, "Untraced change", "b.txt")
     checked, failures = trace(project, f"{base}..HEAD", load_corpus(load(project)))
@@ -63,7 +65,7 @@ def test_commit_msg_hook_and_install(project, capsys):
     # the routing hook (fw-STRUCTURE-000017): each owning deployment's CLI checks the message
     assert hook.name == "commit-msg" and '"commit-msg", "--route"' in text
     assert "catalyst hook install" in text and text.startswith("#!/usr/bin/env python3")
-    install_hook(project)                                     # idempotent
+    install_hook(project)  # idempotent
     hook.write_text("#!/bin/sh\necho mine\n", encoding="utf-8")
     with pytest.raises(ValueError, match="not written by catalyst"):
         install_hook(project)
@@ -79,20 +81,34 @@ def test_trace_cli(project, capsys):
 def test_report_counts_actors_tiers_and_traced_commits(project):
     from catalyst import journal as j
     from catalyst.report import build, render
+
     dep = load(project)
     write(project / "src" / "a.py", "a\n")
-    j.append(dep, j.AppendRequest(command="/create-item", action="create", artifact="x", targets=[],
-                                  intent=["x"], files=["src/a.py"], actor="ada", tier="feature"))
+    j.append(
+        dep,
+        j.AppendRequest(
+            command="/create-item",
+            action="create",
+            artifact="x",
+            targets=[],
+            intent=["x"],
+            files=["src/a.py"],
+            actor="ada",
+            tier="feature",
+        ),
+    )
     commit(project, f"Work on ITEM-000001-{USERID}", "b.txt")
     r = build(dep)
     assert r["actors"] == {"ada": 1} and r["tiers"] == {"feature": 1}
-    assert r["commits"] == 2 and r["commits_traced"] == 1          # init commit is untraced
+    assert r["commits"] == 2 and r["commits_traced"] == 1  # init commit is untraced
     assert "commits traced: 1/2" in render(r)
 
 
 def test_format_is_declared_and_checked(project):
     import json
+
     from catalyst.check import run as run_checks
+
     pointer = project / "app.catalyst"
     assert any("declares no `format`" in w for w in run_checks(load(project)).warnings)
     data = json.loads(pointer.read_text(encoding="utf-8"))
@@ -113,13 +129,19 @@ def test_paths_and_versions_are_not_ids(project):
 
 def test_ambiguous_short_id_must_be_written_in_full(project):
     from catalyst.corpus import load_corpus as lc
+
     dep = load(project)
     users = project / ".criterion" / "IAM" / "users" / "users.json"
     import json
+
     data = json.loads(users.read_text(encoding="utf-8"))
     data["users"].append({"name": "Bob", "active": True, "userid": "Bb4xR9pQ"})
     users.write_text(json.dumps(data), encoding="utf-8")
-    other = (project / ".criterion" / "items" / "ITEM-000001-first-item.md").read_text(encoding="utf-8").replace(USERID, "Bb4xR9pQ")
+    other = (
+        (project / ".criterion" / "items" / "ITEM-000001-first-item.md")
+        .read_text(encoding="utf-8")
+        .replace(USERID, "Bb4xR9pQ")
+    )
     write(project / ".criterion" / "items" / "ITEM-000001-bobs-item.md", other)
     reason = check_message("Fix ITEM-000001", lc(dep))
     assert reason and "ambiguous" in reason
@@ -134,12 +156,15 @@ def test_commit_msg_hook_lets_merges_through(project):
     assert main(["hook", "commit-msg", str(msg)]) == 0
 
 
-@pytest.mark.parametrize("argv", [
-    ["trace", "--", "--output=pwned.txt"],
-    ["trace", "--pattern-only", "--", "--output=pwned.txt"],
-    ["unrecorded", "--", "--output=pwned.txt"],
-    ["journal", "adopt", "--intent", "x", "--", "--output=pwned.txt"],
-])
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["trace", "--", "--output=pwned.txt"],
+        ["trace", "--pattern-only", "--", "--output=pwned.txt"],
+        ["unrecorded", "--", "--output=pwned.txt"],
+        ["journal", "adopt", "--intent", "x", "--", "--output=pwned.txt"],
+    ],
+)
 def test_a_revision_that_is_an_option_is_refused(project, capsys, argv):
     commit(project, "chore: a")
     assert main(argv) == 1

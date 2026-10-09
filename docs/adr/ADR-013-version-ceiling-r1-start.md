@@ -8,6 +8,7 @@
 ## Context
 
 At the start of the R1 phase (2026-10-07), the framework and SE module reached specific version milestones:
+
 - **Kernel:** Version 0.46.0
 - **SE module:** Version 2.4.0
 
@@ -20,6 +21,7 @@ The `.catalyst` pointer files in deployed projects record these version numbers 
 **The version ceiling for R1 start is kernel 0.46.0 and SE module 2.4.0.**
 
 This is a versioning decision that:
+
 - Establishes the baseline for R1 work
 - Ensures deployments can track which kernel and module versions they are running
 - Pins versions at the start of each roadmap phase for clarity

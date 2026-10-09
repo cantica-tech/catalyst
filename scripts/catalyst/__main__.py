@@ -1,6 +1,7 @@
 """`catalyst` command line. Every subcommand works on the deployment found at
 or above the current directory (or `--project`), prints human-readable
 output, or JSON with `--json`, and exits non-zero on failure."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,16 +12,17 @@ import sys
 from pathlib import Path
 
 from catalyst import version_string
+from catalyst.analysis import AnalysisError
+from catalyst.criterion import CriterionError
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
-from catalyst.analysis import AnalysisError
-from catalyst.criterion import CriterionError
 
 
 def open_deployment(args):
     if getattr(args, "working_copy", None):
         from catalyst.deployment import load_working_copy
+
         return load_working_copy(args.working_copy)
     return load(args.project)
 
@@ -34,16 +36,17 @@ def cmd_validate(args) -> int:
     errors = [f for f in findings if f.level == ERROR]
     failing = findings if args.strict else errors
     if args.json:
-        json.dump({"ok": not failing, "findings": [f.as_dict() for f in findings]},
-                  sys.stdout, indent=2)
+        json.dump({"ok": not failing, "findings": [f.as_dict() for f in findings]}, sys.stdout, indent=2)
         print()
     else:
         for f in findings:
             print(f)
         warnings = len(findings) - len(errors)
         verdict = "FAILED" if failing else "passed"
-        print(f"catalyst validate {verdict}: {len(errors)} error(s), {warnings} warning(s)"
-              + (" (strict)" if args.strict else ""))
+        print(
+            f"catalyst validate {verdict}: {len(errors)} error(s), {warnings} warning(s)"
+            + (" (strict)" if args.strict else "")
+        )
     return 1 if failing else 0
 
 
@@ -81,25 +84,48 @@ def cmd_journal(args) -> int:
         from catalyst.ids import resolve_signer
 
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
-        entry = j.append(dep, j.AppendRequest(
-            command=args.cmd, action=args.action, artifact=args.artifact,
-            targets=args.target or [], intent=args.intent or [], files=args.file or [],
-            actor=str(signer.get("git_username") or signer.get("name")),
-            allow_unchanged=args.allow_unchanged, tier=args.tier))
-        print(json.dumps(entry, ensure_ascii=False) if args.json else
-              f"journaled {len(entry['files'])} file(s) at {entry['timestamp']}")
+        entry = j.append(
+            dep,
+            j.AppendRequest(
+                command=args.cmd,
+                action=args.action,
+                artifact=args.artifact,
+                targets=args.target or [],
+                intent=args.intent or [],
+                files=args.file or [],
+                actor=str(signer.get("git_username") or signer.get("name")),
+                allow_unchanged=args.allow_unchanged,
+                tier=args.tier,
+            ),
+        )
+        print(
+            json.dumps(entry, ensure_ascii=False)
+            if args.json
+            else f"journaled {len(entry['files'])} file(s) at {entry['timestamp']}"
+        )
         return 0
     if args.journal_command == "adopt":
         from catalyst import unrecorded
+
         try:
-            entries = unrecorded.adopt(dep, args.revs, args.intent or [], tier=args.tier,
-                                       targets=args.target or [], artifact=args.artifact, actor=args.as_user)
+            entries = unrecorded.adopt(
+                dep,
+                args.revs,
+                args.intent or [],
+                tier=args.tier,
+                targets=args.target or [],
+                artifact=args.artifact,
+                actor=args.as_user,
+            )
         except ValueError as exc:
             print(f"catalyst: {exc}", file=sys.stderr)
             return 1
         for e in entries:
-            print(json.dumps(e, ensure_ascii=False) if args.json else
-                  f"adopted {e['commit'][:10]} ({e['actor']}): {len(e['files'])} file(s)")
+            print(
+                json.dumps(e, ensure_ascii=False)
+                if args.json
+                else f"adopted {e['commit'][:10]} ({e['actor']}): {len(e['files'])} file(s)"
+            )
         if not entries:
             print("nothing to adopt: every change in those commits is already in the journal")
         return 0
@@ -118,11 +144,12 @@ def cmd_journal(args) -> int:
                 if i not in hidden:
                     print(i)
             if hidden:
-                print(f"({len(hidden)} warning(s) on entries written before the catalyst CLI; "
-                      "--legacy lists them)")
-            print(f"catalyst journal verify {'FAILED' if failing else 'passed'}: "
-                  f"{len(errors)} error(s), {len(issues) - len(errors)} warning(s)"
-                  + (f", {len(notes)} note(s) (merged concurrent edits)" if notes else ""))
+                print(f"({len(hidden)} warning(s) on entries written before the catalyst CLI; --legacy lists them)")
+            print(
+                f"catalyst journal verify {'FAILED' if failing else 'passed'}: "
+                f"{len(errors)} error(s), {len(issues) - len(errors)} warning(s)"
+                + (f", {len(notes)} note(s) (merged concurrent edits)" if notes else "")
+            )
         return 1 if failing else 0
     if args.journal_command == "restore":
         restored, missing = j.restore(dep, args.timestamp, args.out)
@@ -135,10 +162,15 @@ def cmd_journal(args) -> int:
         print(f"{repo}: pinned {n} new blob(s) under {j.PIN_REF}")
     if args.share:
         from catalyst.criterion import CriterionError, share_pins
+
         repos = [dep.root] + ([] if dep.standalone else [dep.project_root])
         for repo in repos:
-            if subprocess.run(["git", "-C", str(repo), "remote", "get-url", "origin"],
-                              check=False, capture_output=True).returncode != 0:
+            if (
+                subprocess.run(
+                    ["git", "-C", str(repo), "remote", "get-url", "origin"], check=False, capture_output=True
+                ).returncode
+                != 0
+            ):
                 continue
             try:
                 print(f"{repo.name}: {share_pins(repo)} blob(s) pinned on the remote")
@@ -161,8 +193,9 @@ def cmd_index(args) -> int:
         if args.check:
             print(f"out of date: {rel}")
             if args.diff:
-                sys.stdout.writelines(difflib.unified_diff(
-                    c.old.splitlines(True), c.new.splitlines(True), rel, rel + " (regenerated)"))
+                sys.stdout.writelines(
+                    difflib.unified_diff(c.old.splitlines(True), c.new.splitlines(True), rel, rel + " (regenerated)")
+                )
         else:
             print(f"regenerated: {rel}")
     if not changes:
@@ -179,19 +212,20 @@ def cmd_check(args) -> int:
         print(f"catalyst check FAILED: {exc}")
         return 1
     except DeploymentNotFound as exc:
-        print(f"catalyst check skipped: {exc}")     # not a catalyst project at all
+        print(f"catalyst check skipped: {exc}")  # not a catalyst project at all
         return 0
     report = run(dep)
     failing = report.failing(args.strict)
     if args.json:
-        json.dump({"ok": not failing, "errors": report.errors, "warnings": report.warnings},
-                  sys.stdout, indent=2)
+        json.dump({"ok": not failing, "errors": report.errors, "warnings": report.warnings}, sys.stdout, indent=2)
         print()
     else:
         if report.errors or report.warnings:
             print(report.text())
-        print(f"catalyst check {'FAILED' if failing else 'passed'} ({report.scope}): "
-              f"{len(report.errors)} error(s), {len(report.warnings)} warning(s)")
+        print(
+            f"catalyst check {'FAILED' if failing else 'passed'} ({report.scope}): "
+            f"{len(report.errors)} error(s), {len(report.warnings)} warning(s)"
+        )
     return 1 if failing else 0
 
 
@@ -242,14 +276,41 @@ def cmd_edit(args) -> int:
                 if not sep:
                     raise edit.EditError(f"--field '{spec}' is not NAME=VALUE")
                 values[key.strip()] = value.strip()
-            res = edit.new(dep, corpus, args.type, args.title, values, signer, args.intent or [],
-                           command=args.cmd or "catalyst new", tier=args.tier)
+            res = edit.new(
+                dep,
+                corpus,
+                args.type,
+                args.title,
+                values,
+                signer,
+                args.intent or [],
+                command=args.cmd or "catalyst new",
+                tier=args.tier,
+            )
         elif args.edit == "status":
-            res = edit.set_status(dep, corpus, args.id, args.status, signer, args.intent or [],
-                                  force=args.force, command=args.cmd or "/status", tier=args.tier)
+            res = edit.set_status(
+                dep,
+                corpus,
+                args.id,
+                args.status,
+                signer,
+                args.intent or [],
+                force=args.force,
+                command=args.cmd or "/status",
+                tier=args.tier,
+            )
         else:
-            res = edit.link(dep, corpus, args.id, args.field_name, args.ids, signer, args.intent or [],
-                            command=args.cmd or "catalyst link", tier=args.tier)
+            res = edit.link(
+                dep,
+                corpus,
+                args.id,
+                args.field_name,
+                args.ids,
+                signer,
+                args.intent or [],
+                command=args.cmd or "catalyst link",
+                tier=args.tier,
+            )
     except (edit.EditError, IdError, JournalError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -264,11 +325,10 @@ def cmd_edit(args) -> int:
 
 def cmd_admin(args) -> int:
     """Administration verbs (R2 W3): users, roles, freeze/unfreeze, definitions."""
-    from module_loader import REPO_ROOT
-
     from catalyst import admin
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
+    from module_loader import REPO_ROOT
 
     dep = open_deployment(args)
     intent = args.intent or []
@@ -290,8 +350,11 @@ def cmd_admin(args) -> int:
             else:
                 out = admin.role_modify(dep, args.name, args.action or [], signer, intent)
         elif args.admin in ("freeze", "unfreeze"):
-            out = {"frozen" if args.admin == "freeze" else "unfrozen":
-                   admin.freeze(dep, args.item, signer, intent, unfreeze=args.admin == "unfreeze")}
+            out = {
+                "frozen" if args.admin == "freeze" else "unfrozen": admin.freeze(
+                    dep, args.item, signer, intent, unfreeze=args.admin == "unfreeze"
+                )
+            }
         else:
             kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
             entity, old = admin.migrate_definition(dep, args.entity, args.version, kernel, signer, intent)
@@ -299,8 +362,11 @@ def cmd_admin(args) -> int:
     except (admin.AdminError, IdError, JournalError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps(out, ensure_ascii=False) if args.json else
-          "; ".join(f"{k}: {v}" for k, v in out.items() if k != "notes"))
+    print(
+        json.dumps(out, ensure_ascii=False)
+        if args.json
+        else "; ".join(f"{k}: {v}" for k, v in out.items() if k != "notes")
+    )
     return 0
 
 
@@ -323,8 +389,9 @@ def cmd_sync(args) -> int:
             print(json.dumps(p.as_dict(), indent=2) if args.json else sync.render(p), end="" if not args.json else "\n")
             return 0
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
-        p, touched = sync.apply(dep, src, commands, str(signer.get("git_username") or signer.get("name")),
-                                args.intent or [])
+        p, touched = sync.apply(
+            dep, src, commands, str(signer.get("git_username") or signer.get("name")), args.intent or []
+        )
     except (sync.SyncError, IdError, JournalError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -352,19 +419,26 @@ def cmd_where(args) -> int:
     name = project_file.project_name(data)
     criterion = project_file.resolve(project)
     home = project_file.home_criterion(name) if name else None
-    kind = ("home" if criterion is not None and criterion == home else
-            "legacy" if criterion is not None else "missing")
-    out = {"project": str(project), "file": project_file.find(project).name, "name": name,
-           "criterion": str(criterion) if criterion else None, "kind": kind,
-           "expected": str(home) if home else None, "workspace": project_file.workspace_of(data)}
+    kind = "home" if criterion is not None and criterion == home else "legacy" if criterion is not None else "missing"
+    out = {
+        "project": str(project),
+        "file": project_file.find(project).name,
+        "name": name,
+        "criterion": str(criterion) if criterion else None,
+        "kind": kind,
+        "expected": str(home) if home else None,
+        "workspace": project_file.workspace_of(data),
+    }
     if out["workspace"]:
         out["workspace_criterion"] = str(project_file.workspace_criterion(out["workspace"]))
     if args.json:
         print(json.dumps(out, indent=2))
     else:
         print(f"project    {out['project']} ({out['file']}, name {name})")
-        print(f"criterion  {out['criterion'] or 'not found'} ({kind})"
-              + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else ""))
+        print(
+            f"criterion  {out['criterion'] or 'not found'} ({kind})"
+            + (f" — expected {out['expected']}" if kind != "home" and out["expected"] else "")
+        )
         if out["workspace"]:
             print(f"workspace  {out['workspace']} ({out['workspace_criterion']})")
     return 0 if criterion is not None else 1
@@ -389,8 +463,9 @@ def cmd_agent(args) -> int:
                 print(json.dumps(rows, indent=2))
             else:
                 for row in rows:
-                    parts = ", ".join(f"{k} {'yes' if v else 'unknown' if v is None else 'no'}"
-                                      for k, v in row["parts"].items())
+                    parts = ", ".join(
+                        f"{k} {'yes' if v else 'unknown' if v is None else 'no'}" for k, v in row["parts"].items()
+                    )
                     print(f"{row['agent']:<12} {'installed' if row['installed'] else '-':<10} {parts}")
             return 0
         print("\n".join(agents.run(args.agent, install=args.agent_command == "install")))
@@ -400,7 +475,7 @@ def cmd_agent(args) -> int:
         return 1
 
 
-AGENT_BINARIES = {"claude-code": "claude"}   # an agent id whose CLI binary has another name
+AGENT_BINARIES = {"claude-code": "claude"}  # an agent id whose CLI binary has another name
 
 
 def cmd_task(args) -> int:
@@ -436,8 +511,7 @@ def cmd_runtime(args) -> int:
     import tempfile
 
     import project_file
-    from catalyst import runtime as rt
-    from catalyst import version_string
+    from catalyst import runtime as rt, version_string
 
     version = version_string()
     start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
@@ -446,18 +520,21 @@ def cmd_runtime(args) -> int:
     name = project_file.project_name(project_file.read_dir(project)) if project else None
     home_store = criterion is not None and name is not None and criterion == project_file.home_criterion(name)
     if args.runtime_command == "status":
-        out = {"version": version, "home": str(project_file.home()),
-               "runtimes": sorted(p.name for p in rt.runtimes().glob("*") if (p / rt.MARKER).is_file()),
-               "launcher": str(project_file.home() / "bin" / "catalyst"),
-               "launcher_installed": (project_file.home() / "bin" / "catalyst").is_file(),
-               "criterion": str(criterion) if criterion else None,
-               "criterion_runtime": rt.installed_version(criterion / ".venv") if criterion else None}
+        out = {
+            "version": version,
+            "home": str(project_file.home()),
+            "runtimes": sorted(p.name for p in rt.runtimes().glob("*") if (p / rt.MARKER).is_file()),
+            "launcher": str(project_file.home() / "bin" / "catalyst"),
+            "launcher_installed": (project_file.home() / "bin" / "catalyst").is_file(),
+            "criterion": str(criterion) if criterion else None,
+            "criterion_runtime": rt.installed_version(criterion / ".venv") if criterion else None,
+        }
         print(json.dumps(out, indent=2) if args.json else "\n".join(f"{k:<20}{v}" for k, v in out.items()))
         return 0
     try:
         with tempfile.TemporaryDirectory() as tmp:
             pyz = rt.own_pyz(Path(tmp))
-            version = rt.pyz_version(pyz)       # a build from source is not its release
+            version = rt.pyz_version(pyz)  # a build from source is not its release
             runtime_dir = rt.ensure_runtime(version, pyz)
             launcher = rt.install_launcher()
             lines = [f"runtime {version}: {runtime_dir}", f"launcher: {launcher} (put {launcher.parent} on PATH)"]
@@ -499,10 +576,9 @@ def cmd_move(args) -> int:
 
 def cmd_workspace(args) -> int:
     """`workspace init|status` (R3.1b): a VS Code workspace's meta criterion."""
-    from module_loader import REPO_ROOT
-
     from catalyst import workspace as ws
     from catalyst.init import git_user_name
+    from module_loader import REPO_ROOT
 
     path = Path(os.path.abspath(args.file))
     try:
@@ -570,9 +646,11 @@ def cmd_trace(args) -> int:
     for c in manual:
         print(f"{'ERROR  ' if lvl == 'error' else 'WARNING'} unrecorded-change: {unrecorded.describe(c)}")
     failed = bool(failures) or (lvl == "error" and bool(manual))
-    print(f"catalyst trace {'FAILED' if failed else 'passed'}: {checked} commit(s) checked, "
-          f"{len(failures)} without a trace" + (" (pattern only)" if corpus is None else
-                                                 f", {len(manual)} with unrecorded changes"))
+    print(
+        f"catalyst trace {'FAILED' if failed else 'passed'}: {checked} commit(s) checked, "
+        f"{len(failures)} without a trace"
+        + (" (pattern only)" if corpus is None else f", {len(manual)} with unrecorded changes")
+    )
     return 1 if failed else 0
 
 
@@ -584,8 +662,11 @@ def cmd_unrecorded(args) -> int:
         print("catalyst: a standalone working copy has no product history", file=sys.stderr)
         return 1
     if unrecorded.baseline(dep) is None and not args.range:
-        print(f"catalyst: the pointer declares no `{unrecorded.BASELINE_KEY}` (migration 0.42.0); "
-              "pass a range to check one", file=sys.stderr)
+        print(
+            f"catalyst: the pointer declares no `{unrecorded.BASELINE_KEY}` (migration 0.42.0); "
+            "pass a range to check one",
+            file=sys.stderr,
+        )
         return 1
     if unrecorded.baseline_missing(dep):
         print(f"catalyst: {unrecorded.MISSING_BASELINE}", file=sys.stderr)
@@ -593,22 +674,33 @@ def cmd_unrecorded(args) -> int:
     try:
         pairs = unrecorded.recorded(dep)
         revs = unrecorded.scoped(dep, [args.range or "HEAD"])
-        found = [unrecorded.Commit(c.sha, c.author, c.subject, m)
-                 for c in unrecorded.commits(dep.project_root, revs)
-                 if (m := unrecorded.unrecorded_in(c, pairs))]
+        found = [
+            unrecorded.Commit(c.sha, c.author, c.subject, m)
+            for c in unrecorded.commits(dep.project_root, revs)
+            if (m := unrecorded.unrecorded_in(c, pairs))
+        ]
     except ValueError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     if args.json:
-        json.dump([{"commit": c.sha, "author": c.author, "subject": c.subject,
-                    "files": [{"path": p, "before": b, "after": a} for p, b, a in c.changes]}
-                   for c in found], sys.stdout, indent=2)
+        json.dump(
+            [
+                {
+                    "commit": c.sha,
+                    "author": c.author,
+                    "subject": c.subject,
+                    "files": [{"path": p, "before": b, "after": a} for p, b, a in c.changes],
+                }
+                for c in found
+            ],
+            sys.stdout,
+            indent=2,
+        )
         print()
     else:
         for c in found:
             print(unrecorded.describe(c))
-        print(f"{len(found)} commit(s) with changes not in the journal "
-              f"(checked as {unrecorded.level(dep)}s)")
+        print(f"{len(found)} commit(s) with changes not in the journal (checked as {unrecorded.level(dep)}s)")
     return 1 if found and unrecorded.level(dep) == "error" else 0
 
 
@@ -617,42 +709,59 @@ def cmd_hook(args) -> int:
 
     if args.hook_command == "commit-msg" and args.route:
         from catalyst.trace import route
+
         top = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
         return route(top, Path(os.path.abspath(args.message_file)), [sys.executable, sys.argv[0]])
     if args.hook_command == "commit-msg":
         from catalyst.corpus import load_corpus
         from catalyst.trace import check_message
+
         try:
             corpus = load_corpus(open_deployment(args))
         except DeploymentNotFound:
             return 0
-        git_dir = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], check=False, capture_output=True, text=True, encoding="utf-8")
+        git_dir = subprocess.run(
+            ["git", "rev-parse", "--absolute-git-dir"], check=False, capture_output=True, text=True, encoding="utf-8"
+        )
         if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
-            return 0                         # a merge carries its parents' trace (as in `trace`)
+            return 0  # a merge carries its parents' trace (as in `trace`)
         reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
         if not reason:
             from catalyst import unrecorded
+
             dep = open_deployment(args)
             missing = unrecorded.staged(dep) if unrecorded.baseline(dep) is not None else []
             if missing:
                 paths = ", ".join(p for p, _, _ in missing[:5]) + (" ..." if len(missing) > 5 else "")
-                advice = ("Journal them first (`catalyst journal append --file <path>`), or record the "
-                          "commit afterwards with `catalyst journal adopt HEAD`.")
+                advice = (
+                    "Journal them first (`catalyst journal append --file <path>`), or record the "
+                    "commit afterwards with `catalyst journal adopt HEAD`."
+                )
                 if unrecorded.level(dep) == "error":
-                    print(f"catalyst: commit refused — {len(missing)} staged file(s) not recorded in the "
-                          f"journal: {paths}.\n{advice} Bypass once: git commit --no-verify.", file=sys.stderr)
+                    print(
+                        f"catalyst: commit refused — {len(missing)} staged file(s) not recorded in the "
+                        f"journal: {paths}.\n{advice} Bypass once: git commit --no-verify.",
+                        file=sys.stderr,
+                    )
                     return 1
-                print(f"catalyst: warning — {len(missing)} staged file(s) not recorded in the journal: "
-                      f"{paths}.\n{advice} (A warning during the beta; from format 1.0 this refuses "
-                      "the commit.)", file=sys.stderr)
+                print(
+                    f"catalyst: warning — {len(missing)} staged file(s) not recorded in the journal: "
+                    f"{paths}.\n{advice} (A warning during the beta; from format 1.0 this refuses "
+                    "the commit.)",
+                    file=sys.stderr,
+                )
         if reason:
-            print(f"catalyst: commit refused — {reason}.\nCite the artifact or rule this commit serves "
-                  "(e.g. <PREFIX>-000012 or its full ID), or start the subject with `chore:` "
-                  "if no rule's behaviour changes. Bypass once: git commit --no-verify.", file=sys.stderr)
+            print(
+                f"catalyst: commit refused — {reason}.\nCite the artifact or rule this commit serves "
+                "(e.g. <PREFIX>-000012 or its full ID), or start the subject with `chore:` "
+                "if no rule's behaviour changes. Bypass once: git commit --no-verify.",
+                file=sys.stderr,
+            )
             return 1
         return 0
     if args.hook_command == "install":
         from catalyst.trace import install_hook
+
         try:
             print(f"installed {install_hook(open_deployment(args).project_root)}")
         except ValueError as exc:
@@ -663,6 +772,7 @@ def cmd_hook(args) -> int:
     # Fail closed: Claude Code ignores every exit but 2, so a crash here must
     # block the stop (with its reason) instead of switching enforcement off.
     from catalyst.check import hook_block, hook_input
+
     try:
         data = hook_input()
         try:
@@ -672,7 +782,7 @@ def cmd_hook(args) -> int:
         except DeploymentNotFound:
             return 0
         return hook_stop(dep, data, strict=args.strict, fmt=args.format)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return hook_block(f"catalyst hook stop crashed — {type(exc).__name__}: {exc}", args.format)
 
 
@@ -697,13 +807,13 @@ def _ask_url(exc) -> str:
     url = input("criterion repository URL (empty to stay local): ").strip()
     if not url:
         from catalyst.criterion import CriterionError
+
         raise CriterionError("no URL given: nothing changed, the deployment stays local")
     return url
 
 
 def cmd_analysis(args) -> int:
-    from catalyst import analysis as an
-    from catalyst import journal
+    from catalyst import analysis as an, journal
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
 
@@ -715,10 +825,19 @@ def cmd_analysis(args) -> int:
         return resolve_signer(dep, corpus, getattr(args, "as_user", None))
 
     def journaled(ctx, action: str, intent: str, who: dict) -> None:
-        journal.append(dep, journal.AppendRequest(
-            command=f"catalyst analysis {sub}", action=action, artifact=ctx.art.id,
-            targets=[], intent=[intent], files=[str(f) for f in an.files_of(ctx)],
-            actor=str(who.get("git_username") or who.get("name")), allow_unchanged=True))
+        journal.append(
+            dep,
+            journal.AppendRequest(
+                command=f"catalyst analysis {sub}",
+                action=action,
+                artifact=ctx.art.id,
+                targets=[],
+                intent=[intent],
+                files=[str(f) for f in an.files_of(ctx)],
+                actor=str(who.get("git_username") or who.get("name")),
+                allow_unchanged=True,
+            ),
+        )
 
     def read_json(path: str):
         try:
@@ -731,18 +850,24 @@ def cmd_analysis(args) -> int:
         ctx = an.start(dep, args.scope, args.mode, who, args.name)
         journaled(ctx, "create", f"{args.mode} analysis of {' '.join(ctx.load('inventory.json')['scope'])}", who)
         inv = ctx.load("inventory.json")
-        print(f"{ctx.art.id}: {len(inv['files'])} file(s) at {inv['code_state'][:10]}; "
-              f"record two independent passes with `catalyst analysis record {ctx.art.id} --pass A|B <file>`")
+        print(
+            f"{ctx.art.id}: {len(inv['files'])} file(s) at {inv['code_state'][:10]}; "
+            f"record two independent passes with `catalyst analysis record {ctx.art.id} --pass A|B <file>`"
+        )
         return 0
     ctx = an.context(dep, args.id, corpus)
     if sub == "status":
         d, r = ctx.load("diff.json"), ctx.load("reconciled.json")
         decided = (ctx.load("decisions.json") or {}).get("decisions", {})
         print(f"{ctx.art.id}: {an.phase(ctx.art)} ({ctx.art.get('Mode')}; {ctx.art.get('Scope')})")
-        print(f"passes:    A {'recorded' if ctx.load('A.json') else '—'}, B {'recorded' if ctx.load('B.json') else '—'}")
+        print(
+            f"passes:    A {'recorded' if ctx.load('A.json') else '—'}, B {'recorded' if ctx.load('B.json') else '—'}"
+        )
         if d:
-            print(f"diff:      {len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, "
-                  f"{len(d['a_only'])} A-only, {len(d['b_only'])} B-only")
+            print(
+                f"diff:      {len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, "
+                f"{len(d['a_only'])} A-only, {len(d['b_only'])} B-only"
+            )
         if r:
             print(f"decisions: {len(decided)}/{len(r['findings'])} findings decided")
         for problem in an.problems(ctx):
@@ -758,8 +883,10 @@ def cmd_analysis(args) -> int:
     if sub == "diff":
         d = an.run_diff(ctx)
         journaled(an.context(dep, ctx.art.id), "update", "passes matched for reconciliation", who)
-        print(f"{len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, {len(d['a_only'])} A-only, "
-              f"{len(d['b_only'])} B-only — reconcile every one (`catalyst analysis reconcile`)")
+        print(
+            f"{len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, {len(d['a_only'])} A-only, "
+            f"{len(d['b_only'])} B-only — reconcile every one (`catalyst analysis reconcile`)"
+        )
         return 0
     if sub == "reconcile":
         an.reconcile(ctx, read_json(args.file))
@@ -769,15 +896,24 @@ def cmd_analysis(args) -> int:
         return 0
     if sub == "decide":
         an.decide(ctx, args.finding, args.verdict, who, args.artifact, args.reason)
-        journaled(ctx, "update", f"finding {args.finding}: {args.verdict}"
-                  + (f" as {args.artifact}" if args.artifact else ""), who)
+        journaled(
+            ctx,
+            "update",
+            f"finding {args.finding}: {args.verdict}" + (f" as {args.artifact}" if args.artifact else ""),
+            who,
+        )
         print(f"{args.finding}: {args.verdict}" + (f" → {args.artifact}" if args.artifact else ""))
         return 0
     if sub == "close":
         counts = an.close(ctx)
         journaled(an.context(dep, ctx.art.id), "close", "every finding decided; accepted ones exist", who)
-        print(f"{ctx.art.id} closed: " + (", ".join(f"{k} {c['accept']}/{c['accept'] + c['reject']} accepted"
-                                                   for k, c in sorted(counts.items())) or "no findings"))
+        print(
+            f"{ctx.art.id} closed: "
+            + (
+                ", ".join(f"{k} {c['accept']}/{c['accept'] + c['reject']} accepted" for k, c in sorted(counts.items()))
+                or "no findings"
+            )
+        )
         return 0
     an.abandon(ctx, args.reason)
     journaled(an.context(dep, ctx.art.id), "close", f"abandoned: {args.reason}", who)
@@ -792,6 +928,7 @@ def cmd_criterion(args) -> int:
     if sub == "join":
         start = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
         import project_file
+
         project = project_file.find_up(start)
         if project is None:
             raise DeploymentNotFound(f"no catalyst.toml (or legacy *.catalyst pointer) at or above {start}")
@@ -806,8 +943,10 @@ def cmd_criterion(args) -> int:
     dep = open_deployment(args)
     if sub == "status":
         st = cr.status(dep, fetch=args.fetch)
-        print(f"mode:     {st.mode}\nremote:   {st.remote or '(none)'}\nshared:   {st.branch}\n"
-              f"branch:   {st.current or '(detached)'}\nchanges:  {len(st.dirty)} uncommitted")
+        print(
+            f"mode:     {st.mode}\nremote:   {st.remote or '(none)'}\nshared:   {st.branch}\n"
+            f"branch:   {st.current or '(detached)'}\nchanges:  {len(st.dirty)} uncommitted"
+        )
         if st.ahead is not None:
             print(f"vs shared: {st.ahead} ahead, {st.behind} behind")
         return 0
@@ -832,15 +971,21 @@ def cmd_criterion(args) -> int:
     if sub == "push":
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
+
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
         res = cr.push(dep, signer, args.message, open_pr=not args.no_pr)
         if res.commits == 0:
             print("nothing to push: the working copy matches the shared branch")
             return 0
-        print(f"pushed {res.commits} commit(s) to {res.branch}"
-              + (f" (regenerated {', '.join(res.regenerated)})" if res.regenerated else ""))
-        print(f"pull request: {res.pr}" if res.pr else
-              f"open a pull request from {res.branch} into {cr.shared_branch(dep)}")
+        print(
+            f"pushed {res.commits} commit(s) to {res.branch}"
+            + (f" (regenerated {', '.join(res.regenerated)})" if res.regenerated else "")
+        )
+        print(
+            f"pull request: {res.pr}"
+            if res.pr
+            else f"open a pull request from {res.branch} into {cr.shared_branch(dep)}"
+        )
         return 0
     if sub == "sync":
         print(f"working copy at {cr.sync(dep)} (shared branch {cr.shared_branch(dep)})")
@@ -851,28 +996,25 @@ def cmd_criterion(args) -> int:
         problems = cr.integrity(dep.root, args.head, args.parent or None)
         for p in problems:
             print(f"ERROR   {p}")
-        print(f"catalyst criterion integrity {'FAILED' if problems else 'passed'}: "
-              f"{len(problems)} missing")
+        print(f"catalyst criterion integrity {'FAILED' if problems else 'passed'}: {len(problems)} missing")
         return 1 if problems else 0
     print(cr.protect(dep, apply=args.yes))
     return 0
 
 
 def cmd_init(args) -> int:
-    from module_loader import REPO_ROOT
-
     from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
+    from module_loader import REPO_ROOT
 
     kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
     if not (kernel / "rules-of-rules.template.md").is_file():
         print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
         return 2
     project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
-    if not args.module:                      # never chosen for the user: list what is here
+    if not args.module:  # never chosen for the user: list what is here
         found = local_modules(project)
         listing = "; ".join(f"{m} ({d})" for m, d in found.items()) or "none next to the project or catalyst"
-        print(f"catalyst: pass --module <id> (and --module-dir if it is elsewhere). Found: {listing}",
-              file=sys.stderr)
+        print(f"catalyst: pass --module <id> (and --module-dir if it is elsewhere). Found: {listing}", file=sys.stderr)
         return 2
     user = args.user or git_user_name(project)
     if not user:
@@ -883,18 +1025,32 @@ def cmd_init(args) -> int:
         doc, _, prefix = spec.partition(":")
         docs.append((doc if doc.endswith(".md") else doc + ".md", prefix or "br"))
     try:
-        steps = init(InitRequest(
-            project=project, name=args.name, module_id=args.module, user=user, kernel=kernel,
-            module=args.module_dir, git_username=args.git_username or user, rule_docs=docs,
-            test_locations=args.test_locations, at=args.at, agent=args.agent, userid=args.userid,
-            runtime=not args.no_runtime))
+        steps = init(
+            InitRequest(
+                project=project,
+                name=args.name,
+                module_id=args.module,
+                user=user,
+                kernel=kernel,
+                module=args.module_dir,
+                git_username=args.git_username or user,
+                rule_docs=docs,
+                test_locations=args.test_locations,
+                at=args.at,
+                agent=args.agent,
+                userid=args.userid,
+                runtime=not args.no_runtime,
+            )
+        )
     except InitError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     for step in steps:
         print(f"- {step}")
-    print("Next: `catalyst agent install <agent>` once per machine, then the first rules (catalyst id next-rule) "
-          "and `catalyst check`. Nothing was committed in the project repository.")
+    print(
+        "Next: `catalyst agent install <agent>` once per machine, then the first rules (catalyst id next-rule) "
+        "and `catalyst check`. Nothing was committed in the project repository."
+    )
     return 0
 
 
@@ -911,13 +1067,16 @@ def cmd_hook_start(args) -> int:
     except DeploymentNotFound:
         return 0
     else:
-        text = "\n".join(path.read_text(encoding="utf-8", errors="replace")
-                         for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md") if path.is_file())
+        text = "\n".join(
+            path.read_text(encoding="utf-8", errors="replace")
+            for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md")
+            if path.is_file()
+        )
     if args.format == "text":
         print(text)
     elif args.format == "cursor":
         print(json.dumps({"additional_context": text}))
-    else:      # Codex, Copilot (CLI and VS Code), Gemini CLI, Claude Code
+    else:  # Codex, Copilot (CLI and VS Code), Gemini CLI, Claude Code
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": text}}))
     return 0
 
@@ -932,8 +1091,10 @@ def cmd_spec(args) -> int:
             over = sorted(o for o in over if o[0] > args.budget)
             for words, c in over:
                 print(f"ERROR   /{c}: {words} words (budget {args.budget})")
-            print(f"catalyst spec budget {'FAILED' if over else 'passed'}: "
-                  f"{len(commands(dep))} commands, budget {args.budget} words each")
+            print(
+                f"catalyst spec budget {'FAILED' if over else 'passed'}: "
+                f"{len(commands(dep))} commands, budget {args.budget} words each"
+            )
             return 1 if over else 0
         if args.general:
             sys.stdout.write(general(dep))
@@ -958,14 +1119,25 @@ def cmd_recompose(args) -> int:
     params = deployed_params(dep.root, dep.module.id)
     new_module = args.module_dir or dep.module.path
     try:
-        results = recompose(dep.root, params, (args.base_kernel, args.base_module),
-                            (args.kernel, new_module), write=not args.check, force=args.force)
+        results = recompose(
+            dep.root,
+            params,
+            (args.base_kernel, args.base_module),
+            (args.kernel, new_module),
+            write=not args.check,
+            force=args.force,
+        )
     except RuntimeError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     for r in results:
-        state = ("frozen, skipped" if r.frozen else f"{r.conflicts} conflict(s)" if r.conflicts
-                 else ("merged" if r.changed else "unchanged"))
+        state = (
+            "frozen, skipped"
+            if r.frozen
+            else f"{r.conflicts} conflict(s)"
+            if r.conflicts
+            else ("merged" if r.changed else "unchanged")
+        )
         print(f"{'would update' if args.check and r.changed else state:>14}  .criterion/{r.path}")
     conflicts = sum(r.conflicts for r in results)
     if conflicts:
@@ -976,10 +1148,15 @@ def cmd_recompose(args) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"catalyst {version_string()}")
-    parser.add_argument("--project", type=Path, default=None,
-                        help="a directory inside the project (default: current directory)")
-    parser.add_argument("--working-copy", type=Path, default=None,
-                        help="check a bare working copy (e.g. the criterion repository in CI)")
+    parser.add_argument(
+        "--project", type=Path, default=None, help="a directory inside the project (default: current directory)"
+    )
+    parser.add_argument(
+        "--working-copy",
+        type=Path,
+        default=None,
+        help="check a bare working copy (e.g. the criterion repository in CI)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("validate", help="validate the traceability chain against the ETDs")
@@ -989,23 +1166,40 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init", help="install catalyst into this project (explicit only, INV-2)")
     p.add_argument("--name", required=True, help="the project name (the pointer is <name>.catalyst)")
-    p.add_argument("--module", help="the active process module id (no default: without it, init lists "
-                   "the modules it finds)")
+    p.add_argument(
+        "--module", help="the active process module id (no default: without it, init lists the modules it finds)"
+    )
     p.add_argument("--user", help="the first user's name, who becomes Admin (default: git config user.name)")
     p.add_argument("--git-username", help="the first user's git username (default: --user)")
-    p.add_argument("--rule-doc", action="append", metavar="FILE:PREFIX",
-                   help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)")
+    p.add_argument(
+        "--rule-doc",
+        action="append",
+        metavar="FILE:PREFIX",
+        help="a rule document and its ID prefix, e.g. business-rules:br (repeatable)",
+    )
     p.add_argument("--test-locations", help="where the project's tests live (Rules-of-Rules §2)")
-    p.add_argument("--at", type=Path, help="legacy: an agent-owned location reached through a .criterion "
-                   "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)")
-    p.add_argument("--no-runtime", action="store_true",
-                   help="do not fill the criterion's .venv now (`catalyst runtime install` later)")
-    p.add_argument("--agent", default="unknown", help="the running agent's id, e.g. claude-code (recorded in "
-                   "catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level)")
-    p.add_argument("--kernel", type=Path, help="framework/kernel of a catalyst checkout or release "
-                   "(default: this checkout's)")
+    p.add_argument(
+        "--at",
+        type=Path,
+        help="legacy: an agent-owned location reached through a .criterion "
+        "symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project)",
+    )
+    p.add_argument(
+        "--no-runtime",
+        action="store_true",
+        help="do not fill the criterion's .venv now (`catalyst runtime install` later)",
+    )
+    p.add_argument(
+        "--agent",
+        default="unknown",
+        help="the running agent's id, e.g. claude-code (recorded in "
+        "catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level)",
+    )
+    p.add_argument(
+        "--kernel", type=Path, help="framework/kernel of a catalyst checkout or release (default: this checkout's)"
+    )
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
-    p.add_argument("--userid", help=argparse.SUPPRESS)       # fixed first userid: reproducible examples
+    p.add_argument("--userid", help=argparse.SUPPRESS)  # fixed first userid: reproducible examples
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("check", help="run every check: structure, chain, journal, indexes")
@@ -1017,20 +1211,31 @@ def build_parser() -> argparse.ArgumentParser:
     hk = p.add_subparsers(dest="hook_command", required=True)
     q = hk.add_parser("stop", help="end-of-turn hook: block the stop with the failures")
     q.add_argument("--strict", action="store_true")
-    q.add_argument("--format", choices=("exit2", "json", "gemini", "cursor"), default="exit2",
-                   help="how to block: exit 2 + stderr (Claude Code), decision JSON (Codex, Copilot), "
-                        "Gemini CLI's, Cursor's follow-up message")
+    q.add_argument(
+        "--format",
+        choices=("exit2", "json", "gemini", "cursor"),
+        default="exit2",
+        help="how to block: exit 2 + stderr (Claude Code), decision JSON (Codex, Copilot), "
+        "Gemini CLI's, Cursor's follow-up message",
+    )
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("commit-msg", help="git commit-msg hook: the message must trace to the chain")
     q.add_argument("message_file")
-    q.add_argument("--route", action="store_true",
-                   help="from the repository top: hand the message to each deployment owning a staged file")
+    q.add_argument(
+        "--route",
+        action="store_true",
+        help="from the repository top: hand the message to each deployment owning a staged file",
+    )
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("start", help="session-start hook: print the deployment's invariants")
-    q.add_argument("--format", choices=("text", "json", "cursor"), default="text",
-                   help="plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's")
+    q.add_argument(
+        "--format",
+        choices=("text", "json", "cursor"),
+        default="text",
+        help="plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's",
+    )
     q.set_defaults(func=cmd_hook_start)
 
     p = sub.add_parser("report", help="usage report: actors, tiers, traced commits, open artifacts")
@@ -1045,14 +1250,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("trace", help="check that every commit in a range cites an artifact or rule ID")
     p.add_argument("range", nargs="?", default="HEAD~1..HEAD", help="git revision range (default: HEAD~1..HEAD)")
-    p.add_argument("--pattern-only", action="store_true",
-                   help="no working copy (e.g. CI of a local-only deployment): accept any well-formed ID")
+    p.add_argument(
+        "--pattern-only",
+        action="store_true",
+        help="no working copy (e.g. CI of a local-only deployment): accept any well-formed ID",
+    )
     p.set_defaults(func=cmd_trace)
 
-    p = sub.add_parser("recompose", help="merge kernel/module template changes into the deployed "
-                       "documents, keeping local edits (three-way)")
-    p.add_argument("--base-kernel", type=Path, required=True,
-                   help="framework/kernel the deployment was composed from (the old version)")
+    p = sub.add_parser(
+        "recompose",
+        help="merge kernel/module template changes into the deployed documents, keeping local edits (three-way)",
+    )
+    p.add_argument(
+        "--base-kernel",
+        type=Path,
+        required=True,
+        help="framework/kernel the deployment was composed from (the old version)",
+    )
     p.add_argument("--base-module", type=Path, required=True, help="the module directory it was composed from")
     p.add_argument("--kernel", type=Path, required=True, help="the new framework/kernel")
     p.add_argument("--module-dir", type=Path, help="the new module directory (default: the deployed one)")
@@ -1063,8 +1277,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("spec", help="print only what one command needs from CODE-OF-CONDUCT §4")
     p.add_argument("command", nargs="?", help="e.g. status or /check-rules (none: list commands)")
     p.add_argument("--general", action="store_true", help="the §4 rules that apply to every command")
-    p.add_argument("--budget", type=int, metavar="WORDS",
-                   help="check every command's spec against a word budget (exit 1 if over)")
+    p.add_argument(
+        "--budget", type=int, metavar="WORDS", help="check every command's spec against a word budget (exit 1 if over)"
+    )
     p.set_defaults(func=cmd_spec)
 
     p = sub.add_parser("id", help="allocate the next ID (never reused)")
@@ -1090,8 +1305,9 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--file", action="append", help="a touched file (repeatable)")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--allow-unchanged", action="store_true")
-    q.add_argument("--tier", choices=["chore", "fix", "feature"],
-                   help="the change's ceremony tier (a chore needs no artifact)")
+    q.add_argument(
+        "--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier (a chore needs no artifact)"
+    )
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("adopt", help="record commits made outside catalyst in the journal (origin manual)")
@@ -1120,14 +1336,21 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_view, view="journal")
     q = js.add_parser("pin", help="pin every referenced blob so git gc keeps it")
-    q.add_argument("--share", action="store_true",
-                   help="also merge with and push the remote's pins (working copy and product repository)")
+    q.add_argument(
+        "--share",
+        action="store_true",
+        help="also merge with and push the remote's pins (working copy and product repository)",
+    )
     q.set_defaults(func=cmd_journal)
 
     p = sub.add_parser("list", help="read-only: artifacts of a type, rules, users, roles or templates")
     p.add_argument("type", help="an entity type (prefix, name or folder), rule, user, role, template, or all")
-    p.add_argument("--filter", action="append", metavar="KEY=VALUE",
-                   help="keep items whose KEY matches VALUE (* and ? wildcards; repeatable)")
+    p.add_argument(
+        "--filter",
+        action="append",
+        metavar="KEY=VALUE",
+        help="keep items whose KEY matches VALUE (* and ? wildcards; repeatable)",
+    )
     p.add_argument("--type", dest="template_type", help="with `template`: one template family")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="list")
@@ -1144,8 +1367,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("new", help="create an artifact from its type's latest template, signed, indexed, journaled")
     p.add_argument("type", help="an entity type (prefix, name or folder)")
     p.add_argument("--title", required=True)
-    p.add_argument("--field", action="append", metavar="NAME=VALUE",
-                   help="a field value; references as comma-separated IDs (repeatable)")
+    p.add_argument(
+        "--field",
+        action="append",
+        metavar="NAME=VALUE",
+        help="a field value; references as comma-separated IDs (repeatable)",
+    )
     p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
@@ -1227,8 +1454,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="role")
 
-    for verb, text in (("freeze", "protect an item from /sync-framework (.frozen)"),
-                       ("unfreeze", "remove an item from .frozen")):
+    for verb, text in (
+        ("freeze", "protect an item from /sync-framework (.frozen)"),
+        ("unfreeze", "remove an item from .frozen"),
+    ):
         p = sub.add_parser(verb, help=text)
         p.add_argument("item", help="an artifact ID, entity type, template name or working-copy path")
         p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
@@ -1249,17 +1478,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("sync", help="synchronize the deployment with a kernel (and module) release")
     sy = p.add_subparsers(dest="sync_command", required=True)
-    for verb, text in (("plan", "list what a sync would change, and the migrations to run"),
-                       ("apply", "do the mechanical half of /sync-framework, then journal it")):
+    for verb, text in (
+        ("plan", "list what a sync would change, and the migrations to run"),
+        ("apply", "do the mechanical half of /sync-framework, then journal it"),
+    ):
         q = sy.add_parser(verb, help=text)
-        q.add_argument("--kernel", type=Path, required=True,
-                       help="the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip")
+        q.add_argument(
+            "--kernel",
+            type=Path,
+            required=True,
+            help="the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip",
+        )
         q.add_argument("--module", type=Path, help="the target module: its directory or release zip")
-        q.add_argument("--base-kernel", type=Path,
-                       help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)")
+        q.add_argument(
+            "--base-kernel",
+            type=Path,
+            help="the kernel the deployment was composed from (default: found next to the zip, or the git tag)",
+        )
         q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
-        q.add_argument("--commands-dir", type=Path, help="where an older catalyst wrote the project's command files, "
-                       "to retire them (default: .claude/commands)")
+        q.add_argument(
+            "--commands-dir",
+            type=Path,
+            help="where an older catalyst wrote the project's command files, "
+            "to retire them (default: .claude/commands)",
+        )
         q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
@@ -1271,8 +1513,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("agent", help="wire catalyst into an agent at user level (MCP server, hooks), never a project")
     ags = p.add_subparsers(dest="agent_command", required=True)
-    for verb, text in (("install", "add catalyst to the agent's user-level configuration"),
-                       ("uninstall", "remove catalyst's entries from it")):
+    for verb, text in (
+        ("install", "add catalyst to the agent's user-level configuration"),
+        ("uninstall", "remove catalyst's entries from it"),
+    ):
         q = ags.add_parser(verb, help=text)
         q.add_argument("agent", choices=("claude-code", "copilot", "vscode", "cursor", "codex", "gemini"))
         q.set_defaults(func=cmd_agent)
@@ -1298,8 +1542,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("move", help="move a legacy deployment into $HOME/.catalyst, or rename a project")
     mg = p.add_mutually_exclusive_group(required=True)
-    mg.add_argument("--to-home", action="store_true",
-                    help="symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion")
+    mg.add_argument(
+        "--to-home",
+        action="store_true",
+        help="symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion",
+    )
     mg.add_argument("--name", help="rename a home-store project")
     p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
     p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
@@ -1329,8 +1576,12 @@ def build_parser() -> argparse.ArgumentParser:
     an_sub = p.add_subparsers(dest="analysis_command", required=True)
     q = an_sub.add_parser("start", help="open an analysis: scope, mode, code state, inventory")
     q.add_argument("scope", nargs="*", default=["."], help="paths to analyse (default: the whole project)")
-    q.add_argument("--mode", choices=["bootstrap", "incremental"], default="incremental",
-                   help="bootstrap: no rules yet; incremental: find what the rules miss (default)")
+    q.add_argument(
+        "--mode",
+        choices=["bootstrap", "incremental"],
+        default="incremental",
+        help="bootstrap: no rules yet; incremental: find what the rules miss (default)",
+    )
     q.add_argument("--name", help="a short name for the record")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.set_defaults(func=cmd_analysis)
@@ -1376,10 +1627,16 @@ def build_parser() -> argparse.ArgumentParser:
     q = cs.add_parser("status", help="the working copy against the shared branch")
     q.add_argument("--fetch", action="store_true")
     q.set_defaults(func=cmd_criterion)
-    q = cs.add_parser("create", help="version the working copy for sharing; with a URL, publish it as the .criterion submodule")
-    q.add_argument("url", nargs="?", default=None,
-                   help="the criterion repository (empty, or already holding this history); without it "
-                        "the working copy is versioned strictly locally, and push/sync/join ask for it")
+    q = cs.add_parser(
+        "create", help="version the working copy for sharing; with a URL, publish it as the .criterion submodule"
+    )
+    q.add_argument(
+        "url",
+        nargs="?",
+        default=None,
+        help="the criterion repository (empty, or already holding this history); without it "
+        "the working copy is versioned strictly locally, and push/sync/join ask for it",
+    )
     q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("join", help="check out a shared deployment in a clone of the product")
@@ -1396,8 +1653,9 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("integrity", help="fail if a merge lost any ID, index row or journal line")
     q.add_argument("--head", default="HEAD")
-    q.add_argument("--parent", action="append", help="compare against this revision (repeatable; "
-                   "default: the head's own parents)")
+    q.add_argument(
+        "--parent", action="append", help="compare against this revision (repeatable; default: the head's own parents)"
+    )
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("protect", help="branch protection for the shared branch (GitHub)")
     q.add_argument("--yes", action="store_true", help="apply it (without: show what would be set)")
@@ -1411,8 +1669,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    for stream in (sys.stdout, sys.stderr):       # UTF-8 out, whatever the code page (cp1252), so
-        if hasattr(stream, "reconfigure"):        # git and hooks read it back; degrade, never crash
+    for stream in (sys.stdout, sys.stderr):  # UTF-8 out, whatever the code page (cp1252), so
+        if hasattr(stream, "reconfigure"):  # git and hooks read it back; degrade, never crash
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     args = build_parser().parse_args(argv)
     try:
@@ -1423,7 +1681,7 @@ def main(argv: list[str] | None = None) -> int:
     except DeploymentNotFound as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 2
-    except OSError as exc:        # e.g. git missing, unreadable file
+    except OSError as exc:  # e.g. git missing, unreadable file
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
 

@@ -8,11 +8,13 @@
 ## Context
 
 Early in development, terminology around the catalyst project was inconsistent:
+
 - Was "catalyst" the entire system or just a component?
 - What was the "framework" vs. the "kernel"?
 - How should these terms be used in documentation, commands, and user communication?
 
 Clarifying the terminology was essential for:
+
 - Consistent documentation and user guidance
 - Clear boundaries between kernel (rule engine) and modules (process implementations)
 - Avoiding confusion about what users were installing or configuring
@@ -24,6 +26,7 @@ The BOOTSTRAP.md hard rule 3 establishes the canonical naming convention.
 **Catalyst is the framework; the kernel is the rule engine within catalyst.**
 
 Precise definitions:
+
 - **Catalyst** (or "catalyst framework"): The complete system, including the kernel rule engine, standard library, process modules, and supporting tools. This is the product name.
 - **The kernel**: The module-independent part of catalyst (`framework/kernel/` in the repository), responsible for:
   - Rule engine and rule storage/validation
@@ -35,6 +38,7 @@ Precise definitions:
   - Each module declares its `grounding_type` (how its artifacts link to kernel rules)
 
 Usage examples:
+
 - ✓ "Install catalyst" (the framework)
 - ✓ "The kernel provides the rule system" (the rule engine)
 - ✓ "The SE module implements software engineering" (a process)

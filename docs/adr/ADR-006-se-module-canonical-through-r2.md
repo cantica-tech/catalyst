@@ -16,6 +16,7 @@ The planning document (06-roadmap-streamline.md, R1.6 phase) indicates that feat
 ## Decision
 
 **The SE module is designated as the canonical process module through R2.** This means:
+
 - All example deployments use the SE module by default
 - The SE module's artifact types and workflows are the reference implementation
 - No other process modules are expected to ship during R0–R2

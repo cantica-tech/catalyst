@@ -10,6 +10,7 @@
 The catalyst framework has a multi-phase roadmap (R0 through R7) with specific deliverables at each phase. The question arose: when should the framework be released as version 1.0?
 
 The planning document (what-is-going-on/06-roadmap-streamline.md, §R7) indicates that Release 1.0 should align with the completion of R7, which includes:
+
 - **R3.9:** Multi-user server support (the server protocol for shared deployments)
 - **R5:** UI parity (web SPA and desktop UI achieve feature parity with CLI)
 
@@ -18,6 +19,7 @@ These represent the maturity checkpoints needed for a production 1.0 release.
 ## Decision
 
 **Release 1.0 of catalyst aligns with R7 completion.** This means:
+
 - R0–R6 are pre-1.0 phases (version numbers 0.40–0.50 range)
 - R7 completion triggers the 1.0 release (first production-ready release)
 - 1.0 assumes:

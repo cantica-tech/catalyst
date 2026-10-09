@@ -1,4 +1,5 @@
 """Administration verbs (roadmap R2 W3): users, roles, freeze/unfreeze, definitions."""
+
 import json
 
 import pytest
@@ -30,7 +31,7 @@ def _last_entry(project):
 def test_roles_then_users_with_every_refusal(tmp_path):
     project, dep, me = _dep(tmp_path)
     role = admin.role_add(dep, "Developer", ["/create-item"], me, [])
-    assert role["reconciliation"] == "propose"                       # never silently full
+    assert role["reconciliation"] == "propose"  # never silently full
     assert _last_entry(project)["command"] == "/role-add"
     with pytest.raises(admin.AdminError, match="role modify"):
         admin.role_add(dep, "Developer", [], me, [])
@@ -47,7 +48,7 @@ def test_roles_then_users_with_every_refusal(tmp_path):
             admin.user_modify(dep, "grace", field, "x", me, [])
     admin.user_modify(dep, "grace", "notes", "on loan", me, [])
     admin.user_remove(dep, "grace", me, [])
-    assert [u["active"] for u in _users(project)] == [True, False]   # kept, deactivated
+    assert [u["active"] for u in _users(project)] == [True, False]  # kept, deactivated
     with pytest.raises(admin.AdminError, match="only active user"):
         admin.user_remove(dep, USER, me, [])
     admin.role_modify(dep, "Developer", ["/status"], me, [])
@@ -90,7 +91,7 @@ def test_the_cli_runs_them(tmp_path, capsys):
     assert run("role", "add", "QA", "--action", "/create-test", "--reconciliation", "none") == 0
     assert run("user", "add", "Grace Hopper", "QA", "--json") == 0
     assert json.loads(capsys.readouterr().out.splitlines()[-1])["roles"] == ["QA"]
-    assert run("freeze", "items") == 1                    # two active users: who signs?
+    assert run("freeze", "items") == 1  # two active users: who signs?
     assert "--as" in capsys.readouterr().err
     assert run("freeze", "items", "--as", USER) == 0
     assert run("user", "remove", USER, "--as", USER) == 0

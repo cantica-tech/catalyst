@@ -69,7 +69,7 @@ def test_missing_required_field(tmp_path):
 def test_inherited_grounding_needs_a_resolvable_parent(tmp_path):
     project = make_project(tmp_path)
     sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
-    edit(sub, "| **Item** |", "| **Requirement** |")    # legacy field name
+    edit(sub, "| **Item** |", "| **Requirement** |")  # legacy field name
     assert sorted(codes(project, ERROR)) == ["required-field", "ungrounded"]
 
 
@@ -127,21 +127,36 @@ def test_rule_missing_from_index(tmp_path):
 
 def test_module_placeholder_heading_is_not_a_definition(tmp_path):
     project = make_project(tmp_path)
-    write(project / ".criterion" / "rules" / "Rules-of-Rules.md",
-          f"## 9. `rr-META-000009-{USERID}` — owned by the active module\n\n"
-          f"### From module example-process\n\n## 9. `rr-META-000009-{USERID}` Items\n")
+    write(
+        project / ".criterion" / "rules" / "Rules-of-Rules.md",
+        f"## 9. `rr-META-000009-{USERID}` — owned by the active module\n\n"
+        f"### From module example-process\n\n## 9. `rr-META-000009-{USERID}` Items\n",
+    )
     assert findings(project) == []
 
 
 def test_index_drift_and_orphans(tmp_path):
     project = make_project(tmp_path)
-    write(project / ".criterion" / "items" / "ITEM-000002-second.md",
-          artifact(f"ITEM-000002-{USERID}", "Second", {
-              "ID": f"`ITEM-000002-{USERID}`", "Status": "Open", "Targets": f"`br-AUTH-000001-{USERID}`",
-              "Domain": "`AUTH`", "Signed-off-by": "Ada Lovelace"}))
+    write(
+        project / ".criterion" / "items" / "ITEM-000002-second.md",
+        artifact(
+            f"ITEM-000002-{USERID}",
+            "Second",
+            {
+                "ID": f"`ITEM-000002-{USERID}`",
+                "Status": "Open",
+                "Targets": f"`br-AUTH-000001-{USERID}`",
+                "Domain": "`AUTH`",
+                "Signed-off-by": "Ada Lovelace",
+            },
+        ),
+    )
     assert codes(project) == ["index-drift"]
-    edit(project / ".criterion" / "items" / "items.md", "| First item |", "| First item |\n"
-         f"| [ITEM-000003-{USERID}](ITEM-000003-gone.md) | Gone | Open |")
+    edit(
+        project / ".criterion" / "items" / "items.md",
+        "| First item |",
+        f"| First item |\n| [ITEM-000003-{USERID}](ITEM-000003-gone.md) | Gone | Open |",
+    )
     assert "index-orphan" in codes(project, ERROR)
 
 
@@ -170,6 +185,7 @@ def test_field_row_with_a_notes_cell(tmp_path):
 
 def test_runs_from_inside_a_symlinked_working_copy(tmp_path, monkeypatch):
     import shutil
+
     project = make_project(tmp_path)
     real = tmp_path / "agent-space" / ".criterion"
     real.parent.mkdir()
@@ -188,22 +204,27 @@ def test_runs_from_inside_a_symlinked_working_copy(tmp_path, monkeypatch):
 
 def test_pointer_without_working_copy_fails_check(tmp_path):
     import shutil
+
     project = make_project(tmp_path)
     shutil.rmtree(project / ".criterion")
-    assert main(["--project", str(project), "check"]) == 1     # a broken project fails
+    assert main(["--project", str(project), "check"]) == 1  # a broken project fails
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    assert main(["--project", str(elsewhere), "check"]) == 0   # not a project: skipped
+    assert main(["--project", str(elsewhere), "check"]) == 0  # not a project: skipped
 
 
 def test_closed_entity_needs_its_required_when_closed_fields(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
-    schema.write_text(schema.read_text(encoding="utf-8").replace(
-        "  - name: Subs\n    kind: ref-list\n    required: false",
-        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"), encoding="utf-8")
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "  - name: Subs\n    kind: ref-list\n    required: false",
+            "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true",
+        ),
+        encoding="utf-8",
+    )
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
-    assert "closed-incomplete" not in codes(project)          # still Open: fine
+    assert "closed-incomplete" not in codes(project)  # still Open: fine
     edit(item_file(project), "| **Status** | Open |", "| **Status** | Done |")
     assert "closed-incomplete" in codes(project, ERROR)
 
@@ -211,7 +232,9 @@ def test_closed_entity_needs_its_required_when_closed_fields(tmp_path):
 def test_target_type_may_list_alternatives(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "sub.yaml"
-    schema.write_text(schema.read_text(encoding="utf-8").replace("target_type: ITEM", "target_type: ITEM|rule"), encoding="utf-8")
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace("target_type: ITEM", "target_type: ITEM|rule"), encoding="utf-8"
+    )
     sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
     edit(sub, f"| **Item** | `ITEM-000001-{USERID}` |", f"| **Item** | `br-AUTH-000001-{USERID}` |")
     assert "ref-type" not in codes(project)
@@ -220,9 +243,13 @@ def test_target_type_may_list_alternatives(tmp_path):
 def test_decorated_closed_status_counts_as_closed(tmp_path):
     project = make_project(tmp_path)
     schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
-    schema.write_text(schema.read_text(encoding="utf-8").replace(
-        "  - name: Subs\n    kind: ref-list\n    required: false",
-        "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true"), encoding="utf-8")
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "  - name: Subs\n    kind: ref-list\n    required: false",
+            "  - name: Subs\n    kind: ref-list\n    required: false\n    required_when_closed: true",
+        ),
+        encoding="utf-8",
+    )
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
     edit(item_file(project), "| **Status** | Open |", "| **Status** | **Done** ✅ |")
     assert "closed-incomplete" in codes(project, ERROR)

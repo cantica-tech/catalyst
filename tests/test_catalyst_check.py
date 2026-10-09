@@ -1,5 +1,6 @@
 """`catalyst check`: uncommitted product changes are judged by what the
 deployment governs (scope.py) and ignore operating-system noise."""
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,7 @@ def test_catalystignore_nested_deployments_and_noise_are_not_reported(tmp_path, 
 
 def test_project_in_a_subdirectory_reports_paths_from_the_project(tmp_path, monkeypatch):
     mono = tmp_path / "mono"
-    project = make_project(mono)                       # mono/app, working copy mono/app/.criterion
+    project = make_project(mono)  # mono/app, working copy mono/app/.criterion
     write(mono / "README.md", "mono\n")
     write(mono / ".gitignore", "/app/.criterion\n")
     git_init(project / ".criterion")
@@ -55,7 +56,9 @@ def test_a_rename_reports_the_new_path_only(tmp_path, monkeypatch):
 
 def _stop(project, monkeypatch, hook_input="{}"):
     import io
+
     from catalyst.__main__ import main
+
     monkeypatch.setattr("sys.stdin", io.StringIO(hook_input))
     return main(["--project", str(project), "hook", "stop"])
 
@@ -78,6 +81,7 @@ def test_stop_hook_fails_closed_when_the_deployment_cannot_be_read(tmp_path, mon
 
     def broken(args):
         raise RuntimeError("unreadable pointer")
+
     monkeypatch.setattr("catalyst.__main__.open_deployment", broken)
     assert _stop(project, monkeypatch) == 2
     err = capsys.readouterr().err
@@ -86,11 +90,13 @@ def test_stop_hook_fails_closed_when_the_deployment_cannot_be_read(tmp_path, mon
 
 def test_stop_and_start_hooks_speak_each_agents_format(tmp_path, monkeypatch, capsys):
     import io
+
     from catalyst.__main__ import main
+
     project = make_project(tmp_path, git=True)
     (project / ".criterion" / "development" / "journal.jsonl").write_bytes(b'{"a": "\xff"}\n')
     write(project / ".criterion" / "INVARIANTS.md", "# Invariants\n\n- INV-1\n")
-    monkeypatch.chdir(tmp_path)                       # the project comes from the hook's input
+    monkeypatch.chdir(tmp_path)  # the project comes from the hook's input
     named = json.dumps({"cwd": str(project)})
     for fmt, decision in (("json", "block"), ("gemini", "deny")):
         monkeypatch.setattr("sys.stdin", io.StringIO(named))
@@ -104,7 +110,7 @@ def test_stop_and_start_hooks_speak_each_agents_format(tmp_path, monkeypatch, ca
     assert main(["hook", "start", "--format", "json"]) == 0
     assert "INV-1" in json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"cwd": str(tmp_path)})))
-    assert main(["hook", "stop", "--format", "json"]) == 0 and capsys.readouterr().out == ""   # no project
+    assert main(["hook", "stop", "--format", "json"]) == 0 and capsys.readouterr().out == ""  # no project
 
 
 def test_a_suspended_governance_never_blocks_the_stop(tmp_path, monkeypatch, capsys):
@@ -114,7 +120,8 @@ def test_a_suspended_governance_never_blocks_the_stop(tmp_path, monkeypatch, cap
     assert _stop(project, monkeypatch) == 2
     capsys.readouterr()
     pointer = project / "app.catalyst"
-    pointer.write_text(json.dumps({**json.loads(pointer.read_text(encoding="utf-8")), "governance": "suspended"}),
-                       encoding="utf-8")
+    pointer.write_text(
+        json.dumps({**json.loads(pointer.read_text(encoding="utf-8")), "governance": "suspended"}), encoding="utf-8"
+    )
     assert _stop(project, monkeypatch) == 0
     assert "suspended" in capsys.readouterr().err

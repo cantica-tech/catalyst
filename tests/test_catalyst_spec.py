@@ -80,12 +80,15 @@ def test_procedures_need_not_start_with_when_the_user_enters(tmp_path):
     dep = load(p)
     assert "resolves the plugin first" in spec(dep, "catalyzer")
     from catalyst.spec import general
-    assert "name, uuid and version" in general(dep)       # nothing is dropped
+
+    assert "name, uuid and version" in general(dep)  # nothing is dropped
 
 
 def test_prefix_is_not_an_alias(tmp_path):
     import pytest
+
     from catalyst.spec import SpecError
+
     p = make_project(tmp_path)
     write(p / ".criterion" / "CODE-OF-CONDUCT.md", CATALYZER)
     with pytest.raises(SpecError):
@@ -96,12 +99,17 @@ def test_every_paragraph_of_the_real_section4_lands_somewhere():
     """catalyst's own deployed CODE-OF-CONDUCT: the union of every command's
     spec and the general part covers every §4 paragraph."""
     from pathlib import Path
+
     from catalyst.spec import parse, section4_text
+
     coc = Path(__file__).resolve().parent.parent / "framework" / "kernel" / "rules-of-development.template.md"
     s = parse(coc.read_text(encoding="utf-8"))
     covered = sum(len(v) for v in s.procedures.values()) + len(s.general)
-    paragraphs = [b for b in "\n".join(section4_text(coc.read_text(encoding="utf-8"))).split("\n\n")
-                  if b.strip() and not b.lstrip().startswith(("- `/", "#"))]
+    paragraphs = [
+        b
+        for b in "\n".join(section4_text(coc.read_text(encoding="utf-8"))).split("\n\n")
+        if b.strip() and not b.lstrip().startswith(("- `/", "#"))
+    ]
     assert covered >= len([p for p in paragraphs if not p.startswith("  ")]) * 0.9
 
 
@@ -144,6 +152,5 @@ def test_colon_form_is_not_general(tmp_path, capsys):
 
 def test_bullet_without_a_command_name_is_skipped(tmp_path):
     p = make_project(tmp_path)
-    write(p / ".criterion" / "CODE-OF-CONDUCT.md",
-          "## 4. C\n\n- `/x|y` — odd.\n- `/ok` — fine.\n\n## 5. N\n")
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", "## 4. C\n\n- `/x|y` — odd.\n- `/ok` — fine.\n\n## 5. N\n")
     assert commands(load(p)) == ["ok"]

@@ -5,9 +5,9 @@ pointer) plus its working copy, reached through `<project root>/.criterion`
 (INV-6). Its entity types are the kernel's (framework/kernel/entities/, or the copy
 module_loader finds embedded in the zipapp) plus the active module's ETDs.
 """
+
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,11 +37,11 @@ def logical_cwd() -> Path:
 @dataclass
 class Deployment:
     project_root: Path
-    root: Path                      # the working copy (.criterion)
+    root: Path  # the working copy (.criterion)
     pointer: dict
     module: ModuleManifest | None
-    etds: dict[str, ETD] = field(default_factory=dict)   # by id prefix
-    standalone: bool = False        # a bare working copy, with no project around it
+    etds: dict[str, ETD] = field(default_factory=dict)  # by id prefix
+    standalone: bool = False  # a bare working copy, with no project around it
 
     def folder(self, etd: ETD) -> Path | None:
         """The ETD's folder in the working copy: at the root, or nested one
@@ -64,6 +64,7 @@ class Deployment:
 def read_pointer(project_root: Path) -> dict:
     """The project file's fields (catalyst.toml, else a legacy *.catalyst)."""
     import project_file
+
     return project_file.read_dir(project_root)
 
 
@@ -74,20 +75,24 @@ def load(start: Path | None = None) -> Deployment:
     root = find_deploy_root(start)
     project_root = find_project_root(start)
     import project_file
+
     pointer_dir = project_file.find_up(start)
     if root is None or project_root is None:
         if pointer_dir is not None:
             name = project_file.project_name(project_file.read_dir(pointer_dir)) or "<name>"
             raise WorkingCopyMissing(
                 f"{pointer_dir} has {project_file.find(pointer_dir).name} but its criterion is not reachable "
-                f"(expected {project_file.home_criterion(name)}, or a legacy .criterion)")
+                f"(expected {project_file.home_criterion(name)}, or a legacy .criterion)"
+            )
         raise DeploymentNotFound(
             f"no catalyst deployment found at or above {start} "
-            "(expected a catalyst.toml, or a legacy *.catalyst pointer)")
+            "(expected a catalyst.toml, or a legacy *.catalyst pointer)"
+        )
     if not project_file.is_project(project_root):
         raise DeploymentNotFound(
             f"{project_root} has a .criterion directory but no catalyst.toml (or *.catalyst pointer) — "
-            "run catalyst from the project instead")
+            "run catalyst from the project instead"
+        )
     module = load_module(project_root)
     etds = dict(load_kernel_entities())
     if module is not None:
@@ -103,8 +108,11 @@ def load_working_copy(path: Path) -> Deployment:
     root = Path(os.path.abspath(path))
     if not (root / "version.txt").is_file() or not (root / "rules").is_dir():
         raise DeploymentNotFound(f"{root} is not a catalyst working copy")
-    mods = sorted(d for d in (root / "modules").glob("*") if (d / "module.yaml").is_file()) \
-        if (root / "modules").is_dir() else []
+    mods = (
+        sorted(d for d in (root / "modules").glob("*") if (d / "module.yaml").is_file())
+        if (root / "modules").is_dir()
+        else []
+    )
     module = load_module(module_dir=mods[0]) if len(mods) == 1 else None
     etds = dict(load_kernel_entities())
     if module is not None:

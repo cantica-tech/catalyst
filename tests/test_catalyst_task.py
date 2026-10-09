@@ -1,5 +1,6 @@
 """The criterion's Taskfile.common.yml runs on its own: catalyst never adds to
 or edits a project's own Taskfile."""
+
 import re
 import shutil
 import sys
@@ -29,8 +30,10 @@ def test_every_composed_task_runs_from_the_callers_directory():
     assert compose.taskfile(KERNEL, module, _params()) == text
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11) or shutil.which("task") is None,
-                    reason="catalyst.toml needs Python 3.11+; Task not installed")
+@pytest.mark.skipif(
+    sys.version_info < (3, 11) or shutil.which("task") is None,
+    reason="catalyst.toml needs Python 3.11+; Task not installed",
+)
 def test_task_dispatches_from_the_project_root(tmp_path, monkeypatch, capfd):
     project = make_project(tmp_path / "w", git=True)
     move.to_home(project, runtime=False)

@@ -13,15 +13,15 @@ resolved via the pointer-file mechanism check_deployment.py implements
 Exit 0 = clean (including when no deployment resolves, unless `--require`,
 as CI passes), exit 1 = drift found (or nothing to check under `--require`).
 """
+
 from __future__ import annotations
 
 import re
 import sys
 from pathlib import Path
 
-from module_loader import load_module
-
 from check_deployment import REQUIRE_FLAG, find_deploy_root, find_project_root
+from module_loader import load_module
 
 # Taskfile.common.yml utility tasks that are not slash commands: `catalyst`
 # passes its arguments to the catalyst CLI (the launcher).
@@ -56,7 +56,7 @@ def extract_section4_commands(coc_text: str) -> set[str] | None:
         return None
 
     names: set[str] = set()
-    for line in lines[start:end or len(lines)]:
+    for line in lines[start : end or len(lines)]:
         # Column-0 "- " only: a 2-space-indented sub-bullet (/catalyzer's
         # subcommands) or a bold prose paragraph naming commands mid-sentence
         # (e.g. the work-items-are-plugin-territory callout) must not count.
@@ -100,39 +100,35 @@ def check_module_manifest_parity(project_root: Path | None, code_of_conduct: Pat
     if module is None or not module.commands or not code_of_conduct.is_file():
         return []
     coc_names = extract_section4_commands(code_of_conduct.read_text(encoding="utf-8", errors="ignore")) or set()
-    return [f"module parity: module '{module.id}' registers /{name} but CODE-OF-CONDUCT.md §4 does not "
-            "list it" for name in sorted(set(module.commands) - coc_names)]
+    return [
+        f"module parity: module '{module.id}' registers /{name} but CODE-OF-CONDUCT.md §4 does not list it"
+        for name in sorted(set(module.commands) - coc_names)
+    ]
 
 
 def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
     if not code_of_conduct.is_file():
         return [f"taskfile parity: {code_of_conduct} is missing"]
 
-    coc_names = extract_section4_commands(
-        code_of_conduct.read_text(encoding="utf-8", errors="ignore")
-    )
+    coc_names = extract_section4_commands(code_of_conduct.read_text(encoding="utf-8", errors="ignore"))
     if coc_names is None:
         return [f"taskfile parity: {code_of_conduct} has no '## 4.' section"]
 
     if not taskfile.is_file():
         return [f"taskfile parity: {taskfile} is missing"]
 
-    task_names = extract_taskfile_commands(
-        taskfile.read_text(encoding="utf-8", errors="ignore")
-    )
+    task_names = extract_taskfile_commands(taskfile.read_text(encoding="utf-8", errors="ignore"))
     if task_names is None:
         return [f"taskfile parity: {taskfile} has no 'tasks:' block"]
 
     errors: list[str] = []
     for name in sorted(coc_names - task_names):
         errors.append(
-            f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{name} but "
-            f"{taskfile.name} has no matching task"
+            f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{name} but {taskfile.name} has no matching task"
         )
     for name in sorted(task_names - coc_names - UTILITY_TASKS):
         errors.append(
-            f"taskfile parity: {taskfile.name} has a '{name}' task but it is "
-            f"not referenced in CODE-OF-CONDUCT.md §4"
+            f"taskfile parity: {taskfile.name} has a '{name}' task but it is not referenced in CODE-OF-CONDUCT.md §4"
         )
     return errors
 
@@ -148,11 +144,12 @@ def main(argv: list[str] | None = None) -> int:
     root = find_deploy_root(Path.cwd())
     if root is None:
         if REQUIRE_FLAG in argv:
-            print("command parity validation FAILED: no *.catalyst pointer with a reachable working "
-                  f"copy or .criterion/ found from {Path.cwd()} ({REQUIRE_FLAG})")
+            print(
+                "command parity validation FAILED: no *.catalyst pointer with a reachable working "
+                f"copy or .criterion/ found from {Path.cwd()} ({REQUIRE_FLAG})"
+            )
             return 1
-        print("no *.catalyst pointer or .criterion/ found; skipping command "
-              "parity validation")
+        print("no *.catalyst pointer or .criterion/ found; skipping command parity validation")
         return 0
 
     # Taskfile.common.yml lives inside the resolved deployment root (INV-6),

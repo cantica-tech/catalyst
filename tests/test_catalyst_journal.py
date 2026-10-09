@@ -14,9 +14,15 @@ from catalyst_fixtures import USERID, make_project, write
 
 
 def req(files, **kw):
-    base = dict(command="/status", action="update", artifact=f"ITEM-000001-{USERID}",
-                targets=[f"br-AUTH-000001-{USERID}"], intent=["close the item"],
-                files=files, actor="ada")
+    base = dict(
+        command="/status",
+        action="update",
+        artifact=f"ITEM-000001-{USERID}",
+        targets=[f"br-AUTH-000001-{USERID}"],
+        intent=["close the item"],
+        files=files,
+        actor="ada",
+    )
     base.update(kw)
     return j.AppendRequest(**base)
 
@@ -39,7 +45,9 @@ def item(project: Path) -> Path:
 def test_append_records_real_hashes_and_pins(project):
     dep = load(project)
     before = j.head_blob(dep.root, "items/ITEM-000001-first-item.md")
-    item(project).write_text(item(project).read_text(encoding="utf-8").replace("| Open |", "| Done |"), encoding="utf-8")
+    item(project).write_text(
+        item(project).read_text(encoding="utf-8").replace("| Open |", "| Done |"), encoding="utf-8"
+    )
     entry = j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
     f = entry["files"][0]
     assert f["path"] == ".criterion/items/ITEM-000001-first-item.md"
@@ -66,8 +74,7 @@ def test_project_files_are_hashed_into_the_project_repo(project):
     write(project / "src" / "app.py", "print('hi')\n")
     entry = j.append(dep, req(["src/app.py"], action="create"))
     f = entry["files"][0]
-    assert f == {"path": "src/app.py", "before": None,
-                 "after": j.git(project, "hash-object", "src/app.py")}
+    assert f == {"path": "src/app.py", "before": None, "after": j.git(project, "hash-object", "src/app.py")}
     assert j.blob_exists(project, f["after"])
 
 
@@ -109,9 +116,17 @@ def test_verify_flags_unjournaled_edits_and_chain_breaks(project):
     item(project).write_text("v3, not journaled\n", encoding="utf-8")
     assert [(i.level, i.code) for i in j.verify(dep)] == [("error", "unjournaled")]
     # a hand-written CLI-looking entry that breaks the chain
-    bad = {"timestamp": j.now(), "actor": "ada", "command": "x", "action": "update",
-           "artifact": "x", "targets": [], "intent": ["x"], "writer": "catalyst/0",
-           "files": [{"path": path, "before": "0" * 40, "after": None}]}
+    bad = {
+        "timestamp": j.now(),
+        "actor": "ada",
+        "command": "x",
+        "action": "update",
+        "artifact": "x",
+        "targets": [],
+        "intent": ["x"],
+        "writer": "catalyst/0",
+        "files": [{"path": path, "before": "0" * 40, "after": None}],
+    }
     with j.journal_path(dep).open("a") as fh:
         fh.write(json.dumps(bad) + "\n")
     codes = {i.code for i in j.verify(dep) if i.level == "error"}
@@ -120,9 +135,16 @@ def test_verify_flags_unjournaled_edits_and_chain_breaks(project):
 
 def test_legacy_entries_only_warn(project):
     dep = load(project)
-    legacy = {"timestamp": "2026-01-01T00:00:00Z", "actor": "Ada", "command": "x", "action": "update",
-              "artifact": "x", "targets": [], "intent": ["x"],
-              "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}]}
+    legacy = {
+        "timestamp": "2026-01-01T00:00:00Z",
+        "actor": "Ada",
+        "command": "x",
+        "action": "update",
+        "artifact": "x",
+        "targets": [],
+        "intent": ["x"],
+        "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}],
+    }
     j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
     issues = j.verify(dep)
     assert issues and all(i.level == "warning" and i.legacy for i in issues)
@@ -181,15 +203,49 @@ def test_restore_before_a_files_first_entry_uses_its_before(project, tmp_path):
 
 def test_cli_append_verify_pin(project, capsys):
     item(project).write_text("changed\n", encoding="utf-8")
-    assert main(["journal", "append", "--command", "/status", "--action", "status-change",
-                 "--artifact", f"ITEM-000001-{USERID}", "--intent", "mark done",
-                 "--file", ".criterion/items/ITEM-000001-first-item.md", "--json"]) == 0
+    assert (
+        main(
+            [
+                "journal",
+                "append",
+                "--command",
+                "/status",
+                "--action",
+                "status-change",
+                "--artifact",
+                f"ITEM-000001-{USERID}",
+                "--intent",
+                "mark done",
+                "--file",
+                ".criterion/items/ITEM-000001-first-item.md",
+                "--json",
+            ]
+        )
+        == 0
+    )
     entry = json.loads(capsys.readouterr().out)
     assert entry["actor"] == "ada"
     assert main(["journal", "verify"]) == 0
     assert main(["journal", "pin"]) == 0
-    assert main(["journal", "append", "--command", "x", "--action", "bogus", "--artifact", "x",
-                 "--intent", "x", "--file", "app.catalyst"]) == 1
+    assert (
+        main(
+            [
+                "journal",
+                "append",
+                "--command",
+                "x",
+                "--action",
+                "bogus",
+                "--artifact",
+                "x",
+                "--intent",
+                "x",
+                "--file",
+                "app.catalyst",
+            ]
+        )
+        == 1
+    )
 
 
 def test_cli_entries_keep_their_canonical_paths(project):
@@ -207,8 +263,7 @@ def test_cli_entries_keep_their_canonical_paths(project):
 def test_duplicate_file_is_recorded_once(project):
     dep = load(project)
     item(project).write_text("changed\n", encoding="utf-8")
-    entry = j.append(dep, req([".criterion/items/ITEM-000001-first-item.md",
-                               str(item(project))]))
+    entry = j.append(dep, req([".criterion/items/ITEM-000001-first-item.md", str(item(project))]))
     assert len(entry["files"]) == 1
     assert [i for i in j.verify(dep) if not i.legacy] == []
 
@@ -221,7 +276,7 @@ def test_timestamps_compare_as_times_not_strings(project, tmp_path):
     item(project).write_text("half a second later\n", encoding="utf-8")
     j.append(dep, req([path], timestamp="2026-09-27T10:00:00.500Z"))
     assert [i.code for i in j.verify(dep) if not i.legacy] == []
-    j.restore(dep, "2026-09-27T12:00:00+02:00", tmp_path / "side")    # == 10:00:00Z
+    j.restore(dep, "2026-09-27T12:00:00+02:00", tmp_path / "side")  # == 10:00:00Z
     assert (tmp_path / "side" / path).read_text(encoding="utf-8") == "at ten\n"
     with pytest.raises(j.JournalError, match="ISO 8601"):
         j.restore(dep, "yesterday", tmp_path / "other")
@@ -243,13 +298,16 @@ def test_before_hash_in_a_subdirectory_project(tmp_path, monkeypatch):
     """The project root need not be the git top level (monorepo)."""
     mono = tmp_path / "mono"
     mono.mkdir()
-    project = make_project(mono)            # mono/app
+    project = make_project(mono)  # mono/app
     from catalyst_fixtures import git_init
-    git_init(mono)                          # one repository above the project
+
+    git_init(mono)  # one repository above the project
     monkeypatch.chdir(project)
     dep = load(project)
     committed = j.git(mono, "rev-parse", "HEAD:app/app.catalyst")
-    (project / "app.catalyst").write_text((project / "app.catalyst").read_text(encoding="utf-8") + " ", encoding="utf-8")
+    (project / "app.catalyst").write_text(
+        (project / "app.catalyst").read_text(encoding="utf-8") + " ", encoding="utf-8"
+    )
     assert j.append(dep, req(["app.catalyst"]))["files"][0]["before"] == committed
 
 
@@ -264,19 +322,26 @@ def test_tier_is_recorded_and_checked(project):
 
 def test_blobs_written_after_a_verify_are_still_pinned(project):
     dep = load(project)
-    j.verify(dep)                                   # warms the existence cache
+    j.verify(dep)  # warms the existence cache
     write(project / "fresh.txt", "new\n")
     sha = j.git(project, "hash-object", "fresh.txt")
-    j.prefetch(project, {sha})                      # cached as absent
+    j.prefetch(project, {sha})  # cached as absent
     entry = j.append(dep, req(["fresh.txt"], action="create"))
     assert entry["files"][0]["after"] in j.pinned(project)
 
 
 def test_missing_before_inherited_from_a_legacy_entry_only_warns(project):
     dep = load(project)
-    legacy = {"timestamp": "2026-01-01T00:00:00Z", "actor": "x", "command": "x", "action": "update",
-              "artifact": "x", "targets": [], "intent": ["x"],
-              "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}]}
+    legacy = {
+        "timestamp": "2026-01-01T00:00:00Z",
+        "actor": "x",
+        "command": "x",
+        "action": "update",
+        "artifact": "x",
+        "targets": [],
+        "intent": ["x"],
+        "files": [{"path": "items/ITEM-000001-first-item.md", "before": None, "after": "1" * 40}],
+    }
     j.journal_path(dep).write_text(json.dumps(legacy) + "\n", encoding="utf-8")
     item(project).write_text("current\n", encoding="utf-8")
     j.append(dep, req([".criterion/items/ITEM-000001-first-item.md"]))
@@ -285,6 +350,7 @@ def test_missing_before_inherited_from_a_legacy_entry_only_warns(project):
 
 def test_check_warns_about_new_unjournaled_product_files(project):
     from catalyst.check import unrecorded_changes
+
     dep = load(project)
     write(project / "src" / "new.py", "x = 1\n")
     assert unrecorded_changes(dep) == ["src/new.py"]
@@ -308,4 +374,4 @@ def test_revisions_and_object_ids_never_reach_git_as_options():
         j.revisions(["HEAD", "--output=x"])
     assert j.revisions(["A..B", "^c"]) == ["A..B", "^c"]
     assert j.object_id("a" * 40) and not j.object_id("--batch") and not j.object_id("A" * 40)
-    assert not j.blob_exists(Path("."), "-p")
+    assert not j.blob_exists(Path(), "-p")

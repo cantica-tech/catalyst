@@ -1,4 +1,5 @@
 """`catalyst sync plan|apply` (roadmap R2 W4)."""
+
 import json
 import shutil
 import subprocess
@@ -27,8 +28,21 @@ def _deployment(tmp_path):
     req = request(tmp_path)
     init(req)
     subprocess.run(["git", "-C", str(req.project / ".criterion"), "add", "-A"], check=True)
-    subprocess.run(["git", "-C", str(req.project / ".criterion"), "-c", "user.name=t", "-c", "user.email=t@t",
-                    "commit", "-qm", "init"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(req.project / ".criterion"),
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-qm",
+            "init",
+        ],
+        check=True,
+    )
     deployed = (req.project / ".criterion" / "version.txt").read_text(encoding="utf-8").strip()
     pointer = next(req.project.glob("*.catalyst"))
     data = json.loads(pointer.read_text(encoding="utf-8"))
@@ -74,43 +88,63 @@ def test_the_agent_files_catalyst_once_wrote_into_the_project_are_retired(tmp_pa
     new = _release(tmp_path, "9.9.9")
     commands = project / ".claude" / "commands"
     commands.mkdir(parents=True)
-    (commands / "status.md").write_text("as released\n", encoding="utf-8")                  # shipped copy
+    (commands / "status.md").write_text("as released\n", encoding="utf-8")  # shipped copy
     (commands / "check-rules.md").write_text("First run `catalyst spec check-rules`.\n", encoding="utf-8")
-    (commands / "user-add.md").write_text("my own procedure\n", encoding="utf-8")            # edited
+    (commands / "user-add.md").write_text("my own procedure\n", encoding="utf-8")  # edited
     (commands / "dogfood.md").write_text("not catalyst's\n", encoding="utf-8")
     settings = project / ".claude" / "settings.json"
-    settings.write_text(json.dumps({"hooks": {
-        "Stop": [{"hooks": [{"type": "command", "command": '"$HOME/.catalyst/bin/catalyst" hook stop'}]}],
-        "SessionStart": [{"hooks": [{"type": "command", "command": "python3 .criterion/bin/catalyst.pyz hook start"}]},
-                         {"hooks": [{"type": "command", "command": "echo mine"}]}]},
-        "permissions": {"allow": ["Bash(ls)"]}}), encoding="utf-8")
-    subprocess.run(["git", "-C", str(project), "add", ".claude"], check=True)       # tracked, as init left them
-    subprocess.run(["git", "-C", str(project), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "wiring"],
-                   check=True)
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "Stop": [{"hooks": [{"type": "command", "command": '"$HOME/.catalyst/bin/catalyst" hook stop'}]}],
+                    "SessionStart": [
+                        {"hooks": [{"type": "command", "command": "python3 .criterion/bin/catalyst.pyz hook start"}]},
+                        {"hooks": [{"type": "command", "command": "echo mine"}]},
+                    ],
+                },
+                "permissions": {"allow": ["Bash(ls)"]},
+            }
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(project), "add", ".claude"], check=True)  # tracked, as init left them
+    subprocess.run(
+        ["git", "-C", str(project), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "wiring"], check=True
+    )
     dep = load(project)
     src = sync.Sources(dep, new, None, base, None)
     p = sync.plan(dep, src, sync.commands_dir(dep, None))
     changes = {(a.kind, a.target): a.change for a in p.actions if a.kind in ("command", "agent-hook")}
-    assert changes == {("command", ".claude/commands/status.md"): "remove",
-                       ("command", ".claude/commands/check-rules.md"): "remove",
-                       ("command", ".claude/commands/user-add.md"): "conflict",
-                       ("agent-hook", ".claude/settings.json"): "remove"}
+    assert changes == {
+        ("command", ".claude/commands/status.md"): "remove",
+        ("command", ".claude/commands/check-rules.md"): "remove",
+        ("command", ".claude/commands/user-add.md"): "conflict",
+        ("agent-hook", ".claude/settings.json"): "remove",
+    }
     sync.apply(dep, src, sync.commands_dir(dep, None), "ada", [])
     src.close()
     assert sorted(f.name for f in commands.iterdir()) == ["dogfood.md", "user-add.md"]
     assert json.loads(settings.read_text(encoding="utf-8")) == {
         "hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "echo mine"}]}]},
-        "permissions": {"allow": ["Bash(ls)"]}}
+        "permissions": {"allow": ["Bash(ls)"]},
+    }
 
 
 def test_migrations_between_the_versions_are_listed_in_order(tmp_path):
     index = tmp_path / "migrations.md"
-    index.write_text("| [`0.46.0/a.md`](0.46.0/a.md) | `0.45.0` | `0.46.0` | a |\n"
-                     "| [`0.47.0/b.md`](0.47.0/b.md) | `0.46.1` | `0.47.0` | b |\n"
-                     "| [`0.48.0/c.md`](0.48.0/c.md) | `0.47.0` | `0.48.0` | c |\n", encoding="utf-8")
+    index.write_text(
+        "| [`0.46.0/a.md`](0.46.0/a.md) | `0.45.0` | `0.46.0` | a |\n"
+        "| [`0.47.0/b.md`](0.47.0/b.md) | `0.46.1` | `0.47.0` | b |\n"
+        "| [`0.48.0/c.md`](0.48.0/c.md) | `0.47.0` | `0.48.0` | c |\n",
+        encoding="utf-8",
+    )
     assert [m["file"] for m in sync.migrations(index, "0.46.0", "0.47.0", "kernel")] == ["0.47.0/b.md"]
     assert [m["file"] for m in sync.migrations(index, "0.45.0", "0.48.0", "kernel")] == [
-        "0.46.0/a.md", "0.47.0/b.md", "0.48.0/c.md"]
+        "0.46.0/a.md",
+        "0.47.0/b.md",
+        "0.48.0/c.md",
+    ]
 
 
 def test_the_cli_plans_without_writing(tmp_path, capsys):

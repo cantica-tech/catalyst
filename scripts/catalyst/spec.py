@@ -7,6 +7,7 @@ Every §4 paragraph lands somewhere: with the command its first line names,
 as the continuation of the previous command's procedure, or in the general
 part (`catalyst spec --general`) that every command's spec points to.
 """
+
 from __future__ import annotations
 
 import re
@@ -24,7 +25,8 @@ PREAMBLE = (
     "`catalyst id next-rule`, never by hand). Artifact-changing commands end with "
     "`catalyst index regen`, then `catalyst journal append`, then `catalyst check`. Commit the "
     "working copy and the product repository only with the user's assent (INV-4). Rules for every "
-    "command: `catalyst spec --general`.")
+    "command: `catalyst spec --general`."
+)
 
 
 class SpecError(Exception):
@@ -33,9 +35,9 @@ class SpecError(Exception):
 
 @dataclass
 class Section4:
-    bullets: dict[str, list[str]] = field(default_factory=dict)     # command -> bullet blocks
+    bullets: dict[str, list[str]] = field(default_factory=dict)  # command -> bullet blocks
     procedures: dict[str, list[str]] = field(default_factory=dict)  # command -> paragraphs
-    aliases: dict[str, str] = field(default_factory=dict)           # alias -> primary
+    aliases: dict[str, str] = field(default_factory=dict)  # alias -> primary
     general: list[str] = field(default_factory=list)
 
 
@@ -43,8 +45,8 @@ def section4_text(text: str) -> list[str]:
     m = re.search(r"^## 4\.[^\n]*\n", text, re.M)
     if not m:
         raise SpecError("CODE-OF-CONDUCT.md has no '## 4.' section")
-    end = re.search(r"^## 5\.", text[m.end():], re.M)
-    return text[m.end():m.end() + end.start() if end else len(text)].splitlines()
+    end = re.search(r"^## 5\.", text[m.end() :], re.M)
+    return text[m.end() : m.end() + end.start() if end else len(text)].splitlines()
 
 
 def blocks_of(lines: list[str]) -> list[tuple[str, str]]:
@@ -68,8 +70,12 @@ def blocks_of(lines: list[str]) -> list[tuple[str, str]]:
         else:
             block = [line]
             i += 1
-            while (i < len(lines) and lines[i].strip() and not BULLET_START.match(lines[i])
-                   and not lines[i].startswith("#")):
+            while (
+                i < len(lines)
+                and lines[i].strip()
+                and not BULLET_START.match(lines[i])
+                and not lines[i].startswith("#")
+            ):
                 block.append(lines[i])
                 i += 1
             blocks.append(("para", "\n".join(block)))

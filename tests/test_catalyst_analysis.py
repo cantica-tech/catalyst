@@ -1,5 +1,6 @@
 """Four-eyes code analysis (`catalyst analysis`, fw-STRUCTURE-000015): the
 lifecycle, and every refusal that makes the four-eyes process real."""
+
 from __future__ import annotations
 
 import json
@@ -35,27 +36,43 @@ def signer(project):
 
 
 def finding(fid, kind, title, **kw):
-    f = {"id": fid, "kind": kind, "title": title, "statement": f"{title}.", "area": "auth",
-         "confidence": "high", "evidence": [{"path": "src/login.py", "line": 1}]}
+    f = {
+        "id": fid,
+        "kind": kind,
+        "title": title,
+        "statement": f"{title}.",
+        "area": "auth",
+        "confidence": "high",
+        "evidence": [{"path": "src/login.py", "line": 1}],
+    }
     if kind == "rule":
         f["status"] = "holds"
     f.update(kw)
     return f
 
 
-PASS_A = {"findings": [
-    finding("A1", "rule", "Sessions expire", status="partial",
-            evidence=[{"path": "src/session.py", "line": 1}]),
-    finding("A2", "defect", "Session timeout is zero", breaks="A1",
-            evidence=[{"path": "src/session.py", "line": 1}]),
-    finding("A3", "rule", "Passwords are checked on login"),
-]}
-PASS_B = {"findings": [
-    finding("B1", "rule", "Sessions expire", status="missing",          # disagrees on status
-            evidence=[{"path": "src/session.py", "line": 1}]),
-    finding("B2", "rule", "Passwords are checked on login"),
-    finding("B3", "domain", "Session management", code="SESSION", evidence=[]),
-]}
+PASS_A = {
+    "findings": [
+        finding("A1", "rule", "Sessions expire", status="partial", evidence=[{"path": "src/session.py", "line": 1}]),
+        finding(
+            "A2", "defect", "Session timeout is zero", breaks="A1", evidence=[{"path": "src/session.py", "line": 1}]
+        ),
+        finding("A3", "rule", "Passwords are checked on login"),
+    ]
+}
+PASS_B = {
+    "findings": [
+        finding(
+            "B1",
+            "rule",
+            "Sessions expire",
+            status="missing",  # disagrees on status
+            evidence=[{"path": "src/session.py", "line": 1}],
+        ),
+        finding("B2", "rule", "Passwords are checked on login"),
+        finding("B3", "domain", "Session management", code="SESSION", evidence=[]),
+    ]
+}
 
 
 def started(project):
@@ -67,8 +84,12 @@ def test_start_records_scope_code_state_and_inventory(project):
     assert ctx.art.id == f"ANALYSIS-000001-{USERID}"
     inv = ctx.load("inventory.json")
     assert set(inv["files"]) == {"src/login.py", "src/session.py"}
-    assert inv["code_state"] == subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"],
-                                               capture_output=True, text=True, encoding="utf-8").stdout.strip()
+    assert (
+        inv["code_state"]
+        == subprocess.run(
+            ["git", "-C", str(project), "rev-parse", "HEAD"], capture_output=True, text=True, encoding="utf-8"
+        ).stdout.strip()
+    )
     assert RULE in inv["existing"]["rules"] and ITEM in inv["existing"]["grounded"]
     assert an.phase(ctx.art) == "Extracting"
     with pytest.raises(an.AnalysisError, match="already has 1 rule"):
@@ -77,18 +98,28 @@ def test_start_records_scope_code_state_and_inventory(project):
 
 def test_passes_are_validated_and_recorded_once(project):
     ctx = started(project)
-    bad = {"findings": [finding("X1", "defect", "No rule", breaks="nope"),
-                        finding("X2", "rule", "Outside", evidence=[{"path": "README.md"}])]}
+    bad = {
+        "findings": [
+            finding("X1", "defect", "No rule", breaks="nope"),
+            finding("X2", "rule", "Outside", evidence=[{"path": "README.md"}]),
+        ]
+    }
     with pytest.raises(an.AnalysisError) as exc:
         an.record(ctx, "A", bad)
     assert "neither an existing rule" in str(exc.value) and "not in the analysed scope" in str(exc.value)
     an.record(ctx, "A", PASS_A)
     with pytest.raises(an.AnalysisError, match="already recorded"):
         an.record(ctx, "A", PASS_A)
-    assert an.record(ctx, "B", {"findings": [dict(f, id=f["id"].replace("A", "B"),
-                                                  **({"breaks": "B1"} if f.get("breaks") else {}))
-                                             for f in PASS_A["findings"]]}) == \
-        ["both passes are identical — were they really run independently?"]
+    assert an.record(
+        ctx,
+        "B",
+        {
+            "findings": [
+                dict(f, id=f["id"].replace("A", "B"), **({"breaks": "B1"} if f.get("breaks") else {}))
+                for f in PASS_A["findings"]
+            ]
+        },
+    ) == ["both passes are identical — were they really run independently?"]
 
 
 def test_diff_classifies_agreed_conflicting_and_single_pass(project):
@@ -106,14 +137,25 @@ def test_diff_classifies_agreed_conflicting_and_single_pass(project):
 
 RECONCILED = {
     "findings": [
-        finding("F1", "rule", "Sessions expire", status="partial", sources=["A:A1", "B:B1"],
-                evidence=[{"path": "src/session.py", "line": 1}],
-                verification="read session.py: a timeout exists but is 0 — partial, not missing"),
-        finding("F2", "defect", "Session timeout is zero", breaks="F1", sources=["A:A2"],
-                evidence=[{"path": "src/session.py", "line": 1}],
-                verification="session.py:1 sets TIMEOUT = 0"),
-        finding("F3", "rule", "Passwords are checked on login", sources=["A:A3", "B:B2"],
-                verification="both passes"),
+        finding(
+            "F1",
+            "rule",
+            "Sessions expire",
+            status="partial",
+            sources=["A:A1", "B:B1"],
+            evidence=[{"path": "src/session.py", "line": 1}],
+            verification="read session.py: a timeout exists but is 0 — partial, not missing",
+        ),
+        finding(
+            "F2",
+            "defect",
+            "Session timeout is zero",
+            breaks="F1",
+            sources=["A:A2"],
+            evidence=[{"path": "src/session.py", "line": 1}],
+            verification="session.py:1 sets TIMEOUT = 0",
+        ),
+        finding("F3", "rule", "Passwords are checked on login", sources=["A:A3", "B:B2"], verification="both passes"),
     ],
     "dropped": [{"source": "B:B3", "reason": "one file does not make a domain; folded into AUTH"}],
 }
@@ -153,7 +195,7 @@ def test_decisions_need_real_artifacts_and_close_needs_them_all(project):
         an.decide(ctx, "F3", "accept", who)
     with pytest.raises(an.AnalysisError, match="does not exist"):
         an.decide(ctx, "F3", "accept", who, artifact="br-AUTH-000099-" + USERID)
-    an.decide(ctx, "F3", "accept", who, artifact=RULE)            # an existing rule covers it
+    an.decide(ctx, "F3", "accept", who, artifact=RULE)  # an existing rule covers it
     an.decide(ctx, "F2", "accept", who, artifact=ITEM)
     with pytest.raises(an.AnalysisError, match="F1 has no decision"):
         an.close(ctx)
@@ -170,7 +212,7 @@ def test_decisions_need_real_artifacts_and_close_needs_them_all(project):
 def test_check_rejects_a_record_its_reports_do_not_support(project):
     ctx = reconciled(project)
     an.reconcile(ctx, RECONCILED)
-    (ctx.dir / "B.json").unlink()                                 # a pass lost after the fact
+    (ctx.dir / "B.json").unlink()  # a pass lost after the fact
     errors = [e for e in run_check(load(project)).errors if e.startswith("analysis:")]
     assert errors and "both passes are not recorded" in errors[0]
 
@@ -186,6 +228,7 @@ def test_abandon(project):
 
 def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
     from catalyst.__main__ import main
+
     assert main(["analysis", "start", "src", "--name", "cli run"]) == 0
     aid = f"ANALYSIS-000001-{USERID}"
     for which, data in (("A", PASS_A), ("B", PASS_B)):
@@ -203,8 +246,9 @@ def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
     lines = (project / ".criterion" / "development" / "journal.jsonl").read_text(encoding="utf-8").splitlines()
     commands = [c for c in (json.loads(line)["command"] for line in lines) if c.startswith("catalyst analysis")]
     assert commands == ["catalyst analysis start"] + ["catalyst analysis record"] * 2 + [
-        "catalyst analysis diff", "catalyst analysis reconcile"] + ["catalyst analysis decide"] * 3 + [
-        "catalyst analysis close"]
+        "catalyst analysis diff",
+        "catalyst analysis reconcile",
+    ] + ["catalyst analysis decide"] * 3 + ["catalyst analysis close"]
     assert main(["analysis", "record", aid, "--pass", "A", str(tmp_path / "A.json")]) == 1
     assert "Closed" in capsys.readouterr().err
 
@@ -212,7 +256,9 @@ def test_cli_lifecycle_journals_every_phase(project, tmp_path, capsys):
 def test_the_playbooks_findings_example_is_valid():
     """The documented format is the one the CLI accepts."""
     import re
-    text = (Path(__file__).resolve().parents[1] / "framework" / "kernel" / "ANALYSIS-PLAYBOOK.md").read_text(encoding="utf-8")
+
+    text = (Path(__file__).resolve().parents[1] / "framework" / "kernel" / "ANALYSIS-PLAYBOOK.md").read_text(
+        encoding="utf-8"
+    )
     example = json.loads(re.search(r"```json\n(.*?)```", text, re.S).group(1))
-    assert an.validate_findings(example["findings"], inventory={"src/session.py"}, rules=set(),
-                                domains=set()) == []
+    assert an.validate_findings(example["findings"], inventory={"src/session.py"}, rules=set(), domains=set()) == []

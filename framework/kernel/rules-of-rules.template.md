@@ -718,6 +718,7 @@ courtesy as `/criterion create`:
 ### Agent switching procedure
 
 When a session starts or an agent assumes governance of a project previously managed by another agent (detected when the running agent's identity differs from the `agent` field in `<app-name>.catalyst`):
+
 1. Resolve the running agent's own owned location (local-only, above) (or the in-project fallback `.criterion/`).
 2. If the `.criterion/` working copy existed at a previous location (the current `.criterion` symlink's target, or a legacy pointer's `agent-source`), mirror it into the new location: the new location ends up an exact copy of the old one — every file the old one had, none it didn't — overwriting anything already at the new location that conflicts, and removing anything at the new location the old one doesn't have. Never a partial merge.
 3. Repoint the `.criterion` symlink at the project root to the new location (skip on the in-project fallback), keeping `/.criterion` in the project's `.gitignore`. A shared deployment's `.criterion` is a submodule inside the project (§13): skip steps 2–3 for it.

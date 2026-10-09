@@ -8,10 +8,12 @@
 ## Context
 
 Currently, all catalyst deployments store their working copy (`.criterion/`) as a directory in a specific location:
+
 - Agent-owned space (local deployments)
 - Git submodule (shared deployments)
 
 This works for current use cases, but it creates coupling between the deployment and its storage backend. Future evolution requires:
+
 - Supporting alternative storage backends (cloud storage, databases, etc.)
 - Pluggable storage drivers
 - Migration between storage backends
@@ -24,11 +26,13 @@ The proposal (what-is-going-on/08-criterion-proposals.md, "One truth" design) su
 **In R3, introduce a store abstraction with multiple driver implementations.** The initial release targets in-repo (filesystem) storage as the default, but the architecture supports alternative drivers.
 
 **Store drivers:**
+
 - `in-repo` (default for R3): Store working copy in filesystem (current behavior, improved with catalyst.toml)
 - `git-submodule`: Store working copy as git submodule (current behavior, now explicit)
 - Future drivers: cloud storage, database-backed, distributed, etc. (post-R3)
 
 **The abstraction layer:**
+
 - Sits between catalyst CLI and physical storage
 - Defines a consistent API for store operations (read, write, list, delete)
 - Allows stores to be created, switched, and migrated programmatically

@@ -16,6 +16,7 @@ The planning document (what-is-going-on/06-roadmap-streamline.md, §R5–R6) and
 **The VS Code thin client (R6) communicates with a catalyst server using the server protocol developed in R3.9.**
 
 Architecture:
+
 - **VS Code extension (thin client):** Lightweight UI component; communicates with a remote catalyst server
 - **Catalyst server:** Runs separately (locally or remotely); implements the server protocol from R3.9
 - **Server protocol:** RPC-based (likely JSON-RPC or gRPC) for commands, artifact access, and subscription to changes
@@ -23,6 +24,7 @@ Architecture:
 - **Offline support:** Limited when the server is unreachable (graceful degradation)
 
 Benefits of thin client:
+
 - Reduces VS Code extension complexity (network client, not full app)
 - Allows the same server to be used by CLI, SPA, desktop, and VS Code
 - Simplifies version management (server version drives feature set)

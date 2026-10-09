@@ -9,6 +9,7 @@ this file. Nothing here writes.
 Each function returns plain data (lists and dicts, ready for `--json`);
 `render_*` turns it into text.
 """
+
 from __future__ import annotations
 
 import fnmatch
@@ -57,8 +58,13 @@ def _rel(dep: Deployment, path: Path) -> str:
 
 
 def _artifact_row(dep: Deployment, art: Artifact) -> dict:
-    return {"id": art.id, "type": art.prefix, "title": art.title, "file": _rel(dep, art.file),
-            **{k: v for k, v in art.fields.items() if k.lower() != "id"}}
+    return {
+        "id": art.id,
+        "type": art.prefix,
+        "title": art.title,
+        "file": _rel(dep, art.file),
+        **{k: v for k, v in art.fields.items() if k.lower() != "id"},
+    }
 
 
 def _roles(dep: Deployment) -> list[dict]:
@@ -74,7 +80,7 @@ def _templates(dep: Deployment) -> list[dict]:
     for path in sorted(dep.root.glob("**/templates/TEMPLATE-*.md")):
         if "modules" in path.relative_to(dep.root).parts:
             continue
-        stem = path.stem[len("TEMPLATE-"):]
+        stem = path.stem[len("TEMPLATE-") :]
         family, _, version = stem.rpartition("-v")
         rows.append({"family": family or stem, "version": version, "file": _rel(dep, path)})
     return rows
@@ -91,8 +97,9 @@ def kinds(dep: Deployment) -> dict[str, str]:
     return names
 
 
-def list_items(dep: Deployment, corpus: Corpus, kind: str, filters: list[tuple[str, str]],
-               template_family: str | None = None) -> list[dict]:
+def list_items(
+    dep: Deployment, corpus: Corpus, kind: str, filters: list[tuple[str, str]], template_family: str | None = None
+) -> list[dict]:
     if kind.lower() == "all":
         return [row for k in ["rule", *sorted(dep.etds)] for row in list_items(dep, corpus, k, filters)]
     canon = kinds(dep).get(kind.lower())
@@ -100,15 +107,22 @@ def list_items(dep: Deployment, corpus: Corpus, kind: str, filters: list[tuple[s
         known = sorted({*dep.etds, "rule", "user", "role", "template"})
         raise ViewError(f"unknown type '{kind}' — one of: all, {', '.join(known)}")
     if canon == "rule":
-        rows = [{"id": rid, "type": "rule", "file": _rel(dep, defs[0].file), "line": defs[0].line,
-                 "retired": defs[0].retired} for rid, defs in sorted(corpus.rules.items())]
+        rows = [
+            {
+                "id": rid,
+                "type": "rule",
+                "file": _rel(dep, defs[0].file),
+                "line": defs[0].line,
+                "retired": defs[0].retired,
+            }
+            for rid, defs in sorted(corpus.rules.items())
+        ]
     elif canon == "user":
         rows = [dict(u) for u in corpus.users]
     elif canon == "role":
         rows = _roles(dep)
     elif canon == "template":
-        rows = [r for r in _templates(dep)
-                if template_family is None or r["family"].lower() == template_family.lower()]
+        rows = [r for r in _templates(dep) if template_family is None or r["family"].lower() == template_family.lower()]
     else:
         rows = [_artifact_row(dep, a) for a in corpus.by_prefix.get(canon, [])]
         rows += [{"id": i, "type": canon} for i in sorted(corpus.row_items.get(canon, ()))]
@@ -116,8 +130,13 @@ def list_items(dep: Deployment, corpus: Corpus, kind: str, filters: list[tuple[s
 
 
 # --- journal show ---------------------------------------------------------
-def journal_entries(dep: Deployment, since: str | None = None, artifact: str | None = None,
-                    actor: str | None = None, rule: str | None = None) -> list[dict]:
+def journal_entries(
+    dep: Deployment,
+    since: str | None = None,
+    artifact: str | None = None,
+    actor: str | None = None,
+    rule: str | None = None,
+) -> list[dict]:
     after = journal.parse_time(since) if since else None
     out = []
     for line, entry, _ in journal.read(dep):
@@ -147,22 +166,43 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
     if arts:
         art = arts[0]
         out = _artifact_row(dep, art)
-        out["links"] = {name: ref_values(art.get(name) or "") for name in _ref_fields(dep, art.prefix)
-                        if art.get(name) is not None}
+        out["links"] = {
+            name: ref_values(art.get(name) or "") for name in _ref_fields(dep, art.prefix) if art.get(name) is not None
+        }
     elif item_id in corpus.rules:
         rule = corpus.rules[item_id][0]
-        out = {"id": item_id, "type": "rule", "file": _rel(dep, rule.file), "line": rule.line,
-               "retired": rule.retired, "links": {}}
+        out = {
+            "id": item_id,
+            "type": "rule",
+            "file": _rel(dep, rule.file),
+            "line": rule.line,
+            "retired": rule.retired,
+            "links": {},
+        }
     else:
         raise ViewError(f"no artifact or rule '{item_id}' in this deployment")
     out["linked_from"] = sorted(
-        {(other.id, name) for defs in corpus.artifacts.values() for other in defs if other.id != item_id
-         for name in _ref_fields(dep, other.prefix) if item_id in ref_values(other.get(name) or "")})
+        {
+            (other.id, name)
+            for defs in corpus.artifacts.values()
+            for other in defs
+            if other.id != item_id
+            for name in _ref_fields(dep, other.prefix)
+            if item_id in ref_values(other.get(name) or "")
+        }
+    )
     out["linked_from"] = [{"id": i, "field": f} for i, f in out["linked_from"]]
-    out["journal"] = [{"timestamp": e.get("timestamp"), "actor": e.get("actor"), "command": e.get("command"),
-                       "action": e.get("action"), "intent": e.get("intent")}
-                      for e in journal_entries(dep)
-                      if e.get("artifact") == item_id or item_id in (e.get("targets") or [])]
+    out["journal"] = [
+        {
+            "timestamp": e.get("timestamp"),
+            "actor": e.get("actor"),
+            "command": e.get("command"),
+            "action": e.get("action"),
+            "intent": e.get("intent"),
+        }
+        for e in journal_entries(dep)
+        if e.get("artifact") == item_id or item_id in (e.get("targets") or [])
+    ]
     return out
 
 
@@ -198,8 +238,11 @@ def render_list(rows: list[dict]) -> str:
     lines = []
     for r in rows:
         head = r.get("id") or r.get("name") or r.get("family") or "?"
-        extra = [f"{k}: {v}" for k, v in r.items()
-                 if k in ("Status", "status", "title", "roles", "active", "version", "retired") and v not in ("", None)]
+        extra = [
+            f"{k}: {v}"
+            for k, v in r.items()
+            if k in ("Status", "status", "title", "roles", "active", "version", "retired") and v not in ("", None)
+        ]
         lines.append(f"{head}  {r.get('file', '')}".rstrip() + (f"  ({'; '.join(map(str, extra))})" if extra else ""))
     return "\n".join(lines) + f"\n{len(rows)} item(s)\n"
 
@@ -211,8 +254,10 @@ def render_journal(entries: list[dict]) -> str:
     for e in entries:
         targets = ", ".join(e.get("targets") or []) or "-"
         intent = " / ".join(e.get("intent") or []) if isinstance(e.get("intent"), list) else str(e.get("intent", ""))
-        out.append(f"{e.get('timestamp')}  {e.get('actor')}  {e.get('command')} {e.get('action')}  "
-                   f"{e.get('artifact')}  [{targets}]\n    {intent}")
+        out.append(
+            f"{e.get('timestamp')}  {e.get('actor')}  {e.get('command')} {e.get('action')}  "
+            f"{e.get('artifact')}  [{targets}]\n    {intent}"
+        )
     return "\n".join(out) + f"\n{len(entries)} entr{'y' if len(entries) == 1 else 'ies'}\n"
 
 

@@ -11,14 +11,17 @@ a long run" artifact the anti-drift architecture protects — hence the re-groun
 step and the machine checks below.
 
 ## Preconditions
+
 - [ ] `framework/kernel/INVARIANTS.md` read this session (INV-10..INV-13)
 - [ ] Activation was explicitly requested via `/catalyzer activate <name>` (INV-10)
 
 ## Structure (also enforced by `scripts/check_plugins.py`)
+
 - [ ] Plugin directory carries `README.md` and `working-contract.md` (INV-10)
 - [ ] Plugin is sourced from its own repository, not the framework repo (INV-11)
 
 ## Contract content (also enforced by `scripts/check_plugin_contracts.py`)
+
 - [ ] All six metadata fields present: Name, Description, UUID, Version, Active, Type
 - [ ] No leftover `<placeholder>` values in any metadata field
 - [ ] `UUID` is a well-formed UUID and unchanged from any prior activation (INV-12)
@@ -26,6 +29,7 @@ step and the machine checks below.
 - [ ] `Active` is a boolean; intended load state set/confirmed (INV-12)
 
 ## Load into context
+
 - [ ] `working-contract.md` Scope + Responsibilities read into context before use
 - [ ] Resolved runtime target = the deployed project's repository root — never the
       catalyst framework repo, never `plugins/<type>/<name>/` (INV-13); target
@@ -42,10 +46,12 @@ step and the machine checks below.
       at deactivating the first.
 
 ## Re-ground (anti-drift)
+
 - [ ] Re-read `working-contract.md` + `INVARIANTS.md` after any context compaction
       and every 5 ledger items, before continuing plugin work
 
 ## Definition of done
+
 - [ ] Every item above `[x]` in the ledger; blocked items surfaced, not skipped
 - [ ] `scripts/check_plugins.py` and `scripts/check_plugin_contracts.py` both pass
 - [ ] No commit/push without explicit assent (INV-4)

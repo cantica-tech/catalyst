@@ -20,6 +20,7 @@ Two tiers:
 
 Exit 0 = clean (warnings allowed), exit 1 = violations found.
 """
+
 from __future__ import annotations
 
 import os
@@ -97,21 +98,21 @@ def build_denylist(module_dir: Path) -> Denylist:
             continue
         prefix = str(entry.get("id", ""))
         if prefix:
-            deny.errors.append(Pattern(
-                re.compile(r"(?<![\w-])" + re.escape(prefix) + r"(?:-|(?![\w-]))"),
-                f"entity prefix '{prefix}'"))
-            deny.errors.append(Pattern(
-                re.compile(re.escape(f"DEFINITION-{prefix}"), re.I),
-                f"definition of '{prefix}'"))
+            deny.errors.append(
+                Pattern(re.compile(r"(?<![\w-])" + re.escape(prefix) + r"(?:-|(?![\w-]))"), f"entity prefix '{prefix}'")
+            )
+            deny.errors.append(
+                Pattern(re.compile(re.escape(f"DEFINITION-{prefix}"), re.I), f"definition of '{prefix}'")
+            )
         schema = entry.get("schema")
         etd = {}
         if schema and (module_dir / schema).is_file():
             etd = parse_simple_yaml((module_dir / schema).read_text(encoding="utf-8")) or {}
         folder = str(etd.get("folder", "")) if isinstance(etd, dict) else ""
         if folder:
-            deny.errors.append(Pattern(
-                re.compile(r"(?<![\w-])" + re.escape(folder) + r"(?:/|\.md\b)"),
-                f"entity folder '{folder}'"))
+            deny.errors.append(
+                Pattern(re.compile(r"(?<![\w-])" + re.escape(folder) + r"(?:/|\.md\b)"), f"entity folder '{folder}'")
+            )
         for key in ("name", "plural_name"):
             term = str(etd.get(key, "")) if isinstance(etd, dict) else ""
             if term:
@@ -146,7 +147,7 @@ def scan_files(root: Path = ROOT) -> list[Path]:
 
 def _inside_submodule(path: Path, root: Path) -> bool:
     for parent in path.relative_to(root).parents:
-        if parent != Path(".") and (root / parent / ".git").exists():
+        if parent != Path() and (root / parent / ".git").exists():
             return True
     return False
 
@@ -177,8 +178,10 @@ def main() -> int:
     for module_id in ids:
         module_dir = find_module_dir(module_id)
         if module_dir is None:
-            print(f"kernel purity: warning: module '{module_id}' is not checked out; "
-                  "its names cannot be checked", file=sys.stderr)
+            print(
+                f"kernel purity: warning: module '{module_id}' is not checked out; its names cannot be checked",
+                file=sys.stderr,
+            )
             continue
         denylists.append(build_denylist(module_dir))
     if not denylists:

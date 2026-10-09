@@ -38,6 +38,7 @@ Claude Code at user level (the `catalyst mcp` server and the Stop hook;
 the project. Then carry on with the judgment steps of `BOOTSTRAP.md` §2.
 
 Capabilities you have (use them per `BOOTSTRAP.md §1`):
+
 - **Sub-agents:** use `Agent` calls with `run_in_background: true`, launched in
   the same message so they run in parallel, `subagent_type: general-purpose`,
   and `model: opus` for the long reading passes in `ANALYSIS-PLAYBOOK.md`.

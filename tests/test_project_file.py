@@ -1,4 +1,5 @@
 """The project file and the criterion's place (roadmap R3.1, stages A–B)."""
+
 import json
 import shutil
 import sys
@@ -7,8 +8,8 @@ import pytest
 
 import project_file as pf
 from catalyst.corpus import load_corpus
-from catalyst.validate import ERROR, validate
 from catalyst.deployment import load
+from catalyst.validate import ERROR, validate
 from catalyst_fixtures import make_project
 
 needs_tomllib = pytest.mark.skipif(sys.version_info < (3, 11), reason="tomllib is Python 3.11+")
@@ -16,8 +17,13 @@ needs_tomllib = pytest.mark.skipif(sys.version_info < (3, 11), reason="tomllib i
 
 @needs_tomllib
 def test_catalyst_toml_round_trips_and_wins_over_a_legacy_pointer(tmp_path):
-    data = {"project_name": "app", "kernel_version": "0.48.0", "repoed": False, "targets": ["a", "b"],
-            "note": 'quotes " and \\ and é'}
+    data = {
+        "project_name": "app",
+        "kernel_version": "0.48.0",
+        "repoed": False,
+        "targets": ["a", "b"],
+        "note": 'quotes " and \\ and é',
+    }
     pf.write(tmp_path / pf.NAME, data)
     (tmp_path / "app.catalyst").write_text(json.dumps({"project_name": "old"}), encoding="utf-8")
     assert pf.find(tmp_path).name == pf.NAME
@@ -60,6 +66,7 @@ def test_a_project_with_its_criterion_in_the_home_store_is_found_from_anywhere_i
 
 def test_a_missing_criterion_names_where_it_was_expected(tmp_path, monkeypatch):
     from catalyst.deployment import WorkingCopyMissing
+
     monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
     (tmp_path / "app.catalyst").write_text(json.dumps({"project_name": "app"}), encoding="utf-8")
     with pytest.raises(WorkingCopyMissing, match=r"projects[\\/]app[\\/]criterion"):
@@ -68,6 +75,7 @@ def test_a_missing_criterion_names_where_it_was_expected(tmp_path, monkeypatch):
 
 def test_where_reports_the_home_store_or_a_legacy_working_copy(tmp_path, capsys):
     from catalyst.__main__ import main
+
     project = make_project(tmp_path / "w")
     assert main(["--project", str(project), "where", "--json"]) == 0
     out = json.loads(capsys.readouterr().out)

@@ -1,12 +1,13 @@
 """Read-only views (roadmap R2 W1): list, journal show, view, backlog."""
+
 import json
 
 import pytest
 
+from catalyst import views
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
-from catalyst import views
 from catalyst_fixtures import USER, USERID, artifact, make_project, write
 
 ITEM, SUB, RULE = f"ITEM-000001-{USERID}", f"SUB-000001-{USERID}", f"br-AUTH-000001-{USERID}"
@@ -52,13 +53,28 @@ def test_view_shows_links_both_ways(tmp_path):
 def test_journal_show_filters_and_orders(tmp_path):
     project = make_project(tmp_path)
     entries = [
-        {"timestamp": "2026-10-02T00:00:00Z", "actor": "ada", "command": "/status", "action": "update",
-         "artifact": ITEM, "targets": [RULE], "intent": ["b"], "files": []},
-        {"timestamp": "2026-10-01T00:00:00Z", "actor": "grace", "command": "/create-item", "action": "create",
-         "artifact": ITEM, "targets": [], "intent": ["a"], "files": []},
+        {
+            "timestamp": "2026-10-02T00:00:00Z",
+            "actor": "ada",
+            "command": "/status",
+            "action": "update",
+            "artifact": ITEM,
+            "targets": [RULE],
+            "intent": ["b"],
+            "files": [],
+        },
+        {
+            "timestamp": "2026-10-01T00:00:00Z",
+            "actor": "grace",
+            "command": "/create-item",
+            "action": "create",
+            "artifact": ITEM,
+            "targets": [],
+            "intent": ["a"],
+            "files": [],
+        },
     ]
-    write(project / ".criterion" / "development" / "journal.jsonl",
-          "".join(json.dumps(e) + "\n" for e in entries))
+    write(project / ".criterion" / "development" / "journal.jsonl", "".join(json.dumps(e) + "\n" for e in entries))
     dep = load(project)
     assert [e["intent"] for e in views.journal_entries(dep)] == [["a"], ["b"]]
     assert [e["actor"] for e in views.journal_entries(dep, since="2026-10-02")] == ["ada"]
@@ -69,17 +85,27 @@ def test_journal_show_filters_and_orders(tmp_path):
 
 def test_backlog_reads_open_states_and_links_from_the_etds(tmp_path):
     project = make_project(tmp_path)
-    write(project / ".criterion" / "items" / "ITEM-000002-done.md", artifact(
-        f"ITEM-000002-{USERID}", "Done item", {"ID": f"`ITEM-000002-{USERID}`", "Status": "Done",
-                                                "Targets": f"`{RULE}`", "Domain": "`AUTH`"}))
-    write(project / ".criterion" / "items" / "ITEM-000003-loose.md", artifact(
-        f"ITEM-000003-{USERID}", "Loose item", {"ID": f"`ITEM-000003-{USERID}`", "Status": "Open",
-                                                 "Targets": "", "Domain": "`AUTH`"}))
+    write(
+        project / ".criterion" / "items" / "ITEM-000002-done.md",
+        artifact(
+            f"ITEM-000002-{USERID}",
+            "Done item",
+            {"ID": f"`ITEM-000002-{USERID}`", "Status": "Done", "Targets": f"`{RULE}`", "Domain": "`AUTH`"},
+        ),
+    )
+    write(
+        project / ".criterion" / "items" / "ITEM-000003-loose.md",
+        artifact(
+            f"ITEM-000003-{USERID}",
+            "Loose item",
+            {"ID": f"`ITEM-000003-{USERID}`", "Status": "Open", "Targets": "", "Domain": "`AUTH`"},
+        ),
+    )
     dep = load(project)
     b = views.backlog(dep, load_corpus(dep))
-    assert b["open"]["ITEM"] == {"Open": [ITEM, f"ITEM-000003-{USERID}"]}     # Done is closed
+    assert b["open"]["ITEM"] == {"Open": [ITEM, f"ITEM-000003-{USERID}"]}  # Done is closed
     assert {"id": f"ITEM-000003-{USERID}", "field": "Targets"} in b["missing_links"]
-    assert b["rules_without_open_work"] == []                                 # ITEM-000001 targets it
+    assert b["rules_without_open_work"] == []  # ITEM-000001 targets it
 
 
 def test_the_cli_prints_text_and_json(tmp_path, capsys):
