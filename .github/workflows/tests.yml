@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ['3.9', '3.13']           # the declared floor (pyproject.toml) and a current release
+        python: ['3.11', '3.13']          # the declared floor (pyproject.toml) and a current release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

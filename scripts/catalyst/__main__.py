@@ -366,6 +366,48 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+def cmd_runtime(args) -> int:
+    """`runtime install|status` (R3.1a): the per-version runtime, the
+    launcher, and the project's criterion .venv."""
+    import tempfile
+
+    import project_file
+    from catalyst import runtime as rt
+    from catalyst import version_string
+
+    version = version_string()
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    criterion = project_file.resolve(project) if project else None
+    name = project_file.project_name(project_file.read_dir(project)) if project else None
+    home_store = criterion is not None and name is not None and criterion == project_file.home_criterion(name)
+    if args.runtime_command == "status":
+        out = {"version": version, "home": str(project_file.home()),
+               "runtimes": sorted(p.name for p in rt.runtimes().glob("*") if (p / rt.MARKER).is_file()),
+               "launcher": str(project_file.home() / "bin" / "catalyst"),
+               "launcher_installed": (project_file.home() / "bin" / "catalyst").is_file(),
+               "criterion": str(criterion) if criterion else None,
+               "criterion_runtime": rt.installed_version(criterion / ".venv") if criterion else None}
+        print(json.dumps(out, indent=2) if args.json else "\n".join(f"{k:<20}{v}" for k, v in out.items()))
+        return 0
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            pyz = rt.own_pyz(Path(tmp))
+            runtime_dir = rt.ensure_runtime(version, pyz)
+            launcher = rt.install_launcher()
+            lines = [f"runtime {version}: {runtime_dir}", f"launcher: {launcher} (put {launcher.parent} on PATH)"]
+            if home_store:
+                venv, changed = rt.install_into(criterion, version, pyz)
+                lines.append(f"criterion runtime: {venv} ({'installed' if changed else 'already ' + version})")
+            elif criterion is not None:
+                lines.append("legacy deployment (.criterion in the project): no .venv; `catalyst move --to-home` first")
+    except (rt.RuntimeError_, OSError, subprocess.CalledProcessError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    print("\n".join(lines))
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -1079,6 +1121,14 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_where)
+
+    p = sub.add_parser("runtime", help="the per-version runtime, the launcher, the criterion's .venv")
+    rs = p.add_subparsers(dest="runtime_command", required=True)
+    q = rs.add_parser("install", help="build this version's runtime, install the launcher, fill the criterion's .venv")
+    q.set_defaults(func=cmd_runtime)
+    q = rs.add_parser("status", help="runtimes, launcher and the criterion's runtime version")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_runtime)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)

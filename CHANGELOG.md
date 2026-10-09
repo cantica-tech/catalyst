@@ -15,6 +15,14 @@ messages.
   the migrations to run, in order. `/sync-framework` runs it.
 - Kernel release archives carry the command files and `agents/`, so an
   install or sync from a release has them.
+- The criterion's place (roadmap R3.1, ADR-010): `catalyst.toml` at the
+  project root (a legacy `<name>.catalyst` is still read) and
+  `$CATALYST_HOME/projects/<name>/criterion` (default `$HOME/.catalyst`),
+  else a legacy `.criterion`; `catalyst where` reports which.
+- A runtime per criterion: `catalyst runtime install|status` builds a runtime
+  per catalyst version once, copies it into the criterion's `.venv`, and
+  installs the `catalyst` launcher, which runs the project's own runtime.
+- **Python 3.11 or later** (was 3.9): the criterion's runtime brings it.
 
 ## 0.47.0 — 2026-10-08
 

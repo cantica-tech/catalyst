@@ -1,7 +1,7 @@
 [project]
 name = "catalyst"
 description = "The catalyst framework's CLI (stdlib only; shipped as a zipapp, not installed)"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dynamic = ["version"]
 
 [tool.pytest.ini_options]

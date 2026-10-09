@@ -11,8 +11,9 @@ intent is, whether two rules conflict.
 The CLI is agent-agnostic and module-agnostic. It reads the kernel's
 entity types (`entities/`) plus the active module's Entity Type
 Definitions (`MODULE-SPECIFICATION.md`), so it knows every type a
-deployment has without naming any of them. It needs Python 3.9 or later
-and `git`, and nothing else.
+deployment has without naming any of them. It needs Python 3.11 or later
+(a criterion's own runtime brings one, `catalyst runtime install`) and `git`,
+and nothing else.
 
 ## Invocation
 
@@ -374,6 +375,20 @@ side of a trial:
 `errors`, `warnings`, `commits`, `commits_traced`, `unrecorded_commits`,
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
+
+### `catalyst where`, `catalyst runtime install|status`
+
+- `where` names the project file (`catalyst.toml`, or a legacy
+  `<name>.catalyst`) and the criterion it resolves to:
+  `$CATALYST_HOME/projects/<name>/criterion` (`CATALYST_HOME` defaults to
+  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `1` when none is found.
+- `runtime install` builds this version's runtime once per machine in
+  `$CATALYST_HOME/runtimes/<version>/` (uv `--relocatable` when uv is
+  installed, else Python's `venv`; `catalyst.pyz` sits in its site-packages),
+  installs the launcher `$CATALYST_HOME/bin/catalyst` (and `catalyst.cmd`),
+  and copies the runtime into the criterion's `.venv` (git-ignored). The
+  launcher runs the `.venv` of the project it is called from — no activation
+  — or a legacy deployment's vendored CLI. `runtime status` reports all three.
 
 ### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip>]`
 

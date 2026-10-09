@@ -11,6 +11,8 @@ minor (ADR-009) and moved with `catalyst move`.
 
 ## Stages (each tested, each shippable)
 
+Progress: **A, B done** (`e6d6c50`); **C done** (runtime, launcher, floor 3.11). Next: D.
+
 | # | Stage | Content | Done when |
 |---|---|---|---|
 | A | **`catalyst.toml`** | one reader/writer for the project file: `catalyst.toml` (stdlib `tomllib`, imported only when a TOML file is read, so legacy JSON pointers still work on the 3.9 `python3` deployments run today) else the legacy `*.catalyst` JSON, same fields | every command works with either file |
