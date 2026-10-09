@@ -457,6 +457,7 @@ def cmd_runtime(args) -> int:
     try:
         with tempfile.TemporaryDirectory() as tmp:
             pyz = rt.own_pyz(Path(tmp))
+            version = rt.pyz_version(pyz)       # a build from source is not its release
             runtime_dir = rt.ensure_runtime(version, pyz)
             launcher = rt.install_launcher()
             lines = [f"runtime {version}: {runtime_dir}", f"launcher: {launcher} (put {launcher.parent} on PATH)"]
