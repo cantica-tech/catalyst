@@ -22,6 +22,10 @@ The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).
 - Unrecorded changes are decided by content hashes, never by clocks:
   committing before journaling, rebases and skewed machines no longer produce
   false reports.
+- The criterion's store (roadmap R3.2): its working form (read, list, append,
+  lock; driver `home`) and its sharing (`catalyst share info|status|pull|push`;
+  drivers `local` and `git`, chosen by `share` in `catalyst.toml` or by the
+  criterion's remote). The journal reads, appends and locks through it.
 
 ## 0.49.0 — 2026-10-09
 

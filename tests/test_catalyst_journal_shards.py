@@ -42,7 +42,7 @@ def test_an_append_goes_to_its_actors_shard_and_never_to_the_legacy_file(project
     assert json.loads(shard.read_text(encoding="utf-8")) == entry
     assert (dep.root / j.LEGACY).read_text(encoding="utf-8") == ""  # the fixture's pre-0.50 file, untouched
     assert j.machine() == machine and len(machine) == 6  # created once
-    assert j.sources(dep) == [dep.root / j.LEGACY, shard]
+    assert [dep.root / rel for rel in j.sources(dep)] == [dep.root / j.LEGACY, shard]
     assert [e for _, e, _ in j.read(dep)] == [entry]
     assert j.read(dep)[0][0] == f"journal/ada-lovelace@{machine}/{entry['timestamp'][:7]}.jsonl:1"
 
@@ -55,7 +55,7 @@ def test_shards_merge_in_causal_order_whatever_the_clocks_say(project):
     j.append(dep, req(["src/f.py"], action="create", actor="ada", timestamp="2026-10-09T12:00:00Z"))
     write(project / "src" / "f.py", "bob\n")
     j.append(dep, req(["src/f.py"], actor="bob", timestamp="2026-10-09T11:00:00Z"))
-    assert [e["actor"] for _, e, _ in j.read(dep)] == ["ada", "bob"]
+    assert [(e or {}).get("actor") for _, e, _ in j.read(dep)] == ["ada", "bob"]
     assert [i for i in j.verify(dep) if i.code in ("chain", "unjournaled")] == []
     assert j.last_after(dep)["src/f.py"] == j.git(project, "hash-object", "src/f.py")
 
@@ -78,9 +78,9 @@ def test_concurrent_appends_are_serialised(project):
     procs = [subprocess.Popen([sys.executable, "-c", code, str(i)], cwd=project, env=env) for i in range(8)]
     assert [p.wait(timeout=120) for p in procs] == [0] * 8
     dep = load(project)
-    rows = j.read(dep)
-    assert len(rows) == 8 and all(e is not None for _, e, _ in rows)
-    shared = [f for _, e, _ in rows for f in e["files"] if f["path"] == "shared.txt"]
+    rows = [e for _, e, _ in j.read(dep) if e is not None]
+    assert len(rows) == len(j.read(dep)) == 8
+    shared = [f for e in rows for f in e["files"] if f["path"] == "shared.txt"]
     assert shared[0]["before"] is None and all(f["before"] == shared[0]["after"] for f in shared[1:])
     assert [i for i in j.verify(dep) if i.level == "error"] == []
 
@@ -129,7 +129,7 @@ def test_ids_and_the_structure_check_read_every_shard(project):
     j.append(dep, req(["src/a.py"], action="create", artifact="ITEM-000042-AbCd1234"))
     assert highest_number(dep, load_corpus(dep), "ITEM") == 42
     assert check_journal_exists(dep.root) == []
-    shard = j.sources(dep)[-1]
+    shard = dep.root / j.sources(dep)[-1]
     shard.write_text(shard.read_text(encoding="utf-8") + "{not json\n", encoding="utf-8")
     name = shard.relative_to(dep.root / "development").as_posix()
     assert any(f"{name}:2 is not valid JSON" in e for e in check_journal_exists(dep.root))

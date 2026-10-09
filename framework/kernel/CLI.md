@@ -770,6 +770,28 @@ exit `1` and a reason on stderr when a precondition does not hold.
 later without a complete reconciliation, or `Closed` with an undecided
 finding or a missing artifact, is an error.
 
+### `catalyst share info|status|pull|push`
+
+The criterion's sharing, whichever driver holds the shared copy (roadmap
+R3.2). `catalyst.toml` may name the driver (`share = "git"`); without it a
+criterion with a git remote, or a project file naming its repository, uses
+`git`, any other `local`.
+
+- `info [--json]`: the driver, where the shared copy is, the shared branch,
+  and what the driver can do.
+- `status [--fetch] [--json]`: unpublished local changes, and how far this
+  criterion is ahead of or behind its shared copy.
+- `pull`: bring in what the shared copy has; refuses while local work is
+  unpublished (git: `criterion sync`).
+- `push -m <message> [--as <user>] [--no-pr] [--json]`: publish this
+  criterion's changes (git: `criterion push`, a topic branch and a pull
+  request).
+
+Drivers: `local` (not shared: `pull` and `push` say how to share it) and
+`git` (below). The working form behind every driver is the criterion's
+store — read, list, append, lock (`scripts/catalyst/store.py`); a server
+driver implements the same verbs.
+
 ### `catalyst criterion <subcommand>`
 
 Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). The criterion

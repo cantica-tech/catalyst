@@ -8,7 +8,8 @@ merges without conflicts. A deployment made before kernel 0.50 also keeps
 `development/journal.jsonl`, read as one more source and never written.
 The journal reads as every source merged by timestamp, each source keeping
 its own order. Appends run under the criterion's journal lock (`lock.py`),
-so concurrent sessions never compute a `before` from a stale state.
+so concurrent sessions never compute a `before` from a stale state. Every
+read, append and lock goes through the criterion's store (`store.py`).
 
 Paths are relative to the project root; working-copy files start with
 `.criterion/` and are hashed into the working copy's own git repository,
@@ -45,8 +46,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import project_file
-from catalyst import __version__, lock, proc
+from catalyst import __version__, proc
 from catalyst.deployment import Deployment
+from catalyst.store import store_for
 
 LEGACY = "development/journal.jsonl"  # before kernel 0.50: read, never written
 SHARDS = "development/journal"
@@ -175,19 +177,23 @@ def locate(dep: Deployment, path: str) -> tuple[Path, str] | None:
 
 
 # --- reading -------------------------------------------------------------
-def sources(dep: Deployment) -> list[Path]:
-    """Every file the journal is read from: the legacy single file first,
-    then each shard, in a stable order."""
-    legacy = dep.root / LEGACY
-    shards = dep.root / SHARDS
-    found = sorted(shards.rglob("*.jsonl"), key=lambda p: p.relative_to(shards).as_posix()) if shards.is_dir() else []
-    return ([legacy] if legacy.is_file() else []) + found
+def sources(dep: Deployment) -> list[str]:
+    """Every file the journal is read from, criterion-relative: the legacy
+    single file first, then each shard, in a stable order."""
+    store = store_for(dep)
+    return [*store.list(LEGACY), *store.list(SHARDS, ".jsonl")]
 
 
-def _source(dep: Deployment, path: Path) -> list[tuple[str, dict | None, str]]:
-    name = path.relative_to(dep.root / "development").as_posix()
+def texts(dep: Deployment) -> list[str]:
+    """The raw text of every journal source (ID allocation scans it)."""
+    store = store_for(dep)
+    return [store.read(rel) or "" for rel in sources(dep)]
+
+
+def _source(dep: Deployment, rel: str) -> list[tuple[str, dict | None, str]]:
+    name = rel.removeprefix("development/")
     out = []
-    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for n, line in enumerate((store_for(dep).read(rel) or "").splitlines(), 1):
         if not line.strip():
             continue
         try:
@@ -216,7 +222,7 @@ def read(dep: Deployment) -> list[tuple[str, dict | None, str]]:
     or, for a file not seen yet, from a state no pending entry produces. When
     none is ready (merged concurrent work), the earliest of all. Timestamps
     only break ties, so a skewed clock cannot reorder a chain."""
-    queues = [_source(dep, path) for path in sources(dep)]
+    queues = [_source(dep, rel) for rel in sources(dep)]
     if len(queues) == 1:
         return queues[0]
     floor = datetime.datetime.min.replace(tzinfo=datetime.UTC)
@@ -291,16 +297,15 @@ def shard(entry: dict) -> str:
 
 def journal_lock(dep: Deployment):
     """Held around every append: read the last states, then write."""
-    return lock.held(dep.root, "journal", stale=LOCK_STALE, error=JournalError)
+    return store_for(dep).lock("journal", stale=LOCK_STALE, error=JournalError)
 
 
-def write(dep: Deployment, entry: dict) -> Path:
-    """Append one entry to its shard (call with the journal lock held)."""
-    path = dep.root / shard(entry)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8", newline="\n") as fh:
-        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    return path
+def write(dep: Deployment, entry: dict) -> str:
+    """Append one entry to its shard (call with the journal lock held);
+    returns the shard, criterion-relative."""
+    rel = shard(entry)
+    store_for(dep).append(rel, json.dumps(entry, ensure_ascii=False))
+    return rel
 
 
 def entry_path(dep: Deployment, entry: dict, f: dict) -> str:

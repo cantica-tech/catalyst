@@ -17,6 +17,7 @@ from catalyst.criterion import CriterionError
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
 from catalyst.ids import IdError
 from catalyst.journal import JournalError
+from catalyst.store import ShareError
 
 
 def open_deployment(args):
@@ -1002,6 +1003,53 @@ def cmd_criterion(args) -> int:
     return 0
 
 
+def cmd_share(args) -> int:
+    """The criterion's sharing driver, whichever it is (roadmap R3.2)."""
+    from catalyst import store
+
+    dep = open_deployment(args)
+    share = store.share_for(dep)
+    if args.share_command == "info":
+        info = share.info()
+        if args.json:
+            print(json.dumps(info, indent=2))
+        else:
+            print(f"driver:   {info['driver']}\nlocation: {info.get('location') or '(not shared)'}")
+            if info.get("branch"):
+                print(f"branch:   {info['branch']}")
+            print(f"can:      {', '.join(info['capabilities']) or '(nothing: local only)'}")
+        return 0
+    if args.share_command == "status":
+        st = share.status(fetch=args.fetch)
+        if args.json:
+            print(json.dumps(st.as_dict(), indent=2))
+            return 0
+        print(f"driver:   {st.driver}" + (f" ({st.mode})" if st.mode else ""))
+        print(f"location: {st.location or '(not shared)'}")
+        if st.branch:
+            print(f"branch:   {st.branch}")
+        print(f"changes:  {len(st.dirty)} not published")
+        if st.ahead is not None:
+            print(f"vs shared: {st.ahead} ahead, {st.behind} behind")
+        return 0
+    if args.share_command == "pull":
+        print(f"criterion at {share.pull()} ({share.driver})")
+        return 0
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    res = share.push(resolve_signer(dep, load_corpus(dep), args.as_user), args.message, open_pr=not args.no_pr)
+    if args.json:
+        print(json.dumps(res, indent=2))
+    elif not res["commits"]:
+        print("nothing to publish: the criterion matches its shared copy")
+    else:
+        print(f"published {res['commits']} commit(s) on {res['branch']} ({share.driver})")
+        if res.get("pull_request"):
+            print(f"pull request: {res['pull_request']}")
+    return 0
+
+
 def cmd_init(args) -> int:
     from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
     from module_loader import REPO_ROOT
@@ -1622,6 +1670,24 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("id")
     q.set_defaults(func=cmd_analysis)
 
+    p = sub.add_parser("share", help="the criterion's sharing driver: info, status, pull, push")
+    ss = p.add_subparsers(dest="share_command", required=True)
+    q = ss.add_parser("info", help="the driver, where the shared copy is, what it can do")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_share)
+    q = ss.add_parser("status", help="this criterion against its shared copy")
+    q.add_argument("--fetch", action="store_true", help="fetch the shared copy first")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_share)
+    q = ss.add_parser("pull", help="bring in what the shared copy has (refuses with unpublished work)")
+    q.set_defaults(func=cmd_share)
+    q = ss.add_parser("push", help="publish this criterion's changes (git: a topic branch and a pull request)")
+    q.add_argument("-m", "--message", required=True, help="what the change is (commit message, pull request title)")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--no-pr", action="store_true", help="git: push the branch without opening a pull request")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_share)
+
     p = sub.add_parser("criterion", help="shared deployments on git: submodule, pull requests")
     cs = p.add_subparsers(dest="criterion_command", required=True)
     q = cs.add_parser("status", help="the working copy against the shared branch")
@@ -1675,7 +1741,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except (IdError, JournalError, CriterionError, AnalysisError) as exc:
+    except (IdError, JournalError, CriterionError, AnalysisError, ShareError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     except DeploymentNotFound as exc:

@@ -71,8 +71,8 @@ def highest_number(dep: Deployment, corpus: Corpus, prefix: str) -> int:
                 numbers += [int(n) for n in pattern.findall(f.read_text(encoding="utf-8", errors="ignore"))]
     numbers += [int(m.group(1)) for i in corpus.artifacts if (m := pattern.match(i))]
     # the journal remembers every ID ever touched, even if its file is gone
-    for source in journal.sources(dep):
-        numbers += [int(n) for n in pattern.findall(source.read_text(encoding="utf-8", errors="ignore"))]
+    for text in journal.texts(dep):
+        numbers += [int(n) for n in pattern.findall(text)]
     return max(numbers)
 
 
@@ -105,8 +105,8 @@ def highest_rule_number(dep: Deployment, corpus: Corpus, domain: str) -> int:
         if rules_dir.is_dir()
         else []
     )
-    for f in texts + journal.sources(dep):
-        numbers += [int(n) for n in cited.findall(f.read_text(encoding="utf-8", errors="ignore"))]
+    for text in [f.read_text(encoding="utf-8", errors="ignore") for f in texts] + journal.texts(dep):
+        numbers += [int(n) for n in cited.findall(text)]
     return max(numbers)
 
 
