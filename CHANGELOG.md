@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.48.0 — 2026-10-09
+
+The criterion in catalyst's home store (migration `0.48.0/criterion-in-catalyst-home.md`).
 
 - `catalyst sync plan|apply` (roadmap R2 W4): the mechanical half of
   `/sync-framework` from a checkout or a release zip — CLI, invariants,

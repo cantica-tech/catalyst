@@ -547,6 +547,15 @@ Target version `0.47.0`. Full procedure:
 duplicated here. Re-vendor the CLI (the procedures now call its verbs) and
 recompose. No layout change.
 
+### From `0.47.x`: the criterion in catalyst's home store
+
+Target version `0.48.0`. Full procedure:
+`migrations/0.48.0/criterion-in-catalyst-home.md` (this repository) — not
+duplicated here. Install the runtime and launcher, point the hooks at the
+launcher, and — with the user's assent — `catalyst move --to-home`. Layout
+change: the criterion leaves the project; `catalyst.toml` replaces
+`<name>.catalyst`.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current
