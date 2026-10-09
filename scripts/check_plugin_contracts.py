@@ -25,6 +25,7 @@ UUID *stability* over time and *activation gating* (INV-13 runtime target) are
 behavioural — not checkable from a single tree snapshot — and stay the agent's
 responsibility, re-grounded via INVARIANTS.md.
 """
+
 from __future__ import annotations
 
 import re
@@ -35,9 +36,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = ROOT / "framework" / "kernel" / "plugins"
 
-UUID_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
-)
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 REQUIRED_FIELDS = ["Name", "Description", "UUID", "Version", "Active", "Type"]
 
 
@@ -89,17 +88,15 @@ def parse_catalog_pins(type_dir: Path) -> dict[str, dict[str, str]]:
 def normalize_url(url: str) -> str:
     url = url.strip().rstrip("/")
     url = re.sub(r"\.git$", "", url, flags=re.I)
-    url = re.sub(r"^git@([^:]+):", r"\1/", url)     # git@host:owner/repo
+    url = re.sub(r"^git@([^:]+):", r"\1/", url)  # git@host:owner/repo
     url = re.sub(r"^[a-z]+://", "", url, flags=re.I)  # scheme://
-    url = re.sub(r"^[^@/]+@", "", url)               # user@host
+    url = re.sub(r"^[^@/]+@", "", url)  # user@host
     return url.lower()
 
 
 def origin_url() -> str | None:
     try:
-        out = subprocess.check_output(
-            ["git", "remote", "get-url", "origin"], cwd=ROOT, text=True, encoding="utf-8"
-        )
+        out = subprocess.check_output(["git", "remote", "get-url", "origin"], cwd=ROOT, text=True, encoding="utf-8")
         return normalize_url(out)
     except Exception:
         return None
@@ -150,9 +147,7 @@ def validate_plugin(plugin_dir: Path, framework_url: str | None) -> list[str]:
     if vtxt is None:
         errors.append(f"INV-12 {rel}: version.txt is missing")
     elif version and "<" not in version and version != vtxt:
-        errors.append(
-            f"INV-12 {rel}: Version '{version}' != version.txt '{vtxt}'"
-        )
+        errors.append(f"INV-12 {rel}: Version '{version}' != version.txt '{vtxt}'")
 
     pins = parse_catalog_pins(plugin_dir.parent).get(plugin_dir.name)
     if pins and vtxt:
@@ -161,9 +156,7 @@ def validate_plugin(plugin_dir: Path, framework_url: str | None) -> list[str]:
         if tag and tag != vtxt:
             errors.append(f"INV-12 {rel}: catalog Tag '{tag}' != version.txt '{vtxt}'")
         if release and release not in {vtxt, f"v{vtxt}"}:
-            errors.append(
-                f"INV-12 {rel}: catalog Release '{release}' != '{vtxt}'/'v{vtxt}'"
-            )
+            errors.append(f"INV-12 {rel}: catalog Release '{release}' != '{vtxt}'/'v{vtxt}'")
 
     return errors
 
@@ -178,8 +171,10 @@ def main(argv: list[str] | None = None) -> int:
     plugins = find_plugins()
     if not plugins:
         if "--require" in argv:
-            print("plugin contract validation FAILED: no plugin with a working-contract.md found "
-                  "(are the submodules checked out?) (--require)")
+            print(
+                "plugin contract validation FAILED: no plugin with a working-contract.md found "
+                "(are the submodules checked out?) (--require)"
+            )
             return 1
         print("no plugins with working-contract.md found; skipping contract checks")
         return 0

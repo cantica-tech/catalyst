@@ -1,14 +1,14 @@
 """Sharing a home-store criterion (roadmap R3.1 stage F): the criterion is its
 own git repository with a remote; a collaborator joins by cloning it into
 their own $CATALYST_HOME. No submodule."""
+
 import subprocess
 import sys
 
 import pytest
 
 import project_file as pf
-from catalyst import criterion as cr
-from catalyst import move
+from catalyst import criterion as cr, move
 from catalyst.deployment import load
 from catalyst_fixtures import make_project
 from test_catalyst_criterion import allow_file_submodules, git  # noqa: F401  (fixture)
@@ -32,8 +32,14 @@ def shared(tmp_path, monkeypatch):
     git(ada, "push", "-q", "origin", "HEAD:refs/heads/main")
     bob = tmp_path / "bob" / "app"
     subprocess.run(["git", "clone", "-q", "-b", "main", str(product), str(bob)], check=True)
-    return {"ada": ada, "bob": bob, "remote": remote, "ada_home": ada_home,
-            "bob_home": tmp_path / "bob-home", "steps": steps}
+    return {
+        "ada": ada,
+        "bob": bob,
+        "remote": remote,
+        "ada_home": ada_home,
+        "bob_home": tmp_path / "bob-home",
+        "steps": steps,
+    }
 
 
 def test_create_publishes_the_home_criterion_without_a_submodule(shared):
@@ -55,7 +61,7 @@ def test_a_collaborator_joins_by_cloning_into_their_own_home(shared, monkeypatch
     assert head == git(target, "rev-parse", "--short", "HEAD")
     dep = load(shared["bob"])
     assert dep.root == target
-    assert cr.join_home(shared["bob"], runtime=False) == head            # joining again is a no-op
+    assert cr.join_home(shared["bob"], runtime=False) == head  # joining again is a no-op
 
 
 def test_a_change_landed_on_the_shared_branch_reaches_the_collaborator(shared, monkeypatch):
@@ -65,7 +71,7 @@ def test_a_change_landed_on_the_shared_branch_reaches_the_collaborator(shared, m
     (ada_criterion / "NOTE.md").write_text("from Ada\n", encoding="utf-8")
     git(ada_criterion, "add", "NOTE.md")
     git(ada_criterion, "-c", "user.name=Ada", "-c", "user.email=a@x", "commit", "-q", "-m", "note")
-    git(ada_criterion, "push", "-q", "origin", "HEAD:refs/heads/criterion")    # a merged pull request
+    git(ada_criterion, "push", "-q", "origin", "HEAD:refs/heads/criterion")  # a merged pull request
     cr.sync(load(shared["bob"]))
     assert (shared["bob_home"] / "projects" / "app" / "criterion" / "NOTE.md").is_file()
 
@@ -84,8 +90,10 @@ def test_join_refuses_a_same_named_criterion_with_another_remote(shared, monkeyp
 @pytest.mark.skipif(__import__("shutil").which("uv") is None, reason="a runtime build is slow without uv")
 def test_the_commit_msg_hook_checks_a_home_store_project_with_its_own_runtime(tmp_path, monkeypatch):
     import os
+
     from catalyst import runtime as rt
     from catalyst.trace import install_hook
+
     monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
     project = make_project(tmp_path / "w", git=True)
     move.to_home(project)
@@ -95,9 +103,19 @@ def test_the_commit_msg_hook_checks_a_home_store_project_with_its_own_runtime(tm
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
     (project / "src.py").write_text("x = 1\n", encoding="utf-8")
     git(project, "add", "src.py")
-    refused = subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", "no id here"],
-                             capture_output=True, text=True, encoding="utf-8", env=env)
+    refused = subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", "no id here"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+    )
     assert refused.returncode != 0
-    ok = subprocess.run(["git", "-C", str(project), "commit", "-q", "-m", "chore: tidy"],
-                        capture_output=True, text=True, encoding="utf-8", env=env)
+    ok = subprocess.run(
+        ["git", "-C", str(project), "commit", "-q", "-m", "chore: tidy"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+    )
     assert ok.returncode == 0, ok.stderr

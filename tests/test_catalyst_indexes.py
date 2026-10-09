@@ -21,15 +21,18 @@ def test_fixture_indexes_are_already_current(tmp_path):
 def test_new_artifact_is_added_in_id_order_with_its_columns(tmp_path):
     project = make_project(tmp_path)
     item2 = f"ITEM-000002-{USERID}"
-    write(project / ".criterion" / "subs" / "SUB-000002-second.md", artifact(
-        f"SUB-000002-{USERID}", "Second sub",
-        {"ID": f"`SUB-000002-{USERID}`", "Status": "Done", "Item": f"`{item2}`",
-         "Signed-off-by": "ada"}))
+    write(
+        project / ".criterion" / "subs" / "SUB-000002-second.md",
+        artifact(
+            f"SUB-000002-{USERID}",
+            "Second sub",
+            {"ID": f"`SUB-000002-{USERID}`", "Status": "Done", "Item": f"`{item2}`", "Signed-off-by": "ada"},
+        ),
+    )
     changes = regen(project)
     assert [c.path.name for c in changes] == ["subs.md"]
     rows = (project / ".criterion" / "subs" / "subs.md").read_text(encoding="utf-8").splitlines()
-    assert rows[-1] == (f"| [SUB-000002-{USERID}](SUB-000002-second.md) | Second sub | "
-                        f"{item2} | Done |")
+    assert rows[-1] == (f"| [SUB-000002-{USERID}](SUB-000002-second.md) | Second sub | {item2} | Done |")
     assert rows[-2].startswith(f"| [SUB-000001-{USERID}]")
 
 
@@ -49,9 +52,13 @@ def test_removed_file_keeps_its_row_and_prose_is_kept(tmp_path):
 
 def test_orphan_row_keeps_its_id_from_being_reused(tmp_path):
     from catalyst.ids import next_entity_id
+
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text(encoding="utf-8") + f"| [ITEM-000009-{USERID}](ITEM-000009-gone.md) | Gone | Done |\n", encoding="utf-8")
+    index.write_text(
+        index.read_text(encoding="utf-8") + f"| [ITEM-000009-{USERID}](ITEM-000009-gone.md) | Gone | Done |\n",
+        encoding="utf-8",
+    )
     regen(project)
     dep = load(project)
     corpus = load_corpus(dep)
@@ -61,9 +68,12 @@ def test_orphan_row_keeps_its_id_from_being_reused(tmp_path):
 def test_hand_written_cells_without_a_field_are_kept(tmp_path):
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text(encoding="utf-8").replace("| ID | Title | Status |\n|---|---|---|",
-                                               "| ID | Title | Status | Notes |\n|---|---|---|---|")
-                     .replace("| First item | Open |", "| First item | Open | keep me |"), encoding="utf-8")
+    index.write_text(
+        index.read_text(encoding="utf-8")
+        .replace("| ID | Title | Status |\n|---|---|---|", "| ID | Title | Status | Notes |\n|---|---|---|---|")
+        .replace("| First item | Open |", "| First item | Open | keep me |"),
+        encoding="utf-8",
+    )
     regen(project)
     assert "| First item | Open | keep me |" in index.read_text(encoding="utf-8")
 
@@ -72,18 +82,20 @@ def test_only_the_id_table_is_regenerated(tmp_path):
     project = make_project(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
     legend = "| Status | Meaning |\n|---|---|\n| Open | not started |\n"
-    index.write_text(index.read_text(encoding="utf-8").replace("# Items index\n", "# Items index\n\n" + legend), encoding="utf-8")
+    index.write_text(
+        index.read_text(encoding="utf-8").replace("# Items index\n", "# Items index\n\n" + legend), encoding="utf-8"
+    )
     assert regen(project) == []
     assert legend in index.read_text(encoding="utf-8")
 
 
 def test_placeholder_line_removed_once_rows_exist():
-    out = render("# Things index\n\n| ID | Title | Status |\n|---|---|---|\n\n*(none yet — add one)*\n",
-                 "Things", [])
+    out = render("# Things index\n\n| ID | Title | Status |\n|---|---|---|\n\n*(none yet — add one)*\n", "Things", [])
     assert "*(none yet" in out
     art = Artifact("T-000001-Ab3xR9pQ", "T", Path("T-000001-x.md"), "X", {"Status": "Open"})
-    out = render("# Things index\n\n| ID | Title | Status |\n|---|---|---|\n\n*(none yet — add one)*\n",
-                 "Things", [art])
+    out = render(
+        "# Things index\n\n| ID | Title | Status |\n|---|---|---|\n\n*(none yet — add one)*\n", "Things", [art]
+    )
     assert "*(none yet" not in out and "| [T-000001-Ab3xR9pQ](T-000001-x.md) | X | Open |" in out
 
 

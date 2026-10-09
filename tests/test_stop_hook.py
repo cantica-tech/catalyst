@@ -13,8 +13,7 @@ def write_check(root: Path, name: str, code: int, out: str = "") -> None:
 
 def fake_root(tmp_path: Path, failing: set[str]) -> Path:
     for check in sh.CHECKS:
-        write_check(tmp_path, check, 1 if check in failing else 0,
-                    f"{check} broke" if check in failing else "ok")
+        write_check(tmp_path, check, 1 if check in failing else 0, f"{check} broke" if check in failing else "ok")
     pkg = tmp_path / "scripts" / "catalyst"
     pkg.mkdir()
     (pkg / "__init__.py").write_text("", encoding="utf-8")
@@ -22,7 +21,9 @@ def fake_root(tmp_path: Path, failing: set[str]) -> Path:
     (pkg / "__main__.py").write_text(
         "import sys\n"
         f"code = {code} if sys.argv[1] == 'check' else 0\n"
-        "print(f'catalyst {sys.argv[1]} said {code}')\nraise SystemExit(code)\n", encoding="utf-8")
+        "print(f'catalyst {sys.argv[1]} said {code}')\nraise SystemExit(code)\n",
+        encoding="utf-8",
+    )
     return tmp_path
 
 
@@ -67,6 +68,7 @@ def test_malformed_hook_input_is_treated_as_empty():
 def test_a_crash_blocks_the_stop(monkeypatch, capsys):
     def boom(root=None):
         raise OSError("python3 vanished")
+
     monkeypatch.setattr(sh, "run_checks", boom)
     monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
     assert sh.main() == 2

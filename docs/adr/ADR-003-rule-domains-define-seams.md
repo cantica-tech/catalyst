@@ -8,6 +8,7 @@
 ## Context
 
 The catalyst framework organizes rules into documents, but the mapping between rule documents and semantic domains needed clarification. Without this explicit mapping, it was unclear:
+
 - Which rules formed a coherent domain
 - How new rules should be added to existing domains
 - What constitutes a "seam" (boundary) between domains

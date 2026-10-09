@@ -26,7 +26,7 @@ rules/business-rules.md
 ITEM-000012-Ab3xR9pQ-reset-link-never-expires.md
   Targets: br-AUTH-000003-Ab3xR9pQ   Status: Done   Signed-off-by: Ada Lovelace
 
-development/journal.jsonl
+development/journal/ada@k3j9q2/2026-10.jsonl
   {"command": "/status", "action": "status-change", "tier": "fix",
    "artifact": "ITEM-000012-Ab3xR9pQ", "targets": ["br-AUTH-000003-Ab3xR9pQ"],
    "intent": ["Reset links honour the 30-minute expiry again"],
@@ -112,7 +112,7 @@ gated by the role's `reconciliation` level.
 
 ## History: the journal
 
-`development/journal.jsonl` is an append-only, transaction-log-grade record
+The journal (`development/journal/`, one shard per actor, machine and month) is an append-only, transaction-log-grade record
 of every rule-linked change — not a changelog. Each entry carries the exact
 git content hash before and after, per touched file, plus the rule(s) it
 served and the actual intent behind it (the goal, not a label). Because the

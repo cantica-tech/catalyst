@@ -29,7 +29,7 @@ def write_example_module(mdir: Path) -> Path:
         "commands:\n"
         "  - name: create-item\n"
         "    description: Create a new item\n"
-        "    argument_hint: \"[<rule-id>]\"\n"
+        '    argument_hint: "[<rule-id>]"\n'
         "    spec_path: commands/create-item.md\n"
         "\n"
         "templates:\n"
@@ -38,8 +38,9 @@ def write_example_module(mdir: Path) -> Path:
         "\n"
         "required_paths:\n"
         "  - path: development/ITEMS-SUMMARY.md\n"
-        "    invariant: INV-EX-1\n"
-    , encoding="utf-8")
+        "    invariant: INV-EX-1\n",
+        encoding="utf-8",
+    )
     (mdir / "schemas" / "item.yaml").write_text(
         "id_prefix: ITEM\n"
         "name: Item\n"
@@ -63,8 +64,9 @@ def write_example_module(mdir: Path) -> Path:
         "    - Open\n"
         "    - Done\n"
         "  closed_states:\n"
-        "    - Done\n"
-    , encoding="utf-8")
+        "    - Done\n",
+        encoding="utf-8",
+    )
     return mdir
 
 
@@ -132,8 +134,9 @@ def test_load_module_from_deployment_modules_dir(tmp_path: Path):
     project.mkdir()
     deploy = tmp_path / "agent" / ".criterion"
     write_example_module(deploy / "modules" / "example-process")
-    (project / "app.catalyst").write_text(json.dumps(
-        {"module": "example-process", "agent-source": str(deploy)}), encoding="utf-8")
+    (project / "app.catalyst").write_text(
+        json.dumps({"module": "example-process", "agent-source": str(deploy)}), encoding="utf-8"
+    )
     assert resolve_deploy_root(project) == deploy
     manifest = load_module(project)
     assert manifest is not None

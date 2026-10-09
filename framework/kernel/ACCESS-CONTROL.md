@@ -117,6 +117,7 @@ Given writes proceed without asking (INV-25), *which* identity does the
 agent sign as, without asking that either?
 
 **Safe without asking:**
+
 - **Exactly one active user in `IAM/users/users.json`.** Nobody else can
   plausibly be signing; the CLI signs as them without `--as`.
 - **An identity already resolved this session.** Per §3 step 1 — once

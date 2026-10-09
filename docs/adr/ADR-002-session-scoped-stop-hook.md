@@ -16,6 +16,7 @@ This design violated the principle of session isolation and caused cascading blo
 ## Decision
 
 The stop hook must distinguish between:
+
 - **Pre-existing failures:** Changes that existed when this session started (do not block)
 - **New failures:** New unjournaled changes made during this session (block on these)
 

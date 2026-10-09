@@ -10,6 +10,7 @@ A file is backed up once (`<file>.before-catalyst`) before catalyst first
 changes it, and a file that is not plain JSON is never rewritten: its
 snippet is printed for the user to add.
 """
+
 from __future__ import annotations
 
 import json
@@ -52,8 +53,8 @@ def vscode_user_dir() -> Path:
 @dataclass
 class Change:
     file: Path
-    path: tuple[str, ...]        # where in the JSON
-    value: object                # what catalyst puts there (a dict entry, or list items)
+    path: tuple[str, ...]  # where in the JSON
+    value: object  # what catalyst puts there (a dict entry, or list items)
 
 
 def _hook(command: str, **extra) -> dict:
@@ -64,31 +65,70 @@ def changes(agent: str) -> list[Change]:
     """What `install` writes, per agent (JSON files; Codex's TOML aside)."""
     home = Path.home()
     server = {"command": launcher(), "args": ["mcp"]}
-    if agent == "claude-code":      # the MCP server goes through `claude mcp add --scope user`
+    if agent == "claude-code":  # the MCP server goes through `claude mcp add --scope user`
         return [Change(home / ".claude" / "settings.json", ("hooks", "Stop"), [_hook(_cmd("hook", "stop"))])]
-    if agent == "copilot":          # Copilot CLI; its hooks directory is read by VS Code's agent too
-        return [Change(home / ".copilot" / "mcp-config.json", ("mcpServers", SERVER),
-                       {"type": "local", **server, "tools": ["*"]}),
-                Change(home / ".copilot" / "hooks" / "catalyst.json", (), {"version": 1, "hooks": {
-                    "sessionStart": [{"type": "command", "bash": _cmd("hook", "start", "--format", "json"),
-                                      "powershell": _cmd("hook", "start", "--format", "json"), "timeoutSec": 30}],
-                    "agentStop": [{"type": "command", "bash": _cmd("hook", "stop", "--format", "json"),
-                                   "powershell": _cmd("hook", "stop", "--format", "json"), "timeoutSec": 120}]}})]
+    if agent == "copilot":  # Copilot CLI; its hooks directory is read by VS Code's agent too
+        return [
+            Change(
+                home / ".copilot" / "mcp-config.json",
+                ("mcpServers", SERVER),
+                {"type": "local", **server, "tools": ["*"]},
+            ),
+            Change(
+                home / ".copilot" / "hooks" / "catalyst.json",
+                (),
+                {
+                    "version": 1,
+                    "hooks": {
+                        "sessionStart": [
+                            {
+                                "type": "command",
+                                "bash": _cmd("hook", "start", "--format", "json"),
+                                "powershell": _cmd("hook", "start", "--format", "json"),
+                                "timeoutSec": 30,
+                            }
+                        ],
+                        "agentStop": [
+                            {
+                                "type": "command",
+                                "bash": _cmd("hook", "stop", "--format", "json"),
+                                "powershell": _cmd("hook", "stop", "--format", "json"),
+                                "timeoutSec": 120,
+                            }
+                        ],
+                    },
+                },
+            ),
+        ]
     if agent == "vscode":
         return [Change(vscode_user_dir() / "mcp.json", ("servers", SERVER), {"type": "stdio", **server})]
     if agent == "cursor":
-        return [Change(home / ".cursor" / "mcp.json", ("mcpServers", SERVER), {"type": "stdio", **server}),
-                Change(home / ".cursor" / "hooks.json", ("hooks", "sessionStart"),
-                       [{"command": _cmd("hook", "start", "--format", "cursor")}]),
-                Change(home / ".cursor" / "hooks.json", ("hooks", "stop"),
-                       [{"command": _cmd("hook", "stop", "--format", "cursor")}])]
-    if agent == "codex":            # the MCP server is a TOML table in config.toml (see _codex_toml)
-        return [Change(home / ".codex" / "hooks.json", ("hooks", "Stop"),
-                       [_hook(_cmd("hook", "stop", "--format", "json"))])]
+        return [
+            Change(home / ".cursor" / "mcp.json", ("mcpServers", SERVER), {"type": "stdio", **server}),
+            Change(
+                home / ".cursor" / "hooks.json",
+                ("hooks", "sessionStart"),
+                [{"command": _cmd("hook", "start", "--format", "cursor")}],
+            ),
+            Change(
+                home / ".cursor" / "hooks.json",
+                ("hooks", "stop"),
+                [{"command": _cmd("hook", "stop", "--format", "cursor")}],
+            ),
+        ]
+    if agent == "codex":  # the MCP server is a TOML table in config.toml (see _codex_toml)
+        return [
+            Change(home / ".codex" / "hooks.json", ("hooks", "Stop"), [_hook(_cmd("hook", "stop", "--format", "json"))])
+        ]
     if agent == "gemini":
-        return [Change(home / ".gemini" / "settings.json", ("mcpServers", SERVER), server),
-                Change(home / ".gemini" / "settings.json", ("hooks", "AfterAgent"),
-                       [_hook(_cmd("hook", "stop", "--format", "gemini"))])]
+        return [
+            Change(home / ".gemini" / "settings.json", ("mcpServers", SERVER), server),
+            Change(
+                home / ".gemini" / "settings.json",
+                ("hooks", "AfterAgent"),
+                [_hook(_cmd("hook", "stop", "--format", "gemini"))],
+            ),
+        ]
     raise AgentError(f"unknown agent '{agent}' (one of: {', '.join(AGENTS)})")
 
 
@@ -119,7 +159,7 @@ def _save(file: Path, data: dict) -> None:
 
 
 def _apply(data: dict, change: Change, install: bool) -> dict:
-    if not change.path:                                  # a file of catalyst's own
+    if not change.path:  # a file of catalyst's own
         return change.value if install else {}
     node = data
     for key in change.path[:-1]:
@@ -127,7 +167,7 @@ def _apply(data: dict, change: Change, install: bool) -> dict:
         if not isinstance(node, dict):
             raise AgentError(f"{change.file}: '{key}' is not an object")
     last = change.path[-1]
-    if isinstance(change.value, list):                   # hook entries: ours replaced, others kept
+    if isinstance(change.value, list):  # hook entries: ours replaced, others kept
         kept = [item for item in node.get(last, []) if not _ours(item)]
         if install:
             node[last] = kept + change.value
@@ -179,13 +219,18 @@ def _codex(install: bool) -> str:
 def _claude_mcp(install: bool) -> str:
     claude = shutil.which("claude")
     if claude is None:
-        return ("claude is not on PATH — add the server yourself: claude mcp add --scope user catalyst -- "
-                f"{launcher()} mcp")
+        return (
+            f"claude is not on PATH — add the server yourself: claude mcp add --scope user catalyst -- {launcher()} mcp"
+        )
     subprocess.run([claude, "mcp", "remove", "--scope", "user", SERVER], capture_output=True, check=False)
     if not install:
         return "claude mcp: catalyst removed (user scope)"
-    done = subprocess.run([claude, "mcp", "add", "--scope", "user", SERVER, "--", launcher(), "mcp"],
-                          capture_output=True, text=True, check=False)
+    done = subprocess.run(
+        [claude, "mcp", "add", "--scope", "user", SERVER, "--", launcher(), "mcp"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if done.returncode != 0:
         raise AgentError(f"claude mcp add failed: {done.stderr.strip() or done.stdout.strip()}")
     return "claude mcp: catalyst added (user scope, ~/.claude.json)"
@@ -222,8 +267,9 @@ def run(agent: str, install: bool) -> list[str]:
                 snippet = {}
                 for change in group:
                     _apply(snippet, change, True)
-                raise AgentError(f"{file} cannot be rewritten (not plain JSON); add this yourself:\n"
-                                 + json.dumps(snippet, indent=2)) from None
+                raise AgentError(
+                    f"{file} cannot be rewritten (not plain JSON); add this yourself:\n" + json.dumps(snippet, indent=2)
+                ) from None
             raise
         for change in group:
             data = _apply(data, change, install)
@@ -233,8 +279,10 @@ def run(agent: str, install: bool) -> list[str]:
             continue
         if install or file.is_file():
             _save(file, data)
-        lines.append(f"{file}: {'set' if install else 'cleared'} " +
-                     ", ".join(".".join(c.path) or "(catalyst's own file)" for c in group))
+        lines.append(
+            f"{file}: {'set' if install else 'cleared'} "
+            + ", ".join(".".join(c.path) or "(catalyst's own file)" for c in group)
+        )
     if agent == "codex":
         lines.append(_codex(install))
     if agent == "claude-code":
@@ -250,7 +298,9 @@ def status() -> list[dict]:
         parts = {".".join(c.path) or c.file.name: _present(c) for c in changes(agent)}
         if agent == "codex":
             file = _codex_toml()
-            parts["mcp_servers.catalyst"] = file.is_file() and bool(CODEX_TABLE.search(file.read_text(encoding="utf-8")))
+            parts["mcp_servers.catalyst"] = file.is_file() and bool(
+                CODEX_TABLE.search(file.read_text(encoding="utf-8"))
+            )
         if agent == "claude-code":
             parts["mcp (user scope)"] = _claude_mcp_present()
         rows.append({"agent": agent, "installed": all(v for v in parts.values() if v is not None), "parts": parts})

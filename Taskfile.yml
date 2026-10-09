@@ -7,6 +7,14 @@
 
 version: "3"
 
+includes:
+  # cantica-tech code standards: `task lint`, `task format`, `task typecheck`, `task standards:sync`,
+  # `task standards:check` — from a checkout of the standards repository next to this one (STANDARDS_DIR).
+  standards:
+    taskfile: '{{.STANDARDS_DIR | default "../standards"}}/Taskfile.standards.yml'
+    optional: true
+    flatten: true
+
 tasks:
   install:
     desc: "Install Python test dependencies into the active environment"

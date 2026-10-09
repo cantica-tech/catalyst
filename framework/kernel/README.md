@@ -72,8 +72,8 @@ catalogued `templates/` subdirectory and its own `README.md`
 and `workflows/` (optional, per agile flavor) and a `tickets/` slot
 reserved for plugin population rather than a core-defined type.
 
-Every rule-linked change also appends one entry to
-`development/journal.jsonl`, an append-only, transaction-log-grade
+Every rule-linked change also appends one entry to the journal
+(`development/journal/`), an append-only, transaction-log-grade
 record: exact git content hashes before/after per touched file, the
 rule(s) it served, and the actual intent behind it. Precise enough that
 `/journal-restore <timestamp>` can materialize the tree as it stood at

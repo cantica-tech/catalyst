@@ -198,10 +198,11 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
      run `/user-add` before considering the sync complete (INV-16's hard
      "at least one active user" requirement applies regardless of how the
      file came to exist).
-   - `development/journal.jsonl` (from `templates/journal.template.jsonl`
-     on first deploy — see `INVARIANTS.md` INV-17). Append-only: a sync
-     may create this file if missing, but must never rewrite, reorder, or
-     truncate a single existing line. A deployed project that predates
+   - The journal (`development/journal/`, one shard per actor, machine and
+     month; `development/journal.jsonl` in a deployment made before kernel
+     0.50 — see `INVARIANTS.md` INV-17). Append-only: a sync appends its own
+     entry to a shard, but must never rewrite, reorder, or truncate a single
+     existing line, nor move the legacy file's lines into shards. A deployed project that predates
      this requirement gets it created empty on its next sync — synchronizing
      does not retroactively fabricate entries for history that predates
      the journal's own existence.
@@ -560,6 +561,14 @@ Target version `0.49.0`. Full procedure:
 `catalyst agent install <agent>` on each machine; `catalyst sync apply`
 retires the project's catalyst command files and hooks, and the user
 commits that removal.
+
+### From `0.49.x`: the journal in shards
+
+Target version `0.50.0`. Full procedure:
+`migrations/0.50.0/journal-shards.md` (this repository). Nothing is
+converted: new entries go to `development/journal/` shards, an existing
+`development/journal.jsonl` is read and never written. Contributors to a
+shared criterion upgrade together.
 
 ## Expected outcome
 

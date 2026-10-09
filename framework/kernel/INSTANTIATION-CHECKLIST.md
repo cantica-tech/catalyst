@@ -7,6 +7,7 @@ item is atomic and independently verifiable — that is what stops a long instal
 from drifting. The guide holds the rationale; this holds the checks.
 
 ## Preconditions
+
 - [ ] The user explicitly asked for the install (INV-2) — never on load alone
 - [ ] `INVARIANTS.md` read this session
 - [ ] Capabilities resolved and fallbacks chosen (`BOOTSTRAP.md §1`); mode stated
@@ -14,6 +15,7 @@ from drifting. The guide holds the rationale; this holds the checks.
       retrofit — existing code, no rules yet (`§4`) / neither, skeleton only
 
 ## Discover (judgment — `INSTANTIATION-GUIDE.md` §1 steps 1–3)
+
 - [ ] `dev-instructions.yaml` located, or user asked for the project name
 - [ ] Project `name` resolved (defaults to target repo name); a leftover
       `layout` key reported to the user as not applied
@@ -26,6 +28,7 @@ from drifting. The guide holds the rationale; this holds the checks.
       (registered as Admin, INV-16)
 
 ## Install (mechanical — `catalyst init`, `INSTANTIATION-GUIDE.md` §1 step 4)
+
 - [ ] `catalyst init --name <name> --module <id> [--user <name>]
       --git-username <u> --rule-doc <file>:<prefix> ...
       --agent <id> [--test-locations <where>]
@@ -44,7 +47,7 @@ from drifting. The guide holds the rationale; this holds the checks.
         `definitions/README.md` — frozen from here on (INV-23)
       - `IAM/users/users.json` with the first user (userid, Admin) and
         `IAM/roles/roles.json` (INV-16, INV-26)
-      - empty `development/journal.jsonl` (INV-17), `version.txt`,
+      - the journal's first entry, the install (INV-17), `version.txt`,
         `DEPLOYMENT.md`, root `README.md`, `bin/catalyst.pyz`
       - the criterion at `$HOME/.catalyst/projects/<name>/criterion` with its
         `.venv` runtime, and `catalyst.toml` at the project root — the only
@@ -54,6 +57,7 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Module's `INVARIANTS.module.md` read together with `INVARIANTS.md` (§6.4)
 
 ## Wire up (`INSTANTIATION-GUIDE.md` §1 steps 5–8)
+
 - [ ] `catalyst agent install <agent>` run once on this machine (user-level
       `catalyst mcp` server and end-of-turn hook; `catalyst agent status`
       shows it) — no command files or hooks written into the project
@@ -70,6 +74,7 @@ from drifting. The guide holds the rationale; this holds the checks.
       each folder's `README.md`
 
 ## Seed content (judgment)
+
 - [ ] Greenfield only (`INSTANTIATION-GUIDE.md §3`): decision areas worked
       with the user (runtime/language, dependency policy, code style,
       testing, CI/CD, local dev environment, repo layout — skip/add per
@@ -88,12 +93,14 @@ from drifting. The guide holds the rationale; this holds the checks.
 - [ ] Every change after the install journaled with `catalyst journal append`
 
 ## Finalize
+
 - [ ] `dev-instructions.yaml` deleted after successful install
 - [ ] Deployment target cached in the memory tool if one is available
       (optional — `<app-name>.catalyst` and `.criterion/DEPLOYMENT.md`
       are read fresh regardless, `INSTANTIATION-GUIDE.md §6`)
 
 ## Definition of done
+
 - [ ] Every item above `[x]` in the ledger; no silent skips
 - [ ] `catalyst check` reports no errors (warnings reported to the user)
 - [ ] Deployed tree presented to user; **no commit/push yet** (INV-4)

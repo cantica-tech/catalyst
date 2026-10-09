@@ -28,8 +28,9 @@ def make_contract(
         f"- Active: {active}\n"
         "- Type: repository\n"
         f"{extra_metadata}"
-        "\n## Operation\n\n- Name: not-metadata-here\n"
-    , encoding="utf-8")
+        "\n## Operation\n\n- Name: not-metadata-here\n",
+        encoding="utf-8",
+    )
     if write_version_txt:
         (plugin_dir / "version.txt").write_text(f"{version}\n", encoding="utf-8")
     return plugin_dir
@@ -69,8 +70,9 @@ def test_parse_catalog_pins_skips_header_and_separator(tmp_path: Path):
     (type_dir / "catalog.md").write_text(
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
-        "| [catalyst-git](https://github.com/x/catalyst-git) | repository | 1.2.3 | 1.2.3 |\n"
-    , encoding="utf-8")
+        "| [catalyst-git](https://github.com/x/catalyst-git) | repository | 1.2.3 | 1.2.3 |\n",
+        encoding="utf-8",
+    )
     pins = cpc.parse_catalog_pins(type_dir)
     assert pins == {"catalyst-git": {"release": "1.2.3", "tag": "1.2.3"}}
 
@@ -122,9 +124,7 @@ def test_validate_plugin_valid_contract_has_no_errors(tmp_path: Path):
 def test_validate_plugin_missing_field(tmp_path: Path):
     plugin_dir = tmp_path / "plugins" / "repository" / "bad"
     plugin_dir.mkdir(parents=True)
-    (plugin_dir / "working-contract.md").write_text(
-        "## Metadata\n\n- Name: bad\n- Version: 1.0.0\n"
-    , encoding="utf-8")
+    (plugin_dir / "working-contract.md").write_text("## Metadata\n\n- Name: bad\n- Version: 1.0.0\n", encoding="utf-8")
     (plugin_dir / "version.txt").write_text("1.0.0\n", encoding="utf-8")
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("missing metadata field 'UUID'" in e for e in errors)
@@ -170,8 +170,9 @@ def test_validate_plugin_catalog_tag_mismatch(tmp_path: Path):
     (plugin_dir.parent / "catalog.md").write_text(
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
-        "| [catalyst-git](https://x) | repository | 1.2.3 | 1.9.9 |\n"
-    , encoding="utf-8")
+        "| [catalyst-git](https://x) | repository | 1.2.3 | 1.9.9 |\n",
+        encoding="utf-8",
+    )
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert any("catalog Tag '1.9.9' != version.txt '1.2.3'" in e for e in errors)
 
@@ -181,8 +182,9 @@ def test_validate_plugin_catalog_release_allows_v_prefix(tmp_path: Path):
     (plugin_dir.parent / "catalog.md").write_text(
         "| Plugin | Type | Release | Tag |\n"
         "|---|---|---|---|\n"
-        "| [catalyst-git](https://x) | repository | v1.2.3 | 1.2.3 |\n"
-    , encoding="utf-8")
+        "| [catalyst-git](https://x) | repository | v1.2.3 | 1.2.3 |\n",
+        encoding="utf-8",
+    )
     errors = cpc.validate_plugin(plugin_dir, framework_url=None)
     assert errors == []
 

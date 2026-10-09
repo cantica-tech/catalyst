@@ -16,6 +16,7 @@ outside catalyst, `trace`, the commit-msg hook, an analysis's inventory.
 The topology is the working tree's as it is now — a file deleted from the
 tree is judged by the directories that would hold it.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -42,7 +43,7 @@ def _ignore_lines(directory: str) -> tuple[str, ...] | None:
         if line and line != ".":
             lines.append(line)
         elif line in ("", "."):
-            return ()                         # "." or "/" alone: the whole directory
+            return ()  # "." or "/" alone: the whole directory
     return tuple(lines)
 
 
@@ -50,6 +51,7 @@ def _ignore_lines(directory: str) -> tuple[str, ...] | None:
 def _has_pointer(directory: str) -> bool:
     d = Path(directory)
     import project_file
+
     return d.is_dir() and project_file.is_project(d)
 
 
@@ -83,7 +85,7 @@ def governs(project_root: Path, path: str) -> bool:
     for depth in range(len(parts)):
         here = root.joinpath(*parts[:depth])
         if depth > 0 and _has_pointer(str(here)):
-            return False                      # a nested deployment owns it
+            return False  # a nested deployment owns it
         lines = _ignore_lines(str(here))
         if lines is not None:
             if lines == ():

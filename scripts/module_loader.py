@@ -16,10 +16,10 @@ Exposes query functions:
 - get_grounding_type(manifest) -> str
 - resolve_command(manifest, name) -> CommandRegistration | None
 """
+
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -95,6 +95,7 @@ class TemplateRegistration:
 @dataclass
 class RequiredPath:
     """A deployment path the module requires to always exist."""
+
     path: str
     invariant: str | None = None
     seed: str | None = None
@@ -130,6 +131,7 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
 
     try:
         import yaml
+
         res = yaml.safe_load(text)
         if isinstance(res, dict):
             return res
@@ -228,6 +230,7 @@ def _read_pointer(project_root: Path) -> dict[str, Any]:
     """The project file at `project_root` (catalyst.toml, else a legacy
     *.catalyst pointer), or {}."""
     import project_file
+
     return project_file.read_dir(project_root)
 
 
@@ -239,6 +242,7 @@ def resolve_deploy_root(project_root: Path | str | None) -> Path | None:
     if not project_root:
         return None
     import project_file
+
     return project_file.resolve(Path(project_root).resolve())
 
 
@@ -267,6 +271,7 @@ def resolve_module_id(project_root: Path | str | None) -> str | None:
             return str(parsed["id"])
 
     return None
+
 
 def parse_etd_dict(d: dict[str, Any]) -> ETD:
     id_prefix = d.get("id_prefix", "")
@@ -367,16 +372,20 @@ def module_search_dirs(project_root: Path | str | None, module_id: str) -> list[
         deploy = resolve_deploy_root(pr)
         if deploy is not None:
             dirs.append(deploy / "modules" / module_id)
-        dirs.extend([
-            pr / DEPLOY_DIRNAME / "modules" / module_id,
-            pr / "framework" / "modules" / module_id,
-            # A module's own repository, checked out next to the project.
-            pr.parent / f"catalyst-{module_id}",
-        ])
-    dirs.extend([
-        REPO_ROOT / "framework" / "modules" / module_id,
-        REPO_ROOT.parent / f"catalyst-{module_id}",
-    ])
+        dirs.extend(
+            [
+                pr / DEPLOY_DIRNAME / "modules" / module_id,
+                pr / "framework" / "modules" / module_id,
+                # A module's own repository, checked out next to the project.
+                pr.parent / f"catalyst-{module_id}",
+            ]
+        )
+    dirs.extend(
+        [
+            REPO_ROOT / "framework" / "modules" / module_id,
+            REPO_ROOT.parent / f"catalyst-{module_id}",
+        ]
+    )
     unique: list[Path] = []
     for d in dirs:
         if d not in unique:
@@ -392,9 +401,9 @@ def find_module_dir(project_root: Path | str | None, module_id: str) -> Path | N
     return None
 
 
-def load_module(project_root: Path | str | None = None,
-                module_id: str | None = None,
-                module_dir: Path | None = None) -> ModuleManifest | None:
+def load_module(
+    project_root: Path | str | None = None, module_id: str | None = None, module_dir: Path | None = None
+) -> ModuleManifest | None:
     """Load the manifest of module `module_id` (or of the module declared for
     `project_root`, or the one at `module_dir`). None when no module is
     declared or it cannot be found."""
@@ -441,11 +450,13 @@ def load_module(project_root: Path | str | None = None,
     required_paths: list[RequiredPath] = []
     for r in data.get("required_paths") or []:
         if isinstance(r, dict) and r.get("path"):
-            required_paths.append(RequiredPath(
-                path=str(r["path"]),
-                invariant=r.get("invariant"),
-                seed=r.get("seed"),
-            ))
+            required_paths.append(
+                RequiredPath(
+                    path=str(r["path"]),
+                    invariant=r.get("invariant"),
+                    seed=r.get("seed"),
+                )
+            )
 
     mid = str(data.get("id", target_id))
     return ModuleManifest(
@@ -461,6 +472,7 @@ def load_module(project_root: Path | str | None = None,
         required_paths=required_paths,
         path=mdir,
     )
+
 
 def get_active_etds(manifest: ModuleManifest) -> dict[str, ETD]:
     """Return dictionary of active ETDs keyed by ID prefix."""

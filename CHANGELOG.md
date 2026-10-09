@@ -6,6 +6,33 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.50.0 — 2026-10-09
+
+The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).
+
+- Journal shards: each actor on each machine appends to its own
+  `development/journal/<actor>@<machine>/<YYYY-MM>.jsonl`, so a shared
+  criterion merges without conflicts; `development/journal.jsonl` is read,
+  never written. `init` and `workspace init` no longer create it.
+- Appends and adoptions run under the criterion's journal lock (the ID lock's
+  mechanism, now `catalyst.lock`).
+- The shards read in causal order: each file's chain decides, timestamps only
+  break ties. Issues and `journal show --json` name an entry `<source>:<line>`
+  (`at`).
+- Unrecorded changes are decided by content hashes, never by clocks:
+  committing before journaling, rebases and skewed machines no longer produce
+  false reports.
+- The criterion's store (roadmap R3.2): its working form (read, list, append,
+  lock; driver `home`) and its sharing (`catalyst share info|status|pull|push`;
+  drivers `local` and `git`, chosen by `share` in `catalyst.toml` or by the
+  criterion's remote). The journal reads, appends and locks through it.
+- Teams on git (roadmap R3.6): `catalyst share create <url> [--protect]` and
+  `share join` (a second machine); publishing needs the user's assent —
+  `share push|create`, `criterion push`, `criterion create <url>` print what
+  they would publish (the batch: added to the open pull request, or a new
+  one) and exit `3` unless given `--yes` (INV-4); `catalyst check` runs the
+  integrity check whenever the criterion's HEAD is a merge.
+
 ## 0.49.0 — 2026-10-09
 
 Agents at user level, nothing in a project but `catalyst.toml` (migration

@@ -114,7 +114,7 @@ the surrounding deploy-procedure text.
             meta-tags.md                 # meta-tags catalog
             [...]
         README.md
-        journal.jsonl                    # not an artifact type (INV-17) — no templates/ of its own
+        journal/                         # not an artifact type (INV-17): <actor>@<machine>/<YYYY-MM>.jsonl shards
 ```
 
 Which `<folder>/` directories exist, and whether each sits at the top
@@ -135,8 +135,9 @@ that has one:
 - Any generated summary file the active module deploys (its
   `INVARIANTS.module.md` names them) — machine-regenerated, never
   hand-edited, never versioned as a template.
-- `development/journal.jsonl` (INV-17) — an append-only log, not a
-  document type with versions.
+- `development/journal/` (INV-17) — an append-only log in shards (and,
+  before kernel 0.50, `development/journal.jsonl`), not a document type
+  with versions.
 - `rules/Rules-of-Rules.md` — the document that *governs* an artifact
   type, sibling to its `templates/` and instance catalog, not an
   instance itself.

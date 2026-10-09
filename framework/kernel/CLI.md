@@ -60,6 +60,7 @@ work this way.
 | `0` | Success. |
 | `1` | Failure: a check found errors (or warnings under `--strict`), an argument was rejected, or a git operation failed. The reason is printed. |
 | `2` | No deployment found at or above the current directory (or `--working-copy` names no working copy). |
+| `3` | Not done for lack of the user's assent (INV-4): a command that publishes (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`) printed what it would publish; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead. |
 
 The deployment is found by walking up from the current directory as the
 shell sees it, through the `.criterion` symlink, so any directory inside
@@ -173,8 +174,10 @@ left to grow.
 Every check a deployment can run on itself, in one pass: the on-disk
 format version, the deployment's structure, the traceability chain
 (`validate`), the journal (`journal verify`), changes committed outside
-catalyst (`unrecorded`) and index freshness
-(`index regen --check`). Journal warnings on entries written before the
+catalyst (`unrecorded`), index freshness
+(`index regen --check`) and, when the criterion's own HEAD is a merge, its
+integrity (`criterion integrity`: nothing either side recorded is lost;
+kept per HEAD, so the end-of-turn check stays cheap). Journal warnings on entries written before the
 CLI are summarised in one line (`journal verify --legacy` lists them).
 Exits `1` on any error, or on any warning under `--strict`.
 
@@ -620,7 +623,9 @@ catalyst journal append --command <cmd> --action <action> --artifact <id|descrip
                         [--as <user>] [--allow-unchanged] [--json]
 ```
 
-Appends one entry to `development/journal.jsonl` with the real UTC time,
+Appends one entry to the signer's shard
+(`development/journal/<actor>@<machine>/<YYYY-MM>.jsonl`), under the
+criterion's journal lock, with the real UTC time,
 the signer as `actor`, and each file's `before`/`after` git blob hashes
 (`Rules-of-Rules.md` §12). Write the files first, then append.
 
@@ -768,6 +773,36 @@ exit `1` and a reason on stderr when a precondition does not hold.
 later without a complete reconciliation, or `Closed` with an undecided
 finding or a missing artifact, is an error.
 
+### `catalyst share info|status|pull|push`
+
+The criterion's sharing, whichever driver holds the shared copy (roadmap
+R3.2). `catalyst.toml` may name the driver (`share = "git"`); without it a
+criterion with a git remote, or a project file naming its repository, uses
+`git`, any other `local`.
+
+- `info [--json]`: the driver, where the shared copy is, the shared branch,
+  and what the driver can do.
+- `status [--fetch] [--json]`: unpublished local changes, and how far this
+  criterion is ahead of or behind its shared copy.
+- `pull`: bring in what the shared copy has; refuses while local work is
+  unpublished (git: `criterion sync`).
+- `push -m <message> [--as <user>] [--no-pr] [--yes] [--json]`: publish
+  this criterion's changes (git: `criterion push`). Without `--yes` it
+  prints what it would publish — uncommitted changes, local commits, and
+  whether they are added to the open topic branch (its pull request: one
+  batch) or start a new one — and exits `3` (INV-4).
+- `create <url> [--branch <name>] [--protect] [--yes]`: publish a local-only
+  criterion for the first time (git: `criterion create <url>`); `--protect`
+  also makes pull requests and the `catalyst` check required on the shared
+  branch (GitHub, `criterion protect --yes`). Needs `--yes` (INV-4).
+- `join [<url>]`: bring a shared criterion to this machine, from a project
+  whose `catalyst.toml` names it (git: `criterion join`).
+
+Drivers: `local` (not shared: `pull` and `push` say how to share it) and
+`git` (below). The working form behind every driver is the criterion's
+store — read, list, append, lock (`scripts/catalyst/store.py`); a server
+driver implements the same verbs.
+
 ### `catalyst criterion <subcommand>`
 
 Shared deployments on git (`Rules-of-Rules.md` §13, INV-18). The criterion
@@ -873,7 +908,11 @@ the current branch, the count of uncommitted changes and, when the
 remote has the shared branch, how far the working copy is ahead of and
 behind it. `--fetch` fetches first. Always exits `0`.
 
-#### `catalyst criterion push -m <message> [--as <user>] [--no-pr] [--url <url>]`
+#### `catalyst criterion push -m <message> [--as <user>] [--no-pr] [--url <url>] [--yes]`
+
+Without `--yes`, it prints what it would publish and exits `3` (INV-4; on a
+terminal it asks). `create <url>` and a first `--url` on `sync` publish too,
+and take `--yes` the same way.
 
 Lands the working copy's changes as a pull request against the shared
 branch. `<message>` is the commit message and pull request title; the
@@ -937,7 +976,8 @@ recorded must still be recorded at `<rev>` (default `HEAD`). Parents
 default to `<rev>`'s own parents, which fits a pull request's merge
 commit in CI; `--parent` (repeatable) compares against given revisions
 instead. It reads revisions straight from git, so it needs no checkout
-of them.
+of them. `catalyst check` runs it on its own whenever the criterion's HEAD
+is a merge.
 
 #### `catalyst criterion protect [--yes]`
 
@@ -955,7 +995,8 @@ write access can push to the shared branch directly.
 
 `create` and `push` keep one block in the working copy's `.gitattributes`,
 headed by a `# catalyst:` comment, marking `merge=union` for the files
-that are append-only or regenerated: `development/journal.jsonl` and
+that are append-only or regenerated: the journal (its shards and the
+legacy `development/journal.jsonl`) and
 every per-file entity type's `<folder>/<folder>.md` index
 (`rules/rules.md` is hand-maintained, so concurrent edits to it conflict
 instead). A union merge keeps both sides' lines; `push` then regenerates

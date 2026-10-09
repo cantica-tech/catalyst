@@ -12,6 +12,7 @@ rough edges, and report them.
 
 Assume nothing beyond repo file read/write. Work through `BOOTSTRAP.md §1` and
 pick a fallback for every capability you cannot confirm:
+
 - No parallel sub-agents → run analysis passes sequentially, context-isolated.
 - No persistent memory tool → no problem: `catalyst.toml` (project root,
   always tracked) and the criterion's `DEPLOYMENT.md` (`catalyst where`

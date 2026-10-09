@@ -13,6 +13,7 @@ is a stdlib script any `python3` can run: it finds the project above the
 current directory and runs its criterion's `.venv`, or a legacy deployment's
 vendored `.criterion/bin/catalyst.pyz`.
 """
+
 from __future__ import annotations
 
 import os
@@ -52,17 +53,21 @@ def site_packages(venv: Path) -> Path:
 def _create_venv(target: Path) -> None:
     uv = shutil.which("uv")
     if uv:
-        res = subprocess.run([uv, "venv", "--quiet", "--relocatable", "--python",
-                              f">={MIN_PYTHON[0]}.{MIN_PYTHON[1]}", str(target)],
-                             capture_output=True, text=True, encoding="utf-8")
+        res = subprocess.run(
+            [uv, "venv", "--quiet", "--relocatable", "--python", f">={MIN_PYTHON[0]}.{MIN_PYTHON[1]}", str(target)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
         if res.returncode == 0:
             return
         shutil.rmtree(target, ignore_errors=True)
     if sys.version_info < MIN_PYTHON:
-        raise RuntimeError_(f"building a runtime needs uv, or Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ "
-                            f"(this is {sys.version.split()[0]})")
-    subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(target)], check=True,
-                   capture_output=True)
+        raise RuntimeError_(
+            f"building a runtime needs uv, or Python {MIN_PYTHON[0]}.{MIN_PYTHON[1]}+ "
+            f"(this is {sys.version.split()[0]})"
+        )
+    subprocess.run([sys.executable, "-m", "venv", "--without-pip", str(target)], check=True, capture_output=True)
 
 
 def ensure_runtime(version: str, pyz: Path) -> Path:
@@ -122,9 +127,11 @@ def project_name(directory):
         m = re.search(r'^(?:project_name|name)\s*=\s*"((?:[^"\\]|\\.)*)"', toml.read_text(encoding="utf-8"), re.M)
         return (m.group(1) if m else None), True
     for pointer in sorted(directory.glob("*.catalyst")):
+        if not pointer.is_file():
+            continue  # $HOME/.catalyst, catalyst's own home, is a directory, never a pointer
         try:
             return json.loads(pointer.read_text(encoding="utf-8")).get("project_name"), True
-        except ValueError:
+        except (ValueError, OSError):
             pass
     return None, False
 
@@ -182,17 +189,23 @@ def install_launcher() -> Path:
 def own_pyz(tmp: Path) -> Path:
     """The catalyst.pyz this process runs from, or one built from this checkout."""
     for candidate in (Path(sys.argv[0]), *Path(__file__).parents):
-        if candidate.suffix == ".pyz" and candidate.is_file():     # run as a zipapp, or from a runtime's .pth
+        if candidate.suffix == ".pyz" and candidate.is_file():  # run as a zipapp, or from a runtime's .pth
             return candidate
     import package_release
+
     return package_release.build_cli(Path(package_release.ROOT), tmp / "catalyst.pyz")
 
 
 def pyz_version(pyz: Path) -> str:
     """The version a catalyst.pyz reports (`X.Y.Z[+g<sha>[.dirty]]`): the
     runtime's label, so a development build never shares a release's runtime."""
-    res = subprocess.run([sys.executable, str(pyz), "--version"], capture_output=True, text=True,
-                         encoding="utf-8", env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"})
+    res = subprocess.run(
+        [sys.executable, str(pyz), "--version"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
+    )
     if res.returncode != 0 or not res.stdout.startswith("catalyst "):
         raise RuntimeError_(f"{pyz} does not run: {res.stderr.strip()}")
     return res.stdout.split()[1]

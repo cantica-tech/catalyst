@@ -18,6 +18,7 @@ The Stop hook runs `catalyst check` and other validators on every session end. I
 ### Solution
 
 The stop hook should distinguish between:
+
 - Changes that existed when **this session started** (do not block)
 - New changes made **during this session** (block on these)
 
@@ -29,6 +30,7 @@ The stop hook should distinguish between:
 4. If failures were present at session start, report them but exit 0 (allow stop)
 
 **Interim solution** (if baseline tracking is not ready for R0):
+
 - Use the existing `stop_hook_active` flag to allow the stop after one block attempt
 - This prevents infinite loops and lets concurrent sessions eventually proceed
 - Full session-scoped checking can ship in R2 with proper metadata
@@ -49,12 +51,14 @@ The stop hook should distinguish between:
 ### Problem
 
 Two conflicting interpretations existed:
+
 1. One file per individual rule ID (e.g., `rr-META-001.md`, `rr-META-002.md`, …) — creates ~100+ files, splits related rules
 2. One file per rule document (e.g., `Rules-of-Rules.md` contains RR-META-001…006) — keeps related rules grouped
 
 ### Decision
 
 **One file per rule document.** Rule documents represent a coherent domain:
+
 - `Rules-of-Rules.md` — meta-rules (how rules are created, versioned, cited)
 - Domain documents — structure rules, behavior rules, plugins rules, etc.
 - Each document contains 1–20 related rules with clear ID numbering
@@ -70,6 +74,7 @@ Two conflicting interpretations existed:
 ### Validation
 
 `catalyst validate` should enforce:
+
 - Each rule document has a clear domain title
 - Each rule within the document has a unique ID (`PREFIX-SERIAL-USERID`)
 - Rule IDs are grouped by domain and never reused

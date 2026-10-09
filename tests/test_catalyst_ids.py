@@ -8,7 +8,11 @@ from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
 from catalyst.ids import (
-    IdError, generate_userid, highest_number, next_entity_id, next_rule_id,
+    IdError,
+    generate_userid,
+    highest_number,
+    next_entity_id,
+    next_rule_id,
     resolve_signer,
 )
 from catalyst_fixtures import USER, USERID, make_project
@@ -32,7 +36,10 @@ def test_numbers_are_never_reused_after_a_file_disappears(tmp_path):
     folder) keeps its number even when its file is gone."""
     project, dep, corpus = setup(tmp_path)
     index = project / ".criterion" / "items" / "items.md"
-    index.write_text(index.read_text(encoding="utf-8") + f"| [ITEM-000007-{USERID}](ITEM-000007-x.md) | X | Done |\n", encoding="utf-8")
+    index.write_text(
+        index.read_text(encoding="utf-8") + f"| [ITEM-000007-{USERID}](ITEM-000007-x.md) | X | Done |\n",
+        encoding="utf-8",
+    )
     assert highest_number(dep, load_corpus(dep), "ITEM") == 7
 
 
@@ -56,7 +63,7 @@ def test_next_rule_id_needs_a_registered_domain(tmp_path):
 def test_signer_resolution(tmp_path):
     project, dep, corpus = setup(tmp_path)
     assert resolve_signer(dep, corpus, "ada")["userid"] == USERID
-    assert resolve_signer(dep, corpus)["userid"] == USERID      # the only active user
+    assert resolve_signer(dep, corpus)["userid"] == USERID  # the only active user
     with pytest.raises(IdError, match="not a registered user"):
         resolve_signer(dep, corpus, "mallory")
 
@@ -98,7 +105,9 @@ def test_cli(tmp_path, capsys):
 def test_next_rule_id_counts_rules_only_listed_in_the_index(tmp_path):
     project, dep, _ = setup(tmp_path)
     index = project / ".criterion" / "rules" / "rules.md"
-    index.write_text(index.read_text(encoding="utf-8") + f"- `br-AUTH-000007-{USERID}` — removed later\n", encoding="utf-8")
+    index.write_text(
+        index.read_text(encoding="utf-8") + f"- `br-AUTH-000007-{USERID}` — removed later\n", encoding="utf-8"
+    )
     corpus = load_corpus(dep)
     assert next_rule_id(dep, corpus, "br", "AUTH", corpus.user(USER)) == f"br-AUTH-000008-{USERID}"
 
@@ -106,7 +115,8 @@ def test_next_rule_id_counts_rules_only_listed_in_the_index(tmp_path):
 def test_ids_seen_only_in_the_journal_are_not_reused(tmp_path):
     project, dep, _ = setup(tmp_path)
     (project / ".criterion" / "development" / "journal.jsonl").write_text(
-        f'{{"artifact": "ITEM-000005-{USERID}"}}\n', encoding="utf-8")
+        f'{{"artifact": "ITEM-000005-{USERID}"}}\n', encoding="utf-8"
+    )
     corpus = load_corpus(dep)
     assert next_entity_id(dep, corpus, "ITEM", corpus.user(USER)) == f"ITEM-000006-{USERID}"
 
@@ -124,11 +134,14 @@ def test_next_rule_id_counts_rules_cited_only_in_a_rule_document(tmp_path):
     (or remembered by the journal) keeps its number."""
     project, dep, _ = setup(tmp_path)
     doc = project / ".criterion" / "rules" / "business" / "br-business-rules.md"
-    doc.write_text(doc.read_text(encoding="utf-8") + f"\nSupersedes `xr-AUTH-000011-{USERID}` (removed).\n", encoding="utf-8")
+    doc.write_text(
+        doc.read_text(encoding="utf-8") + f"\nSupersedes `xr-AUTH-000011-{USERID}` (removed).\n", encoding="utf-8"
+    )
     corpus = load_corpus(dep)
     assert next_rule_id(dep, corpus, "br", "AUTH", corpus.user(USER)) == f"br-AUTH-000012-{USERID}"
     (project / ".criterion" / "development" / "journal.jsonl").write_text(
-        f'{{"artifact": "br-AUTH-000020-{USERID}"}}\n', encoding="utf-8")
+        f'{{"artifact": "br-AUTH-000020-{USERID}"}}\n', encoding="utf-8"
+    )
     assert next_rule_id(dep, corpus, "br", "AUTH", corpus.user(USER)) == f"br-AUTH-000021-{USERID}"
 
 
@@ -148,14 +161,15 @@ def test_reserved_ids_are_handed_out_once(tmp_path):
 def test_a_stale_lock_is_broken(tmp_path):
     import os
     import time
+
     from catalyst.ids import id_lock, state_dir
+
     _, dep, _ = setup(tmp_path)
     lock = state_dir(dep) / "ids.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
     lock.write_text("12345\n", encoding="utf-8")
-    with pytest.raises(IdError, match="held by another process"):
-        with id_lock(dep, wait=0.1, stale=60):
-            pass
+    with pytest.raises(IdError, match="held by another process"), id_lock(dep, wait=0.1, stale=60):
+        pass
     old = time.time() - 120
     os.utime(lock, (old, old))
     with id_lock(dep, wait=0.1, stale=60):
@@ -169,12 +183,28 @@ def test_parallel_cli_callers_never_get_the_same_id(tmp_path):
     import subprocess
     import sys
     from pathlib import Path
+
     project = make_project(tmp_path, git=True)
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parent.parent / "scripts"))
-    procs = [subprocess.Popen([sys.executable, "-m", "catalyst", "--project", str(project), "id",
-                               *(["next", "ITEM"] if i % 2 else ["next-rule", "br", "AUTH"])],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", env=env)
-             for i in range(12)]
+    procs = [
+        subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "catalyst",
+                "--project",
+                str(project),
+                "id",
+                *(["next", "ITEM"] if i % 2 else ["next-rule", "br", "AUTH"]),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            env=env,
+        )
+        for i in range(12)
+    ]
     outs = [p.communicate(timeout=120) for p in procs]
     assert all(p.returncode == 0 for p in procs), [e for _, e in outs]
     ids = [o.strip() for o, _ in outs]
@@ -182,8 +212,12 @@ def test_parallel_cli_callers_never_get_the_same_id(tmp_path):
     assert sorted(i for i in ids if i.startswith("ITEM")) == [f"ITEM-{n:06d}-{USERID}" for n in range(2, 8)]
     assert sorted(i for i in ids if i.startswith("br")) == [f"br-AUTH-{n:06d}-{USERID}" for n in range(2, 8)]
     # nothing was left in the working copy's tracked tree
-    status = subprocess.run(["git", "-C", str(project / ".criterion"), "status", "--porcelain"],
-                            capture_output=True, text=True, encoding="utf-8").stdout
+    status = subprocess.run(
+        ["git", "-C", str(project / ".criterion"), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
     assert status == ""
 
 
@@ -191,8 +225,10 @@ def test_the_lock_waits_while_windows_reports_it_delete_pending(tmp_path, monkey
     """Windows: opening a lock file its holder is deleting fails with
     PermissionError; that means busy, so the caller waits and gets the lock."""
     import os
-    from catalyst import ids
+
+    from catalyst import ids, lock
     from catalyst.deployment import load
+
     dep = load(make_project(tmp_path, git=True))
     real_open, calls = os.open, []
 
@@ -202,8 +238,8 @@ def test_the_lock_waits_while_windows_reports_it_delete_pending(tmp_path, monkey
             raise PermissionError(13, "Permission denied", path)
         return real_open(path, *a, **kw)
 
-    monkeypatch.setattr(ids, "BUSY", (FileExistsError, PermissionError))
-    monkeypatch.setattr(ids.os, "open", flaky_open)
+    monkeypatch.setattr(lock, "BUSY", (FileExistsError, PermissionError))
+    monkeypatch.setattr(lock.os, "open", flaky_open)
     with ids.id_lock(dep, wait=5):
         pass
     assert len(calls) == 2

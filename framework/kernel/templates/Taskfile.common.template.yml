@@ -147,7 +147,7 @@ tasks:
       - '{{.AGENT_CMD}} "/commands {{.CLI_ARGS}}"'
 
   journal:
-    desc: "Read-only filter/report over development/journal.jsonl"
+    desc: "Read-only filter/report over the journal"
     cmds:
       - '{{.AGENT_CMD}} "/journal {{.CLI_ARGS}}"'
 
