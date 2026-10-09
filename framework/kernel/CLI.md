@@ -394,6 +394,20 @@ With `--working-copy` there is no product repository: commits are `0`.
   launcher runs the `.venv` of the project it is called from — no activation
   — or a legacy deployment's vendored CLI. `runtime status` reports all three.
 
+### `catalyst move --to-home | --name <new>`
+
+- `--to-home` moves a legacy deployment into the home store
+  (`$CATALYST_HOME/projects/<name>/criterion`): a `.criterion` symlink into
+  agent space (its target moves), an in-project `.criterion` directory, or a
+  `.criterion` git submodule — which becomes a standalone repository with its
+  branches, remote and unpushed work, the product dropping the submodule.
+  `<name>.catalyst` becomes `catalyst.toml`, `/.criterion` leaves
+  `.gitignore`, the runtime fills the criterion's `.venv` (`--no-runtime`
+  defers it), and the move is journaled. Product changes are staged, never
+  committed. A name already used on the machine is refused.
+- `--name <new>` renames a home-store project: its criterion directory and
+  `project_name` in `catalyst.toml`.
+
 ### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip>]`
 
 The mechanical half of `/sync-framework`. `--kernel` is a catalyst

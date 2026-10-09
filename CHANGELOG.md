@@ -30,6 +30,10 @@ messages.
   a `.criterion` symlink) remains for one minor; the in-project fallback is
   gone. Hooks call the launcher (`agents/claude-code/settings.template.json`).
   INV-6 and the install docs say so.
+- `catalyst move --to-home` moves a legacy deployment (symlink, in-project
+  directory or shared submodule) into the home store, keeping its history,
+  branches and remote; `catalyst move --name <new>` renames a project
+  (roadmap R2 W5).
 
 ## 0.47.0 — 2026-10-08
 

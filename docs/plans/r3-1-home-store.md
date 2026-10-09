@@ -11,7 +11,7 @@ minor (ADR-009) and moved with `catalyst move`.
 
 ## Stages (each tested, each shippable)
 
-Progress: **A, B done** (`e6d6c50`); **C done** (`dadedc1`); **D done** (init to the home store, docs). Next: E.
+Progress: **A, B done** (`e6d6c50`); **C done** (`dadedc1`); **D done** (`f465a2d`); **E done** (`catalyst move`). Next: move the real deployments, then F.
 
 | # | Stage | Content | Done when |
 |---|---|---|---|

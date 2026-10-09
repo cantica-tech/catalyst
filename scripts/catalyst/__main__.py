@@ -408,6 +408,30 @@ def cmd_runtime(args) -> int:
     return 0
 
 
+def cmd_move(args) -> int:
+    """`move --to-home | --name <new>` (R2 W5): legacy deployment to the home
+    store, or rename a project."""
+    import project_file
+    from catalyst import move
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 1
+    try:
+        if args.name:
+            _, steps = move.rename(project, args.name, actor=args.as_user)
+        else:
+            _, steps = move.to_home(project, runtime=not args.no_runtime, actor=args.as_user)
+    except (move.MoveError, JournalError, OSError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    for step in steps:
+        print(f"- {step}")
+    return 0
+
+
 def cmd_report(args) -> int:
     from catalyst.report import build, render
 
@@ -1132,6 +1156,15 @@ def build_parser() -> argparse.ArgumentParser:
     q = rs.add_parser("status", help="runtimes, launcher and the criterion's runtime version")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_runtime)
+
+    p = sub.add_parser("move", help="move a legacy deployment into $HOME/.catalyst, or rename a project")
+    mg = p.add_mutually_exclusive_group(required=True)
+    mg.add_argument("--to-home", action="store_true",
+                    help="symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion")
+    mg.add_argument("--name", help="rename a home-store project")
+    p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
+    p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
+    p.set_defaults(func=cmd_move)
 
     p = sub.add_parser("index", help="regenerate entity indexes from the artifact files")
     ix = p.add_subparsers(dest="index_command", required=True)
