@@ -497,7 +497,8 @@ When the user enters `/criterion create <url>`: confirm the user wants
 this deployment shared, and that the criterion repository at `<url>`
 exists (empty, or holding this working copy's own history) — creating it
 on a hosting service is externally visible, so ask before doing it. Run
-`catalyst criterion create <url>` (`--branch <name>` only if the user
+`catalyst criterion create <url> --yes` once they agreed (without `--yes`
+it publishes nothing and exits `3`; `--branch <name>` only if the user
 wants a shared branch other than `criterion`). If it refuses because the
 remote branch holds history the working copy lacks, report it: that is
 someone else's work or another deployment, never something to overwrite.
@@ -518,7 +519,10 @@ machine holds the local working copy, publishes it there. If the joining person 
 `/criterion push` like any other change.
 
 When the user enters `/criterion push <message>`: resolve the signer
-(§2) and run `catalyst criterion push -m "<message>" --as <signer>`.
+(§2) and run `catalyst criterion push -m "<message>" --as <signer>`. It
+prints what it would publish (uncommitted changes, local commits, and
+whether they join the open pull request or start one) and exits `3`: show
+that to the user, and only on their assent (INV-4) re-run it with `--yes`.
 Report the pull request (or the branch to open one from). If the push
 stops on a conflict, report the conflicting files and stop: nothing was
 pushed. Never resolve the conflict by applying an edit of your own. You

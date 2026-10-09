@@ -26,6 +26,12 @@ The journal in shards (migration `0.50.0/journal-shards.md`; roadmap R3.3).
   lock; driver `home`) and its sharing (`catalyst share info|status|pull|push`;
   drivers `local` and `git`, chosen by `share` in `catalyst.toml` or by the
   criterion's remote). The journal reads, appends and locks through it.
+- Teams on git (roadmap R3.6): `catalyst share create <url> [--protect]` and
+  `share join` (a second machine); publishing needs the user's assent —
+  `share push|create`, `criterion push`, `criterion create <url>` print what
+  they would publish (the batch: added to the open pull request, or a new
+  one) and exit `3` unless given `--yes` (INV-4); `catalyst check` runs the
+  integrity check whenever the criterion's HEAD is a merge.
 
 ## 0.49.0 — 2026-10-09
 

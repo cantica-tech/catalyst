@@ -508,7 +508,9 @@ def test_cli_names_url_when_it_cannot_ask(solo, capsys, monkeypatch):
     monkeypatch.setattr("sys.stdin.isatty", lambda: False, raising=False)
     assert main(["criterion", "sync"]) == 1
     assert "--url" in capsys.readouterr().err
-    assert main(["criterion", "sync", "--url", str(solo["remote"])]) == 0
+    assert main(["criterion", "sync", "--url", str(solo["remote"])]) == 3  # INV-4: no assent, nothing published
+    assert not cr.is_submodule(project) and "--yes" in capsys.readouterr().err
+    assert main(["criterion", "sync", "--url", str(solo["remote"]), "--yes"]) == 0
     assert cr.is_submodule(project)
     assert "Published" in capsys.readouterr().out
 

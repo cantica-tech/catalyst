@@ -31,6 +31,9 @@ one-line placeholder; numbers are never reused.
   module-independent part "the kernel", never "the framework core".
 - **INV-4 — Assent before push.** Never push anything (project or catalyst)
   without the user's explicit assent. No target-repo commit without assent.
+  The CLI enforces it for the criterion: every command that publishes
+  (`catalyst share push|create`, `criterion push`, `criterion create <url>`)
+  prints what it would publish and exits `3` unless given `--yes`.
 - **INV-25 — Act without asking, except where it breaks something
   fundamental.** Creating, reading, or updating an entity proceeds by
   default, without pausing for the user's authorization — routine,
@@ -146,9 +149,11 @@ one-line placeholder; numbers are never reused.
   requests against the shared branch (`criterion_branch`):
   `catalyst criterion push` commits, rebases (the journal and generated
   indexes merge by union), runs `catalyst check` and
-  `catalyst criterion integrity`, and pushes a topic branch; the same
-  two checks run in the criterion repository's CI, and
-  `catalyst criterion protect` makes them required. A real conflict
+  `catalyst criterion integrity`, and pushes a topic branch (with the
+  user's assent, INV-4); the same two checks run in the criterion
+  repository's CI — `catalyst check` includes the integrity check whenever
+  the criterion's HEAD is a merge — and `catalyst criterion protect` (or
+  `share create --protect`) makes them required. A real conflict
   stops the push with nothing pushed; the agent never applies a merge —
   it may record a proposed resolution as a `RECON-` case for a human to
   accept (INV-21). Identity is self-declared: branch protection and

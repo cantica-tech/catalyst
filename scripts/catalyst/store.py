@@ -8,7 +8,8 @@ without the rest of catalyst knowing:
   working copy). A server driver (`catalyst serve`, roadmap R3.9) implements
   the same four verbs.
 - `Share`, publishing the working form to others: `info`, `status`, `head`,
-  `pull` and `push`. Drivers: `local` (not shared) and `git` (a criterion
+  `preview`, `pull` and `push` (never without the user's assent, INV-4:
+  the CLI shows `preview` and publishes on `--yes`). Drivers: `local` (not shared) and `git` (a criterion
   repository: today's `catalyst criterion` code). `catalyst.toml` may name
   the driver (`share = "git"`); without it, a criterion with a git remote, or
   a project file naming its repository, is `git`, any other `local`.
@@ -20,10 +21,13 @@ import contextlib
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from catalyst import lock
 from catalyst.deployment import Deployment
+
+if TYPE_CHECKING:
+    from catalyst.criterion import Preview
 
 SHARE_KEY = "share"
 
@@ -102,11 +106,12 @@ class Share(Protocol):
     def info(self) -> dict: ...
     def status(self, fetch: bool = False) -> ShareStatus: ...
     def head(self) -> str | None: ...
+    def preview(self, fetch: bool = True) -> Preview: ...  # what push would publish
     def pull(self) -> str: ...
     def push(self, signer: dict, message: str, open_pr: bool = True) -> dict: ...
 
 
-NOT_SHARED = "this criterion is not shared — `catalyst criterion create <url>` publishes it to a git repository"
+NOT_SHARED = "this criterion is not shared — `catalyst share create <url>` publishes it to a git repository"
 
 
 @dataclass
@@ -124,6 +129,9 @@ class LocalShare:
 
     def head(self) -> str | None:
         return None
+
+    def preview(self, fetch: bool = True) -> Preview:
+        raise ShareError(NOT_SHARED)
 
     def pull(self) -> str:
         raise ShareError(NOT_SHARED)
@@ -170,6 +178,13 @@ class GitShare:
         )
         return res.stdout.strip() or None
 
+    def preview(self, fetch: bool = True) -> Preview:
+        from catalyst import criterion as cr
+
+        if not cr.remote_url(self.dep.root):
+            raise ShareError(NOT_SHARED)
+        return cr.preview(self.dep, fetch=fetch)
+
     def pull(self) -> str:
         from catalyst import criterion as cr
 
@@ -206,3 +221,30 @@ def share_for(dep: Deployment) -> Share:
     if name not in DRIVERS:
         raise ShareError(f"unknown share driver '{name}' in catalyst.toml (known: {', '.join(sorted(DRIVERS))})")
     return DRIVERS[name](dep)
+
+
+def create(dep: Deployment, url: str, branch: str = "criterion", protect: bool = False) -> list[str]:
+    """Publish a local-only criterion for the first time, to a git
+    repository (the git driver); `protect` also makes pull requests and the
+    `catalyst` check required on the shared branch (GitHub). Call only with
+    the user's assent (INV-4)."""
+    from catalyst import criterion as cr
+    from catalyst.deployment import load
+
+    if cr.remote_url(dep.root):
+        raise ShareError(f"this criterion is already shared ({cr.remote_url(dep.root)})")
+    notes = cr.create(dep, url, branch, cr.CI_TEMPLATE)
+    if protect:
+        notes.append(cr.protect(load(dep.project_root), apply=True))
+    return notes
+
+
+def join(project: Path, url: str | None = None, runtime: bool = True) -> str:
+    """Bring a shared criterion to this machine (`catalyst.toml` names it,
+    or `url`); returns the commit it is at."""
+    from catalyst import criterion as cr
+
+    try:
+        return cr.join(project, url, runtime=runtime)
+    except cr.NeedsURL:
+        raise ShareError("catalyst.toml names no criterion repository — pass its URL") from None

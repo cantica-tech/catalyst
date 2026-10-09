@@ -537,6 +537,60 @@ def sync(dep: Deployment) -> str:
     return out(wc, "rev-parse", "--short", "HEAD")
 
 
+# --- what a push would publish (INV-4: assent first) -------------------------
+@dataclass
+class Preview:
+    remote: str | None
+    branch: str  # the shared branch
+    dirty: list[str]  # uncommitted changes, committed by the push
+    commits: list[str]  # local commits no remote has ("<short> <subject>")
+    topic: str | None  # an open topic branch the push adds to (its pull request), else None: a new one
+
+    @property
+    def empty(self) -> bool:
+        return not self.dirty and not self.commits
+
+    def describe(self) -> str:
+        if self.empty:
+            return "nothing to publish: the criterion matches its shared copy"
+        lines = [f"publish to {self.remote or '(no remote yet)'} (shared branch {self.branch}):"]
+        if self.dirty:
+            shown = ", ".join(self.dirty[:8]) + (f" (+{len(self.dirty) - 8} more)" if len(self.dirty) > 8 else "")
+            lines.append(f"  {len(self.dirty)} uncommitted change(s), committed with the message given: {shown}")
+        for c in self.commits[:10]:
+            lines.append(f"  commit {c}")
+        if len(self.commits) > 10:
+            lines.append(f"  (+{len(self.commits) - 10} more commits)")
+        lines.append(
+            f"  added to the open topic branch {self.topic} (its pull request), in one batch"
+            if self.topic
+            else "  on a new topic branch, one pull request for the whole batch"
+        )
+        return "\n".join(lines)
+
+
+def preview(dep: Deployment, fetch: bool = True) -> Preview:
+    """What `push` would publish, without changing anything but the
+    remote-tracking refs (`fetch`)."""
+    wc, branch = dep.root, shared_branch(dep)
+    remote = remote_url(wc)
+    if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
+        return Preview(remote, branch, [], [], None)
+    if fetch and remote:
+        run(wc, "fetch", "-q", "--prune", "origin", check=False)
+    log = run(wc, "log", "--format=%h %s", "HEAD", "--not", "--remotes=origin", check=False)
+    commits = log.stdout.splitlines() if log.returncode == 0 else []
+    current = run(wc, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout.strip()
+    topic = None
+    if current and current != branch:
+        remote_topic = run(wc, "rev-parse", "-q", "--verify", f"origin/{current}", check=False).stdout.strip()
+        merged = remote_topic and (
+            run(wc, "merge-base", "--is-ancestor", remote_topic, f"origin/{branch}", check=False).returncode == 0
+        )
+        topic = current if remote_topic and not merged else None
+    return Preview(remote, branch, dirty(wc), commits, topic)
+
+
 # --- push -------------------------------------------
 @dataclass
 class PushResult:
@@ -1154,7 +1208,7 @@ def _add_submodule(project_root: Path, url: str) -> None:
     _record_shared(project_root, url, branch)
 
 
-def join(project_root: Path, url: str | None = None) -> str:
+def join(project_root: Path, url: str | None = None, runtime: bool = True) -> str:
     """Check out the shared working copy in a clone of the product
     repository. A product with no `.criterion` submodule yet needs the
     criterion repository's URL: a local working copy on this machine is
@@ -1165,7 +1219,7 @@ def join(project_root: Path, url: str | None = None) -> str:
         check_url(url)
     legacy = project_root / ".criterion"
     if (project_root / project_file.NAME).is_file() and not (legacy.is_symlink() or legacy.exists()):
-        return join_home(project_root, url)
+        return join_home(project_root, url, runtime=runtime)
     if not is_submodule(project_root):
         from catalyst.deployment import load
 

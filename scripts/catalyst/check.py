@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from catalyst import journal
 from catalyst.corpus import load_corpus
@@ -110,7 +111,43 @@ def run(dep: Deployment) -> Report:
         report.warnings.append(
             f"index: .criterion/{c.path.relative_to(dep.root)} is out of date (`catalyst index regen`)"
         )
+    report.errors += [f"integrity: {p}" for p in merge_integrity(dep)]
     return report
+
+
+def merge_integrity(dep: Deployment) -> list[str]:
+    """When the criterion's own HEAD is a merge (a pull, a pull request's
+    merge ref in CI), nothing either side recorded — IDs, index rows,
+    journal lines — may be missing from it (`criterion integrity`). The
+    result is kept per HEAD, so the end-of-turn check stays cheap."""
+    import subprocess
+
+    from catalyst import criterion as cr, lock
+
+    def git(*args: str) -> str:
+        res = subprocess.run(
+            ["git", "-C", str(dep.root), *args], capture_output=True, text=True, encoding="utf-8", check=False
+        )
+        return res.stdout.strip() if res.returncode == 0 else ""
+
+    top = git("rev-parse", "--show-toplevel")
+    if not top or Path(top).resolve() != dep.root.resolve():
+        return []  # not its own repository (a legacy in-project working copy)
+    head, *parents = git("rev-list", "--parents", "-n", "1", "HEAD").split() or [""]
+    if len(parents) < 2:
+        return []
+    cache = lock.state_dir(dep.root) / "integrity" / head
+    try:
+        return [line for line in cache.read_text(encoding="utf-8").splitlines() if line]
+    except OSError:
+        pass
+    problems = cr.integrity(dep.root, head, parents)
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text("".join(f"{p}\n" for p in problems), encoding="utf-8")
+    except OSError:
+        pass  # a read-only checkout: checked again next time
+    return problems
 
 
 def _matches_head(dep: Deployment, path: str) -> bool:

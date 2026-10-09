@@ -37,6 +37,16 @@ or a commit made before its journal entry. From `0.50.0` (roadmap R3.3):
    way.
 5. **Shared criteria:** the `.gitattributes` union block also covers
    `development/journal/**/*.jsonl`.
+6. **`catalyst share`** (roadmap R3.2, R3.6): `info|status|pull|push|create|join`
+   works whatever the sharing driver (`local` or `git`; `share = "<driver>"`
+   in `catalyst.toml`, else the criterion's remote decides).
+7. **Assent is enforced (INV-4):** `share push|create`, `criterion push`,
+   `criterion create <url>` and a first `--url` on `criterion sync` print what
+   they would publish and exit `3` unless given `--yes` (a terminal asks).
+   An agent shows the preview to the user and re-runs with `--yes` once they
+   agree.
+8. **`catalyst check` checks merges:** when the criterion's HEAD is a merge,
+   nothing either side recorded may be missing (`criterion integrity`).
 
 ## Steps for every deployment
 
@@ -48,6 +58,8 @@ or a commit made before its journal entry. From `0.50.0` (roadmap R3.3):
    shards, so its `verify` reports the shards' files as unjournaled. Run
    `catalyst criterion push` once after the sync so the `.gitattributes`
    block gains the shard line.
-3. **Tools that read the journal file directly** read every `*.jsonl` under
+3. **Scripts that push the criterion** (`catalyst criterion push` in CI or a
+   wrapper) add `--yes`: the person who runs them has agreed.
+4. **Tools that read the journal file directly** read every `*.jsonl` under
    `development/journal/` as well as `development/journal.jsonl`, or call
    `catalyst journal show --json`.

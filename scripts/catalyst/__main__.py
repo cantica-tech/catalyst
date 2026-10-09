@@ -799,13 +799,33 @@ def _hook_project(args, data: dict):
     return args
 
 
+NEEDS_ASSENT = 3  # exit code: nothing done, the user's assent is needed (INV-4)
+
+
+def _assented(args, what: str) -> bool:
+    """INV-4: never push without the user's assent. `--yes` carries it; an
+    interactive terminal asks; anywhere else (an agent, CI) the preview is
+    printed and nothing happens — the agent shows it to the user and re-runs
+    with --yes once they agree."""
+    if getattr(args, "yes", False):
+        return True
+    print(what)
+    if sys.stdin.isatty():
+        return input("Publish? [y/N] ").strip().lower() in ("y", "yes")
+    print(
+        "catalyst: publishing needs the user's assent (INV-4): show them the above, then re-run with --yes",
+        file=sys.stderr,
+    )
+    return False
+
+
 def _ask_url(exc) -> str:
     """Ask for the criterion repository's URL on an interactive terminal;
     elsewhere (an agent, CI) the error stands and names --url."""
     if not sys.stdin.isatty():
         raise exc
     print(f"catalyst: {exc}", file=sys.stderr)
-    url = input("criterion repository URL (empty to stay local): ").strip()
+    url = input("publish the criterion to which repository URL? (empty to stay local): ").strip()
     if not url:
         from catalyst.criterion import CriterionError
 
@@ -952,19 +972,24 @@ def cmd_criterion(args) -> int:
             print(f"vs shared: {st.ahead} ahead, {st.behind} behind")
         return 0
     if sub == "create":
+        if args.url and not _assented(args, f"publish this criterion to {args.url} (shared branch {args.branch})"):
+            return NEEDS_ASSENT
         for note in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE):
             print(f"- {note}")
         print("Commit the product repository's staged changes when ready.")
         return 0
     if sub in ("push", "sync"):
         # a local-only deployment is published first, to the URL given or asked for
-        url = args.url
+        url, typed = args.url, False
         while True:
             try:
+                publishing = url and not cr.remote_url(dep.root)
+                if publishing and not typed and not _assented(args, f"publish this criterion to {url}"):
+                    return NEEDS_ASSENT
                 dep, published = cr.ensure_remote(dep, url)
                 break
             except cr.NeedsURL as exc:
-                url = _ask_url(exc)
+                url, typed = _ask_url(exc), True  # typed at the prompt: the user's assent
         for note in published:
             print(f"- {note}")
         if published:
@@ -974,6 +999,12 @@ def cmd_criterion(args) -> int:
         from catalyst.ids import resolve_signer
 
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        pv = cr.preview(dep)
+        if pv.empty:
+            print(pv.describe())
+            return 0
+        if not _assented(args, pv.describe()):
+            return NEEDS_ASSENT
         res = cr.push(dep, signer, args.message, open_pr=not args.no_pr)
         if res.commits == 0:
             print("nothing to push: the working copy matches the shared branch")
@@ -1004,10 +1035,25 @@ def cmd_criterion(args) -> int:
 
 
 def cmd_share(args) -> int:
-    """The criterion's sharing driver, whichever it is (roadmap R3.2)."""
+    """The criterion's sharing driver, whichever it is (roadmaps R3.2, R3.6)."""
     from catalyst import store
 
+    if args.share_command == "join":
+        import project_file
+
+        start = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
+        project = project_file.find_up(start)
+        if project is None:
+            raise DeploymentNotFound(f"no catalyst.toml (or legacy *.catalyst pointer) at or above {start}")
+        print(f"joined: the criterion is at {store.join(project, args.url)} (catalyst where)")
+        return 0
     dep = open_deployment(args)
+    if args.share_command == "create":
+        if not _assented(args, f"publish this criterion to {args.url} (shared branch {args.branch})"):
+            return NEEDS_ASSENT
+        for note in store.create(dep, args.url, args.branch, protect=args.protect):
+            print(f"- {note}")
+        return 0
     share = store.share_for(dep)
     if args.share_command == "info":
         info = share.info()
@@ -1038,7 +1084,14 @@ def cmd_share(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
 
-    res = share.push(resolve_signer(dep, load_corpus(dep), args.as_user), args.message, open_pr=not args.no_pr)
+    signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+    pv = share.preview()
+    if pv.empty:
+        print(pv.describe())
+        return 0
+    if not _assented(args, pv.describe()):
+        return NEEDS_ASSENT
+    res = share.push(signer, args.message, open_pr=not args.no_pr)
     if args.json:
         print(json.dumps(res, indent=2))
     elif not res["commits"]:
@@ -1685,7 +1738,17 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("-m", "--message", required=True, help="what the change is (commit message, pull request title)")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--no-pr", action="store_true", help="git: push the branch without opening a pull request")
+    q.add_argument("--yes", action="store_true", help="the user agreed to publish what the preview shows (INV-4)")
     q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_share)
+    q = ss.add_parser("create", help="publish a local-only criterion for the first time (git)")
+    q.add_argument("url", help="the criterion repository: empty, or already holding this history")
+    q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
+    q.add_argument("--protect", action="store_true", help="also require pull requests and the check (GitHub)")
+    q.add_argument("--yes", action="store_true", help="the user agreed to publish (INV-4)")
+    q.set_defaults(func=cmd_share)
+    q = ss.add_parser("join", help="bring a shared criterion to this machine (a project with catalyst.toml)")
+    q.add_argument("url", nargs="?", default=None, help="the criterion repository, when catalyst.toml names none")
     q.set_defaults(func=cmd_share)
 
     p = sub.add_parser("criterion", help="shared deployments on git: submodule, pull requests")
@@ -1704,6 +1767,7 @@ def build_parser() -> argparse.ArgumentParser:
         "the working copy is versioned strictly locally, and push/sync/join ask for it",
     )
     q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
+    q.add_argument("--yes", action="store_true", help="with a URL: the user agreed to publish (INV-4)")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("join", help="check out a shared deployment in a clone of the product")
     q.add_argument("--url", help="the criterion repository, when the product has no .criterion submodule yet")
@@ -1713,9 +1777,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--no-pr", action="store_true", help="push the branch without opening a pull request")
     q.add_argument("--url", help="the criterion repository, when the deployment is still local only")
+    q.add_argument("--yes", action="store_true", help="the user agreed to publish what the preview shows (INV-4)")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("sync", help="fast-forward to the shared branch (refuses with local work)")
     q.add_argument("--url", help="the criterion repository, when the deployment is still local only")
+    q.add_argument("--yes", action="store_true", help="with --url: the user agreed to publish (INV-4)")
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("integrity", help="fail if a merge lost any ID, index row or journal line")
     q.add_argument("--head", default="HEAD")
