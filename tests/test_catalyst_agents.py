@@ -16,6 +16,7 @@ def home(tmp_path, monkeypatch):
     user = tmp_path / "user"
     user.mkdir()
     monkeypatch.setenv("HOME", str(user))
+    monkeypatch.setenv("USERPROFILE", str(user))          # Path.home() on Windows
     monkeypatch.setenv("APPDATA", str(user / "AppData"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(user / ".config"))
     monkeypatch.delenv("CODEX_HOME", raising=False)
