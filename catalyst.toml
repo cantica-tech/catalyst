@@ -2,7 +2,7 @@
 project_name = "catalyst"
 format = "1.0-rc"
 journal_since = "52748da373d800274faa92d227a58d9c37082960"
-kernel_version = "0.52.0"
+kernel_version = "0.52.1"
 module = "software-engineering"
 agent = "claude-code"
 repoed = false

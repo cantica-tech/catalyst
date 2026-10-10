@@ -112,7 +112,7 @@ def _check_refs(dep: Deployment, corpus: Corpus, fd: FieldDefinition, ids: list[
     else:
         allowed = set((fd.target_type or "").split("|")) - {""}
         known = {i for i, arts in corpus.artifacts.items() if not allowed or arts[0].prefix in allowed}
-    missing = [i for i in ids if i not in known]
+    missing = [i for i in ids if i not in known and not (fd.target_type == "rule" and corpus.rule_id(i))]
     if missing:
         raise EditError(f"`{fd.name}` cites what does not exist here: {', '.join(missing)}")
 

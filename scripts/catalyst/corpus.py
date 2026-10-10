@@ -17,6 +17,7 @@ from pathlib import Path
 
 from catalyst.deployment import Deployment
 from check_deployment import (
+    DOMAIN_CODE,
     RULE_HEADING_RE,
     TEMPLATE_RE,
     TEMPLATES_CATALOG_RE,
@@ -28,6 +29,10 @@ TICKED_RE = re.compile(r"`([^`]+)`")
 H1_RE = re.compile(r"^#\s+(.*)$")
 DOMAIN_ROW_RE = re.compile(r"^\|\s*\[?`([A-Z][A-Z0-9_.]*)`")
 LINK_ID_RE = re.compile(r"^\|\s*\[`?([A-Za-z]+-[0-9]{3,6}(?:-[A-Za-z0-9]+)?)`?\]\(([^)]+)\)")
+# A rule ID at the start of a citation or a file name: `<doc>-<DOMAIN>-NNNNNN`
+# plus its signer's userid (8 characters, at least one uppercase — a slug is
+# lowercase, so `<id>-<slug>` splits unambiguously).
+RULE_ID_RE = re.compile(rf"^([a-z]+-{DOMAIN_CODE}-\d{{3,6}}(?:-(?=[A-Za-z0-9]{{0,7}}[A-Z])[A-Za-z0-9]{{8}})?)(?=-|$)")
 TABLE_ID_RE = re.compile(r"^\|\s*`?([A-Z]+-[0-9]{6}(?:-[A-Za-z0-9]{8})?)`?\s*\|")
 PLACEHOLDER_MARK = "owned by the active module"
 EMPTY_VALUES = {"", "-", "—", "n/a", "none"}
@@ -92,6 +97,14 @@ class Corpus:
     index_rows: dict[str, dict[str, str]] = field(default_factory=dict)  # prefix -> id -> file
     row_items: dict[str, set[str]] = field(default_factory=dict)  # prefix -> ids
 
+    def rule_id(self, value: str) -> str | None:
+        """The rule a citation names: the ID itself, or `<id>-<slug>` (the
+        rule's file name, as one-file-per-rule documents cite it)."""
+        if value in self.rules:
+            return value
+        m = RULE_ID_RE.match(value)
+        return m.group(1) if m and m.group(1) in self.rules else None
+
     def all_ids(self) -> set[str]:
         ids = set(self.rules) | set(self.artifacts)
         for items in self.row_items.values():
@@ -114,7 +127,8 @@ def _rules(root: Path) -> tuple[dict[str, list[Rule]], set[str]]:
         return found, indexed
     index = rules_dir / "rules.md"
     if index.is_file():
-        indexed = set(re.findall(r"`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", index.read_text(encoding="utf-8")))
+        indexed = set(re.findall(rf"`([a-z]+-{DOMAIN_CODE}-\d+(?:-[A-Za-z0-9]+)*)`", index.read_text(encoding="utf-8")))
+        indexed |= {m.group(1) for i in indexed if (m := RULE_ID_RE.match(i))}  # `<id>-<slug>` rows
     for f in sorted(rules_dir.rglob("*.md")):
         if (
             f.name == "rules.md"
@@ -125,6 +139,13 @@ def _rules(root: Path) -> tuple[dict[str, list[Rule]], set[str]]:
         ):
             continue
         lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
+        own = RULE_ID_RE.match(f.stem)
+        if own and not any(RULE_HEADING_RE.match(line) for line in lines):
+            # one file per rule, named `<id>-<slug>.md` (FORMAT.md §5.1)
+            rule = Rule(own.group(1), f, 1)
+            rule.retired = any("🗑" in line and "status" in line.lower() for line in lines)
+            found.setdefault(rule.id, []).append(rule)
+            continue
         current: Rule | None = None
         for lineno, line in enumerate(lines, 1):
             m = RULE_HEADING_RE.match(line)

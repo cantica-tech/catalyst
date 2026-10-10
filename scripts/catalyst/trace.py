@@ -25,10 +25,10 @@ from catalyst.journal import revisions
 # an entity ID (ITEM-000001[-userid]) or a rule ID (br-AUTH-000001[-userid]);
 # nothing else that merely looks like word-digits (paths, versions)
 TOKEN_RE = re.compile(
-    r"\b([A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{3,6}(?:-[A-Za-z0-9]{8})?)\b"
+    r"\b([A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?-\d{3,6}(?:-[A-Za-z0-9]{8})?)\b"
 )
 FULL_SHAPE = re.compile(
-    r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?)$"
+    r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?-\d{6}(?:-[A-Za-z0-9]{8})?)$"
 )
 CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
 HOOK = """#!/usr/bin/env python3

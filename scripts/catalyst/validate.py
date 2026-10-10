@@ -80,7 +80,7 @@ class Validator:
     def resolve(self, value: str, target: str | None) -> tuple[bool, str | None]:
         """(resolves at all, the type it resolved to)."""
         c = self.corpus
-        if value in c.rules:
+        if c.rule_id(value):
             kind = "rule"
         elif value in c.domains:
             kind = "domain"
@@ -114,7 +114,7 @@ class Validator:
                     self.rel(art.file),
                     f"`{fd.name}` cites `{v}` (a {kind}); the ETD expects {fd.target_type}",
                 )
-            elif kind == "rule" and self.corpus.rules[v][0].retired:
+            elif kind == "rule" and self.corpus.rules[self.corpus.rule_id(v) or v][0].retired:
                 self.add(WARNING, "retired-target", self.rel(art.file), f"`{fd.name}` cites retired rule `{v}`")
         return values
 

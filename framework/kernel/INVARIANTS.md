@@ -163,7 +163,8 @@ to the active module keeps a one-line placeholder here
   `<id>-<short-summary>.md` (sub-domain: `<prefix>-<PARENT>.<SUB>-<summary>.md`).
   Bare-ID filenames are invalid.
 - **INV-8 — No orphan rules.** Every rule is a heading in a rule document
-  under `rules/` and appears in the global `rules/rules.md` index. The rule
+  under `rules/`, or its own `<ID>-<slug>.md` file a rule document lists,
+  and appears in the global `rules/rules.md` index. The rule
   template is the highest-numbered `TEMPLATE-RULE-vN.md` in
   `rules/templates/` (INV-20) — never at the `rules/` root directly.
 - **INV-9** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
