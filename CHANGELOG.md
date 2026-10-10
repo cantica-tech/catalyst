@@ -8,7 +8,7 @@ messages.
 
 ## 0.52.1 — 2026-10-10
 
-A fix (`BUG-000003-yCNjAMXO`); no layout change, no migration.
+A fix; no layout change, no migration.
 
 - Both rule shapes real deployments use are recognised: a heading in a rule
   document, or one file per rule, `<ID>-<slug>.md`, that a rule document
