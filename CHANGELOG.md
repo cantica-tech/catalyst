@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.52.0 — 2026-10-10
+
+The ten laws and the handbook (migration `0.52.0/the-handbook.md`; ADR-018). Pairs with
+software-engineering 2.7.0.
 
 - The ten laws (roadmap R4.1): `INVARIANTS.md` opens with ten laws an agent
   must judge — what a session loads (about 0.8k tokens instead of 4.8k) —
