@@ -46,8 +46,10 @@ applies. Until all four hold the rule is not done; its status markers
 ## 3. `rr-META-003` Every rule has a unique, stable ID
 
 A rule is a heading in a rule document under `{{RULES_DIR}}/` —
-`<doc-prefix>-<DOMAIN>-NNNNNN[-parent-id]-<userid>` then its title — listed
-in `{{RULES_DIR}}/rules.md` (`FORMAT.md` §5, INV-8). Take the number from
+`<doc-prefix>-<DOMAIN>-NNNNNN[-parent-id]-<userid>` then its title — or its
+own file, `<ID>-<slug>.md`, that a rule document lists; either way it is
+listed in `{{RULES_DIR}}/rules.md` (`FORMAT.md` §5, INV-8). Keep one shape
+per rule document. Take the number from
 `catalyst id next-rule <doc-prefix> <DOMAIN> --as <signer>`, never by hand.
 Add `[-parent-id]` only for a true sub-case of one existing rule. A rule
 document's file may be renamed to a more descriptive name; an ID never
@@ -86,8 +88,9 @@ A domain groups rules; create one only when no existing domain fits. Check
 it for conflicts as you would a rule (§1), register its code in
 `{{RULES_DIR}}/domains/domains.md` — the registry `id next-rule` reads —
 and write its domain file (`FORMAT.md` §5.4) stating its scope and how it
-relates to its neighbours. A code is permanent. Sub-domains
-(`<PARENT>.<SUB>`) are not supported by the tools yet: do not create one.
+relates to its neighbours. A code is permanent. A sub-domain
+(`<PARENT>.<SUB>`, one level deep) splits a domain that has grown several
+distinct seams; its rules carry the full code (`cor-CORE.INGEST-000001-…`).
 
 ## 8. `rr-META-008` — parked
 

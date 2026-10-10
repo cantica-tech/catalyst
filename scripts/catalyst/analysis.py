@@ -444,7 +444,7 @@ def _artifact_exists(corpus: Corpus, kind: str, ref: str) -> bool:
     if kind == "domain":
         return ref in corpus.domains
     if kind == "rule":
-        return ref in corpus.rules
+        return corpus.rule_id(ref) is not None
     return ref in corpus.artifacts
 
 

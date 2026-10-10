@@ -743,6 +743,7 @@ def test_check_journal_exists_rejects_bad_file_hash(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     entry = json.loads((root / "development" / "journal.jsonl").read_text(encoding="utf-8").strip())
     entry["files"][0]["after"] = "not-a-hash"
+    entry["writer"] = "catalyst/0.52.1"  # a CLI-written entry; a pre-CLI one only warns (journal verify)
     (root / "development" / "journal.jsonl").write_text(json.dumps(entry) + "\n", encoding="utf-8")
     errors = cd.check_journal_exists(root)
     assert any("not a 40-hex git hash or null" in e for e in errors)

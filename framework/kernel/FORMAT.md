@@ -297,8 +297,16 @@ must appear in `rules/rules.md` (structure, INV-8).
 
 ### 5.2 Rule headings and IDs
 
-A rule is defined by a level-2 or level-3 heading whose first element is
-its backticked ID, optionally after a section number:
+A rule is defined in one of two shapes, mixed freely in a deployment:
+
+- **A heading** in a rule document, whose first element is its backticked
+  ID, optionally after a section number (below);
+- **its own file**, named `<ID>-<slug>.md` under `rules/` (outside
+  `domains/` and `templates/`) and containing no rule heading: the file
+  name gives the ID, the file is the rule, and a rule document lists it in
+  a table. A citation of `<ID>-<slug>` resolves to the rule.
+
+A heading-defined rule:
 
 ```markdown
 ### `br-AUTH-000003-Ab3xR9pQ` Session expires after 30 minutes idle
@@ -307,12 +315,11 @@ its backticked ID, optionally after a section number:
 
 - **ID grammar:** `<doc-prefix>-<DOMAIN>-<NNNNNN>[-<parent>]-<userid>` —
   a lowercase document prefix, an uppercase domain code
-  (`[A-Z][A-Z0-9]*`), a six-digit number, an optional parent segment
-  (`Rules-of-Rules.md` §3), and the signer's userid last. Structure: the
-  number must have six digits and the last segment must be a registered
-  userid (INV-26). Sub-domain codes (`PARENT.SUB`, `Rules-of-Rules.md`
-  §7) are valid in domain files, but the 1.0-rc tools do not recognise a
-  rule heading whose ID uses one — an open item for `1.0`.
+  (`[A-Z][A-Z0-9]*`, or one sub-domain level, `PARENT.SUB`), a six-digit
+  number, an optional parent segment (`Rules-of-Rules.md` §3), and the
+  signer's userid last (8 characters with at least one uppercase letter,
+  which is how `<ID>-<slug>` splits). Structure: the number must have six
+  digits and the last segment must be a registered userid (INV-26).
 - A rule's body runs to the next heading. It is **retired** when its
   heading contains `🗑`, or a line of its body contains both `🗑` and the
   word "status" (`Rules-of-Rules.md` §4).
@@ -436,7 +443,8 @@ development/journal.jsonl            # before 0.50 only: read, never written
   rewritten.
 - Structure: the journal exists (a shard or the legacy file); every line is a JSON object with the eight
   required fields; every `files[]` entry has a `path` and 40-hex-or-null
-  hashes. `catalyst journal verify` (part of `check`) adds: timestamps in
+  hashes (on CLI-written entries: a pre-CLI entry is immutable, and its gaps
+  are `journal verify` warnings). `catalyst journal verify` (part of `check`) adds: timestamps in
   order, each file's `before` equal to its previous `after`, every blob
   present, every CLI-written blob pinned, and no journaled file changed
   since its last entry — errors on CLI-written entries, warnings on legacy

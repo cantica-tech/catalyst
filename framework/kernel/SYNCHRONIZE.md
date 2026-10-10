@@ -26,8 +26,8 @@ immediately.
 - Current kernel version: see this repository's own
   `version.txt`.
 - The source of truth for the latest kernel version is the `release`
-  branch of `git@github.com:oliben67/catalyst.git` (or
-  `https://github.com/oliben67/catalyst.git`).
+  branch of `git@github.com:cantica-tech/catalyst.git` (or
+  `https://github.com/cantica-tech/catalyst.git`).
 - The deployed framework must have a `version.txt` file.
 - If `version.txt` is missing or contains a version lower than this
   framework's own `version.txt`, treat the

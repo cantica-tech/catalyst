@@ -1,13 +1,5 @@
 # Catalyst — Claude Code entry
 
-> **Self-governance of this repository is suspended** (owner decision,
-> 2026-10-07) while the framework is refactored. Changes to this repository
-> are not journaled: do not run `catalyst journal append` for them, and do
-> not try to clear the `unjournaled` / `unrecorded-change` errors
-> `catalyst check` reports here — they are expected. The Stop hook is
-> removed from `.claude/settings.json` for the same reason. Git history and
-> commit messages are the record until self-governance is restored.
-
 You are running catalyst as **Claude Code**. Load `BOOTSTRAP.md` from this
 repository and follow it top to bottom. It is the single source of truth; this
 file only records what Claude Code adds on top.

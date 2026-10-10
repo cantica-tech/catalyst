@@ -30,10 +30,10 @@ jobs:
             url=$(echo "$repo" | sed -E 's#^git@github.com:#https://github.com/#')
             git clone --depth=1 -b "$branch" "$url" "$RUNNER_TEMP/modules/$id"
           done
-      # A clean checkout has no working copy (.criterion is gitignored, in
-      # agent-owned space), so the checks run against a deployment installed
-      # from this checkout's kernel and each catalogued module, with --require:
-      # finding nothing to check fails the job instead of skipping.
+      # A clean checkout has no criterion (it lives in catalyst's home), so the
+      # checks run against a deployment installed from this checkout's kernel
+      # and each catalogued module, with --require: finding nothing to check
+      # fails the job instead of skipping.
       - name: Install a scratch deployment per module and validate it
         env:
           PYTHONPATH: ${{ github.workspace }}/scripts

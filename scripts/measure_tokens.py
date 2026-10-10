@@ -14,8 +14,6 @@ Establishes baselines and CI gates to prevent regression.
 from __future__ import annotations
 
 import json
-import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -74,44 +72,35 @@ def measure_bootstrap_invariants() -> list[TokenBudget]:
 
 
 def measure_command_specs() -> list[TokenBudget]:
-    """Measure catalyst spec output for every command in CODE-OF-CONDUCT.md §4."""
+    """Measure `catalyst spec` for every kernel command, and `spec --general`,
+    from the kernel's own command catalogue composed in memory — the same in
+    any checkout and in CI, with or without a deployment. A module's commands
+    are its own repository's budget."""
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from catalyst import compose, spec
+
+    params = compose.Params(module_id="", userid="Ab12Cd34")
+    s = spec.parse(compose.code_of_conduct(ROOT / "framework" / "kernel", None, params))
     results = []
-
-    # Extract all command names from CODE-OF-CONDUCT.md
-    coc_file = ROOT / ".criterion/CODE-OF-CONDUCT.md"
-    if not coc_file.exists():
-        return results
-
-    coc_text = coc_file.read_text("utf-8")
-    # Find §4 section
-    section_4 = re.search(r"^## 4\..*?(?=^##|\Z)", coc_text, re.MULTILINE | re.DOTALL)
-    if not section_4:
-        return results
-
-    section_text = section_4.group(0)
-    # Extract `/command-name` patterns
-    command_names = set(re.findall(r"`/([a-z][a-z0-9-]*)`", section_text))
-
-    for cmd_name in sorted(command_names):
-        try:
-            res = subprocess.run(
-                [sys.executable, "-m", "catalyst", "spec", cmd_name],
-                cwd=ROOT,
-                env={**__import__("os").environ, "PYTHONPATH": str(ROOT / "scripts")},
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                timeout=10,
+    for name in sorted(s.bullets):
+        _, tokens = count_tokens_approx(spec.spec_text(s, name))
+        results.append(
+            TokenBudget(
+                name=f"spec: /{name}",
+                bytes=len(spec.spec_text(s, name).encode()),
+                tokens=tokens,
+                category="command-spec",
             )
-            if res.returncode == 0:
-                output = res.stdout
-                bytes_count, tokens = count_tokens_approx(output)
-                results.append(
-                    TokenBudget(name=f"spec: /{cmd_name}", bytes=bytes_count, tokens=tokens, category="command-spec")
-                )
-        except Exception as e:
-            print(f"Warning: failed to measure spec /{cmd_name}: {e}", file=sys.stderr)
-
+        )
+    general = "\n\n".join(s.general)
+    results.append(
+        TokenBudget(
+            name="spec: --general",
+            bytes=len(general.encode()),
+            tokens=count_tokens_approx(general)[1],
+            category="command-spec",
+        )
+    )
     return results
 
 

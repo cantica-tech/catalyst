@@ -6,6 +6,25 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.52.1 — 2026-10-10
+
+A fix; no layout change, no migration.
+
+- Both rule shapes real deployments use are recognised: a heading in a rule
+  document, or one file per rule, `<ID>-<slug>.md`, that a rule document
+  lists. A citation of `<ID>-<slug>` resolves to its rule.
+- Domain codes may carry one sub-domain level (`CORE.INGEST`), in rule IDs
+  too (`cor-CORE.INGEST-000001-…`): headings, the `rules.md` index, criterion
+  integrity and `trace` all read them.
+- The structure check no longer errors on a pre-CLI journal entry's malformed
+  hashes: such an entry is immutable, and `journal verify` warns about it.
+- The handbook (§3, §7), INV-8 and `FORMAT.md` §5 document both rule shapes
+  and sub-domains (the 0.52.0 handbook wrongly said sub-domains were
+  unsupported).
+- The token budgets measure every command spec again (composed from the
+  kernel's catalogue, not a deployment), and catalyst and its module are
+  referenced under `cantica-tech`.
+
 ## 0.52.0 — 2026-10-10
 
 The ten laws and the handbook (migration `0.52.0/the-handbook.md`; ADR-018). Pairs with
