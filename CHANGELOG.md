@@ -21,21 +21,9 @@ A fix (`BUG-000003-yCNjAMXO`); no layout change, no migration.
 - The handbook (§3, §7), INV-8 and `FORMAT.md` §5 document both rule shapes
   and sub-domains (the 0.52.0 handbook wrongly said sub-domains were
   unsupported).
-
-## 0.52.1 — 2026-10-10
-
-Both rule shapes real deployments use (BUG-000003; no migration).
-
-- A rule may be its own file, `<ID>-<slug>.md`, listed by a rule document,
-  as well as a heading in a rule document; a citation of `<ID>-<slug>`
-  resolves to the rule.
-- Rule IDs may carry one sub-domain level (`cor-CORE.INGEST-000001-…`):
-  `check`, `validate`, `trace` and criterion integrity recognise them.
-- The structure check no longer errors on a pre-CLI journal entry's malformed
-  hashes (an immutable entry: `journal verify` warns about it).
-- `FORMAT.md` §5, INV-8 and the handbook document both shapes and
-  sub-domains; the token budgets measure every command spec; catalyst and its
-  module are referenced under `cantica-tech`.
+- The token budgets measure every command spec again (composed from the
+  kernel's catalogue, not a deployment), and catalyst and its module are
+  referenced under `cantica-tech`.
 
 ## 0.52.0 — 2026-10-10
 
