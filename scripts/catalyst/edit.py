@@ -346,3 +346,108 @@ def link(
         tier,
     )
     return Result(item_id, art.file, touched)
+
+
+# --- reconcile ------------------------------------------------------------
+RESOLVING = {
+    "accept": "Resolved-Accepted",
+    "accept-with-edits": "Resolved-Accepted-with-Edits",
+    "reject": "Resolved-Rejected",
+}
+RECON_VERBS = (*RESOLVING, "propose", "close")
+LEVELS = {"none": 0, "propose": 1, "full": 2}
+
+
+def reconciliation_level(dep: Deployment, signer: dict) -> tuple[str, str]:
+    """The signer's reconciliation level — the highest among their roles'
+    `reconciliation` (a role without one counts as `none`) — and the role
+    that grants it."""
+    import json
+
+    try:
+        roles = json.loads((dep.root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8")).get("roles", [])
+    except (OSError, ValueError):
+        roles = []
+    by_name = {str(r.get("name")): str(r.get("reconciliation") or "none") for r in roles if isinstance(r, dict)}
+    best = ("none", "")
+    for role in signer.get("roles") or []:
+        level = by_name.get(str(role), "none")
+        if LEVELS.get(level, 0) > LEVELS[best[0]]:
+            best = (level, str(role))
+    return best
+
+
+def _append_revision(text: str, author: str, note: str) -> str:
+    """A new row at the end of the `## Revisions` table."""
+    lines = text.split("\n")
+    start = next((i for i, line in enumerate(lines) if line.strip() == "## Revisions"), None)
+    if start is None:
+        raise EditError("no `## Revisions` section in the case")
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    rows = [i for i in range(start + 1, end) if lines[i].startswith("|")]
+    if not rows:
+        raise EditError("no revisions table in the case's `## Revisions` section")
+    numbers = [int(m.group(1)) for i in rows if (m := re.match(r"^\|\s*(\d+)\s*\|", lines[i]))]
+    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    cell = note.replace("|", "\\|").replace("\n", " ")
+    lines.insert(rows[-1] + 1, f"| {max(numbers, default=0) + 1} | {author} | {stamp} | — | {cell} |")
+    return "\n".join(lines)
+
+
+def reconcile(
+    dep: Deployment, corpus: Corpus, case_id: str, verb: str, signer: dict, text: str = "", intent: list[str] = ()
+) -> Result:
+    """`/reconcile <case> <verb>` (Rules-of-Rules.md rr-META-016, INV-21): the
+    one role check catalyst enforces. `full` may use every verb, `propose`
+    only `propose`, `none` nothing. Records the decision; applying an accepted
+    version to the disputed entity stays the human's (or the agent's, on the
+    human's word) ordinary, journaled work."""
+    if verb not in RECON_VERBS:
+        raise EditError(f"'{verb}' is not a reconcile verb ({', '.join(RECON_VERBS)})")
+    art = _artifact(corpus, case_id)
+    if art.prefix != RECONCILIATION:
+        raise EditError(f"{case_id} is not a reconciliation case")
+    who = str(signer.get("name") or signer.get("git_username"))
+    level, role = reconciliation_level(dep, signer)
+    if level == "none":
+        raise EditError(
+            f"{who} has no reconciliation rights (no role grants `propose` or `full`): ask a `full` or "
+            "`propose` user to act"
+        )
+    if verb != "propose" and level != "full":
+        raise EditError(f"`{verb}` needs a `full` reconciliation role; {who} ({role}) may only `propose`")
+    status = (art.get("Status") or "").strip()
+    if status == "Closed":
+        raise EditError(f"{case_id} is Closed: a closed case is final")
+    resolved = status.startswith("Resolved-")
+    body = art.file.read_text(encoding="utf-8")
+    if verb == "propose":
+        if resolved:
+            raise EditError(f"{case_id} is already {status}: close it, or open a new case")
+        if not text.strip():
+            raise EditError("`propose` needs the proposal's text (--text)")
+        body, new = _append_revision(body, who, text.strip()), "Under Review"
+    elif verb == "close":
+        if not resolved:
+            raise EditError(f"{case_id} is {status or 'not resolved'}: resolve it (accept/reject) before closing")
+        new = "Closed"
+    else:
+        if resolved:
+            raise EditError(f"{case_id} is already {status}")
+        new = RESOLVING[verb]
+        today = datetime.date.today().isoformat()
+        body = set_or_add_field(set_or_add_field(body, "Resolved", today), "Resolver", f"{who} ({role})")
+    body = set_field(body, "Status", new)
+    art.file.write_text(body, encoding="utf-8")
+    _finish(
+        dep,
+        "/reconcile",
+        "status-change" if new != status else "update",
+        case_id,
+        [],
+        list(intent) or [f"{case_id}: {verb} ({status or '?'} -> {new})" + (f" — {text.strip()}" if text else "")],
+        [art.file],
+        str(signer.get("git_username") or signer.get("name")),
+        None,
+    )
+    return Result(case_id, art.file, [art.file])

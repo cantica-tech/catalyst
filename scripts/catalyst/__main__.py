@@ -445,6 +445,33 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+def cmd_reconcile(args) -> int:
+    """`reconcile <RECON-id> <verb>` (rr-META-016, INV-21): the role-gated
+    decision on a reconciliation case."""
+    from catalyst import edit
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    try:
+        res = edit.reconcile(
+            dep,
+            corpus,
+            args.case,
+            args.verb,
+            resolve_signer(dep, corpus, args.as_user),
+            args.text or "",
+            args.intent or [],
+        )
+    except edit.EditError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    status = (load_corpus(dep).artifacts[res.id][0].get("Status") or "").strip()
+    print(f"{res.id}: {args.verb} -> {status}")
+    return 0
+
+
 def cmd_why(args) -> int:
     """`why <law|INV-n|meta-rule|ID>` (R4.1): a law with the invariants it
     absorbs, an invariant with its law and what enforces it, a meta-rule's
@@ -1767,6 +1794,14 @@ def build_parser() -> argparse.ArgumentParser:
     q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
     q.add_argument("id")
     q.set_defaults(func=cmd_analysis)
+
+    p = sub.add_parser("reconcile", help="decide a reconciliation case (role-gated: full, propose, none)")
+    p.add_argument("case", help="the RECON- case ID")
+    p.add_argument("verb", choices=["accept", "accept-with-edits", "reject", "propose", "close"])
+    p.add_argument("--text", help="propose: the proposed resolution (a new Revisions row)")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.set_defaults(func=cmd_reconcile)
 
     p = sub.add_parser("why", help="explain a law (L1…), an invariant (INV-n), a meta-rule or an ID")
     p.add_argument("item", help="L3, INV-17, rr-META-012, a rule or artifact ID")
