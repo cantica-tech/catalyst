@@ -253,14 +253,25 @@ Cursor's `workspace_roots`) when `--project` is not given.
 
 The agent's session-start hook: prints where the project stands (the
 report of [`catalyst open`](#catalyst-open---fetch---agent-id---json),
-changing nothing and touching no network), then the criterion's
-`INVARIANTS.md` and, when the module ships one, `INVARIANTS.module.md`, so a
-deployed project's sessions start grounded. It never blocks a session: it
+changing nothing and touching no network), then the laws — the top of the
+criterion's `INVARIANTS.md` and, when the module ships one,
+`INVARIANTS.module.md`, up to their `end of the session brief` marker (a file
+without the marker is shown whole) — so a deployed project's sessions start
+grounded. It never blocks a session: it
 always exits `0`, prints nothing outside a project, and only the report
 (with `catalyst open` as its to-do) when the criterion is not on this
 machine.
 `--format json` wraps the text as `hookSpecificOutput.additionalContext`
 (Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
+
+### `catalyst why <L1…L10 | INV-n | rr-META-n | ID>`
+
+Explains one item, read from the criterion (roadmap R4.1): a law with the
+invariants it absorbs (`why L3`, `why SE-L1`); an invariant with its law,
+what enforces it, and its full text (`why INV-17`; an invariant the module
+owns is shown from the module's file); a meta-rule's section of
+`Rules-of-Rules.md` (`why rr-META-012`); or, for any other ID, the artifact or
+rule as `view` shows it. Exits `1` when nothing matches.
 
 ### `catalyst open [--fetch] [--agent <id>] [--json]`
 
@@ -298,7 +309,8 @@ else `CLAUDE_PROJECT_DIR`, else its working directory, else a tool call's
   launcher in the project's root, so each project runs its own pinned
   version; `command` (`name`, `arguments`, `cwd`) returns a command's
   procedure, or the list, for clients without MCP prompts;
-- **instructions** — the deployment's invariants, as `hook start` prints them.
+- **instructions** — the deployment's laws (kernel and module), as `hook start` prints them;
+  `catalyst why` explains the rest.
 
 Through the launcher, `mcp` always runs the newest installed runtime.
 

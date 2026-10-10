@@ -445,6 +445,28 @@ def cmd_where(args) -> int:
     return 0 if criterion is not None else 1
 
 
+def cmd_why(args) -> int:
+    """`why <law|INV-n|meta-rule|ID>` (R4.1): a law with the invariants it
+    absorbs, an invariant with its law and what enforces it, a meta-rule's
+    section, or an artifact or rule (`view`)."""
+    from catalyst.laws import why
+
+    dep = open_deployment(args)
+    found = why(dep.root, args.item)
+    if found is not None:
+        print(found)
+        return 0
+    from catalyst import views as v
+    from catalyst.corpus import load_corpus
+
+    try:
+        sys.stdout.write(v.render_view(v.view(dep, load_corpus(dep), args.item)))
+    except v.ViewError:
+        print(f"catalyst: '{args.item}' is not a law, an invariant, a meta-rule or an ID here", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_open(args) -> int:
     """`open` (R3.5): make the project ready on this machine and report it."""
     import project_file
@@ -1193,14 +1215,9 @@ def cmd_hook_start(args) -> int:
     except (WorkingCopyMissing, DeploymentNotFound):
         text = report
     else:
-        text = "\n".join(
-            [report]
-            + [
-                path.read_text(encoding="utf-8", errors="replace")
-                for path in (dep.root / "INVARIANTS.md", dep.root / "INVARIANTS.module.md")
-                if path.is_file()
-            ]
-        )
+        from catalyst.laws import session_brief
+
+        text = "\n".join([report, session_brief(dep.root)])
     if args.format == "text":
         print(text)
     elif args.format == "cursor":
@@ -1750,6 +1767,10 @@ def build_parser() -> argparse.ArgumentParser:
     q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
     q.add_argument("id")
     q.set_defaults(func=cmd_analysis)
+
+    p = sub.add_parser("why", help="explain a law (L1…), an invariant (INV-n), a meta-rule or an ID")
+    p.add_argument("item", help="L3, INV-17, rr-META-012, a rule or artifact ID")
+    p.set_defaults(func=cmd_why)
 
     p = sub.add_parser("open", help="make the project ready on this machine (join, runtime) and say where it stands")
     p.add_argument("--fetch", action="store_true", help="fetch the shared copy first")

@@ -2,7 +2,8 @@
 """Token budget measurement for catalyst.
 
 Measures token usage (approximate as bytes/4) for:
-- BOOTSTRAP + INVARIANTS (grounding docs)
+- BOOTSTRAP + INVARIANTS (grounding docs; of INVARIANTS.md, the laws a
+  session loads — its brief, up to the marker)
 - Every spec <cmd> output
 - Install path (BOOTSTRAP up to fresh checkout state)
 - Each prose command file
@@ -20,6 +21,17 @@ from pathlib import Path
 from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def loaded_text(path: Path) -> str:
+    """What an agent reads of a file: the laws file's brief, else all of it."""
+    text = path.read_text("utf-8")
+    if path.name.startswith("INVARIANTS"):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from catalyst.laws import brief
+
+        return brief(text)
+    return text
 
 
 class TokenBudget(NamedTuple):
@@ -45,7 +57,7 @@ def measure_bootstrap_invariants() -> list[TokenBudget]:
     # Kernel INVARIANTS
     inv_file = ROOT / "framework/kernel/INVARIANTS.md"
     if inv_file.exists():
-        text = inv_file.read_text("utf-8")
+        text = loaded_text(inv_file)
         bytes_count, tokens = count_tokens_approx(text)
         results.append(
             TokenBudget(name="framework/kernel/INVARIANTS.md", bytes=bytes_count, tokens=tokens, category="grounding")
@@ -144,7 +156,7 @@ def measure_install_path() -> list[TokenBudget]:
 
     for name, path, category in docs:
         if path.exists():
-            text = path.read_text("utf-8")
+            text = loaded_text(path)
             bytes_count, tokens = count_tokens_approx(text)
             results.append(TokenBudget(name=name, bytes=bytes_count, tokens=tokens, category=category))
 

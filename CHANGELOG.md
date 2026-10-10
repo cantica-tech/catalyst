@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- The ten laws (roadmap R4.1): `INVARIANTS.md` opens with ten laws an agent
+  must judge — what a session loads (about 0.8k tokens instead of 4.8k) —
+  then every invariant, its law and what enforces it. INV-19 (project
+  lifecycle) is retired, INV-10 to INV-13 and INV-22 (plugins) parked; every
+  number stays resolvable. A module adds at most three laws (software
+  engineering: SE-L1, the tier decides the artifact).
+- `catalyst why <L1…L10|INV-n|rr-META-n|ID>` explains a law, an invariant, a
+  meta-rule or an ID. `hook start` and the MCP server's instructions carry the
+  laws only; `BOOTSTRAP.md` points to them instead of restating nine hard
+  rules.
+
 ## 0.51.0 — 2026-10-10
 
 `catalyst open`, a faster end-of-turn check; no layout change (no migration).
