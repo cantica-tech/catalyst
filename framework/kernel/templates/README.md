@@ -22,7 +22,7 @@ This folder contains the reusable document templates that seed the deployed cata
 - [`reconciliation.template.md`](reconciliation.template.md) — a
   top-level, non-rule-linked type for `RECON-NNNNNN` cases: two
   diverging versions of some other entity — such as a conflict that
-  stopped `/criterion push` — awaiting a human decision. Never a
+  stopped a push (`/share push`) — awaiting a human decision. Never a
   unit of work; see `Rules-of-Rules.md` §16.
 - [`workflow.template.md`](workflow.template.md) — a top-level,
   non-rule-linked type for `WORKFLOW-NNNNNN` process-definition
@@ -49,21 +49,9 @@ This folder contains the reusable document templates that seed the deployed cata
   complete until `/user-add` has registered at least one active user.
   `IAM/users/` and `IAM/roles/` each get the same `templates/` treatment
   as every other artifact type (`INVARIANTS.md` INV-20).
-- [`catalyst-pointer.template.json`](catalyst-pointer.template.json) —
-  copy to `<app-name>.catalyst` **at the target project's own root**
-  (`INVARIANTS.md` INV-6), the one exception to "everything else deploys
-  under `.criterion/`": this file is the only catalyst artifact the
-  target project's own repo ever tracks. It holds no path: the real
-  working copy lives in agent-owned space, computed per machine by the
-  running agent and reached through the gitignored `.criterion` symlink
-  at the project root — or is the in-project `.criterion/` directory
-  (gitignored) when the agent has no owned space (INV-6). Pre-0.37.0
-  pointers may still carry `agent-source`; tools honor it until
-  migrated. Managed by `/project create`/`remove`/`export`/`import` — see
-  `Rules-of-Rules.md` §14. `catalyst criterion create` sets `repoed`,
-  `catalyst_repo_url` and `criterion_branch` (the shared branch, default
-  `criterion`) when the deployment becomes shared (§13); `catalyst_repo`
-  and `created_by` are informational.
+- The project file, `catalyst.toml` — the only catalyst file a project
+  tracks — has no template: `catalyst init` writes it (`FORMAT.md` §1,
+  INV-6); `catalyst share create` adds the sharing fields.
 
 ## How to use this folder
 

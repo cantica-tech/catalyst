@@ -15,6 +15,7 @@ fields:
       - Open
       - Under Review
       - Resolved-Accepted
+      - Resolved-Accepted-with-Edits
       - Resolved-Rejected
       - Closed
   - name: Entity
@@ -31,9 +32,11 @@ workflow:
     - Open
     - Under Review
     - Resolved-Accepted
+    - Resolved-Accepted-with-Edits
     - Resolved-Rejected
     - Closed
   closed_states:
     - Resolved-Accepted
+    - Resolved-Accepted-with-Edits
     - Resolved-Rejected
     - Closed

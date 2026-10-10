@@ -51,8 +51,8 @@ which `catalyst criterion protect` turns on (§4).
 | Developer | everything | create the active module's development artifacts (implementation-driven), implement them, `/status` on tasks/stories | `propose` |
 | QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/status` on verification items | `propose` |
 | Stakeholder | everything | propose ideas and planning items to the active module | `none` |
-| Release Manager | everything | `/sync-framework`, `/catalyzer`, cutting releases | `full` |
-| Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/criterion create`, `/reconcile` | `full` |
+| Release Manager | everything | `/sync-framework`, cutting releases | `full` |
+| Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/share create`, `/reconcile` | `full` |
 
 The "Write" column is each role's *typical* scope (`IAM/roles/roles.json`'s
 `actions` field) — a signal for what to expect and note on mismatch, not an
@@ -61,7 +61,7 @@ active process module names its own commands for these typical actions in
 its documentation; a deployment may list them in `roles.json` via
 `/role-modify`.
 
-Role does not scope what `/criterion push` carries: every contributor's
+Role does not scope what `/share push` carries: every contributor's
 push holds their whole change, and the pull request is where it is
 reviewed.
 
@@ -84,8 +84,8 @@ that records the write, same principle `rr-META-016` gives reconciliation's
 
 ## 4. Identity and the shared deployment's real controls
 
-The `*.catalyst` pointer names no human signer that anything relies on.
-`created_by` (set by the pre-0.39.0 `/criterion create`) is informational;
+`catalyst.toml` names no human signer that anything relies on.
+`created_by` (set at install) is informational;
 `criterion_branch` names the shared branch everyone lands on, not a person.
 **`agent`/`chatAgents`** are a different axis entirely — which AI tool runs
 the deployment. Signing identity is session-resolved per §3.
@@ -107,9 +107,9 @@ In a shared deployment (`rr-META-013`):
   force-pushes and deletion of the branch. Without it, anyone with write
   access can push to the shared branch directly, and every gate in this
   document is agent courtesy only.
-- **The AI never applies a merge.** A conflict stops `/criterion push`; a
+- **The AI never applies a merge.** A conflict stops `/share push`; a
   resolution the agent proposes waits as a `RECON-` case, and resolving it
-  stays role-gated (§1).
+  stays role-gated (§1, `catalyst reconcile`).
 
 ## 5. When may the agent sign without asking?
 

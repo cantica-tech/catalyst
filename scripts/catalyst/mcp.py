@@ -184,11 +184,11 @@ class Server:
     def instructions(self) -> str:
         dep = self.deployment(ask_roots=False)  # roots can only be asked after initialize
         parts = [GENERIC_INSTRUCTIONS]
-        for name in ("INVARIANTS.md", "INVARIANTS.module.md"):
-            path = dep.root / name if dep else None
-            if path is not None and path.is_file():
-                parts.append(path.read_text(encoding="utf-8", errors="replace"))
-        return "\n\n".join(parts)
+        if dep is not None:
+            from catalyst.laws import session_brief
+
+            parts.append(session_brief(dep.root))  # the laws; `catalyst why` explains the rest
+        return "\n\n".join(p for p in parts if p.strip())
 
     # --- methods -------------------------------------------------------------
     def initialize(self, params: dict) -> dict:

@@ -3,7 +3,7 @@
 **Format version: `1.0-rc`.**
 
 This document specifies the files a catalyst deployment consists of, as
-the tools read and write them: the pointer the product repository tracks,
+the tools read and write them: the project file the product repository tracks,
 the working copy it points to, and every file in it that carries meaning.
 It is agent-agnostic and module-agnostic. Examples use the fictional
 module entity type `ITEM` (folder `items`, `MODULE-SPECIFICATION.md` §4.4),
@@ -27,17 +27,17 @@ codes are listed in `CLI.md`.
   new major format version (`2.0`), always with a migration
   (`migrations/`). A change that existing readers ignore safely (a new
   optional field, a new optional file) is a minor version (`1.1`).
-- A deployment declares its format in the pointer's `format` field. The
+- A deployment declares its format in `catalyst.toml`'s `format` field. The
   CLI knows which formats it reads (`SUPPORTED_FORMATS`): `catalyst check`
-  **warns** when the pointer declares none (a deployment from before
+  **warns** when the project file declares none (a deployment from before
   `1.0-rc`; migration `0.41.0` adds it) and **fails** when it declares one
   the CLI does not read — update the vendored CLI, or migrate the
-  deployment. A bare working copy (`--working-copy`) has no pointer and is
+  deployment. A bare working copy (`--working-copy`) has no project file and is
   not format-checked.
 - **The declared format sets how strict the history checks are.** While
   it is a release candidate, [unrecorded changes](#7-the-journal) are
   warnings; from `1.0` they are errors, as are commits without a trace in
-  the hook and `trace` — the same rollout. A pointer may opt in earlier
+  the hook and `trace` — the same rollout. A project file may opt in earlier
   with `"strict_journal": true`.
 
 ## General conventions
@@ -54,39 +54,36 @@ codes are listed in `CLI.md`.
 - Readers ignore JSON fields they do not know; writers that rewrite a
   JSON file keep the fields they do not know.
 
-## 1. The pointer: `<app-name>.catalyst`
+## 1. The project file: `catalyst.toml`
 
-One JSON object in a file named `<app-name>.catalyst` at the product
-repository's root, committed. It is the only catalyst file the product
-repository tracks, besides a shared deployment's `.gitmodules` entry and
-gitlink. The directory holding it is the **project root**; if several
-`*.catalyst` files exist, the CLI reads the first, in name order, that
-parses as a JSON object.
+`catalyst.toml` at the product repository's root, committed: the only
+catalyst file a project holds (INV-6, law L5). The directory holding it is
+the **project root**. Flat `key = value` lines, no tables, never a path:
 
-```json
-{
-  "project_name": "shop",
-  "format": "1.0-rc",
-  "kernel_version": "0.41.0",
-  "module": "example-process",
-  "agent": "claude-code",
-  "repoed": false,
-  "catalyst_repo": null,
-  "catalyst_repo_url": null,
-  "created_by": "Ada Lovelace",
-  "criterion_branch": null,
-  "created": "2026-09-28",
-  "updated": "2026-09-28",
-  "journal_since": "4f1c2a9e0b7d3c5e8a6f9b2d1c0e7a3b5d8f6c4e"
-}
+```toml
+project_name = "shop"
+format = "1.0-rc"
+kernel_version = "0.52.0"
+module = "example-process"
+agent = "claude-code"
+repoed = false
+created_by = "Ada Lovelace"
+created = "2026-09-28"
+updated = "2026-09-28"
+journal_since = "4f1c2a9e0b7d3c5e8a6f9b2d1c0e7a3b5d8f6c4e"
 ```
+
+**Legacy.** A deployment made before kernel 0.48 has `<app-name>.catalyst`
+instead — one JSON object with the same keys — read for one minor and
+moved with `catalyst move --to-home`. If several `*.catalyst` files exist,
+the first, in name order, that parses as a JSON object is read.
 
 | Field | Type | Meaning | Checked |
 |---|---|---|---|
 | `project_name` | string | The project's name; `<app-name>` in the file name. | — |
 | `format` | string | The format version this deployment is written in. | `check`: warning if absent, error if not supported. |
-| `kernel_version` | string | The kernel version the deployment is at. Pre-0.35.0 name: `framework_version`, still read. | Structure: must equal `.criterion/version.txt` (`version drift`). |
-| `module` | string | The active module's id. Its ETDs are loaded from `.criterion/modules/<module>/` (then a sibling checkout `catalyst-<module>`). | A module that cannot be found leaves the checks kernel-only (the check's scope line says so). |
+| `kernel_version` | string | The kernel version the deployment is at. Pre-0.35.0 name: `framework_version`, still read. | Structure: must equal the criterion's `version.txt` (`version drift`). |
+| `module` | string | The active module's id. Its ETDs are loaded from the criterion's `modules/<module>/` (then a sibling checkout `catalyst-<module>`). | A module that cannot be found leaves the checks kernel-only (the check's scope line says so). |
 | `governance` | string | Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything. | — |
 | `agent` | string | The project's default agent, e.g. `claude-code` (`unknown` if none was given). Each user's own choice wins: `catalyst open --agent <id>` records it in `$CATALYST_HOME/projects/<name>/agent`, never here. `catalyst task` dispatches to the user's agent. | — |
 | `share` | string | Optional: the criterion's sharing driver, `git` or `local` (`catalyst share`). Absent: `git` when the criterion has a remote or `catalyst_repo_url` is set, else `local`. | An unknown driver is refused by `catalyst share`. |
@@ -95,25 +92,31 @@ parses as a JSON object.
 | `catalyst_repo_url` | string or null | The criterion repository's URL, when shared. | — |
 | `created_by` | string or null | The installing user's name (`ACCESS-CONTROL.md`). Informational. | — |
 | `criterion_branch` | string or null | The shared branch; `null` means `criterion`. | — |
-| `created`, `updated` | date | When the pointer was written and last changed. | — |
+| `created`, `updated` | date | When the project file was written and last changed. | — |
 | `journal_since` | string | The baseline for changes made outside catalyst: the product commit after which every commit's changes must be in the journal (`catalyst init` writes `HEAD`); `""` checks the whole history. | `check`: warning if absent (history not checked); unrecorded changes after it reported (§7). |
 | `strict_journal` | boolean | Optional, default `false`: `true` makes unrecorded changes errors before format `1.0`. | — |
 
-The pointer holds no path. `agent-source`, a path written by kernels
-before 0.37.0, is still honoured when present and never written.
+The project file holds no path. `agent-source`, a path written into legacy
+pointers by kernels before 0.37.0, is still honoured when present and never
+written.
 
 ## 2. The working copy
 
-A directory named `.criterion/`, reached as `<project root>/.criterion`:
-a gitignored symlink into agent-owned space, a git submodule (shared), or
-an in-project gitignored directory (fallback) — INV-6. It is its own git
-repository. Paths in this section are relative to it.
+The project's criterion: `$CATALYST_HOME/projects/<name>/criterion`
+(`$HOME/.catalyst` by default), named by `catalyst.toml`'s `project_name`
+and found with `catalyst where` — never inside the project (INV-6, law L5).
+It is its own git repository; shared, it has a remote (`catalyst share`).
+Its `.venv` holds its runtime and is git-ignored. Paths in this section are
+relative to it. In the journal and in documents, `.criterion/<path>` names a
+file of the criterion — a namespace, not a directory in the project. A
+legacy deployment reaches it as `<project root>/.criterion` (a symlink, a
+submodule or a directory), read for one minor.
 
 ### 2.1 Root files
 
 | Path | Content | Checked |
 |---|---|---|
-| `version.txt` | The kernel version, one line. | Structure: must exist and equal the pointer's `kernel_version`. |
+| `version.txt` | The kernel version, one line. | Structure: must exist and equal `catalyst.toml`'s `kernel_version`. |
 | `CODE-OF-CONDUCT.md` | The composed rules of development (`MODULE-SPECIFICATION.md` §6). | — (its §4 is what `catalyst spec` reads) |
 | `ACCESS-CONTROL.md` | Per-role rights, verbatim from the kernel. | — |
 | `DEPLOYMENT.md` | Project, kernel, module and version, installer, sharing — a Markdown bullet list, informational. | — |
@@ -439,7 +442,7 @@ development/journal.jsonl            # before 0.50 only: read, never written
   since its last entry — errors on CLI-written entries, warnings on legacy
   ones. `catalyst check` also warns about a product file git shows as
   changed that the journal has never recorded.
-- **Unrecorded changes.** A non-merge product commit after the pointer's
+- **Unrecorded changes.** A non-merge product commit after `catalyst.toml`'s
   `journal_since` that changes a file to a blob its journal chain does not
   reach after the commit's parent blob (a blob never journaled, or a hand
   revert to an older state), and was not adopted for that commit, is an
@@ -495,23 +498,23 @@ CLI reads any type an ETD declares.
 
 ## 11. What the product repository carries
 
-- `<app-name>.catalyst` (§1).
-- `/.criterion` in `.gitignore` (local-only), or `.gitmodules` plus the
-  `.criterion` gitlink (shared).
+- `catalyst.toml` (§1) — and nothing else of catalyst: no criterion, no
+  Taskfile, no agent files (law L5). `catalyst hook install` may add a
+  commit-msg hook in `.git/hooks`, which git never tracks.
 - Commit messages that trace: every product commit cites an artifact or
   rule ID that resolves in the deployment, or its subject starts with
   `chore:` or `chore(<scope>):` (INV-5; `catalyst hook commit-msg`,
   `catalyst trace`, `CLI.md`). A commit message is not a file of the
   format, but the trace convention is part of it.
-- Commits whose product changes the journal records (§7), after the
-  pointer's `journal_since`; a change made outside catalyst is adopted
-  or reverted.
+- Commits whose product changes the journal records (§7), after
+  `catalyst.toml`'s `journal_since`; a change made outside catalyst is
+  adopted or reverted.
 - Optionally, `.catalystignore` files, in any directory: what is not
   governed by catalyst. Empty (blank lines and `#` comments aside): that
   directory and everything below it. Otherwise one path per line,
   relative to the file's directory — a file, or a directory and
   everything below it; `/`-separated, no wildcards, a leading `/` or
-  `./` ignored. A directory with its own `<app-name>.catalyst` is a
+  `./` ignored. A directory with its own `catalyst.toml` is a
   separate, nested deployment, outside its parent's scope (`CLI.md`,
   "What a deployment governs").
 
@@ -521,5 +524,5 @@ CLI reads any type an ETD declares.
 - [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) — modules, manifests and ETDs.
 - [`ARTIFACT-LAYOUT.md`](ARTIFACT-LAYOUT.md) — the working copy's tree at a glance.
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §3, §7, §12, §13 — rule IDs, domains, the journal, shared deployments.
-- [`migrations/0.41.0/traced-commits-and-format.md`](migrations/0.41.0/traced-commits-and-format.md) — adding `format` to an existing pointer.
-- [`migrations/0.42.0/changes-outside-catalyst.md`](migrations/0.42.0/changes-outside-catalyst.md) — adding `journal_since` to an existing pointer.
+- [`migrations/0.41.0/traced-commits-and-format.md`](migrations/0.41.0/traced-commits-and-format.md) — adding `format` to an existing project file.
+- [`migrations/0.42.0/changes-outside-catalyst.md`](migrations/0.42.0/changes-outside-catalyst.md) — adding `journal_since` to an existing project file.

@@ -4,8 +4,8 @@
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
-      "bytes": 19020,
-      "tokens": 4755,
+      "bytes": 3141,
+      "tokens": 785,
       "category": "grounding"
     },
     {
@@ -334,8 +334,8 @@
     },
     {
       "name": "framework/kernel/INVARIANTS.md",
-      "bytes": 19020,
-      "tokens": 4755,
+      "bytes": 3141,
+      "tokens": 785,
       "category": "install"
     },
     {
