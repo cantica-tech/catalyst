@@ -577,6 +577,13 @@ CLI and recompose (`catalyst sync apply`), then `catalyst open` on each
 machine. Each user's agent now comes from `catalyst open --agent <id>` (kept
 in catalyst's home); `catalyst.toml`'s `agent` stays the project's default.
 
+### From `0.51.x`: the laws and the handbook
+
+Target version `0.52.0`. Full procedure: `migrations/0.52.0/the-handbook.md`
+(this repository). `sync apply` recomposes the handbook, the command
+catalogue and the Taskfile; tell the deployment's users that `/criterion` is
+now `/share`.
+
 ## Expected outcome
 
 After synchronization, the deployed framework should reflect the current

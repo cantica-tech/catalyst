@@ -69,7 +69,7 @@ def test_full_decides_propose_proposes_none_asks(case, capsys):
     assert main(["reconcile", case_id, "close", "--as", "ada"]) == 1  # not resolved yet
     assert main(["reconcile", case_id, "accept-with-edits", "--as", "ada"]) == 0
     art = _status(project, case_id)
-    assert art.get("Status") == "Resolved-Accepted-with-Edits" and art.get("Resolver").startswith("Ada")
+    assert art.get("Status") == "Resolved-Accepted-with-Edits" and (art.get("Resolver") or "").startswith("Ada")
     assert main(["reconcile", case_id, "propose", "--as", "bob", "--text", "late"]) == 1
     assert main(["reconcile", case_id, "close", "--as", "ada"]) == 0
     assert _status(project, case_id).get("Status") == "Closed"

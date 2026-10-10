@@ -140,26 +140,24 @@ reads and writes is specified in
 [`framework/kernel/FORMAT.md`](framework/kernel/FORMAT.md) (format
 `1.0-rc`).
 
-## Multi-user sync: criterion
+## Multi-user sync: sharing a criterion
 
-A deployment stays local by default, but can opt into being **shared**
-on plain git. `/criterion create` (`catalyst criterion create <url>`)
-publishes the working copy to a dedicated criterion repository and makes
-`.criterion` a submodule of the product repository, so every product
-commit pins the rules in force. Without a URL, `create` versions the
-working copy locally only; the first `push`, `sync` or `get` asks for
-the repository and publishes then. Contributors check it out with
-`/criterion get`, and land changes through pull requests against the
-shared branch with `/criterion push`: it rebases (the journal and the
-generated indexes merge by union), runs `catalyst check` and an integrity
-check that nothing recorded was lost, and opens the pull request; the
-criterion repository's CI runs the same checks, and
-`catalyst criterion protect` makes them required. The AI never applies a
+A deployment stays local by default, but can opt into being **shared**.
+`/share create <url>` (`catalyst share create <url>`) publishes the
+criterion to a dedicated criterion repository and records it in
+`catalyst.toml`; a teammate runs `catalyst open` in their clone of the
+product and gets the same criterion in their own catalyst home. Changes
+land through pull requests against the shared branch with `/share push`:
+it rebases (the journal's per-person shards and the generated indexes
+merge cleanly), runs `catalyst check` — which also checks a merge lost
+nothing — and opens the pull request, after showing what it would publish
+and getting your yes. The criterion repository's CI runs the same checks,
+and `share create --protect` makes them required. The AI never applies a
 merge: a real conflict stops the push, and a proposed resolution waits as
-a reconciliation case for a human. IDs stay unique across contributors
-through their userid suffix, so nobody renumbers. Identity is still
-self-declared; branch protection and review are the real controls. See
-[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
+a reconciliation case for a human (`catalyst reconcile`). IDs stay unique
+across contributors through their userid suffix, so nobody renumbers.
+Identity is still self-declared; branch protection and review are the
+real controls. See [`framework/kernel/CLI.md`](framework/kernel/CLI.md).
 
 ## Dogfooding
 
@@ -176,7 +174,7 @@ never as something an ordinary deployment carries around.
 Plugins add ongoing capability without touching the kernel — each
 lives in its own repository (never this one, with one exception: schemas
 and plugins still maturing live under `plugins/_prototyping/` until they
-graduate out), is gated behind explicit activation (`/catalyzer`), and
+graduate out), is gated behind explicit activation (parked for now, roadmap R4.7), and
 operates on the *deployed* project, never on catalyst itself. Two shapes
 exist: **background** plugins that continuously watch a deployed
 project — `catalyst-git`, the first one, surfacing rule breaks as they
@@ -224,21 +222,13 @@ explicit anti-drift mechanisms (an invariants file, deployment ledgers, a
 re-ground cadence and an end-of-turn `catalyst check`) rather than trusting
 the agent to simply remember.
 
-`.criterion/` itself is the agent's own governance context for the
-project — not part of the developed code structure, so it doesn't build
-inside the project's own tree at all. It builds in **agent-owned space**
-instead, at a location each agent computes per machine, and the project
-reaches it through a gitignored `.criterion` symlink at its root. The
-target project tracks exactly one small, committed file for it,
-`<app-name>.catalyst`, which holds no path, so it is identical on every
-clone; `/project create`/`remove`/`export`/`import` manage that
-lifecycle. An agent with no owned-space concept (or a platform without
-symlinks) falls back to building `.criterion/` directly in the project,
-gitignored there instead. Either way, `/criterion` is the opt-in mechanism for a team
-that wants the working copy shared across contributors: it moves to a
-dedicated criterion repository, mounted as the product's `.criterion`
-submodule, so the product commits only a gitlink — never the working
-copy's content.
+The criterion is the project's governance context — not part of the
+developed code, so it never sits in the project's tree: it lives in
+catalyst's home, `$HOME/.catalyst/projects/<name>/criterion`, the same for
+every agent. The project tracks exactly one small file, `catalyst.toml`,
+which names it and holds no path, so it is identical on every clone;
+`catalyst where` finds the criterion and `catalyst open` makes it ready on a
+machine. Sharing it with a team is opt-in (`/share`, above).
 
 `BOOTSTRAP.md` is the single source of truth. Everything else here either points
 at it or extends it.

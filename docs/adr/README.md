@@ -18,6 +18,7 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 | [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ⏳ Pending | kernel |
 | [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ⏳ Pending | kernel |
 | [ADR-017](ADR-017-prose-feature-freeze.md) | Prose feature freeze until the R2 verbs exist (R1.6) | ✅ Accepted | kernel |
+| [ADR-018](ADR-018-handbook-and-command-catalogue.md) | The handbook, the command catalogue, and the commands they drop (R4.2) | ✅ Accepted | kernel, SE module |
 
 ### Module & Process
 

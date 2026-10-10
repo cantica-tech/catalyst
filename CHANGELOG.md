@@ -18,6 +18,21 @@ messages.
   meta-rule or an ID. `hook start` and the MCP server's instructions carry the
   laws only; `BOOTSTRAP.md` points to them instead of restating nine hard
   rules.
+- The handbook (roadmap R4.2, ADR-018; migration `0.52.0/the-handbook.md`):
+  `Rules-of-Rules.md` holds every judgment rule, deduplicated (66 KB → 10 KB,
+  with the module's part 13 KB); `CODE-OF-CONDUCT.md` is the command catalogue
+  (51 KB → 22 KB). Obsolete text (the pointer, symlink and submodule model,
+  `/project`), plugin text (parked) and catalyst-development-only text
+  (`/dogfood`, now `docs/dogfood.md`) left the deployed documents; ten
+  contradictions fixed (rules are headings in rule documents, `domains.md` is
+  the domain registry, files may be renamed but IDs never, no "sync before
+  work", sub-domains marked unsupported, …).
+- Commands: `/share` replaces `/criterion`; `/project …` and `/switch-agent`
+  removed; `/catalyzer` parked.
+- `catalyst reconcile <RECON-id> accept|accept-with-edits|reject|propose|close`
+  enforces the reconciliation role gate (INV-21).
+- `FORMAT.md`, `CLI.md` and the invariants describe the home store, not the
+  pointer and `.criterion`; the unused pointer template is removed.
 
 ## 0.51.0 — 2026-10-10
 

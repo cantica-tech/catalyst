@@ -395,7 +395,13 @@ def _append_revision(text: str, author: str, note: str) -> str:
 
 
 def reconcile(
-    dep: Deployment, corpus: Corpus, case_id: str, verb: str, signer: dict, text: str = "", intent: list[str] = ()
+    dep: Deployment,
+    corpus: Corpus,
+    case_id: str,
+    verb: str,
+    signer: dict,
+    text: str = "",
+    intent: list[str] | None = None,
 ) -> Result:
     """`/reconcile <case> <verb>` (Rules-of-Rules.md rr-META-016, INV-21): the
     one role check catalyst enforces. `full` may use every verb, `propose`
@@ -445,7 +451,8 @@ def reconcile(
         "status-change" if new != status else "update",
         case_id,
         [],
-        list(intent) or [f"{case_id}: {verb} ({status or '?'} -> {new})" + (f" — {text.strip()}" if text else "")],
+        list(intent or [])
+        or [f"{case_id}: {verb} ({status or '?'} -> {new})" + (f" — {text.strip()}" if text else "")],
         [art.file],
         str(signer.get("git_username") or signer.get("name")),
         None,

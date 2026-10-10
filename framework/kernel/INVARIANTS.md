@@ -260,7 +260,7 @@ to the active module keeps a one-line placeholder here
 - **INV-21 — Reconciliation entity for diverging versions.** A
   `RECON-NNNNNN` (`reconciliations/`, top-level, full INV-20 template
   treatment) is the durable record of two entity versions that
-  disagree — a conflict that stopped `/criterion push` (INV-18), a
+  disagree — a conflict that stopped a push (INV-18), a
   rights-mismatch against `IAM/roles/roles.json`, or a manually opened
   one — and of the human decision that settles it. Like `WORKFLOW-`, it is never itself work: no `Targets` rule
   field; its chain runs sideways via an `Entity` field naming the

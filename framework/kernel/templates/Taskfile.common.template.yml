@@ -86,18 +86,13 @@ tasks:
     cmds:
       - '{{.AGENT_CMD}} "/migrate-definition {{.CLI_ARGS}}"'
 
-  catalyzer:
-    desc: "Manage plugin installation/activation: <list|activate|download|deactivate|upgrade|downgrade> ..."
+  share:
+    desc: "Share the criterion: <info|status|pull|push <message>|create <url> [--protect]|join [<url>]>"
     cmds:
-      - '{{.AGENT_CMD}} "/catalyzer {{.CLI_ARGS}}"'
-
-  criterion:
-    desc: "Share the working copy through a criterion repository: <create [<url>]|get|push <message>|sync|status>"
-    cmds:
-      - '{{.AGENT_CMD}} "/criterion {{.CLI_ARGS}}"'
+      - '{{.AGENT_CMD}} "/share {{.CLI_ARGS}}"'
 
   reconcile:
-    desc: "Resolve an open reconciliation case: <RECON-id> <accept|accept-with-edits|reject|propose <text>>"
+    desc: "Decide a reconciliation case (role-gated): <RECON-id> <accept|accept-with-edits|reject|propose <text>|close>"
     cmds:
       - '{{.AGENT_CMD}} "/reconcile {{.CLI_ARGS}}"'
 
@@ -105,16 +100,6 @@ tasks:
     desc: "List product changes committed outside catalyst and accept (journal) or reject each: [<commit>|<range>]"
     cmds:
       - '{{.AGENT_CMD}} "/adopt {{.CLI_ARGS}}"'
-
-  project:
-    desc: "Manage a catalyst deployment: <create|remove|export|import> ..."
-    cmds:
-      - '{{.AGENT_CMD}} "/project {{.CLI_ARGS}}"'
-
-  switch-agent:
-    desc: "Force the agent-switch procedure to run now: [agent-id]"
-    cmds:
-      - '{{.AGENT_CMD}} "/switch-agent {{.CLI_ARGS}}"'
 
   status:
     desc: "Update an artifact or work item's Status field"

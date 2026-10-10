@@ -157,7 +157,9 @@ def test_recompose_merges_template_changes_and_keeps_local_edits(tmp_path):
     )
     ror = root / "rules" / "Rules-of-Rules.md"
     ror.write_text(
-        ror.read_text(encoding="utf-8").replace("Meta-rules governing", "Meta-rules (local note) governing", 1),
+        ror.read_text(encoding="utf-8").replace(
+            "The rules a person or an agent", "The rules (local note) a person or an agent", 1
+        ),
         encoding="utf-8",
     )
     params = deployed_params(root, "example-process")
