@@ -12,9 +12,9 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
     path `<project root>/.criterion` through which the project reaches it.
   - **the criterion repository** — the dedicated git repository a *shared*
     deployment publishes its working copy to (`Rules-of-Rules.md` §13).
-  - **`/criterion`** — the command that shares a deployment and lands
-    changes through it (`/criterion create`/`get`/`push`/`sync`/`status`,
-    backed by `catalyst criterion`).
+  - **`catalyst criterion`** — the git sharing driver's own commands
+    (`create`, `join`, `push`, `sync`, `status`, `integrity`, `protect`);
+    `/share` and `catalyst share` are the driver-agnostic way to share.
   - **`criterion`, the branch** — only the *default* name of the shared
     branch in the criterion repository (the pointer's `criterion_branch`
     may name another). It is not a separate concept.
@@ -58,10 +58,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   history before it is not checked for *unrecorded changes*. `catalyst
   init` sets it to `HEAD`; `""` means the whole history; absent, nothing is
   checked and `catalyst check` warns (`FORMAT.md` §1).
-- **catalyzer.** The plugin manager command, `/catalyzer`
-  (`list`/`activate`/`download`/`deactivate`/`upgrade`/`downgrade`); a
-  *plugin* (below) is what it manages. The `-catalyzer` commands edit the
-  plugin catalog.
+- **catalyzer.** The plugin manager command `/catalyzer`, parked with the
+  plugins (roadmap R4.7).
 - **Chain, the.** The traceability path every piece of work must have:
   module artifact → grounding type (a rule) → domain, extended upward
   through work items when a project-management plugin is active (INV-5).

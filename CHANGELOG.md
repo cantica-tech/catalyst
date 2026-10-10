@@ -6,6 +6,37 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.52.0 — 2026-10-10
+
+The ten laws and the handbook (migration `0.52.0/the-handbook.md`; ADR-018). Pairs with
+software-engineering 2.7.0.
+
+- The ten laws (roadmap R4.1): `INVARIANTS.md` opens with ten laws an agent
+  must judge — what a session loads (about 0.8k tokens instead of 4.8k) —
+  then every invariant, its law and what enforces it. INV-19 (project
+  lifecycle) is retired, INV-10 to INV-13 and INV-22 (plugins) parked; every
+  number stays resolvable. A module adds at most three laws (software
+  engineering: SE-L1, the tier decides the artifact).
+- `catalyst why <L1…L10|INV-n|rr-META-n|ID>` explains a law, an invariant, a
+  meta-rule or an ID. `hook start` and the MCP server's instructions carry the
+  laws only; `BOOTSTRAP.md` points to them instead of restating nine hard
+  rules.
+- The handbook (roadmap R4.2, ADR-018; migration `0.52.0/the-handbook.md`):
+  `Rules-of-Rules.md` holds every judgment rule, deduplicated (66 KB → 10 KB,
+  with the module's part 13 KB); `CODE-OF-CONDUCT.md` is the command catalogue
+  (51 KB → 22 KB). Obsolete text (the pointer, symlink and submodule model,
+  `/project`), plugin text (parked) and catalyst-development-only text
+  (`/dogfood`, now `docs/dogfood.md`) left the deployed documents; ten
+  contradictions fixed (rules are headings in rule documents, `domains.md` is
+  the domain registry, files may be renamed but IDs never, no "sync before
+  work", sub-domains marked unsupported, …).
+- Commands: `/share` replaces `/criterion`; `/project …` and `/switch-agent`
+  removed; `/catalyzer` parked.
+- `catalyst reconcile <RECON-id> accept|accept-with-edits|reject|propose|close`
+  enforces the reconciliation role gate (INV-21).
+- `FORMAT.md`, `CLI.md` and the invariants describe the home store, not the
+  pointer and `.criterion`; the unused pointer template is removed.
+
 ## 0.51.0 — 2026-10-10
 
 `catalyst open`, a faster end-of-turn check; no layout change (no migration).

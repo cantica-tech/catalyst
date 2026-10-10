@@ -32,12 +32,12 @@
     },
     {
       "name": "Release Manager",
-      "actions": ["/sync-framework", "/catalyzer", "cutting releases"],
+      "actions": ["/sync-framework", "cutting releases"],
       "reconciliation": "full"
     },
     {
       "name": "Admin",
-      "actions": ["/user-add", "/user-remove", "/user-modify", "/user-assign-role", "/user-list", "/role-add", "/role-modify", "/freeze", "/criterion create", "/reconcile"],
+      "actions": ["/user-add", "/user-remove", "/user-modify", "/user-assign-role", "/user-list", "/role-add", "/role-modify", "/freeze", "/share create", "/reconcile"],
       "reconciliation": "full"
     }
   ]

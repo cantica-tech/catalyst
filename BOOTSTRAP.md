@@ -13,56 +13,18 @@ works from any shell, but those paths are untested.
 
 ---
 
-## 0. Hard rules (read first, re-read on every re-ground)
+## 0. The laws (read first, re-read on every re-ground)
 
-These are non-negotiable and apply for the entire session. They are restated in
-`framework/kernel/INVARIANTS.md`; that file is the canonical copy.
+Read the ten laws now: the top of `framework/kernel/INVARIANTS.md`, up to
+its `end of the session brief` marker (in a deployed project, the session
+start shows them, with the active module's own law). They are the only
+rules you must judge for yourself and they apply for the whole session;
+everything else is enforced by the CLI or explained on demand by
+`catalyst why <L1…L10|INV-n|rule>`. That file is the canonical copy — this
+one does not restate it.
 
-1. **Repo-scoped references only.** When referring to catalyst, never mention a
-   local drive, local folder, or local path. Refer to it only as the git
-   repository provided by the environment and by the repository name itself.
-2. **Install only when asked.** Loading or reading catalyst never installs
-   it. Install into a project only when the user explicitly asks
-   (`catalyst init`, `/project create`, or in plain words), using the
-   install procedure (§2); otherwise, at most offer to.
-3. **Name it "catalyst".** After the first install, always call it "catalyst" or
-   "catalyst framework" in all guidance, memory, and discussion. Its
-   module-independent part (`framework/kernel/`) is **the kernel**; the
-   framework is the kernel plus its process modules.
-4. **Never push without explicit assent.** Never push anything in this project
-   (or catalyst) without the user's explicit go-ahead.
-5. **The chain invariant.** No work happens without a traceable link down to a
-   documented rule: an active-module artifact → the module's grounding type
-   (a kernel rule) → domain, every one carrying a stable, permanent,
-   never-reused ID — extended upward through
-   `epic → story → task →` only when an agile project-management plugin
-   is active (`work-items/` doesn't exist otherwise).
-6. **The criterion lives in catalyst's space; one tracked file.** A
-   project's criterion is `$HOME/.catalyst/projects/<name>/criterion`
-   (`CATALYST_HOME` overrides); nothing of it sits in the project, which
-   tracks only `catalyst.toml` (names the project, never a path). Every
-   agent finds it the same way (`catalyst where`) and runs it through the
-   launcher `$HOME/.catalyst/bin/catalyst`. Shared (opt-in, `/criterion`,
-   INV-18), the criterion is its own git repository with a remote, and
-   contributors land changes through pull requests — never a merge applied
-   by the agent. Legacy deployments (`<app-name>.catalyst` + `.criterion`)
-   are read for one minor; `catalyst move` moves them.
-7. **Descriptive naming.** Every rule, dev artifact, and domain file is named
-   `<id>-<short-summary>.md`. Bare-ID filenames are not acceptable.
-8. **Plugins are gated.** A plugin is never loaded unless explicitly activated
-   via `/catalyzer`, must carry its own `README.md` + `working-contract.md`, and
-   is sourced only from its own repository — never from the framework repo.
-9. **Act without asking, except where it breaks something fundamental.**
-   Creating, reading, or updating an entity proceeds by default, without
-   pausing for authorization — routine, reversible, purely-local writes
-   aren't gated behind a confirmation prompt. Still stop (or refuse) when
-   acting would violate a rules-of-rules provision or a fundamental
-   invariant — hard rule 4's push gate above, or anything already flagged
-   hard-to-reverse/externally-visible/destructive, keep their gates
-   untouched.
-
-If any step below conflicts with a hard rule, the hard rule wins. If a hard rule
-conflicts with a user instruction, stop and ask.
+If any step below conflicts with a law, the law wins. If a law conflicts with
+a user instruction, stop and ask.
 
 ---
 
@@ -86,7 +48,7 @@ sub-agents → analysis passes will be sequential"), then continue.
 
 ### 1.1 Switching agents
 
-The criterion's place does not depend on the agent (hard rule 6): a new agent
+The criterion's place does not depend on the agent (law L5): a new agent
 runs `catalyst open --agent <agent-id>`, which records it for this user in
 catalyst's home — never in `catalyst.toml`. A legacy deployment (`.criterion`
 symlink into another agent's space) is moved once with
@@ -96,7 +58,7 @@ symlink into another agent's space) is moved once with
 
 ## 2. Install procedure
 
-Run this only on the user's explicit request (hard rule 2). The mechanical
+Run this only on the user's explicit request (law L8). The mechanical
 part is one command, `catalyst init` (`framework/kernel/CLI.md`); the agent
 keeps the judgment. Read first, from this repository: `framework/kernel/INVARIANTS.md`
 (in full), `framework/kernel/README.md`, `framework/kernel/INSTANTIATION-GUIDE.md`
@@ -140,7 +102,7 @@ work against). Then:
    `[!] blocked: <reason>` and surface it — never silently skip.
 6. Record the deployment target (§1 memory row).
 7. **Do not commit or push.** Present the deployed tree and wait for explicit
-   assent before any git write (hard rule 4).
+   assent before any git write (law L3).
 
 ---
 
@@ -157,9 +119,9 @@ record you can self-correct against.
 
 **Re-ground cadence.** After every 5 completed ledger items, **or** immediately
 after any context compaction/summarization, re-read
-`framework/kernel/INVARIANTS.md` (in a deployed project,
-`.criterion/INVARIANTS.md`) and the active checklist before continuing.
-The invariants file is deliberately short so this is cheap.
+the laws (the top of `framework/kernel/INVARIANTS.md`; in a deployed
+project, `catalyst hook start` prints them) and the active checklist before
+continuing. The laws are deliberately short so this is cheap.
 
 Before declaring any task done: re-read the checklist and confirm every item is
 `[x]` in the ledger. Blocked items go to the user, not to silence.

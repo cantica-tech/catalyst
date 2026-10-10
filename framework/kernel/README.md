@@ -19,8 +19,8 @@ The specification is written to be agent-agnostic, but only Claude Code is
 supported and tested today; other agents can follow `AGENT.md`/`SYSTEM.md`
 and the `catalyst` CLI works from any shell, untested. Terms are defined in
 [`GLOSSARY.md`](GLOSSARY.md) — including the several things named
-"criterion" (the `.criterion` working copy, the criterion repository, the
-`/criterion` command, and `criterion`, the default shared branch; INV-18,
+"criterion" (the criterion in catalyst's home, the criterion repository, the
+`catalyst criterion` commands, and `criterion`, the default shared branch; INV-18,
 §13 of `rules-of-rules.template.md`).
 
 ## What this framework is
@@ -81,13 +81,12 @@ any point into a side directory — real reconstruction, not narrative.
 Entries are written by `catalyst journal append` ([`CLI.md`](CLI.md)),
 never by hand. See `Rules-of-Rules.md` §12.
 
-A deployment can additionally opt into being **shared**: its working copy
-moves to a dedicated criterion repository, mounted as the product's
-`.criterion` submodule, and contributors land changes through pull
-requests that CI checks with `catalyst check` and
-`catalyst criterion integrity`. A conflict stops the push; the agent
-never applies a merge. `/criterion create`/`get`/`push`/`sync`/`status`
-manage it (`CLI.md`, `Rules-of-Rules.md` §13). `/dogfood` (a
+A deployment can additionally opt into being **shared**: its criterion is
+published to a dedicated criterion repository (`catalyst.toml` records
+it), and contributors land changes through pull requests that CI checks
+with `catalyst check`. A conflict stops the push; the agent never applies
+a merge. `/share create`/`join`/`push`/`pull`/`status` manage it (`CLI.md`,
+`Rules-of-Rules.md` §13). `/dogfood` (a
 `/check-rules` plus four-eyes drift check) runs only against catalyst's
 own repository — it's never part of what a deployed project carries.
 

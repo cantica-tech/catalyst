@@ -3,10 +3,8 @@ description: Vet catalyst's own repository against its own rules (check-rules + 
 argument-hint: "[recreate]"
 ---
 
-Dogfood catalyst's own repository. Full spec:
-`framework/kernel/rules-of-rules.template.md` §13 ("`/dogfood` is
-catalyst-development-only") and, for the `recreate` mode, §18
-("Recreation drift check").
+Dogfood catalyst's own repository. Full spec: `docs/dogfood.md` (the base
+check and, for the `recreate` mode, the recreation drift check).
 Input: $ARGUMENTS
 
 **This command is not part of the catalyst framework's deployed command
@@ -21,18 +19,18 @@ verifying catalyst's own rules against catalyst's own actual state.
    guessing a mode.
 2. Run `scripts/check_deployment.py`/`scripts/check_plugins.py`/
    `scripts/check_plugin_contracts.py`/`scripts/check_command_parity.py`
-   and the pytest suite against `.criterion/` — the structural half of
+   and the pytest suite against catalyst's criterion (`catalyst where`) — the structural half of
    `/check-rules`. Always runs, regardless of `$ARGUMENTS`.
 3. **Only when `recreate` was given** — the recreation drift check
-   (`rules-of-rules.template.md` §18): spawn the isolated agent, get its
-   report, then compare it yourself against `.criterion/rules/framework/
-   fw-framework-rules.md`'s existing `INV-N` coverage. Full mechanics live
-   in §18, not here. When active, launch this spawn alongside step 4's
+   (`docs/dogfood.md`): spawn the isolated agent, get its
+   report, then compare it yourself against the criterion's
+   `rules/framework/fw-framework-rules.md` existing coverage. Full mechanics live
+   in `docs/dogfood.md`, not here. When active, launch this spawn alongside step 4's
    four-eyes pair in the same message — independent spawns, no reason to
    run them sequentially.
 4. Spawn two independent four-eyes sub-agents (no shared context) that
    each separately evaluate whether catalyst's actual state (code, tests,
-   docs) still matches what `.criterion/rules/framework/fw-framework-rules.md`
+   docs) still matches what the criterion's `rules/framework/fw-framework-rules.md`
    claims: for a ✅ rule, does the cited `file:line` still hold with real
    test coverage; for a ⚠️/❌ rule, is that status still accurate rather
    than stale.
@@ -46,11 +44,11 @@ verifying catalyst's own rules against catalyst's own actual state.
    findings alike. Never fix anything automatically — that's the user's
    or a follow-up command's call.
 7. If this run ends clean, or ends with fixes applied and reverified,
-   **offer** to share it — `/criterion push` if this deployment is
-   already shared, `/criterion create` otherwise. Never run either
+   **offer** to share it — `/share push` if this deployment is
+   already shared, `/share create` otherwise. Never run either
    automatically; offer it and proceed only once the user says to.
 
 This command exists only in catalyst's own repository
-(`framework/kernel/rules-of-rules.template.md` §13). Running it never
+(`docs/dogfood.md`). Running it never
 touches the criterion repository or any branch on its own — step 7
 above only ever *offers* that as a next step, never triggers it.

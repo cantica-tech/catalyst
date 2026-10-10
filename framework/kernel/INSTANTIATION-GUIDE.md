@@ -11,7 +11,7 @@ creates concrete rules for that particular project.
 > name itself.
 >
 > Hard rule: catalyst is installed into a project ONLY when the user
-> explicitly asks for it (`catalyst init`, `/project create`, or in plain
+> explicitly asks for it (`catalyst init`, or in plain
 > words). Loading or reading catalyst never installs it; at most, offer to.
 >
 > Hard rule: after that first installation, the framework MUST be referred to
