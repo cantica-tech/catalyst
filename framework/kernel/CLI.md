@@ -25,15 +25,17 @@ is shorthand for one of:
 | A deployed project | `$CATALYST_HOME/bin/catalyst <args>`, the launcher (`runtime install`); a legacy deployment: `python3 .criterion/bin/catalyst.pyz <args>` |
 | catalyst's own repository | `task catalyst -- <args>`, or `PYTHONPATH=scripts python3 -m catalyst <args>` |
 
-`.criterion/bin/catalyst.pyz` is a single-file zipapp. It ships inside
-the kernel release as `bin/catalyst.pyz` and is copied into the working
-copy at install (`INSTANTIATION-GUIDE.md`) and on every `/sync-framework`
-(`SYNCHRONIZE.md`). From catalyst's own checkout, `task build:cli` builds
+The criterion vendors the CLI as `bin/catalyst.pyz`, a single-file
+zipapp: it ships inside the kernel release, is copied into the criterion at
+install (`INSTANTIATION-GUIDE.md`) and on every `/sync-framework`
+(`SYNCHRONIZE.md`), and fills the criterion's `.venv` (`catalyst open`), which
+the launcher runs. From catalyst's own checkout, `task build:cli` builds
 it into `dist/catalyst.pyz`.
 
 Every command works on the deployment found at or above the current
-directory: the project root holding the `*.catalyst` pointer, and its
-working copy reached through `<project root>/.criterion` (INV-6).
+directory: the project root holding `catalyst.toml` (a legacy
+`*.catalyst` pointer is still read), and its criterion in catalyst's home
+(`catalyst where`; INV-6).
 `--project <dir>` starts the search elsewhere. `catalyst --version`
 prints the CLI's version, which is the kernel version it shipped with;
 a zipapp built from a git checkout appends its build, as
@@ -62,11 +64,10 @@ work this way.
 | `2` | No deployment found at or above the current directory (or `--working-copy` names no working copy). |
 | `3` | Not done for lack of the user's assent (INV-4): a command that publishes (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`) printed what it would publish; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead. |
 
-The deployment is found by walking up from the current directory as the
-shell sees it, through the `.criterion` symlink, so any directory inside
-the project or its working copy works. Run from the agent-owned working
-copy's real path (outside the project), the CLI refuses rather than guess
-the project.
+The deployment is found by walking up from the current directory to the
+nearest `catalyst.toml`, so any directory inside the project works. Run
+from inside a criterion itself (outside any project), give `--project` or
+`--working-copy`: the CLI never guesses the project.
 
 Outside any catalyst project (no `*.catalyst` pointer), `catalyst check`,
 `catalyst hook stop` and `catalyst hook commit-msg` exit `0`, so a fresh
@@ -413,10 +414,10 @@ as `WARNING` during the beta and `ERROR` from format `1.0` or under
 `--pattern-only` needs no deployment: it accepts any well-formed full or
 six-digit short ID (`<PREFIX>-NNNNNN[-<userid>]`,
 `<doc-prefix>-<DOMAIN>-NNNNNN[-<userid>]`) without resolving it. Use it
-where CI has no working copy — the product repository of a local-only
-deployment, whose `.criterion` is gitignored. With a working copy (a
-shared deployment, submodule checked out), run it without the flag so
-each ID must resolve. The repository is the project root, or the current
+where CI has no criterion — the product repository of a local-only
+deployment. With the criterion available (a shared deployment, cloned into
+the runner's catalyst home as `catalyst open` does), run it without the
+flag so each ID must resolve. The repository is the project root, or the current
 directory with `--pattern-only` (`--project <dir>` before `trace` picks
 another).
 
@@ -429,14 +430,15 @@ if [ "$EVENT" = "pull_request" ]; then range="$BASE_SHA..$HEAD_SHA"          # t
 elif [ "$BEFORE" != "0000000000000000000000000000000000000000" ]; then
   range="$BEFORE..$SHA"                                                    # a push
 else range="$SHA~1..$SHA"; fi                                              # a new branch's first push
-python3 .criterion/bin/catalyst.pyz trace "$range"                          # or: trace --pattern-only
+catalyst trace "$range"                                                     # or: trace --pattern-only
 ```
 
 with `EVENT`, `BASE_SHA`, `HEAD_SHA`, `BEFORE` and `SHA` set from
 `github.event_name`, `github.event.pull_request.base.sha`,
 `github.event.pull_request.head.sha`, `github.event.before` and
-`github.sha`. Without a working copy, run the zipapp from a catalyst
-release instead of `.criterion/bin/`.
+`github.sha`. `catalyst` is the criterion's vendored CLI
+(`$CATALYST_HOME/projects/<name>/criterion/bin/catalyst.pyz`) or, without a
+criterion, the zipapp of a catalyst release.
 
 ### `catalyst report [--since <date>] [--json]`
 

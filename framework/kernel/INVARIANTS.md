@@ -91,7 +91,7 @@ to the active module keeps a one-line placeholder here
   path when referring to catalyst. Only the git repository and repository name.
 - **INV-2 — Install only when asked.** Loading or reading catalyst never
   installs it. Install into a project only on the user's explicit request
-  (`catalyst init`, `/project create`, or asking in plain words), via the
+  (`catalyst init`, or asking in plain words), via the
   instantiation procedure; otherwise at most offer to.
 - **INV-3 — Name it "catalyst".** Always "catalyst" / "catalyst framework"
   thereafter, in guidance, memory, and discussion. The framework is the
@@ -162,10 +162,10 @@ to the active module keeps a one-line placeholder here
 - **INV-7 — Descriptive naming.** Every rule, dev-artifact, and domain file is
   `<id>-<short-summary>.md` (sub-domain: `<prefix>-<PARENT>.<SUB>-<summary>.md`).
   Bare-ID filenames are invalid.
-- **INV-8 — No orphan rules.** Every rule lives in its type directory, appears in
-  its local type index, and appears in the global `rules.md`. Exactly one
-  *current* `TEMPLATE-RULE-vN.md` (the highest `N`), in `rules/templates/`
-  (INV-20) — never at the `rules/` root directly.
+- **INV-8 — No orphan rules.** Every rule is a heading in a rule document
+  under `rules/` and appears in the global `rules/rules.md` index. The rule
+  template is the highest-numbered `TEMPLATE-RULE-vN.md` in
+  `rules/templates/` (INV-20) — never at the `rules/` root directly.
 - **INV-9** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
   never reused.
 - **INV-14** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
@@ -212,18 +212,17 @@ to the active module keeps a one-line placeholder here
   core, applies to catalyst's own deployment too, and records history
   rather than flagging violations.
 - **INV-18 — Shared deployments on git.** A deployment is shared
-  (`repoed: true`) once `catalyst criterion create <url>` publishes its
-  working copy to a criterion repository and makes `.criterion` a
-  submodule of the product repository; every product commit then pins
-  the rules in force. Contributors land changes only through pull
-  requests against the shared branch (`criterion_branch`):
-  `catalyst criterion push` commits, rebases (the journal and generated
-  indexes merge by union), runs `catalyst check` and
-  `catalyst criterion integrity`, and pushes a topic branch (with the
-  user's assent, INV-4); the same two checks run in the criterion
+  (`repoed: true`) once `catalyst share create <url>` publishes its
+  criterion to a criterion repository; `catalyst.toml` records the remote,
+  and a collaborator joins with `catalyst share join` (or `catalyst open`).
+  Contributors land changes only through pull requests against the shared
+  branch (`criterion_branch`): `catalyst share push` commits, rebases (the
+  journal and generated indexes merge by union), runs `catalyst check`
+  and `catalyst criterion integrity`, and pushes a topic branch (with the
+  user's assent, INV-4); the same checks run in the criterion
   repository's CI — `catalyst check` includes the integrity check whenever
-  the criterion's HEAD is a merge — and `catalyst criterion protect` (or
-  `share create --protect`) makes them required. A real conflict
+  the criterion's HEAD is a merge — and `share create --protect` (or
+  `catalyst criterion protect`) makes them required. A real conflict
   stops the push with nothing pushed; the agent never applies a merge —
   it may record a proposed resolution as a `RECON-` case for a human to
   accept (INV-21). Identity is self-declared: branch protection and
@@ -298,8 +297,8 @@ to the active module keeps a one-line placeholder here
   separate-repository requirement until they graduate out of it.
 - **INV-23 — Frozen entity definitions.** Every real entity type has a
   short, versioned prose definition (`definitions/README.md`) explaining
-  what it is and what it's for, deployed to `.criterion/definitions/
-  <type>.md`. Once deployed, that file is frozen forever: `/sync-framework`
+  what it is and what it's for, deployed to the criterion's
+  `definitions/<type>.md`. Once deployed, that file is frozen forever: `/sync-framework`
   only ever creates a missing one (a type introduced since the project's
   last sync), never overwrites an existing one, no matter how far the
   framework's own copy has moved on. The only sanctioned way to move a
