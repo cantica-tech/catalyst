@@ -169,7 +169,8 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
         out["links"] = {
             name: ref_values(art.get(name) or "") for name in _ref_fields(dep, art.prefix) if art.get(name) is not None
         }
-    elif item_id in corpus.rules:
+    elif corpus.rule_id(item_id):
+        item_id = corpus.rule_id(item_id) or item_id
         rule = corpus.rules[item_id][0]
         out = {
             "id": item_id,

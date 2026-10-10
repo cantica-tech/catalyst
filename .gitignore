@@ -7,3 +7,6 @@ __pycache__/
 
 # golden corpus captures: private governance data, local only
 tests/fixtures/*-golden-corpus.*
+
+# per-machine Claude Code settings
+.claude/settings.local.json

@@ -27,5 +27,5 @@ What we decided to do (and why this option over alternatives).
 ## Related
 
 - ADR-XX (related decision)
-- Issue: github.com/oliben67/catalyst#123
+- Issue: github.com/cantica-tech/catalyst#123
 - Migration: 0.46.0/r0-decisions-*.md

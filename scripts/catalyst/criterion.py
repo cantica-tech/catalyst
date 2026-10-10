@@ -41,7 +41,8 @@ DEFAULT_BRANCH = "criterion"
 ATTRIBUTES_HEADER = "# catalyst: append-only and regenerated files merge by union (catalyst criterion)"
 CI_WORKFLOW = ".github/workflows/catalyst.yml"
 ENTITY_ID_RE = re.compile(r"\b([A-Z][A-Z0-9]*-\d{6}-[A-Za-z0-9]{8})\b")
-RULE_HEAD_RE = re.compile(r"^#{2,3}\s+(?:\d+\.\s+)?`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", re.M)
+DOMAIN_CODE = r"[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?"  # check_deployment.DOMAIN_CODE: AUTH, CORE.INGEST
+RULE_HEAD_RE = re.compile(rf"^#{{2,3}}\s+(?:\d+\.\s+)?`([a-z]+-{DOMAIN_CODE}-\d+(?:-[A-Za-z0-9]+)*)`", re.M)
 ARTIFACT_NAME_RE = re.compile(r"(?:^|/)([A-Z][A-Z0-9]*-\d{6})-[^/]+\.md$")
 INDEX_ROW_RE = re.compile(r"^\|\s*\[`?([A-Za-z]+-\d{3,6}(?:-[A-Za-z0-9]+)*)`?\]\(", re.M)
 
@@ -435,7 +436,7 @@ def facts_at(wc: Path, rev: str) -> Facts:
         if name.startswith("rules/") and "/templates/" not in name:
             facts.ids.update(RULE_HEAD_RE.findall(text))
             if name == "rules/rules.md":
-                facts.rows.update(re.findall(r"`([a-z]+-[A-Z][A-Z0-9]*-\d+(?:-[A-Za-z0-9]+)*)`", text))
+                facts.rows.update(re.findall(rf"`([a-z]+-{DOMAIN_CODE}-\d+(?:-[A-Za-z0-9]+)*)`", text))
         facts.rows.update(INDEX_ROW_RE.findall(text))
     return facts
 

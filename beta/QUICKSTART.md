@@ -22,8 +22,8 @@ You need:
   `framework/modules/catalog.md`).
 
 ```sh
-git clone -b development git@github.com:oliben67/catalyst.git   # the beta branch until the beta release is cut
-git clone -b development git@github.com:oliben67/catalyst-software-engineering.git
+git clone -b development git@github.com:cantica-tech/catalyst.git   # the beta branch until the beta release is cut
+git clone -b development git@github.com:cantica-tech/catalyst-software-engineering.git
 cd catalyst && PYTHONPATH=scripts python3 -c 'from pathlib import Path; import package_release as p; print(p.build_cli(Path("."), Path("dist/catalyst.pyz")))' && cd ..
 ```
 

@@ -19,13 +19,12 @@ BULLET_START = re.compile(r"^- `/([a-z][a-z0-9-]*)")
 # `/name`, `/name <args>` and the colon form `/name: ...` all name a command.
 MENTION = re.compile(r"`/([a-z][a-z0-9-]*)(?=[`\s:])")
 PREAMBLE = (
-    "Tier first: a chore (no rule's behaviour changes) is one `catalyst journal append --tier chore` "
-    "entry with no target; a fix restores a rule (--tier fix); a feature adds or changes behaviour "
-    "(--tier feature) — CODE-OF-CONDUCT.md §9. Signer and IDs: §2 (`catalyst id next`, rules with "
-    "`catalyst id next-rule`, never by hand). Artifact-changing commands end with "
-    "`catalyst index regen`, then `catalyst journal append`, then `catalyst check`. Commit the "
-    "working copy and the product repository only with the user's assent (INV-4). Rules for every "
-    "command: `catalyst spec --general`."
+    "Tier first (Rules-of-Rules.md §6): a chore (no rule's behaviour changes) is one `catalyst journal append "
+    "--tier chore` entry with no target; a fix restores a rule (--tier fix); a feature adds or changes behaviour "
+    "(--tier feature). Signer and IDs: `--as`, `catalyst id next`, rules with `catalyst id next-rule`, never by "
+    "hand. Artifact-changing commands end with `catalyst index regen`, then `catalyst journal append`, then "
+    "`catalyst check`. Nothing is pushed, published or committed in the project without the user's yes (law "
+    "L3). Rules for every command: `catalyst spec --general`; any law or rule: `catalyst why`."
 )
 
 

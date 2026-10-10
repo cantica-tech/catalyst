@@ -67,7 +67,9 @@ USERID_RE = re.compile(r"^[A-Za-z0-9]{8}$")
 # `## N. `id` Title` or `### `id` Title` — a rule heading, id capturing its
 # own trailing digits (group 2) and any suffix segments (group 3), the last
 # of which (once INV-26 applies) must be a userid.
-RULE_HEADING_RE = re.compile(r"^#{2,3}\s+(?:\d+\.\s+)?`([a-z]+-[A-Z][A-Z0-9]*-(\d+)((?:-[a-zA-Z0-9]+)*))`")
+# A domain code, with at most one sub-domain level: `AUTH`, `CORE.INGEST`.
+DOMAIN_CODE = r"[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?"
+RULE_HEADING_RE = re.compile(rf"^#{{2,3}}\s+(?:\d+\.\s+)?`([a-z]+-{DOMAIN_CODE}-(\d+)((?:-[a-zA-Z0-9]+)*))`")
 JOURNAL_REQUIRED_FIELDS = (
     "timestamp",
     "actor",
@@ -535,6 +537,8 @@ def _check_journal_source(journal: Path, name: str) -> list[str]:
                 if not isinstance(f, dict) or "path" not in f:
                     errors.append(f"INV-17: {name}:{lineno} has a files[] entry missing 'path'")
                     continue
+                if not str(entry.get("writer", "")).startswith("catalyst/"):
+                    continue  # a pre-CLI entry is immutable: `journal verify` reports its gaps as warnings
                 for side in ("before", "after"):
                     val = f.get(side)
                     if val is not None and not HASH_RE.match(str(val)):

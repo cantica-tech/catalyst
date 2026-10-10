@@ -7,7 +7,7 @@ catalyst is pre-1.0. Only the latest released version receives fixes.
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately through GitHub's
-[private vulnerability reporting](https://github.com/oliben67/catalyst/security/advisories/new)
+[private vulnerability reporting](https://github.com/cantica-tech/catalyst/security/advisories/new)
 rather than a public issue. You should get an acknowledgement within a few
 days.
 

@@ -11,4 +11,4 @@ listed here.
 
 | Id | Repository | Default branch |
 |---|---|---|
-| `software-engineering` | `git@github.com:oliben67/catalyst-software-engineering.git` | `main` |
+| `software-engineering` | `git@github.com:cantica-tech/catalyst-software-engineering.git` | `main` |
