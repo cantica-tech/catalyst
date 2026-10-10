@@ -74,7 +74,7 @@ to the active module keeps a one-line placeholder here
 | INV-18 shared deployments | L3, L4 | `share`, the criterion's CI gate, `check` integrity |
 | INV-19 project lifecycle (retired) | L3, L5 | `open`, `move`, `share join` |
 | INV-20 uniform artifact-type layout | L6 | `check` (structure) |
-| INV-21 reconciliation | L4 | `reconcile` role gate |
+| INV-21 reconciliation | L4 | — (the role gate is applied by the agent; no CLI verb yet) |
 | INV-22 content-contributing plugins (parked) | L9 | — |
 | INV-23 frozen definitions | L6 | `sync` never overwrites, `definition migrate` |
 | INV-24 workflow entity | — (a format) | `check` (structure) |
