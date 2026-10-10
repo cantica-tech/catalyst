@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-08T14:53:13+00:00",
+  "timestamp": "2026-10-10T12:16:13+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -10,326 +10,164 @@
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 13581,
-      "tokens": 3395,
+      "bytes": 7914,
+      "tokens": 1978,
       "category": "grounding"
     },
     {
-      "name": "spec: /catalyzer",
-      "bytes": 6116,
-      "tokens": 1529,
+      "name": "spec: /adopt",
+      "bytes": 2090,
+      "tokens": 522,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /audit",
+      "bytes": 1467,
+      "tokens": 366,
       "category": "command-spec"
     },
     {
       "name": "spec: /check-rules",
-      "bytes": 1383,
-      "tokens": 345,
+      "bytes": 1417,
+      "tokens": 354,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /commands",
+      "bytes": 1529,
+      "tokens": 382,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /freeze",
+      "bytes": 1229,
+      "tokens": 307,
       "category": "command-spec"
     },
     {
       "name": "spec: /help",
-      "bytes": 1185,
-      "tokens": 296,
+      "bytes": 1219,
+      "tokens": 304,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /journal",
+      "bytes": 1110,
+      "tokens": 277,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /journal-restore",
+      "bytes": 1372,
+      "tokens": 343,
       "category": "command-spec"
     },
     {
       "name": "spec: /list",
-      "bytes": 1436,
-      "tokens": 359,
+      "bytes": 1272,
+      "tokens": 318,
       "category": "command-spec"
     },
     {
       "name": "spec: /meta-tag",
-      "bytes": 1355,
-      "tokens": 338,
+      "bytes": 1389,
+      "tokens": 347,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /migrate-definition",
+      "bytes": 1510,
+      "tokens": 377,
       "category": "command-spec"
     },
     {
       "name": "spec: /reconcile",
-      "bytes": 1801,
-      "tokens": 450,
+      "bytes": 1520,
+      "tokens": 380,
       "category": "command-spec"
     },
     {
       "name": "spec: /role-add",
-      "bytes": 1178,
-      "tokens": 294,
+      "bytes": 1161,
+      "tokens": 290,
       "category": "command-spec"
     },
     {
       "name": "spec: /role-modify",
-      "bytes": 1099,
-      "tokens": 274,
+      "bytes": 1023,
+      "tokens": 255,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /run-analysis",
+      "bytes": 2304,
+      "tokens": 576,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /share",
+      "bytes": 3239,
+      "tokens": 809,
       "category": "command-spec"
     },
     {
       "name": "spec: /status",
-      "bytes": 1600,
-      "tokens": 400,
+      "bytes": 1269,
+      "tokens": 317,
       "category": "command-spec"
     },
     {
       "name": "spec: /sync-framework",
-      "bytes": 3787,
-      "tokens": 946,
+      "bytes": 2209,
+      "tokens": 552,
       "category": "command-spec"
     },
     {
       "name": "spec: /user-add",
-      "bytes": 1778,
-      "tokens": 444,
+      "bytes": 1394,
+      "tokens": 348,
       "category": "command-spec"
     },
     {
       "name": "spec: /user-assign-role",
-      "bytes": 1220,
-      "tokens": 305,
+      "bytes": 1011,
+      "tokens": 252,
+      "category": "command-spec"
+    },
+    {
+      "name": "spec: /user-list",
+      "bytes": 965,
+      "tokens": 241,
       "category": "command-spec"
     },
     {
       "name": "spec: /user-modify",
-      "bytes": 1317,
-      "tokens": 329,
+      "bytes": 1198,
+      "tokens": 299,
       "category": "command-spec"
     },
     {
       "name": "spec: /user-remove",
-      "bytes": 1388,
-      "tokens": 347,
+      "bytes": 1115,
+      "tokens": 278,
       "category": "command-spec"
     },
     {
-      "name": "command-file: adopt.md",
-      "bytes": 1596,
-      "tokens": 399,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: audit.md",
-      "bytes": 823,
-      "tokens": 205,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: catalyzer.md",
-      "bytes": 1961,
-      "tokens": 490,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: check-rules.md",
-      "bytes": 1139,
-      "tokens": 284,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: commands.md",
-      "bytes": 1107,
-      "tokens": 276,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-bug.md",
-      "bytes": 1684,
-      "tokens": 421,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-feature.md",
-      "bytes": 1808,
-      "tokens": 452,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-req.md",
-      "bytes": 1693,
-      "tokens": 423,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-requirement.md",
-      "bytes": 1701,
-      "tokens": 425,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-step.md",
-      "bytes": 1961,
-      "tokens": 490,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: create-test.md",
-      "bytes": 2375,
-      "tokens": 593,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: criterion.md",
-      "bytes": 1833,
-      "tokens": 458,
-      "category": "command-file"
+      "name": "spec: --general",
+      "bytes": 1270,
+      "tokens": 317,
+      "category": "command-spec"
     },
     {
       "name": "command-file: dogfood.md",
-      "bytes": 3269,
-      "tokens": 817,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: freeze.md",
-      "bytes": 855,
-      "tokens": 213,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: help.md",
-      "bytes": 780,
-      "tokens": 195,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: journal-restore.md",
-      "bytes": 1229,
-      "tokens": 307,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: journal.md",
-      "bytes": 1425,
-      "tokens": 356,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: list.md",
-      "bytes": 961,
-      "tokens": 240,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: meta-tag.md",
-      "bytes": 1369,
-      "tokens": 342,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: migrate-definition.md",
-      "bytes": 1286,
-      "tokens": 321,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: project.md",
-      "bytes": 4170,
-      "tokens": 1042,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: reconcile.md",
-      "bytes": 3113,
-      "tokens": 778,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: roadmap-add.md",
-      "bytes": 2845,
-      "tokens": 711,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: roadmap-merge.md",
-      "bytes": 2320,
-      "tokens": 580,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: roadmap-remove.md",
-      "bytes": 1773,
-      "tokens": 443,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: roadmap-update.md",
-      "bytes": 2333,
-      "tokens": 583,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: role-add.md",
-      "bytes": 1891,
-      "tokens": 472,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: role-modify.md",
-      "bytes": 1389,
-      "tokens": 347,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: run-analysis.md",
-      "bytes": 1331,
-      "tokens": 332,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: show-backlog.md",
-      "bytes": 1967,
-      "tokens": 491,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: status.md",
-      "bytes": 1347,
-      "tokens": 336,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: switch-agent.md",
-      "bytes": 1766,
-      "tokens": 441,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: sync-framework.md",
-      "bytes": 1985,
-      "tokens": 496,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: user-add.md",
-      "bytes": 2206,
-      "tokens": 551,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: user-assign-role.md",
-      "bytes": 1583,
-      "tokens": 395,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: user-list.md",
-      "bytes": 1004,
-      "tokens": 251,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: user-modify.md",
-      "bytes": 1726,
-      "tokens": 431,
-      "category": "command-file"
-    },
-    {
-      "name": "command-file: user-remove.md",
-      "bytes": 1676,
-      "tokens": 419,
+      "bytes": 3185,
+      "tokens": 796,
       "category": "command-file"
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 13581,
-      "tokens": 3395,
+      "bytes": 7914,
+      "tokens": 1978,
       "category": "install"
     },
     {
@@ -340,14 +178,14 @@
     },
     {
       "name": "framework/kernel/INSTANTIATION-GUIDE.md",
-      "bytes": 25006,
-      "tokens": 6251,
+      "bytes": 22705,
+      "tokens": 5676,
       "category": "install"
     },
     {
       "name": "framework/kernel/INSTANTIATION-CHECKLIST.md",
-      "bytes": 6947,
-      "tokens": 1736,
+      "bytes": 6148,
+      "tokens": 1537,
       "category": "install"
     }
   ]

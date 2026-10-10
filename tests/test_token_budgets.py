@@ -24,3 +24,12 @@ def test_unbaselined_item_fails(monkeypatch):
     extra = real[0]._replace(name="new-doc.md")
     monkeypatch.setattr(budgets, "measure_all", lambda: [*real, extra])
     assert any("new-doc.md" in p for p in budgets.check())
+
+
+def test_command_specs_are_measured_in_any_checkout():
+    """Specs come from the kernel's composed catalogue, not a deployment: an
+    empty measurement would let every command spec grow unchecked."""
+    from measure_tokens import measure_command_specs
+
+    names = {b.name for b in measure_command_specs()}
+    assert {"spec: /share", "spec: /check-rules", "spec: --general"} <= names and len(names) > 20

@@ -7,8 +7,8 @@ always fine. An item with no baseline entry fails too: new agent-facing text nee
 a deliberate budget. Moving the baseline is a reviewed change:
 `python3 scripts/measure_tokens.py --write-baseline`.
 
-Items the environment cannot measure (command specs need a deployment's
-.criterion) are skipped, never failed.
+Command specs are measured from the kernel's command catalogue, composed in
+memory, so every checkout and CI measure the same items.
 """
 
 from __future__ import annotations
