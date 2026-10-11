@@ -6,7 +6,12 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.55.0 — 2026-10-11
+
+Module v3, step M1: a module declares its tiers, and the kernel range it
+states is enforced. No layout change, no migration. Pairs with process
+module software-engineering 2.8.0, which declares its tiers and requires
+kernel >=0.55.0.
 
 - A module declares its ceremony tiers (`module.yaml` `tiers:`, each with
   the artifact it opens, or `none`, and a commit prefix for a tier with no
