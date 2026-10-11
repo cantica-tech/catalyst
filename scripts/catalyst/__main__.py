@@ -264,6 +264,37 @@ def cmd_view(args) -> int:
     return 0
 
 
+def cmd_repair(args) -> int:
+    """`catalyst repair derived` (module v3 M2): rewrite every derived field
+    from its sources, journaled."""
+    from catalyst import derived, tiers
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    try:
+        signer = resolve_signer(dep, corpus, args.as_user)
+        chore = next((t.id for t in tiers.tiers_for(dep) if not t.needs_artifact), None)
+        changed = derived.repair(dep, corpus, signer, args.tier or chore)
+    except (IdError, JournalError, ValueError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(
+            json.dumps(
+                [{"id": d.art.id, "field": d.field, "added": d.missing, "removed": d.extra} for d in changed], indent=2
+            )
+        )
+    elif not changed:
+        print("every derived field agrees with its sources")
+    else:
+        for d in changed:
+            print(f"{d.art.id} `{d.field}`: added {', '.join(d.missing) or '—'}; removed {', '.join(d.extra) or '—'}")
+        print(f"{len(changed)} derived field(s) rewritten, journaled")
+    return 0
+
+
 def cmd_edit(args) -> int:
     """Writing verbs (R2 W2): new, status set, link."""
     from catalyst import edit
@@ -1622,6 +1653,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="backlog")
 
+    p = sub.add_parser("repair", help="rewrite what catalyst derives when it disagrees with its sources")
+    rs = p.add_subparsers(dest="repair_command", required=True)
+    q = rs.add_parser("derived", help="every derived field (another type's back-reference) from its sources, journaled")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--tier", help="the change's ceremony tier (default: the module's tier with no artifact)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_repair)
+
     p = sub.add_parser("graph", help="read-only: every rule, domain and artifact with its links, and the entity types")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="graph")
@@ -1647,7 +1686,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = st.add_parser("set", help="set Status, checked against the type's statuses and transitions")
     q.add_argument("id")
     q.add_argument("status")
-    q.add_argument("--force", action="store_true", help="write a status outside the type's statuses")
+    q.add_argument(
+        "--force",
+        action="store_true",
+        help="write a status outside the type's statuses, or past a failing guard (journaled)",
+    )
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")

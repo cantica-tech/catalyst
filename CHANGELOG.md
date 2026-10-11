@@ -6,6 +6,22 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.56.0 — 2026-10-11
+
+Module v3, step M2: derived fields kept by catalyst, and guards on entering
+a state. No layout change, no migration. The release notes name the module
+release it pairs with.
+
+- Derived fields are catalyst's: a field another type names as its
+  `backref` is derived from its sources; `catalyst check` reports one that
+  disagrees as the `derived` error (it was the `backref` warning), and
+  `catalyst repair derived` rewrites it, journaled.
+- Guards on entering a state: a type's `workflow.guards` maps a state to
+  `children_closed`, `nonempty` or `section_written` conditions;
+  `catalyst status set` refuses to enter it while one fails (`--force`
+  overrides, journaled), and `catalyst check` warns about an artifact
+  already past one.
+
 ## 0.55.0 — 2026-10-11
 
 Module v3, step M1: a module declares its tiers, and the kernel range it

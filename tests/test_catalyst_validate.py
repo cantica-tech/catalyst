@@ -70,7 +70,8 @@ def test_inherited_grounding_needs_a_resolvable_parent(tmp_path):
     project = make_project(tmp_path)
     sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
     edit(sub, "| **Item** |", "| **Requirement** |")  # legacy field name
-    assert sorted(codes(project, ERROR)) == ["required-field", "ungrounded"]
+    # the item's derived `Subs` still cites the sub, which no longer cites it back
+    assert sorted(codes(project, ERROR)) == ["derived", "required-field", "ungrounded"]
 
 
 def test_unregistered_signer(tmp_path):
@@ -92,10 +93,10 @@ def test_enum_outside_allowed_values_is_a_warning(tmp_path):
     assert codes(project, WARNING) == ["enum-value"]
 
 
-def test_one_sided_backref_is_a_warning(tmp_path):
+def test_a_derived_field_that_misses_its_source_is_an_error(tmp_path):
     project = make_project(tmp_path)
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
-    assert codes(project) == ["backref"]
+    assert codes(project) == ["derived"] and codes(project, ERROR) == ["derived"]
 
 
 def test_reference_to_wrong_type_is_a_warning(tmp_path):
@@ -103,7 +104,7 @@ def test_reference_to_wrong_type_is_a_warning(tmp_path):
     sub = project / ".criterion" / "subs" / "SUB-000001-first-sub.md"
     edit(sub, f"| **Item** | `ITEM-000001-{USERID}` |", f"| **Item** | `br-AUTH-000001-{USERID}` |")
     assert "ref-type" in codes(project, WARNING)
-    assert codes(project, ERROR) == []
+    assert codes(project, ERROR) == ["derived"]  # the item's `Subs` cites a sub that no longer cites it
 
 
 def test_duplicate_artifact_id(tmp_path):

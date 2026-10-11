@@ -289,6 +289,18 @@ def set_status(
     if allowed and (old, status) not in allowed and not force:
         nexts = sorted(t for f, t in allowed if f == old)
         raise EditError(f"{etd.name} cannot go from {old} to {status} (from {old}: {', '.join(nexts) or 'nothing'})")
+    from catalyst.guards import failures
+
+    blocked = failures(dep, corpus, art, status)
+    if blocked and not force:
+        raise EditError(
+            f"{item_id} cannot become {status}: {'; '.join(blocked)} (the module's guards; --force overrides, journaled)"
+        )
+    if blocked:
+        intent = [
+            *(intent or [f"{item_id}: {old or '(none)'} -> {status}"]),
+            f"guards overridden with --force: {'; '.join(blocked)}",
+        ]
     art.file.write_text(set_field(art.file.read_text(encoding="utf-8"), fd.name, status), encoding="utf-8")
     grounding = ref_values(art.get(etd.grounding_field) or "") if etd.grounding_field else []
     _finish(
