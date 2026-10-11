@@ -163,8 +163,6 @@ class Validator:
                 values = self.check_ref_field(art, fd, raw)
                 if etd.grounding_field and norm_field(fd.name) == norm_field(etd.grounding_field):
                     grounded = grounded or any(self.resolve(v, None)[0] for v in values)
-                if fd.backref:
-                    self.check_backref(art, fd, values)
         if etd.grounding in ("required", "inherited") and not grounded:
             self.add(
                 ERROR,
@@ -180,17 +178,37 @@ class Validator:
         elif self.corpus.users and self.corpus.user(signer.strip("` ")) is None:
             self.add(ERROR, "signer", where, f"Signed-off-by '{signer}' is not a registered user (INV-16)")
 
-    def check_backref(self, art: Artifact, fd: FieldDefinition, values: list[str]) -> None:
-        for v in values:
-            for target in self.corpus.artifacts.get(v, []):
-                raw = target.get(fd.backref or "")
-                if raw is None or art.id not in ref_values(raw):
-                    self.add(
-                        WARNING,
-                        "backref",
-                        self.rel(art.file),
-                        f"`{fd.name}` cites `{v}`, whose `{fd.backref}` does not cite `{art.id}` back",
-                    )
+    def check_derived(self) -> None:
+        """A derived field (another type's `backref`) that disagrees with its
+        sources is an error: catalyst writes it (rr-META-015)."""
+        from catalyst.derived import drift
+
+        for d in drift(self.dep, self.corpus):
+            parts = []
+            if d.missing:
+                parts.append(f"misses {', '.join(d.missing)}, which cite it")
+            if d.extra:
+                parts.append(f"cites {', '.join(d.extra)}, which do not cite it back")
+            self.add(
+                ERROR,
+                "derived",
+                self.rel(d.art.file),
+                f"`{d.field}` is derived and {'; '.join(parts)} — `catalyst repair derived`",
+            )
+
+    def check_guards(self) -> None:
+        """An artifact already in a guarded state that fails a guard: a
+        warning, since it may predate the guard (rr-META-021)."""
+        from catalyst.guards import failures
+
+        for defs in self.corpus.artifacts.values():
+            art = defs[0]
+            etd = self.dep.etds.get(art.prefix)
+            if etd is None or not etd.workflow.guards:
+                continue
+            state = (art.get("Status") or "").strip().strip("`")
+            for why in failures(self.dep, self.corpus, art, state) if state in etd.workflow.guards else []:
+                self.add(WARNING, "guard", self.rel(art.file), f"is {state}, but {why}")
 
     def check_artifacts(self) -> None:
         for art_id, defs in sorted(self.corpus.artifacts.items()):
@@ -224,6 +242,8 @@ class Validator:
     def run(self) -> list[Finding]:
         self.check_rules()
         self.check_artifacts()
+        self.check_derived()
+        self.check_guards()
         order = {ERROR: 0, WARNING: 1}
         self.findings.sort(key=lambda f: (order[f.level], f.where, f.code))
         return self.findings

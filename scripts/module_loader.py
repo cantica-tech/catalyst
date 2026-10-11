@@ -50,6 +50,9 @@ class WorkflowDefinition:
     states: list[str] = field(default_factory=list)
     closed_states: list[str] = field(default_factory=list)
     transitions: list[WorkflowTransition] = field(default_factory=list)
+    # state -> the conditions entering it requires, each (condition, argument):
+    # children_closed / nonempty <field>, section_written <heading>
+    guards: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
 
 
 @dataclass
@@ -324,10 +327,16 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
 
     wf_raw = d.get("workflow", {})
     if isinstance(wf_raw, dict):
+        guards: dict[str, list[tuple[str, str]]] = {}
+        for state, conditions in (wf_raw.get("guards") or {}).items():
+            for cond in conditions if isinstance(conditions, list) else [conditions]:
+                if isinstance(cond, dict):
+                    guards.setdefault(str(state), []).extend((str(k), str(v)) for k, v in cond.items())
         wf = WorkflowDefinition(
             initial=wf_raw.get("initial", "Open"),
             states=wf_raw.get("states", []),
             closed_states=wf_raw.get("closed_states", []),
+            guards=guards,
         )
     else:
         wf = WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
