@@ -13,8 +13,11 @@ named here that are not in the criterion — `FORMAT.md`, `CLI.md`,
 
 Meta-rule IDs are written short in the kernel (`rr-META-012`); the
 deployed copy carries them widened and signed with the installer's userid,
-like every other rule ID (§20). A number that moved to the active module, or
-was parked, keeps a one-line placeholder; numbers are never reused.
+like every other rule ID (§20). A parked number keeps a one-line
+placeholder; numbers are never reused. Numbers 9, 10, 21 and 22 were lent
+to the active module before modules had their own namespace: the module now
+writes its meta-rules as `rr-<NS>-NNN` (its `module.yaml` `namespace:`),
+and the kernel never reuses those four.
 
 ## Which document does a rule belong in?
 
@@ -97,14 +100,6 @@ distinct seams; its rules carry the full code (`cor-CORE.INGEST-000001-…`).
 ## 8. `rr-META-008` — parked
 
 Agile work items, with the plugins (roadmap R4.7); never reused.
-
-## 9. `rr-META-009` — owned by the active module
-
-Never reused.
-
-## 10. `rr-META-010` — owned by the active module
-
-Never reused.
 
 ## 11. `rr-META-011` Users and roles are advisory, except reconciliation
 
@@ -196,14 +191,6 @@ never changed (L7). Register a user (`catalyst user add`) before they sign
 anything. The kernel's meta-rule IDs are short in the kernel's copy and
 widened and signed with the installer's userid when the deployment is
 composed.
-
-## 21. `rr-META-021` — owned by the active module
-
-Never reused.
-
-## 22. `rr-META-022` — owned by the active module
-
-Never reused.
 
 ## 23. `rr-META-023` Artifact updates happen atomically, as work happens
 

@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- Module format 3: `module.yaml` with `format: 3` declares its types under
+  `entities:`; catalyst generates each type's template, definition and
+  `/create-<type>` command (catalogue and Taskfile). A shipped file still
+  wins; format 2 stays readable until 1.0. The YAML reader takes flow lists
+  and maps and folded or literal blocks.
+- A module's own namespace (ADR-019): `namespace:` gives its meta-rules
+  `rr-<NS>-NNN` and its invariants `INV-<NS>-n`; `aliases:` maps old IDs to
+  new ones for `catalyst why`. The kernel handbook drops the four numbers it
+  lent the module (9, 10, 21, 22), never to reuse them.
+- `catalyst why rr-META-n` finds the meta-rule on a deployment, whose
+  handbook carries widened, signed IDs.
+
 ## 0.56.0 — 2026-10-11
 
 Module v3, step M2: derived fields kept by catalyst, and guards on entering

@@ -266,14 +266,16 @@ machine.
 `--format json` wraps the text as `hookSpecificOutput.additionalContext`
 (Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
 
-### `catalyst why <L1…L10 | INV-n | rr-META-n | ID>`
+### `catalyst why <L1…L10 | INV-n | rr-META-n | rr-<NS>-n | ID>`
 
 Explains one item, read from the criterion (roadmap R4.1): a law with the
 invariants it absorbs (`why L3`, `why SE-L1`); an invariant with its law,
 what enforces it, and its full text (`why INV-17`; an invariant the module
-owns is shown from the module's file); a meta-rule's section of
-`Rules-of-Rules.md` (`why rr-META-012`); or, for any other ID, the artifact or
-rule as `view` shows it. Exits `1` when nothing matches.
+owns is shown from the module's file, `INV-<NS>-n` included); a meta-rule's
+section of `Rules-of-Rules.md`, the kernel's or the module namespace's, by
+its short or signed ID (`why rr-META-012`, `why rr-SE-001`); an old ID the
+module lists under `aliases:`, as the ID it now is; or, for any other ID,
+the artifact or rule as `view` shows it. Exits `1` when nothing matches.
 
 ### `catalyst open [--fetch] [--agent <id>] [--json]`
 

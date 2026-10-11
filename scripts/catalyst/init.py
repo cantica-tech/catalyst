@@ -112,7 +112,14 @@ PARAMS: compose.Params | None = None  # set by _install for _type_folder
 
 
 def _type_folder(
-    root: Path, rel: str, type_name: str, template_src: Path | None, index_text: str, readme: str, stamp: str
+    root: Path,
+    rel: str,
+    type_name: str,
+    template_src: Path | None,
+    index_text: str,
+    readme: str,
+    stamp: str,
+    template_text: str | None = None,
 ) -> None:
     folder = root / rel
     templates = folder / "templates"
@@ -121,6 +128,9 @@ def _type_folder(
         suffix = template_src.suffix if template_src.suffix != ".md" else ".md"
         _seed_template(template_src, templates / f"TEMPLATE-{type_name}-v1{suffix}", PARAMS)
         catalog_file = f"TEMPLATE-{type_name}-v1{suffix}"
+    elif template_text is not None:  # a v3 type's generated template (module v3, M3)
+        _write(templates / f"TEMPLATE-{type_name}-v1.md", template_text)
+        catalog_file = f"TEMPLATE-{type_name}-v1.md"
     else:
         catalog_file = None
     lower = type_name.lower()
@@ -395,6 +405,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             )
         )
         type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
+        from catalyst import generate
+
         _type_folder(
             root,
             rel,
@@ -403,6 +415,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             index_text,
             f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see `CODE-OF-CONDUCT.md` §3/§4.\n",
             stamp,
+            generate.template(etd) if etd.generated and etd.naming != "free-form" else None,
         )
     for rp in manifest.required_paths:
         target = root / rp.path
@@ -426,6 +439,12 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             latest = _latest_definition(type_dir)
             if latest is not None:
                 shutil.copyfile(latest, defs / f"{type_dir.name}.md")
+    from catalyst import generate
+
+    for etd in manifest.entity_types.values():  # a v3 type's definition, unless the module ships one
+        target = defs / f"{generate.type_slug(etd)}.md"
+        if etd.generated and not target.exists():
+            _write(target, generate.definition(etd))
     steps.append("froze the latest definition of every kernel and module type (INV-23)")
 
     # --- IAM --------------------------------------------------------------

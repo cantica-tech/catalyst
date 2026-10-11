@@ -20,6 +20,7 @@ Exposes query functions:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,11 @@ class ETD:
     workflow: WorkflowDefinition = field(
         default_factory=lambda: WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
     )
+    # module format v3: the sections a new artifact carries, each (heading,
+    # one-line hint), and the definition text catalyst composes and freezes
+    sections: list[tuple[str, str]] = field(default_factory=list)
+    definition: str = ""
+    generated: bool = False  # declared in a v3 module.yaml: its template and definition are generated
 
 
 @dataclass
@@ -141,7 +147,36 @@ class ModuleManifest:
     templates: list[TemplateRegistration] = field(default_factory=list)
     required_paths: list[RequiredPath] = field(default_factory=list)
     tiers: list[Tier] = field(default_factory=list)  # empty: DEFAULT_TIERS
+    # module v3 M4: the module's own meta-rule and invariant namespace
+    # (`rr-<NS>-NNN`, `INV-<NS>-n`) and old IDs that now name new ones
+    namespace: str | None = None
+    aliases: dict[str, str] = field(default_factory=dict)
     path: Path | None = None  # the module directory it was loaded from
+
+
+def _fold_block_scalars(lines: list[str]) -> list[str]:
+    """`key: >` (folded) or `key: |` (literal) and the more-indented lines
+    under it, as one `key: "<text>"` line."""
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        m = re.match(r"^(\s*)(- )?([^:#]+):\s*([>|])[-+]?\s*$", line)
+        if not m:
+            out.append(line)
+            i += 1
+            continue
+        indent = len(m.group(1)) + (2 if m.group(2) else 0)
+        body: list[str] = []
+        i += 1
+        while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip(" ")) > indent):
+            body.append(lines[i].strip())
+            i += 1
+        while body and not body[-1]:
+            body.pop()
+        text = " ".join(b for b in body if b) if m.group(4) == ">" else "\n".join(body)
+        out.append(f"{m.group(1)}{m.group(2) or ''}{m.group(3)}: {json.dumps(text)}")
+    return out
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
@@ -165,7 +200,7 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
     except Exception:
         pass
 
-    lines = text.splitlines()
+    lines = _fold_block_scalars(text.splitlines())
     root: dict[str, Any] = {}
     stack: list[tuple[int, Any]] = [(-1, root)]
 
@@ -233,14 +268,52 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
     return root
 
 
+def _split_flow(body: str) -> list[str]:
+    """Top-level comma-separated parts of a flow collection's body."""
+    parts, depth, quote, cur = [], 0, "", []
+    for ch in body:
+        if quote:
+            cur.append(ch)
+            if ch == quote:
+                quote = ""
+            continue
+        if ch in "\"'":
+            quote = ch
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+        elif ch == "," and depth == 0:
+            parts.append("".join(cur).strip())
+            cur = []
+            continue
+        cur.append(ch)
+    if "".join(cur).strip():
+        parts.append("".join(cur).strip())
+    return parts
+
+
 def _parse_scalar(val: str) -> Any:
+    if val.startswith("[") and val.endswith("]"):  # a flow list: [a, b]
+        return [_parse_scalar(p) for p in _split_flow(val[1:-1])]
+    if val.startswith("{") and val.endswith("}"):  # a flow map: { k: v, ... }
+        out: dict[str, Any] = {}
+        for part in _split_flow(val[1:-1]):
+            key, _, value = part.partition(":")
+            out[key.strip().strip("\"'")] = _parse_scalar(value.strip())
+        return out
     if val in ("true", "True", "TRUE"):
         return True
     if val in ("false", "False", "FALSE"):
         return False
     if val in ("null", "None", "~", ""):
         return None
-    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+    if val.startswith('"') and val.endswith('"') and len(val) >= 2:
+        try:
+            return json.loads(val)  # a double-quoted string's escapes (`\n` from a folded `|` block)
+        except json.JSONDecodeError:
+            return val[1:-1]
+    if val.startswith("'") and val.endswith("'") and len(val) >= 2:
         return val[1:-1]
     if val.isdigit():
         return int(val)
@@ -298,6 +371,66 @@ def resolve_module_id(project_root: Path | str | None) -> str | None:
             return str(parsed["id"])
 
     return None
+
+
+def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
+    """A type declared inline in a v3 `module.yaml` (`entities:`), as the
+    same ETD its v2 schema file would give: fields as a map, `to` for a
+    reference's target (a list for several), `values` for an enum, the
+    `Status` field from `states`, `storage: rows` for a type kept as table
+    rows; plus its sections and definition."""
+    name = str(spec.get("name") or prefix)
+    states = [str(x) for x in spec.get("states") or ["Open"]]
+    fields: list[dict[str, Any]] = [{"name": "ID", "kind": "text", "required": True}]
+    fields.append({"name": "Status", "kind": "enum", "required": True, "allowed_values": states})
+    for fname, fspec in (spec.get("fields") or {}).items():
+        f = fspec if isinstance(fspec, dict) else {"kind": str(fspec)}
+        to = f.get("to")
+        fields.append(
+            {
+                "name": str(fname),
+                "kind": str(f.get("kind") or "text"),
+                "required": bool(f.get("required", False)),
+                "allowed_values": [str(v) for v in f.get("values") or []],
+                "target_type": "|".join(str(t) for t in to) if isinstance(to, list) else (str(to) if to else None),
+                "backref": f.get("backref"),
+                "required_when_closed": bool(f.get("required_when_closed", False)),
+            }
+        )
+    grounding = spec.get("grounding") or "none"
+    grounding_field = spec.get("grounding_field")
+    if isinstance(grounding, dict):  # { inherited_from: Parent } or { required: Targets }
+        (kind, field_name), *_ = grounding.items()
+        grounding = "inherited" if kind == "inherited_from" else str(kind)
+        grounding_field = str(field_name)
+    etd = parse_etd_dict(
+        {
+            "id_prefix": prefix,
+            "name": name,
+            "plural_name": spec.get("plural") or f"{name}s",
+            "folder": spec.get("folder") or prefix.lower(),
+            "location": spec.get("location") or "",
+            "grounding": grounding,
+            "grounding_field": grounding_field,
+            "naming": "free-form" if spec.get("storage") == "rows" else "id-summary",
+            "fields": fields,
+            "workflow": {
+                "initial": spec.get("initial") or states[0],
+                "states": states,
+                "closed_states": [str(x) for x in spec.get("closed") or []],
+                "guards": spec.get("guards") or {},
+            },
+        }
+    )
+    for section in spec.get("sections") or []:
+        if isinstance(section, dict):
+            (heading, hint), *_ = section.items()
+            etd.sections.append((str(heading), str(hint or "")))
+        else:
+            etd.sections.append((str(section), ""))
+    etd.definition = str(spec.get("definition") or "").strip()
+    etd.generated = True
+    return etd
 
 
 def parse_etd_dict(d: dict[str, Any]) -> ETD:
@@ -455,6 +588,10 @@ def load_module(
         return None
 
     etds: dict[str, ETD] = {}
+    if str(data.get("format", "")) == "3":
+        for prefix, spec in (data.get("entities") or {}).items():
+            if isinstance(spec, dict):
+                etds[str(prefix)] = v3_entity(str(prefix), spec)
     for item in data.get("entity_types") or []:
         if not isinstance(item, dict):
             continue
@@ -515,6 +652,8 @@ def load_module(
         templates=templates,
         required_paths=required_paths,
         tiers=tiers,
+        namespace=str(data["namespace"]).upper() if data.get("namespace") else None,
+        aliases={str(k): str(v) for k, v in (data.get("aliases") or {}).items()},
         path=mdir,
     )
 
