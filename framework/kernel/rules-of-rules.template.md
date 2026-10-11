@@ -155,8 +155,10 @@ catalyst but `catalyst.toml`. A legacy deployment is moved once with
 Each type has its folder, its index and a versioned `templates/` catalog
 (`ARTIFACT-LAYOUT.md`, INV-20). A new artifact starts from its type's
 latest template (`catalyst new`). A template is never edited once a newer
-version exists — add a version. Never hand-edit an index or another
-generated file (L6): regenerate it (`catalyst index regen`).
+version exists — add a version. Never hand-edit an index, a derived field
+(another type's back-reference, written by catalyst) or another generated
+file (L6): regenerate it (`catalyst index regen`, `catalyst repair
+derived`).
 
 ## 16. `rr-META-016` Reconciliation of diverging entity versions
 

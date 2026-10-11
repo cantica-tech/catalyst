@@ -127,6 +127,24 @@
           },
           "description": "Status strings indicating entity is closed/done."
         },
+        "guards": {
+          "type": "object",
+          "description": "State -> the conditions entering it requires: each an object with one of children_closed (a reference field whose every cited artifact must be closed), nonempty (a field), section_written (a section heading whose text must differ from the type's template's). catalyst status set enforces them; --force overrides, journaled.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "minProperties": 1,
+              "maxProperties": 1,
+              "properties": {
+                "children_closed": { "type": "string" },
+                "nonempty": { "type": "string" },
+                "section_written": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
         "transitions": {
           "type": "array",
           "items": {

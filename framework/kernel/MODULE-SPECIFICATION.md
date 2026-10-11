@@ -147,7 +147,7 @@ format and live in `framework/kernel/entities/`.
 | `required` | `boolean` | Yes | Whether every instance must carry it. |
 | `allowed_values` | `list[string]` | Conditional | Values for `enum`. |
 | `target_type` | `string` | Conditional | Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`. |
-| `backref` | `string` | Optional | The field on the target that lists this entity back. |
+| `backref` | `string` | Optional | The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand. |
 | `required_when_closed` | `boolean` | Optional | For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`. |
 
 ### 4.3 Workflow (`workflow`)
@@ -158,6 +158,7 @@ format and live in `framework/kernel/entities/`.
 | `states` | `list[string]` | Yes | All valid statuses. |
 | `closed_states` | `list[string]` | Yes | Statuses meaning done. |
 | `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
+| `guards` | `map` | No | State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one. |
 
 The machine-readable form of this schema is
 `schemas/entity-type-definition.schema.json`; it carries `location` and

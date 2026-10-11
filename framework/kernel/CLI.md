@@ -211,6 +211,7 @@ Findings come in two levels.
 | `dangling-ref` | A reference field cites an ID that resolves to nothing. |
 | `required-field` | A field the ETD marks required is missing or empty. |
 | `closed-incomplete` | The artifact's `Status` is one of its workflow's closed states, but a field the ETD marks `required_when_closed` is empty (`MODULE-SPECIFICATION.md` §4.2). |
+| `derived` | A derived field (another type's `backref`) disagrees with its sources: it misses an artifact that cites it, or cites one that does not cite it back. `catalyst repair derived` rewrites it. |
 | `ungrounded` | An artifact whose type grounds (`required` or `inherited`) has no resolvable grounding link (INV-5). |
 | `signer` | `Signed-off-by` is missing or names an unregistered user (INV-16). |
 | `id-shape` | An ID is not `<PREFIX>-NNNNNN-<registered userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
@@ -223,7 +224,7 @@ promotes them to errors:
 | Code | Meaning |
 |---|---|
 | `enum-value` | An enum field holds a value outside the ETD's allowed values. |
-| `backref` | A reference with a declared back-reference is not cited back. |
+| `guard` | An artifact is in a state whose guards it fails (`MODULE-SPECIFICATION.md` §4.3); it may predate the guard. |
 | `ref-type` | A reference resolves, but to a different type than the ETD expects. |
 | `cardinality` | A single-reference field holds several values. |
 | `retired-target` | A reference cites a retired rule. |
@@ -570,9 +571,15 @@ back-references, regenerates the indexes and writes one journal entry
   initial status, dates, signer, the given fields; references as
   comma-separated IDs, checked to exist). Refuses a missing required field.
   The sections below the field table stay for the agent to write.
-- `catalyst status set <ID> <status> [--force]`: a status the type allows
-  and, when the ETD declares transitions, one it can reach; `--force` writes
-  any value. A `RECON-` case is refused: only `/reconcile` changes one.
+- `catalyst status set <ID> <status> [--force]`: a status the type allows,
+  one it can reach when the ETD declares transitions, and one whose guards
+  hold (`workflow.guards`: the refusal names each failing condition);
+  `--force` writes any value and passes a failing guard, which the journal
+  entry records. A `RECON-` case is refused: only `/reconcile` changes one.
+- `catalyst repair derived [--as <user>] [--tier <tier>]`: rewrite every
+  derived field (another type's `backref`) that disagrees with its sources,
+  in one journal entry (by default the module's tier with no artifact).
+  Run again, it changes nothing.
 - `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
   when the field declares a back-reference, cite this artifact back.
 
