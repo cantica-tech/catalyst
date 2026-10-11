@@ -6,6 +6,22 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.55.0 — 2026-10-11
+
+Module v3, step M1: a module declares its tiers, and the kernel range it
+states is enforced. No layout change, no migration. The release notes name
+the module release it pairs with.
+
+- A module declares its ceremony tiers (`module.yaml` `tiers:`, each with
+  the artifact it opens, or `none`, and a commit prefix for a tier with no
+  artifact); without them, `chore`, `fix` and `feature` as before. Every
+  `--tier`, journal entry and adoption is checked against the active
+  module's tiers, and `catalyst trace` accepts as ID-less only commits with
+  a no-artifact tier's prefix.
+- A module's `kernel_version` is enforced: `catalyst init` and
+  `catalyst sync` refuse a kernel outside it, `catalyst check` reports a
+  deployment outside it.
+
 ## 0.54.0 — 2026-10-10
 
 The server's read side, `catalyst graph` and a local read-only server, so a

@@ -56,7 +56,6 @@ LOCK_STALE = 300.0  # an append hashes and pins every file it names
 PIN_REF = "refs/catalyst/journal"
 WC = ".criterion/"
 ACTIONS = ("create", "update", "close", "retire", "status-change", "sync")
-TIERS = ("chore", "fix", "feature")  # how much ceremony the change carries
 REQUIRED = ("timestamp", "actor", "command", "action", "artifact", "targets", "intent", "files")
 
 
@@ -469,15 +468,24 @@ def head_blob(repo: Path, rel: str) -> str | None:
 
 def append(dep: Deployment, req: AppendRequest) -> dict:
     _validate(req)
+    check_tier(dep, req.tier)
     with journal_lock(dep):
         return _append(dep, req)
+
+
+def check_tier(dep: Deployment, tier: str | None) -> None:
+    """The tier is one the active module declares (rr-META-006)."""
+    from catalyst import tiers
+
+    try:
+        tiers.check(dep, tier)
+    except ValueError as exc:
+        raise JournalError(str(exc)) from None
 
 
 def _validate(req: AppendRequest) -> None:
     if req.action not in ACTIONS:
         raise JournalError(f"action '{req.action}' is not one of {', '.join(ACTIONS)}")
-    if req.tier is not None and req.tier not in TIERS:
-        raise JournalError(f"tier '{req.tier}' is not one of {', '.join(TIERS)}")
     if not req.intent or not all(i.strip() for i in req.intent):
         raise JournalError("at least one non-empty --intent is required: the goal, not a label")
     if not req.files:

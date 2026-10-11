@@ -433,7 +433,7 @@ development/journal.jsonl            # before 0.50 only: read, never written
 | `files[].path` | string | Relative to the **project root**: a working-copy file is `.criterion/<path>` and hashed into the working copy's repository; any other path into the project's. |
 | `files[].before`, `files[].after` | string or null | The file's git blob SHA-1 (40 lowercase hex) before and after; `null` when it did not exist (create) or no longer exists (delete). |
 | `writer` | string | `catalyst/<version>` on every CLI-written entry. |
-| `tier` | string | Optional: `chore`, `fix` or `feature`. |
+| `tier` | string | Optional: one of the active module's tiers (`module.yaml` `tiers:`; by default `chore`, `fix` or `feature`). |
 | `origin` | string | Optional: `manual` on an entry `catalyst journal adopt` wrote for a commit made outside catalyst. |
 | `commit` | string | With `origin`: the adopted product commit's full sha. |
 | `files[].superseded` | bool | Optional, on an adopted entry: the file was journaled again after the commit, so this records history only — excluded from the hash chain, the file's last state and restore. |
