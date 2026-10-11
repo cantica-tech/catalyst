@@ -17,7 +17,7 @@ from catalyst.analysis import AnalysisError
 from catalyst.criterion import CriterionError
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
 from catalyst.ids import IdError
-from catalyst.journal import JournalError
+from catalyst.journal import JournalError, check_tier as journal_check_tier
 from catalyst.store import ShareError
 
 
@@ -273,6 +273,8 @@ def cmd_edit(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     try:
+        if getattr(args, "tier", None) is not None:
+            journal_check_tier(dep, args.tier)  # before anything is written (rr-META-006)
         signer = resolve_signer(dep, corpus, args.as_user)
         if args.edit == "new":
             values = {}
@@ -697,7 +699,11 @@ def cmd_trace(args) -> int:
         dep = open_deployment(args)
         corpus, repo = load_corpus(dep), dep.project_root
     try:
-        checked, failures = trace(repo, args.range, corpus, scoped=dep is not None and not dep.standalone)
+        from catalyst.tiers import commit_prefixes
+
+        checked, failures = trace(
+            repo, args.range, corpus, scoped=dep is not None and not dep.standalone, prefixes=commit_prefixes(dep)
+        )
         manual, lvl = [], "warning"
         if corpus is not None and not dep.standalone and unrecorded.baseline_missing(dep):
             print(f"WARNING unrecorded-change: {unrecorded.MISSING_BASELINE}")
@@ -786,7 +792,8 @@ def cmd_hook(args) -> int:
         from catalyst.trace import check_message
 
         try:
-            corpus = load_corpus(open_deployment(args))
+            hook_dep = open_deployment(args)
+            corpus = load_corpus(hook_dep)
         except DeploymentNotFound:
             return 0
         git_dir = subprocess.run(
@@ -794,7 +801,9 @@ def cmd_hook(args) -> int:
         )
         if git_dir.returncode == 0 and (Path(git_dir.stdout.strip()) / "MERGE_HEAD").exists():
             return 0  # a merge carries its parents' trace (as in `trace`)
-        reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus)
+        from catalyst.tiers import commit_prefixes
+
+        reason = check_message(Path(args.message_file).read_text(encoding="utf-8"), corpus, commit_prefixes(hook_dep))
         if not reason:
             from catalyst import unrecorded
 
@@ -1554,7 +1563,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--allow-unchanged", action="store_true")
     q.add_argument(
-        "--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier (a chore needs no artifact)"
+        "--tier",
+        help="the change's ceremony tier, one the active module declares (default: chore, fix, feature; a chore needs no artifact)",
     )
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
@@ -1563,7 +1573,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why the change was made (repeatable, required)")
     q.add_argument("--target", action="append", help="a rule/artifact ID this serves (repeatable)")
     q.add_argument("--artifact", help="the artifact ID or a short description (default: commit <sha>)")
-    q.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    q.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     q.add_argument("--as", dest="as_user", help="actor (default: the commit's git author)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
@@ -1628,7 +1638,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
-    p.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="new")
 
@@ -1641,7 +1651,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
-    q.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    q.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_edit, edit="status")
 
@@ -1652,7 +1662,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
-    p.add_argument("--tier", choices=["chore", "fix", "feature"], help="the change's ceremony tier")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="link")
 

@@ -30,7 +30,6 @@ TOKEN_RE = re.compile(
 FULL_SHAPE = re.compile(
     r"^(?:[A-Z][A-Z0-9]*-\d{6}(?:-[A-Za-z0-9]{8})?|[a-z]+-[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?-\d{6}(?:-[A-Za-z0-9]{8})?)$"
 )
-CHORE_RE = re.compile(r"^chore(?:\([^)]*\))?:", re.I)
 HOOK = """#!/usr/bin/env python3
 # Installed by `catalyst hook install`: every commit cites an artifact or rule ID,
 # or is marked `chore:` (catalyst trace) — checked by each deployment whose files
@@ -88,18 +87,22 @@ def resolves(corpus: Corpus, token: str, all_ids: set[str]) -> bool:
     return any(i.startswith(token + "-") for i in all_ids)  # short form of a full ID
 
 
-def check_message(message: str, corpus: Corpus | None) -> str | None:
-    """None when the message traces; else why not."""
+def check_message(message: str, corpus: Corpus | None, prefixes: tuple[str, ...] = ("chore:",)) -> str | None:
+    """None when the message traces; else why not. `prefixes`: the subject
+    prefixes of the active module's tiers that need no artifact (rr-META-006)."""
+    from catalyst.tiers import prefix_re
+
     lines = [l for l in message.splitlines() if l.strip() and not l.startswith("#")]
     if not lines:
         return "empty message"
-    if CHORE_RE.match(lines[0]):
+    if prefix_re(prefixes).match(lines[0]):
         return None
+    mark = f" (or mark it `{prefixes[0]}`)" if prefixes else ""
     tokens = cited(message)
     if corpus is None:
         if any(FULL_SHAPE.match(t) for t in tokens):
             return None
-        return "cites no artifact or rule ID (or mark it `chore:`)"
+        return f"cites no artifact or rule ID{mark}"
     all_ids = corpus.all_ids()
     for t in tokens:
         if t in all_ids:
@@ -111,7 +114,7 @@ def check_message(message: str, corpus: Corpus | None) -> str | None:
             return f"{t} is ambiguous ({', '.join(matches[:3])}): cite the full ID"
     if tokens:
         return f"cites {', '.join(sorted(set(tokens))[:3])}, which resolve to nothing in the deployment"
-    return "cites no artifact or rule ID (or mark it `chore:`)"
+    return f"cites no artifact or rule ID{mark}"
 
 
 def commits(repo: Path, rev_range: str | list[str], options: tuple[str, ...] = ()) -> list[tuple[str, list[str], str]]:
@@ -156,7 +159,9 @@ def changed_files(repo: Path, rev_range: str | list[str]) -> dict[str, list[str]
     return out
 
 
-def trace(repo: Path, rev_range: str, corpus: Corpus | None, scoped: bool = False) -> tuple[int, list[Failure]]:
+def trace(
+    repo: Path, rev_range: str, corpus: Corpus | None, scoped: bool = False, prefixes: tuple[str, ...] = ("chore:",)
+) -> tuple[int, list[Failure]]:
     """Check each non-merge commit's message. `scoped`: only commits that
     change a file this deployment governs, or no file at all
     (fw-STRUCTURE-000017) — another project's commits in a shared
@@ -179,7 +184,7 @@ def trace(repo: Path, rev_range: str, corpus: Corpus | None, scoped: bool = Fals
             if not any(governs(repo, f) for f in mine):
                 continue  # changes only other projects' files
         checked += 1
-        reason = check_message(body, corpus)
+        reason = check_message(body, corpus, prefixes)
         if reason:
             failures.append(Failure(sha[:10], body.splitlines()[0] if body else "", reason))
     return checked, failures
