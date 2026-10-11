@@ -101,6 +101,29 @@ class RequiredPath:
     seed: str | None = None
 
 
+@dataclass(frozen=True)
+class Tier:
+    """A ceremony tier (rr-META-006): `artifact` is the entity type the tier
+    opens, `none` when it needs no artifact (only its journal entry), `any`
+    when unstated; `commit` the subject prefix a tier with no artifact uses."""
+
+    id: str
+    artifact: str = "any"
+    commit: str | None = None
+
+    @property
+    def needs_artifact(self) -> bool:
+        return self.artifact != "none"
+
+
+# The tiers of a module that declares none.
+DEFAULT_TIERS: tuple[Tier, ...] = (
+    Tier("chore", "none", "chore:"),
+    Tier("fix"),
+    Tier("feature"),
+)
+
+
 @dataclass
 class ModuleManifest:
     id: str
@@ -114,6 +137,7 @@ class ModuleManifest:
     skills: list[SkillRegistration] = field(default_factory=list)
     templates: list[TemplateRegistration] = field(default_factory=list)
     required_paths: list[RequiredPath] = field(default_factory=list)
+    tiers: list[Tier] = field(default_factory=list)  # empty: DEFAULT_TIERS
     path: Path | None = None  # the module directory it was loaded from
 
 
@@ -458,6 +482,17 @@ def load_module(
                 )
             )
 
+    tiers: list[Tier] = []
+    for t in data.get("tiers") or []:
+        if isinstance(t, dict) and t.get("id"):
+            tiers.append(
+                Tier(
+                    id=str(t["id"]),
+                    artifact=str(t.get("artifact") or "any"),
+                    commit=str(t["commit"]) if t.get("commit") else None,
+                )
+            )
+
     mid = str(data.get("id", target_id))
     return ModuleManifest(
         id=mid,
@@ -470,6 +505,7 @@ def load_module(
         commands=cmds,
         templates=templates,
         required_paths=required_paths,
+        tiers=tiers,
         path=mdir,
     )
 

@@ -665,7 +665,7 @@ uppercase letter or collides with a registered userid (INV-26).
 catalyst journal append --command <cmd> --action <action> --artifact <id|description>
                         --intent <text> [--intent <text> ...]
                         --file <path> [--file <path> ...]
-                        [--target <id> ...] [--tier chore|fix|feature]
+                        [--target <id> ...] [--tier <tier>]
                         [--as <user>] [--allow-unchanged] [--json]
 ```
 
@@ -686,11 +686,13 @@ the signer as `actor`, and each file's `before`/`after` git blob hashes
 - `--target` (repeatable) is a rule or artifact ID the change serves. A
   change that serves no rule has none: its entry carries `targets: []`.
 - `--tier` records the change's ceremony tier in the entry's `tier` field:
-  `chore` (no rule's behaviour changes; needs no artifact), `fix`
-  (restores a documented rule's behaviour) or `feature` (new or changed
-  behaviour). Anything else is rejected. What each tier requires beyond the
-  entry is the active module's (`CODE-OF-CONDUCT.md` §3, §9); the tier is
-  omitted from entries that do not state one.
+  one of the active module's tiers (`module.yaml` `tiers:`, see
+  `MODULE-SPECIFICATION.md`); a module that declares none has `chore` (no
+  rule's behaviour changes; needs no artifact), `fix` (restores a documented
+  rule's behaviour) and `feature` (new or changed behaviour). Anything else
+  is rejected, naming the tiers. What each tier requires beyond the entry is
+  the active module's (`CODE-OF-CONDUCT.md` §3, §9); the tier is omitted
+  from entries that do not state one.
 - A file whose content equals its last journaled state is rejected, since
   it did not change; `--allow-unchanged` accepts it deliberately.
 - `--json` prints the written entry.
@@ -701,7 +703,7 @@ the signer as `actor`, and each file's `before`/`after` git blob hashes
 catalyst journal adopt <commit> [<commit> ...] | <A>..<B>
                        --intent <text> [--intent <text> ...]
                        [--target <id> ...] [--artifact <id|description>]
-                       [--tier chore|fix|feature] [--as <user>] [--json]
+                       [--tier <tier>] [--as <user>] [--json]
 ```
 
 Records commits made outside catalyst in the journal after the fact: for

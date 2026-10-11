@@ -73,14 +73,16 @@ reports anything orphaned: fix the document, never the check.
 
 Every artifact the active module defines gets
 `<PREFIX>-NNNNNN-<userid>` from `catalyst new` (or `catalyst id next`),
-never by hand, before work on it starts (L2). Each change is one of three
-tiers: a **chore** changes no rule's behaviour and needs no artifact, only
-its journal entry (`--tier chore`, no target); a **fix** restores a
-documented rule's behaviour; a **feature** adds or changes behaviour. What a
-fix and a feature need is the active module's (below). State the tier
-before starting; escalate it (chore → fix → feature) as soon as the work
-turns out bigger, opening what the new tier needs at that point — never the
-other way round after the fact. When unsure, take the higher tier.
+never by hand, before work on it starts (L2). Each change has a tier, one
+the active module declares (`module.yaml` `tiers:`); by default a
+**chore** changes no rule's behaviour and needs no artifact, only its
+journal entry (`--tier chore`, no target), a **fix** restores a documented
+rule's behaviour, and a **feature** adds or changes behaviour. A tier with
+no artifact is the chore. What each tier needs is the active module's
+(below). State the tier before starting; escalate it (by default chore →
+fix → feature) as soon as the work turns out bigger, opening what the new
+tier needs at that point — never the other way round after the fact. When
+unsure, take the higher tier.
 
 ## 7. `rr-META-007` Defining a new domain
 

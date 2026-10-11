@@ -214,7 +214,25 @@ def _command_sources(kernel: Path | None, module: Path | None) -> dict[str, Path
     return found
 
 
+def _module_range(dep: Deployment, src: Sources) -> tuple[str | None, str]:
+    """(the kernel range of the module the sync leaves in place, which module)."""
+    if src.module is not None and (src.module / "manifest.json").is_file():
+        data = json.loads((src.module / "manifest.json").read_text(encoding="utf-8"))
+        return data.get("kernelVersion"), f"{data.get('id', 'the module')} {data.get('version', '')}".strip()
+    if dep.module is not None:
+        return dep.module.kernel_version, f"{dep.module.id} {dep.module.version}"
+    return None, ""
+
+
 def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
+    from catalyst.versions import satisfies
+
+    requires, which = _module_range(dep, src)
+    if not satisfies(src.version, requires):
+        raise SyncError(
+            f"{which} works with kernel {requires}, not {src.version}: sync a module release that does "
+            f"(--module), or a kernel inside that range"
+        )
     mod = dep.module
     new_mod_version = (
         (src.module / "version.txt").read_text(encoding="utf-8").strip()

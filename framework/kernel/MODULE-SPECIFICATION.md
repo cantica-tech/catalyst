@@ -69,7 +69,8 @@ catalyst-<module-id>/
 | `version` | `string` | Yes | SemVer version. |
 | `description` | `string` | Yes | One-line summary of the process domain. |
 | `grounding_type` | `string` | Yes | The kernel entity the module's artifacts ground to (for example `rule`). |
-| `kernel_version` | `string` | No | The kernel versions the module works with, as a version specifier (for example `>=0.42.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. |
+| `kernel_version` | `string` | No | The kernel versions the module works with, as a version specifier (for example `>=0.42.0`, `>=0.52,<1.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. Enforced: `catalyst init` and `catalyst sync` refuse a kernel outside it, and `catalyst check` reports a deployment outside it. |
+| `tiers` | `list[object]` | No | The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`. |
 | `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |

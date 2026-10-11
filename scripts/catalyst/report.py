@@ -25,6 +25,7 @@ def build(dep: Deployment, since: str | None = None) -> dict:
     weeks = collections.Counter(str(e.get("timestamp", ""))[:10] for e in entries)
     commits = traced = 0
     if not dep.standalone:
+        from catalyst.tiers import commit_prefixes
         from catalyst.trace import check_message, commits as git_commits
 
         window = [f"--since={since}"] if since else ["-200"]
@@ -36,7 +37,7 @@ def build(dep: Deployment, since: str | None = None) -> dict:
             if len(parents) > 1:
                 continue
             commits += 1
-            traced += check_message(body, corpus) is None
+            traced += check_message(body, corpus, commit_prefixes(dep)) is None
     from catalyst import unrecorded
 
     manual = unrecorded.since_baseline(dep) if not dep.standalone else []

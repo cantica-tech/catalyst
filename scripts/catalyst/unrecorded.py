@@ -268,8 +268,7 @@ def adopt(
     already went through the commit's result. Returns the entries written."""
     if not intent or not all(i.strip() for i in intent):
         raise journal.JournalError("at least one non-empty --intent is required: why the change was made")
-    if tier is not None and tier not in journal.TIERS:
-        raise journal.JournalError(f"tier '{tier}' is not one of {', '.join(journal.TIERS)}")
+    journal.check_tier(dep, tier)
     if dep.standalone:
         raise journal.JournalError("a standalone working copy has no product history to adopt")
     with journal.journal_lock(dep):

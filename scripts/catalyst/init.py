@@ -265,6 +265,13 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         version = (kernel.parent.parent / "version.txt").read_text(encoding="utf-8").strip()
     else:
         raise InitError(f"cannot tell the kernel version of {kernel}")
+    from catalyst.versions import satisfies
+
+    if not satisfies(version, manifest.kernel_version):
+        raise InitError(
+            f"{manifest.id} {manifest.version} works with kernel {manifest.kernel_version}, not {version}: "
+            "install a module release that does, or a kernel inside that range"
+        )
     stamp = today()
     root = working_copy_root(project, req.at, req.name)
     home_store = req.at is None
