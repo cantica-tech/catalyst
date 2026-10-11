@@ -6,7 +6,11 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.56.0 — 2026-10-11
+
+Module v3, step M2: derived fields kept by catalyst, and guards on entering
+a state. No layout change, no migration. The release notes name the module
+release it pairs with.
 
 - Derived fields are catalyst's: a field another type names as its
   `backref` is derived from its sources; `catalyst check` reports one that
