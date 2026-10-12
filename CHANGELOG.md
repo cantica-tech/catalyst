@@ -13,6 +13,12 @@ second module run in CI. No layout change, no migration: a sync recomposes
 the handbook and the catalogue, and deployed templates and definitions stay
 as they are. The release notes name the module release it pairs with.
 
+Upgrade order for a criterion shared on git: sync this kernel alone,
+publish and merge, then sync a format 3 module and publish again. The
+criterion's gate runs the CLI of its base branch, and an older one cannot
+read a format 3 module. After the sync, `catalyst runtime install` brings
+the criterion's runtime to this version.
+
 - Module format 3: `module.yaml` with `format: 3` declares its types under
   `entities:`; catalyst generates each type's template, definition and
   `/create-<type>` command (catalogue and Taskfile). A shipped file still
