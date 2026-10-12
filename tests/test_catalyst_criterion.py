@@ -392,6 +392,30 @@ def test_integrity_sees_files_with_quoted_names(world):
     assert any("ITEM-000009" in p for p in cr.integrity(wc, "HEAD", ["HEAD~1"]))
 
 
+def test_integrity_takes_a_rule_renamed_through_a_modules_aliases_as_kept(world):
+    """BUG-000007: a module that takes its own namespace renames the
+    meta-rules the kernel lent it; its `aliases:` say what each one is now."""
+    wc = world["ada"] / ".criterion"
+    handbook = wc / "rules" / "Rules-of-Rules.md"
+    old, kept = f"rr-META-000021-{USERID}", f"rr-META-000022-{USERID}"
+    write(handbook, f"# Handbook\n\n## 21. `{old}` Steps\n\nText.\n\n## 22. `{kept}` Tests\n\nText.\n")
+    git(wc, "add", "-A")
+    git(wc, "commit", "-q", "-m", "the kernel's numbers")
+    write(handbook, f"# Handbook\n\n## 1. `rr-XY-000003-{USERID}` Steps\n\nText.\n")
+    write(wc / "modules" / "xy" / "module.yaml", "id: xy\nnamespace: XY\naliases:\n  rr-META-021: rr-XY-003\n")
+    git(wc, "add", "-A")
+    git(wc, "commit", "-q", "-m", "the module's namespace")
+    # the aliased one is still recorded; the one no alias covers is lost
+    assert cr.integrity(wc, "HEAD", ["HEAD~1"]) == [
+        f"{kept} (defined in {git(wc, 'rev-parse', '--short', 'HEAD~1')}) is missing"
+    ]
+    # an alias whose target is not recorded keeps nothing
+    write(wc / "modules" / "xy" / "module.yaml", "id: xy\nnamespace: XY\naliases:\n  rr-META-021: rr-XY-009\n")
+    git(wc, "add", "-A")
+    git(wc, "commit", "-q", "-m", "an alias to nothing")
+    assert any(old in p for p in cr.integrity(wc, "HEAD", ["HEAD~2"]))
+
+
 def test_push_journals_a_refreshed_gitattributes(world):
     wc = world["ada"] / ".criterion"
     attrs = wc / ".gitattributes"

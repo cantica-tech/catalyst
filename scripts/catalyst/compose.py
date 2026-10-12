@@ -46,8 +46,24 @@ class Params:
         }
 
 
-def sign_meta_ids(text: str, userid: str) -> str:
-    return SHORT_META_RE.sub(lambda m: f"rr-META-0000{m.group(1)}-{userid}", text)
+def sign_meta_ids(text: str, userid: str, namespaces: tuple[str, ...] = ()) -> str:
+    """Widen and sign the short meta-rule IDs: the kernel's `rr-META-0NN`,
+    and a module namespace's `rr-<NS>-NNN` (module v3, M4)."""
+    text = SHORT_META_RE.sub(lambda m: f"rr-META-0000{m.group(1)}-{userid}", text)
+    for ns in namespaces:
+        text = re.sub(
+            rf"\brr-{re.escape(ns)}-(\d{{3}})(?![\d-])",
+            lambda m, ns=ns: f"rr-{ns}-000{m.group(1)}-{userid}",
+            text,
+        )
+    return text
+
+
+def module_namespaces(module: Path | None) -> tuple[str, ...]:
+    from module_loader import load_module
+
+    manifest = load_module(module_dir=module) if module is not None else None
+    return (manifest.namespace,) if manifest is not None and manifest.namespace else ()
 
 
 def resolve(text: str, p: Params) -> str:
@@ -112,16 +128,45 @@ def module_body(text: str) -> str:
     return text[m.start() :].strip("\n") if m else text.strip("\n")
 
 
+def generated_commands(module: Path | None, existing: str) -> list:
+    """The v3 types whose `/create-<type>` the module's catalogue part does
+    not define (module v3, M3): catalyst generates those commands. A
+    catalogue entry counts with its arguments (`/create-x <id>`); a type
+    stored as rows gets none."""
+    from catalyst import generate
+    from module_loader import load_module
+
+    if module is None:
+        return []
+    manifest = load_module(module_dir=module)
+    if manifest is None:
+        return []
+    return [
+        etd
+        for etd in manifest.entity_types.values()
+        if etd.generated
+        and etd.naming != "free-form"  # rows of a file: no document to create
+        and not re.search(rf"`/{re.escape(generate.create_command(etd))}[` :]", existing)
+    ]
+
+
 def code_of_conduct(kernel: Path, module: Path | None, p: Params) -> str:
     text = (kernel / "rules-of-development.template.md").read_text(encoding="utf-8")
     note = (
         "Instantiates the catalyst kernel's development-rules template "
         "(`framework/kernel/rules-of-development.template.md` in the `catalyst` repository)"
     )
+    contribution = ""
     if module is not None and (module / "code-of-conduct.module.md").is_file():
         contribution = (module / "code-of-conduct.module.md").read_text(encoding="utf-8")
+    from catalyst import generate
+
+    generated = "\n".join(generate.catalogue_entry(e) for e in generated_commands(module, contribution))
+    if contribution or generated:
         for n in (4, 3):  # 4 first: inserting §3 would shift nothing, but keep order explicit
-            body = section_body(contribution, n)
+            body = section_body(contribution, n) if contribution else ""
+            if n == 4 and generated:
+                body = (body.rstrip("\n") + "\n\n" if body.strip() else "") + generated
             if body:
                 text = insert_at_section_end(text, n, f"### From module {p.module_id}\n\n{body}")
         note += (
@@ -130,7 +175,7 @@ def code_of_conduct(kernel: Path, module: Path | None, p: Params) -> str:
             "(`MODULE-SPECIFICATION.md` §6.2)"
         )
     text = replace_notice(text, note + ".")
-    return sign_meta_ids(resolve(text, p), p.userid)
+    return sign_meta_ids(resolve(text, p), p.userid, module_namespaces(module))
 
 
 def rules_of_rules(kernel: Path, module: Path | None, p: Params) -> str:
@@ -147,7 +192,7 @@ def rules_of_rules(kernel: Path, module: Path | None, p: Params) -> str:
             f"`### From module {p.module_id}` (`MODULE-SPECIFICATION.md` §6.1)"
         )
     text = replace_notice(text, note + ".")
-    return sign_meta_ids(resolve(text, p), p.userid)
+    return sign_meta_ids(resolve(text, p), p.userid, module_namespaces(module))
 
 
 def access_control(kernel: Path, p: Params) -> str:
@@ -156,12 +201,22 @@ def access_control(kernel: Path, p: Params) -> str:
 
 def taskfile(kernel: Path, module: Path | None, p: Params) -> str:
     text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
+    tasks = ""
     if module is not None and (module / "Taskfile.module.yml").is_file():
         mod = (module / "Taskfile.module.yml").read_text(encoding="utf-8")
         m = re.search(r"^tasks:\s*\n", mod, re.M)
         tasks = mod[m.end() :] if m else ""
-        if tasks.strip():
-            text += f"\n\n  # --- From module {p.module_id} " + "-" * 20 + "\n" + tasks.rstrip("\n")
+    contribution = (
+        (module / "code-of-conduct.module.md").read_text(encoding="utf-8")
+        if module is not None and (module / "code-of-conduct.module.md").is_file()
+        else ""
+    )
+    from catalyst import generate
+
+    for etd in generated_commands(module, contribution):
+        tasks = tasks.rstrip("\n") + ("\n\n" if tasks.strip() else "") + generate.task(etd)
+    if module is not None and tasks.strip():
+        text += f"\n\n  # --- From module {p.module_id} " + "-" * 20 + "\n" + tasks.rstrip("\n")
     # the file sits in the criterion and is run on its own: a task works in
     # the project it was called from, not in the criterion
     text = TASK_RE.sub(lambda m: m.group(0) + "    dir: '{{.USER_WORKING_DIR}}'\n", text)

@@ -6,6 +6,46 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.57.0 — 2026-10-12
+
+Module v3, steps M3 to M5: module format 3, a module's own namespace, and a
+second module run in CI. No layout change, no migration: a sync recomposes
+the handbook and the catalogue, and deployed templates and definitions stay
+as they are. The release notes name the module release it pairs with.
+
+Upgrade order for a criterion shared on git: sync this kernel alone,
+publish and merge, then sync a format 3 module and publish again. The
+criterion's gate runs the CLI of its base branch, and an older one cannot
+read a format 3 module. After the sync, `catalyst runtime install` brings
+the criterion's runtime to this version.
+
+- Module format 3: `module.yaml` with `format: 3` declares its types under
+  `entities:`; catalyst generates each type's template, definition and
+  `/create-<type>` command (catalogue and Taskfile). A shipped file still
+  wins; format 2 stays readable until 1.0. The YAML reader takes flow lists
+  and maps and folded or literal blocks.
+- A module's own namespace (ADR-019): `namespace:` gives its meta-rules
+  `rr-<NS>-NNN` and its invariants `INV-<NS>-n`; `aliases:` maps old IDs to
+  new ones for `catalyst why`. The kernel handbook drops the four numbers it
+  lent the module (9, 10, 21, 22), never to reuse them.
+- `catalyst why rr-META-n` finds the meta-rule on a deployment, whose
+  handbook carries widened, signed IDs.
+- An old meta-rule ID a module lists under `aliases:` keeps resolving where
+  artifacts cite it, short or widened and signed: `validate` and `view` take
+  it as the rule it now is, and `why` explains it (IDs are permanent, L7).
+- Format 3 fields take a `hint:` (and a type a `status_hint:`) for what the
+  generated template's cell tells the author; section hints may be literal
+  blocks. A generated template always carries `Signed-off-by`; a shipped
+  `<folder>.template.md` is a generated type's index template; a catalogue
+  entry with arguments (`/create-x <id>`) counts as the type's own command,
+  and a type kept as rows gets none.
+- The in-repo `sample-process` module is in format 3 with its own
+  namespace; CI installs it and runs its work cycle.
+- `catalyst share push` and `catalyst criterion integrity` take a rule a
+  module renamed into its own namespace as kept when the module's
+  `aliases:` name the ID it now has; they reported it as lost, which
+  refused the publish after such a sync.
+
 ## 0.56.0 — 2026-10-11
 
 Module v3, step M2: derived fields kept by catalyst, and guards on entering

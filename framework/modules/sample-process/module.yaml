@@ -1,14 +1,56 @@
 id: sample-process
 name: Sample Process Module
-version: 1.0.0
-description: Minimal non-software engineering process module for testing kernel isolation.
+version: 2.0.0
+description: Minimal non-software-engineering process module, in module format v3, that CI installs and runs to prove the kernel knows no module.
 grounding_type: policy
+format: 3
+kernel_version: ">=0.56.0"
+namespace: SP
 
-entity_types:
-  - id: POLICY
-    schema: schemas/policy.yaml
-  - id: TASK
-    schema: schemas/task.yaml
+# Tasks are grounded in the policy they carry out; no tier needs a document.
+tiers:
+  - id: chore
+    artifact: none
+    commit: "chore:"
+  - id: task
+    artifact: TASK
+
+entities:
+  POLICY:
+    name: Policy
+    plural: Policies
+    folder: policies
+    grounding: none
+    fields:
+      Owner: {kind: user}
+      Tasks: {kind: ref-list, to: TASK}
+    states: [Draft, Active, Retired]
+    closed: [Retired]
+    guards:
+      Active:
+        - section_written: Statement
+    sections:
+      - Statement: What the policy requires, in one or two sentences.
+      - Rationale
+    definition: >
+      A policy states what the organisation requires. It is the ground
+      every task stands on: work is done because a policy asks for it.
+  TASK:
+    name: Task
+    folder: tasks
+    grounding: required
+    grounding_field: Policy
+    fields:
+      Policy: {kind: ref, to: POLICY, required: true, backref: Tasks}
+    states: [Open, In-Progress, Done]
+    closed: [Done]
+    guards:
+      Done:
+        - section_written: Outcome
+    sections:
+      - Work: What is to be done.
+      - Outcome: What was done, and how it was checked.
+    definition: One unit of work carrying out a policy.
 
 commands:
   - name: create-policy
