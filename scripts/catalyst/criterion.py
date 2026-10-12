@@ -35,7 +35,9 @@ from pathlib import Path
 
 import project_file
 from catalyst import proc
+from catalyst.corpus import meta_key
 from catalyst.deployment import Deployment
+from module_loader import parse_simple_yaml
 
 DEFAULT_BRANCH = "criterion"
 ATTRIBUTES_HEADER = "# catalyst: append-only and regenerated files merge by union (catalyst criterion)"
@@ -390,6 +392,15 @@ class Facts:
     journal: set[str] = field(default_factory=set)
     ids: set[str] = field(default_factory=set)  # defined: artifact files, rule headings
     rows: set[str] = field(default_factory=set)  # registered in an index
+    # the deployed modules' `aliases:` by meta key: an old ID -> what it is now
+    aliases: dict[tuple[str, int], tuple[str, int]] = field(default_factory=dict)
+
+    def renamed(self, old: str, known: set[str]) -> bool:
+        """`old` is recorded here under the ID a module's `aliases:` gives it
+        (a module that took its own namespace renames what the kernel lent)."""
+        key = meta_key(old)
+        now = self.aliases.get(key) if key else None
+        return now is not None and any(meta_key(i) == now for i in known)
 
 
 def _journal_source(name: str) -> bool:
@@ -438,6 +449,13 @@ def facts_at(wc: Path, rev: str) -> Facts:
             if name == "rules/rules.md":
                 facts.rows.update(re.findall(rf"`([a-z]+-{DOMAIN_CODE}-\d+(?:-[A-Za-z0-9]+)*)`", text))
         facts.rows.update(INDEX_ROW_RE.findall(text))
+    for name in names:
+        if re.fullmatch(r"modules/[^/]+/module\.yaml", name):
+            data = parse_simple_yaml(out(wc, "show", f"{rev}:{name}"))
+            for old, new in (data.get("aliases") or {}).items():
+                ko, kn = meta_key(str(old)), meta_key(str(new))
+                if ko and kn:
+                    facts.aliases[ko] = kn
     return facts
 
 
@@ -455,9 +473,11 @@ def integrity(wc: Path, head: str = "HEAD", parents: list[str] | None = None) ->
         for line in sorted(before.journal - result.journal):
             problems.append(f"journal line from {short} is missing: {line[:100]}")
         for i in sorted(before.ids - result.ids):
-            problems.append(f"{i} (defined in {short}) is missing")
+            if not result.renamed(i, result.ids):
+                problems.append(f"{i} (defined in {short}) is missing")
         for i in sorted(before.rows - result.rows):
-            problems.append(f"{i} (registered in {short}) is no longer registered")
+            if not result.renamed(i, result.rows):
+                problems.append(f"{i} (registered in {short}) is no longer registered")
     return problems
 
 

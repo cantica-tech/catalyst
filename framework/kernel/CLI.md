@@ -1090,7 +1090,9 @@ defined entity ID and rule ID, and every index row that a parent
 recorded must still be recorded at `<rev>` (default `HEAD`). Parents
 default to `<rev>`'s own parents, which fits a pull request's merge
 commit in CI; `--parent` (repeatable) compares against given revisions
-instead. It reads revisions straight from git, so it needs no checkout
+instead. An ID a deployed module lists under `aliases:` counts as kept
+when the ID it now has is recorded at `<rev>`. It reads revisions
+straight from git, so it needs no checkout
 of them. `catalyst check` runs it on its own whenever the criterion's HEAD
 is a merge.
 

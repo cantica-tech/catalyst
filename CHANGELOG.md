@@ -35,6 +35,10 @@ as they are. The release notes name the module release it pairs with.
   and a type kept as rows gets none.
 - The in-repo `sample-process` module is in format 3 with its own
   namespace; CI installs it and runs its work cycle.
+- `catalyst share push` and `catalyst criterion integrity` take a rule a
+  module renamed into its own namespace as kept when the module's
+  `aliases:` name the ID it now has; they reported it as lost, which
+  refused the publish after such a sync.
 
 ## 0.56.0 — 2026-10-11
 
