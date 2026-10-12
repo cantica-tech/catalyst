@@ -37,6 +37,8 @@ class FieldDefinition:
     # must be non-empty once the entity's Status is one of its workflow's
     # closed states (e.g. a feature cannot close without its steps)
     required_when_closed: bool = False
+    # what the item template's cell tells its author (module format v3)
+    hint: str = ""
 
 
 @dataclass
@@ -170,11 +172,13 @@ def _fold_block_scalars(lines: list[str]) -> list[str]:
         body: list[str] = []
         i += 1
         while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip(" ")) > indent):
-            body.append(lines[i].strip())
+            body.append(lines[i].rstrip())
             i += 1
         while body and not body[-1]:
             body.pop()
-        text = " ".join(b for b in body if b) if m.group(4) == ">" else "\n".join(body)
+        margin = min((len(b) - len(b.lstrip(" ")) for b in body if b), default=0)
+        # folded: one line; literal: the lines as written, less their common indent
+        text = " ".join(b.strip() for b in body if b) if m.group(4) == ">" else "\n".join(b[margin:] for b in body)
         out.append(f"{m.group(1)}{m.group(2) or ''}{m.group(3)}: {json.dumps(text)}")
     return out
 
@@ -377,12 +381,15 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
     """A type declared inline in a v3 `module.yaml` (`entities:`), as the
     same ETD its v2 schema file would give: fields as a map, `to` for a
     reference's target (a list for several), `values` for an enum, the
-    `Status` field from `states`, `storage: rows` for a type kept as table
+    `Status` field from `states` (`status_hint:` for its cell), `hint:` for
+    what a field's cell tells the author, `storage: rows` for a type kept as table
     rows; plus its sections and definition."""
     name = str(spec.get("name") or prefix)
     states = [str(x) for x in spec.get("states") or ["Open"]]
     fields: list[dict[str, Any]] = [{"name": "ID", "kind": "text", "required": True}]
-    fields.append({"name": "Status", "kind": "enum", "required": True, "allowed_values": states})
+    fields.append(
+        {"name": "Status", "kind": "enum", "required": True, "allowed_values": states, "hint": spec.get("status_hint")}
+    )
     for fname, fspec in (spec.get("fields") or {}).items():
         f = fspec if isinstance(fspec, dict) else {"kind": str(fspec)}
         to = f.get("to")
@@ -395,6 +402,7 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
                 "target_type": "|".join(str(t) for t in to) if isinstance(to, list) else (str(to) if to else None),
                 "backref": f.get("backref"),
                 "required_when_closed": bool(f.get("required_when_closed", False)),
+                "hint": f.get("hint"),
             }
         )
     grounding = spec.get("grounding") or "none"
@@ -455,6 +463,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
                     target_type=f.get("target_type"),
                     backref=f.get("backref"),
                     required_when_closed=bool(f.get("required_when_closed", False)),
+                    hint=str(f.get("hint") or ""),
                 )
             )
 

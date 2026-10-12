@@ -50,6 +50,16 @@ def test_the_kernel_lends_no_numbers_and_why_resolves_the_namespace(tmp_path, mo
     assert main(["why", "rr-META-009"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("rr-META-009 is now rr-SE-001.") and "Cases are handled by people" in out
+    signed = __import__("re").search(r"`(rr-SE-000001-[A-Za-z0-9]{8})`", handbook).group(1)
+    widened = signed.replace("rr-SE-000001", "rr-META-000009")  # as artifacts deployed before 3.0 cite it
+    assert main(["why", widened]) == 0
+    assert capsys.readouterr().out.startswith(f"{widened} is now rr-SE-001.")
+    from catalyst.corpus import load_corpus
+    from catalyst.deployment import load as load_deployment
+
+    corpus = load_corpus(load_deployment(req.project))
+    assert corpus.rule_id(widened) == signed and corpus.rule_id("rr-META-000012-" + signed[-8:]) is not None
+    assert corpus.rule_id("rr-META-000010-" + signed[-8:]) is None  # not aliased: still dangling
     assert main(["why", "INV-SE-1"]) == 0
     assert "Every case has an owner" in capsys.readouterr().out
     for key in ("rr-META-12", "rr-META-012"):  # BUG-000006: the deployed ID is widened and signed

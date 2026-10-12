@@ -19,6 +19,17 @@ messages.
   lent the module (9, 10, 21, 22), never to reuse them.
 - `catalyst why rr-META-n` finds the meta-rule on a deployment, whose
   handbook carries widened, signed IDs.
+- An old meta-rule ID a module lists under `aliases:` keeps resolving where
+  artifacts cite it, short or widened and signed: `validate` and `view` take
+  it as the rule it now is, and `why` explains it (IDs are permanent, L7).
+- Format 3 fields take a `hint:` (and a type a `status_hint:`) for what the
+  generated template's cell tells the author; section hints may be literal
+  blocks. A generated template always carries `Signed-off-by`; a shipped
+  `<folder>.template.md` is a generated type's index template; a catalogue
+  entry with arguments (`/create-x <id>`) counts as the type's own command,
+  and a type kept as rows gets none.
+- The in-repo `sample-process` module is in format 3 with its own
+  namespace; CI installs it and runs its work cycle.
 
 ## 0.56.0 — 2026-10-11
 

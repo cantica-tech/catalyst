@@ -72,7 +72,7 @@ catalyst-<module-id>/
 | `kernel_version` | `string` | No | The kernel versions the module works with, as a version specifier (for example `>=0.42.0`, `>=0.52,<1.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. Enforced: `catalyst init` and `catalyst sync` refuse a kernel outside it, and `catalyst check` reports a deployment outside it. |
 | `format` | `integer` | No | `3` for a module that declares its types in this file (§3.3); absent, the v2 layout of §2. The kernel reads both until 1.0. |
 | `namespace` | `string` | No | The module's own meta-rule and invariant namespace (`SE`): its meta-rules are `rr-<NS>-NNN`, its invariants `INV-<NS>-n` (ADR-019). Composition widens and signs them like `rr-META-`. |
-| `aliases` | `map` | No | Old ID → the ID it is now (`rr-META-009: rr-SE-001`); `catalyst why <old>` explains the new one. |
+| `aliases` | `map` | No | Old ID → the ID it is now (`rr-META-009: rr-SE-001`). An old ID, short or widened and signed, keeps resolving: `validate` and `view` take it as the rule it now is, and `catalyst why <old>` explains the new one. |
 | `tiers` | `list[object]` | No | The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`. |
 | `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
@@ -127,18 +127,24 @@ generates what the module would otherwise ship (module v3, M3):
 - **The type**: `name`, `plural`, `folder`, `location`, `grounding` (with
   `grounding_field`, or `{ inherited_from: <field> }`), `fields` as a map
   (`kind`, `required`, `to` for a reference's target — a list for several —,
-  `values` for an enum, `backref`, `required_when_closed`), `states`,
+  `values` for an enum, `backref`, `required_when_closed`, `hint`), `states`,
+  `status_hint`,
   `initial`, `closed`, `guards`, `storage: rows` for a type kept as table
   rows. It reads into the same type a §4 schema gives.
-- **Its template**: the title, the field table `catalyst new` fills, then
-  each of `sections` (a heading, or `Heading: one-line hint`).
+- **Its template**: the title, the field table `catalyst new` fills (a
+  field's `hint`, or `status_hint` for `Status`, is what its cell tells the
+  author; otherwise a placeholder for its kind), `Signed-off-by`, then each
+  of `sections` (a heading, or `Heading: hint`, the hint a literal block
+  when it runs to several paragraphs, lists or tables).
 - **Its definition**: `definition:` composed into the frozen definition
   document (§6.3).
 - **Its create command**: `/create-<type>` in the command catalogue and the
   Taskfile, unless the module's `code-of-conduct.module.md` defines it.
 
 A file the module still ships for a type — a template, a definition — wins
-over the generated one. The YAML takes flow lists and maps
+over the generated one. For a generated type, a shipped template named
+after its folder (`<folder>.template.md`) is its index template, never its
+item template. The YAML takes flow lists and maps
 (`[Open, Done]`, `{ kind: ref, to: CASE }`) and folded or literal blocks
 (`definition: >`).
 

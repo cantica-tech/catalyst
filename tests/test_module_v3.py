@@ -176,6 +176,21 @@ def test_a_shipped_template_still_wins(tmp_path):
     assert "Hand-written." in (req.at / "cases" / "templates" / "TEMPLATE-CASE-v1.md").read_text(encoding="utf-8")
 
 
+def test_a_generated_type_s_shipped_index_template_is_its_index_not_its_item(tmp_path):
+    mod = v3_module(tmp_path / "mods")
+    write(mod / "templates" / "cases.template.md", "# Cases index\n\n| ID | Title | Status |\n|---|---|---|\n")
+    write(
+        mod / "module.yaml",
+        V3 + "templates:\n  - entity_type: CASE\n    template_path: templates/cases.template.md\n",
+    )
+    req = request(tmp_path, module_id="case-process", module=mod)
+    init(req)
+    assert req.at is not None
+    item = (req.at / "cases" / "templates" / "TEMPLATE-CASE-v1.md").read_text(encoding="utf-8")
+    assert "| **ID** |" in item and "## Summary" in item
+    assert (req.at / "cases" / "cases.md").read_text(encoding="utf-8").startswith("# Cases index")
+
+
 def test_generated_texts_name_every_field_and_state():
     task = v3_entity("TASK", parse_simple_yaml(V3)["entities"]["TASK"])
     assert generate.type_slug(task) == "task"
@@ -204,3 +219,20 @@ def test_each_v3_type_gets_a_create_command_in_the_catalogue_and_the_taskfile(tm
         env={**__import__("os").environ, "PYTHONPATH": str(KERNEL.parent.parent / "scripts")},
     )
     assert parity.returncode == 0, parity.stdout + parity.stderr
+
+
+def test_a_catalogue_entry_with_arguments_is_the_type_s_own_command_and_rows_get_none(tmp_path):
+    from catalyst.compose import generated_commands
+
+    mod = v3_module(tmp_path / "mods")
+    write(
+        mod / "module.yaml",
+        V3
+        + "  ITEM:\n    name: Item\n    folder: items\n    grounding: none\n    storage: rows\n"
+        + "    states: [new, done]\n    closed: [done]\n",
+    )
+    names = lambda existing: [e.id_prefix for e in generated_commands(mod, existing)]  # noqa: E731
+    assert names("") == ["CASE", "TASK"]
+    assert names("- `/create-task <CASE-id>` — create a task.") == ["CASE"]
+    assert names("When the user enters `/create-case: ...`") == ["TASK"]
+    assert names("- `/create-tasks` — something else.") == ["CASE", "TASK"]

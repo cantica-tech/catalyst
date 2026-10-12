@@ -19,19 +19,23 @@ def type_slug(etd: ETD) -> str:
 
 
 def template(etd: ETD) -> str:
-    """The item template: the title, the field table `catalyst new` fills,
-    then each section under its heading with its hint."""
+    """The item template: the title, the field table `catalyst new` fills
+    (a field's `hint:`, else a placeholder for its kind), then each section
+    under its heading with its hint."""
+    status = next((f for f in etd.fields if f.name == "Status"), None)
     rows = [
         ("ID", f"`{etd.id_prefix}-NNNNNN`"),
         ("Name", "`short-name`"),
         ("Filename", f"`{etd.id_prefix}-NNNNNN-short-name.md`"),
-        ("Status", etd.workflow.initial),
+        ("Status", status.hint if status and status.hint else etd.workflow.initial),
         ("Opened", "YYYY-MM-DD"),
     ]
     for f in etd.fields:
         if f.name in ("ID", "Status"):
             continue
-        if f.kind in REF_KINDS:
+        if f.hint:
+            value = f.hint
+        elif f.kind in REF_KINDS:
             value = NONE_YET
         elif f.kind == "enum" and f.allowed_values:
             value = " / ".join(f.allowed_values)
@@ -40,7 +44,7 @@ def template(etd: ETD) -> str:
         else:
             value = ""
         rows.append((f.name, value))
-    if not any(f.kind == "user" for f in etd.fields):
+    if not any(f.name.lower() == "signed-off-by" for f in etd.fields):  # every artifact is signed
         rows.append(("Signed-off-by", "the signer"))
     lines = [f"# `{etd.id_prefix}-NNNNNN` — {{{{title}}}}", "", "| Field | Value |", "|---|---|"]
     lines += [f"| **{name}** | {value} |" for name, value in rows]

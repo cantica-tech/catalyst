@@ -79,7 +79,12 @@ def why(root: Path, item: str) -> str | None:
     """What `catalyst why <item>` prints, or None when it is not a law,
     an invariant or a meta-rule of this criterion. An old ID the module
     lists under `aliases:` is explained as the ID it now is."""
-    alias = _aliases(root).get(item.strip())
+    from catalyst.corpus import meta_key
+
+    key = meta_key(item)
+    alias = next(
+        (new for old, new in _aliases(root).items() if old == item.strip() or (key and meta_key(old) == key)), None
+    )
     if alias:
         found = _why(root, alias)
         return f"{item.strip()} is now {alias}.\n\n{found}" if found else None

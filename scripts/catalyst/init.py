@@ -392,8 +392,11 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         rel = f"{etd.location}/{etd.folder}" if etd.location else etd.folder
         srcs = templates.get(prefix, [])
         # with two templates, the index one is named after the folder
-        # (<folder>.template.md); a single template is always the item's
-        index_src = next((t for t in srcs if len(srcs) > 1 and t.name.split(".")[0] == etd.folder), None)
+        # (<folder>.template.md); a single template is the item's, unless
+        # the type is generated (v3): then it can only be the index's
+        index_src = next(
+            (t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None
+        )
         item = next((t for t in srcs if t is not index_src), None)
         index_text = (
             ""
