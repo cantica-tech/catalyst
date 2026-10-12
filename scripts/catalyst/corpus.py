@@ -32,6 +32,16 @@ LINK_ID_RE = re.compile(r"^\|\s*\[`?([A-Za-z]+-[0-9]{3,6}(?:-[A-Za-z0-9]+)?)`?\]
 # A rule ID at the start of a citation or a file name: `<doc>-<DOMAIN>-NNNNNN`
 # plus its signer's userid (8 characters, at least one uppercase — a slug is
 # lowercase, so `<id>-<slug>` splits unambiguously).
+META_ID_RE = re.compile(r"^(rr-[A-Z]+|INV(?:-[A-Z]+)?)-0*(\d+)(?:-[A-Za-z0-9]{8})?$")
+
+
+def meta_key(value: str) -> tuple[str, int] | None:
+    """A meta-rule or invariant ID by namespace and number, however it is
+    written: `rr-META-021`, `rr-META-000021-Ab12Cd34` and `INV-SE-4` alike."""
+    m = META_ID_RE.match(value.strip())
+    return (m.group(1), int(m.group(2))) if m else None
+
+
 RULE_ID_RE = re.compile(rf"^([a-z]+-{DOMAIN_CODE}-\d{{3,6}}(?:-(?=[A-Za-z0-9]{{0,7}}[A-Z])[A-Za-z0-9]{{8}})?)(?=-|$)")
 TABLE_ID_RE = re.compile(r"^\|\s*`?([A-Z]+-[0-9]{6}(?:-[A-Za-z0-9]{8})?)`?\s*\|")
 PLACEHOLDER_MARK = "owned by the active module"
@@ -96,14 +106,22 @@ class Corpus:
     by_prefix: dict[str, list[Artifact]] = field(default_factory=dict)
     index_rows: dict[str, dict[str, str]] = field(default_factory=dict)  # prefix -> id -> file
     row_items: dict[str, set[str]] = field(default_factory=dict)  # prefix -> ids
+    # the module's `aliases:` by meta key: an old meta-rule ID -> what it is now
+    aliases: dict[tuple[str, int], tuple[str, int]] = field(default_factory=dict)
 
     def rule_id(self, value: str) -> str | None:
         """The rule a citation names: the ID itself, or `<id>-<slug>` (the
-        rule's file name, as one-file-per-rule documents cite it)."""
+        rule's file name, as one-file-per-rule documents cite it), or an old
+        meta-rule ID the module lists under `aliases:` (IDs are permanent:
+        what cited it keeps resolving)."""
         if value in self.rules:
             return value
         m = RULE_ID_RE.match(value)
-        return m.group(1) if m and m.group(1) in self.rules else None
+        if m and m.group(1) in self.rules:
+            return m.group(1)
+        key = meta_key(value)
+        now = self.aliases.get(key) if key else None
+        return next((r for r in self.rules if meta_key(r) == now), None) if now else None
 
     def all_ids(self) -> set[str]:
         ids = set(self.rules) | set(self.artifacts)
@@ -263,6 +281,11 @@ def load_corpus(dep: Deployment) -> Corpus:
     corpus.rules, corpus.indexed_rules = _rules(dep.root)
     corpus.domains = _domains(dep.root)
     corpus.users = _users(dep.root)
+    if dep.module is not None:
+        for old, new in dep.module.aliases.items():
+            ko, kn = meta_key(old), meta_key(new)
+            if ko and kn:
+                corpus.aliases[ko] = kn
     _inherit_workspace(dep, corpus)
     file_re_cache: dict[str, re.Pattern] = {}
     for prefix, etd in dep.etds.items():

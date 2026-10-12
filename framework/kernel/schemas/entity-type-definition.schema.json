@@ -94,6 +94,10 @@
           "required_when_closed": {
             "type": "boolean",
             "description": "The field must be non-empty once the entity's Status is one of its workflow's closed states."
+          },
+          "hint": {
+            "type": "string",
+            "description": "What the item template's cell for this field tells its author (module format v3)."
           }
         },
         "additionalProperties": false

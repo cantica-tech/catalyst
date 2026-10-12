@@ -335,6 +335,13 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
                         "new entity type; existing definitions are never touched (INV-23)",
                     )
                 )
+    planned = {a.target for a in p.actions}
+    for etd in _generated_types(src):  # a v3 type's definition, generated when the module ships none
+        from catalyst import generate
+
+        target = f".criterion/definitions/{generate.type_slug(etd)}.md"
+        if target not in planned and not (deployed_defs / f"{generate.type_slug(etd)}.md").exists():
+            p.actions.append(Action("definition", target, "add", "new entity type, defined in module.yaml (generated)"))
     if p.from_kernel != p.to_kernel:
         p.actions.append(
             Action("version", ".criterion/version.txt + pointer", "update", f"{p.from_kernel} -> {p.to_kernel}")
@@ -413,6 +420,16 @@ def _rel(dep: Deployment, path: Path) -> str:
 
 
 # --- applying -------------------------------------------------------------
+def _generated_types(src: Sources) -> list:
+    """The types a v3 module declares in its module.yaml (module v3, M3)."""
+    from module_loader import load_module
+
+    if src.module is None:
+        return []
+    manifest = load_module(module_dir=src.module)
+    return [e for e in manifest.entity_types.values() if e.generated] if manifest else []
+
+
 def _latest_definition(folder: Path) -> Path | None:
     found = [
         (int(m.group(1)), p) for p in folder.glob("DEFINITION-*-v*.md") if (m := re.search(r"-v(\d+)\.md$", p.name))
@@ -490,6 +507,13 @@ def apply(
                     )
                     touched.append(root / "definitions" / f"{name}.md")
                     break
+            else:
+                from catalyst import generate
+
+                for etd in _generated_types(src):
+                    if generate.type_slug(etd) == name:
+                        (root / "definitions" / f"{name}.md").write_text(generate.definition(etd), encoding="utf-8")
+                        touched.append(root / "definitions" / f"{name}.md")
         elif a.kind == "version":
             (root / "version.txt").write_text(src.version + "\n", encoding="utf-8")
             touched.append(root / "version.txt")

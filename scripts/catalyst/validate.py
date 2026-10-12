@@ -66,8 +66,8 @@ class Validator:
                     f"rule `{rule_id}` is defined {len(defs)} times ({places})",
                 )
             d = defs[0]
-            if d.file.name == "Rules-of-Rules.md" and rule_id.startswith("rr-META-"):
-                continue  # meta-rules are self-governing, never in rules.md
+            if d.file.name == "Rules-of-Rules.md" and rule_id.startswith("rr-"):
+                continue  # meta-rules (the kernel's and a module's namespace) are self-governing, never in rules.md
             if self.corpus.indexed_rules and rule_id not in self.corpus.indexed_rules:
                 self.add(
                     ERROR,
