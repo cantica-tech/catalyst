@@ -6,7 +6,12 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.57.0 — 2026-10-12
+
+Module v3, steps M3 to M5: module format 3, a module's own namespace, and a
+second module run in CI. No layout change, no migration: a sync recomposes
+the handbook and the catalogue, and deployed templates and definitions stay
+as they are. The release notes name the module release it pairs with.
 
 - Module format 3: `module.yaml` with `format: 3` declares its types under
   `entities:`; catalyst generates each type's template, definition and
