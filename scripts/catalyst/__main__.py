@@ -239,7 +239,13 @@ def cmd_view(args) -> int:
     dep = open_deployment(args)
     data: Any  # each view's own shape, printed by its own renderer
     try:
-        if args.view == "journal":
+        if args.view == "journal" and getattr(args, "content", False):
+            from catalyst import history
+
+            if not args.artifact:
+                raise v.ViewError("--content shows one entity's history: name it with --artifact <id>")
+            data, text = history.history(dep, load_corpus(dep), args.artifact), history.render
+        elif args.view == "journal":
             data = v.journal_entries(dep, args.since, args.artifact, args.actor, args.rule)
             text = v.render_journal
         else:
@@ -1782,6 +1788,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--artifact", help="only entries for this artifact")
     q.add_argument("--actor", help="only entries by this actor (name or part of it)")
     q.add_argument("--rule", help="only entries targeting this rule or artifact ID")
+    q.add_argument(
+        "--content",
+        action="store_true",
+        help="with --artifact: the history of that entity, each change with its content before and after",
+    )
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_view, view="journal")
     q = js.add_parser("pin", help="pin every referenced blob so git gc keeps it")

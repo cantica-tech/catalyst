@@ -197,6 +197,13 @@ class Reads:
                 data = views.view(dep, corpus, item)
             elif what == "graph":
                 data = views.graph(dep, corpus)
+            elif what == "history":
+                from catalyst import history
+
+                # a served criterion has no git of its own: its blobs are the server's
+                held = getattr(self, "blob", None)
+                has_git = (dep.root / ".git").exists()
+                data = history.history(dep, corpus, item, None if has_git or held is None else held)
             elif what == "impact":
                 from catalyst import impact
 
@@ -669,7 +676,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
-                path in ("/list", "/backlog", "/journal", "/graph") or path.startswith(("/view/", "/impact/"))
+                path in ("/list", "/backlog", "/journal", "/graph")
+                or path.startswith(("/view/", "/impact/", "/history/"))
             ):
                 what, _, item = path.strip("/").partition("/")
                 seq, data = self.app.read(what, urllib.parse.parse_qs(url.query), urllib.parse.unquote(item))
