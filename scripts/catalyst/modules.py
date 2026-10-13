@@ -104,6 +104,79 @@ def release_tree(src: Path, out: Path, kernel_version: str) -> Path:
     return out
 
 
+# --- fetching a module ----------------------------------------------------------
+URL_RE = re.compile(r"^(?:(?!file:)[a-z][a-z0-9+.-]*://|[\w.-]+@[\w.-]+:)")
+REF_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*$")
+
+
+def is_url(spec: str) -> bool:
+    """A remote git URL (`https://…`, `ssh://…`, `git@host:…`), not a path."""
+    return bool(URL_RE.match(spec))
+
+
+def clean_url(url: str) -> str:
+    """The URL without the credentials it may embed."""
+    return re.sub(r"^([a-z][a-z0-9+.-]*://)[^/@]+@", r"\1", url)
+
+
+def split_ref(spec: str) -> tuple[str, str | None]:
+    """`<source>@<ref>` as (source, ref). An `@` that belongs to the source
+    (`git@host:…`, `https://user@host/…`) is not a ref: only one after the
+    last `/` or `:` is."""
+    at = spec.rfind("@")
+    if at <= 0 or at < max(spec.rfind("/"), spec.rfind(":")):
+        return spec, None
+    return spec[:at], spec[at + 1 :] or None
+
+
+def _is_repository(path: Path) -> bool:
+    return path.is_dir() and _git(path, "rev-parse", "--git-dir") is not None and not (path / "module.yaml").is_file()
+
+
+def fetch(spec: str, tmp: Path) -> tuple[Path, str | None, str | None]:
+    """A module source as (directory or zip, source, commit): a directory or
+    a release zip as they are; a git repository (a URL, or a bare repository
+    on this machine), optionally `@<ref>` (branch, tag or commit), cloned
+    shallow into `tmp`."""
+    path = Path(spec)
+    if path.is_file() or (path.is_dir() and not _is_repository(path)):
+        return path, *source_of(path)
+    repo, ref = split_ref(spec)
+    if not is_url(repo) and not _is_repository(Path(repo)):
+        raise ModuleError(f"{Path(spec).name}: neither a module directory, a release .zip nor a git repository")
+    if repo.startswith("-") or "::" in repo or any(ord(c) < 32 or ord(c) == 127 for c in repo):
+        raise ModuleError(f"{repo!r} is not a usable repository URL")
+    if ref is not None and not REF_RE.match(ref):
+        raise ModuleError(f"{ref!r} is not a usable branch, tag or commit")
+    dest = tmp / "clone"
+    shallow = ["git", "clone", "-q", "--depth", "1", *(["--branch", ref] if ref else []), "--", repo, str(dest)]
+    res = subprocess.run(shallow, capture_output=True, text=True, encoding="utf-8", check=False)
+    if res.returncode != 0 and ref:  # a commit is not a branch: clone whole, then check it out
+        shutil.rmtree(dest, ignore_errors=True)
+        res = subprocess.run(
+            ["git", "clone", "-q", "--", repo, str(dest)], capture_output=True, text=True, encoding="utf-8", check=False
+        )
+        if res.returncode == 0:
+            res = subprocess.run(
+                ["git", "-C", str(dest), "checkout", "-q", "--detach", ref],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=False,
+            )
+    if res.returncode != 0:
+        said = (res.stderr or res.stdout).strip().splitlines()
+        raise ModuleError(
+            f"could not fetch {clean_url(repo) if is_url(repo) else Path(repo).name}"
+            + (f"@{ref}" if ref else "")
+            + (f": {said[-1]}" if said else "")
+        )
+    if not (dest / "module.yaml").is_file():
+        raise ModuleError("the repository has no module.yaml at its top: it is not a module")
+    source = clean_url(repo) if is_url(repo) else re.sub(r"\.git$", "", Path(repo).name)
+    return dest, source, _git(dest, "rev-parse", "HEAD")
+
+
 # --- where a module came from ---------------------------------------------------
 def _git(src: Path, *args: str) -> str | None:
     res = subprocess.run(["git", "-C", str(src), *args], capture_output=True, text=True, encoding="utf-8", check=False)
@@ -126,7 +199,9 @@ def source_of(src: Path | None) -> tuple[str | None, str | None]:
     commit = _git(src, "rev-parse", "HEAD")
     if not url:
         return src.name, commit
-    url = re.sub(r"^([a-z+]+://)[^/@]+@", r"\1", url)
+    if not is_url(url):  # cloned from a repository on this machine: its name, never its path
+        return re.sub(r"\.git$", "", Path(url.removeprefix("file://")).name) or src.name, commit
+    url = clean_url(url)
     prefix = (_git(src, "rev-parse", "--show-prefix") or "").strip("/")
     return (f"{url}#{prefix}" if prefix else url), commit
 
@@ -249,3 +324,111 @@ def verify(root: Path, only: str | None = None) -> list[Finding]:
     if only and not findings:
         raise ModuleError(f"no module '{only}' in this criterion")
     return findings
+
+
+# --- install --------------------------------------------------------------------
+def _snapshot(root: Path) -> dict[Path, bytes]:
+    skip = {".git", ".venv"}
+    return {
+        f: hashlib.sha256(f.read_bytes()).digest()
+        for f in root.rglob("*")
+        if f.is_file() and not skip & set(f.relative_to(root).parts)
+    }
+
+
+def install(dep, kernel: Path, spec: str, actor: str, intent: list[str]) -> dict:
+    """Install the module `spec` names into a deployment that has none
+    (`catalyst module install`): fetch, check, seed as `init` does,
+    recompose the governing documents, name it in the project file, journal
+    one entry. Every refusal comes before anything is written."""
+    import tempfile
+
+    from catalyst import compose, init, journal, sync
+    from catalyst.versions import satisfies
+    from module_loader import load_kernel_entities, load_module
+
+    root = dep.root
+    present = sorted(d.name for d in (root / "modules").iterdir() if d.is_dir()) if (root / "modules").is_dir() else []
+    if dep.module is not None or present:
+        have = dep.module.id if dep.module is not None else present[0]
+        raise ModuleError(
+            f"this criterion already has the module {have}: several modules in one deployment come with a later "
+            f"release (roadmap R4.9, step N3). `catalyst module upgrade {have}` moves it to a newer release"
+        )
+    if not (kernel / "rules-of-rules.template.md").is_file():
+        raise ModuleError("pass --kernel <framework/kernel of the catalyst release this deployment is at>")
+    deployed = (root / "version.txt").read_text(encoding="utf-8").strip()
+    try:
+        given = sync.Sources._kernel_version(kernel, kernel)
+    except sync.SyncError as exc:
+        raise ModuleError(str(exc)) from None
+    if given != deployed:
+        raise ModuleError(
+            f"this deployment is at kernel {deployed} and --kernel is {given}: `catalyst sync apply` moves the "
+            "kernel first, or pass the kernel the deployment is at"
+        )
+    with tempfile.TemporaryDirectory(prefix="catalyst-module-") as tmp:
+        src, source, commit = fetch(spec, Path(tmp))
+        tree = release_tree(src, Path(tmp) / "module", deployed)
+        manifest = load_module(module_dir=tree)
+        if manifest is None:
+            raise ModuleError("the module has no readable module.yaml")
+        which = f"{manifest.id} {manifest.version}"
+        if not satisfies(deployed, manifest.kernel_version):
+            raise ModuleError(
+                f"{which} works with kernel {manifest.kernel_version}, not {deployed}: install a module release "
+                "that does, or sync the kernel first"
+            )
+        gate = sync.gate_version(dep)
+        if gate and not satisfies(gate, manifest.kernel_version):
+            raise ModuleError(
+                f"{which} needs kernel {manifest.kernel_version}, and the shared criterion's gate still runs {gate}: "
+                "publish and merge the kernel sync, pull, then install the module"
+            )
+        kernel_types = load_kernel_entities()
+        taken_prefixes = set(kernel_types)
+        taken_folders = {e.folder for e in kernel_types.values()}
+        for etd in manifest.entity_types.values():
+            if etd.id_prefix in taken_prefixes or etd.folder in taken_folders:
+                raise ModuleError(
+                    f"{which} declares the type {etd.id_prefix} (folder {etd.folder}), which the kernel already has"
+                )
+        params = compose.deployed_params(root, "")
+        params.module_id = manifest.id
+        conflicts = [
+            r.path for r in compose.recompose(root, params, (kernel, None), (kernel, tree), write=False) if r.conflicts
+        ]
+        if conflicts:
+            raise ModuleError(
+                "adding the module's part to " + ", ".join(conflicts) + " would conflict with local edits there: "
+                "resolve with `catalyst recompose` by hand, then install"
+            )
+        before = _snapshot(root)
+        init.seed_module(root, tree, manifest, params, datetime.date.today().isoformat(), source, commit)
+        compose.recompose(root, params, (kernel, None), (kernel, tree))
+        (root / compose.PARAMS_FILE).write_text(json.dumps(params.as_dict(), indent=2) + "\n", encoding="utf-8")
+    after = _snapshot(root)
+    touched = sorted(f for f, digest in after.items() if before.get(f) != digest)
+    import project_file
+
+    pointer = project_file.find(dep.project_root)
+    if pointer is not None and not dep.standalone:
+        data = project_file.read(pointer)
+        data["module"] = manifest.id
+        data["updated"] = datetime.date.today().isoformat()
+        project_file.write(pointer, data)
+        touched.append(pointer)
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst module install",
+            action="create",
+            artifact=f"module {which}",
+            targets=[],
+            intent=intent or [f"Install the module {which}, on the user's explicit request (INV-2)."],
+            files=[str(t) for t in touched],
+            actor=actor,
+            tier="chore",
+        ),
+    )
+    return {"id": manifest.id, "version": manifest.version, "source": source, "commit": commit, "files": len(touched)}

@@ -88,7 +88,7 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 ### `catalyst init`
 
 ```
-catalyst init --name <name> --module <module-id> [--user <name>] [--git-username <u>]
+catalyst init --name <name> (--module <module-id> | --no-module) [--user <name>] [--git-username <u>]
               [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
               [--agent <id>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
@@ -104,7 +104,9 @@ decides its inputs and does the judgment steps after it.
 - `--module` is the active module's id; there is no default. Without it,
   `init` installs nothing and lists the modules it finds in sibling
   checkouts named `catalyst-<id>` (next to the project or to catalyst);
-  one elsewhere is given with `--module-dir`.
+  one elsewhere is given with `--module-dir`. `--no-module` installs the
+  kernel's types only; `catalyst module install` adds a module later, by
+  the same code, and leaves the same criterion.
 - `--user` and `--git-username` register the first user, as Admin, with a
   fresh userid (INV-16, INV-26). `--user` defaults to the project's
   `git config user.name`, `--git-username` to `--user`.
@@ -521,11 +523,12 @@ entries win on a clash. `catalyst where` names the workspace.
 - `--name <new>` renames a home-store project: its criterion directory and
   `project_name` in `catalyst.toml`.
 
-### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip>]`
+### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip|git-url>]`
 
 The mechanical half of `/sync-framework`. `--kernel` is a catalyst
 checkout's `framework/kernel` or a `kernel-vX.Y.Z.zip`; `--module` the
-module's checkout (reduced to what its release ships) or zip. The base the
+module's checkout (reduced to what its release ships), its zip, or a git
+repository with an optional `@<ref>` (see `module install`). The base the
 deployment was composed from is found next to a release zip
 (`…/v<deployed>/kernel-v<deployed>.zip`), or from the checkout's git tag of
 the deployed version; `--base-kernel` names it otherwise.
@@ -549,6 +552,37 @@ the deployed version; `--base-kernel` names it otherwise.
   pull request with the CLI of its base branch, which could not read that
   module. Sync the kernel alone, publish and merge it, pull, then sync the
   module.
+
+### `catalyst module install <source>[@<ref>] [--kernel <dir>]`
+
+Installs a module into a deployment that has none, only ever on the user's
+explicit request (INV-2). `<source>` is the module's directory, a release
+zip, or a git repository (a URL, or a bare repository on this machine) with
+an optional `@<ref>`: a branch, a tag or a commit. A repository is cloned
+shallow into a temporary directory, removed afterwards. `--kernel` is the
+`framework/kernel` of the release the deployment is at (default: this
+checkout's).
+
+It seeds the module as `init --module` does — its tree and record, a folder
+per entity type, its definitions and invariants — merges the module's part
+into the governing documents, names the module in the project file, and
+journals one entry (`--as`, `--intent`, `--json`).
+
+It refuses, before writing anything, when the deployment already has a
+module (several modules per deployment are not supported yet); when the
+module's kernel range excludes the deployed kernel, or the one the shared
+criterion's gate runs; when one of its entity prefixes or folders is a
+kernel one; when `--kernel` is not the deployed version; when the merge
+into a governing document would conflict with local edits; or when a URL
+or ref could be read by git as an option.
+
+### `catalyst module upgrade <id> [<source>[@<ref>]] [--kernel <dir>] [--plan]`
+
+Moves the installed module to another release through `sync plan|apply`
+(the kernel stays): `--plan` lists what would change and writes nothing.
+Without `<source>`, the repository its record names is fetched; a record
+that names a directory or a zip gives nothing to fetch, and the source must
+be passed. Every refusal of `sync` applies.
 
 ### `catalyst module list|verify [<id>] [--json]`
 
