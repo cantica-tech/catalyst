@@ -410,19 +410,36 @@ def cmd_admin(args) -> int:
 
 def cmd_sync(args) -> int:
     """`sync plan|apply` (R2 W4): the mechanical half of /sync-framework."""
+
+    dep = open_deployment(args)
+    return _sync(args, dep, args.module, args.sync_command == "plan")
+
+
+def _sync(args, dep, module_spec: str | None, plan_only: bool) -> int:
+    """Plan or apply a sync; `module_spec` is a directory, a release zip or
+    a git URL[@ref], fetched for the time of the sync."""
+    import tempfile
+
+    from catalyst import modules, sync
+
+    with tempfile.TemporaryDirectory(prefix="catalyst-fetch-") as tmp:
+        try:
+            module = modules.fetch(module_spec, Path(tmp))[0] if module_spec else None
+            src = sync.Sources(dep, args.kernel, module, args.base_kernel, args.cli)
+        except (sync.SyncError, modules.ModuleError) as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        return _sync_run(args, dep, src, plan_only)
+
+
+def _sync_run(args, dep, src, plan_only: bool) -> int:
     from catalyst import sync
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
 
-    dep = open_deployment(args)
-    try:
-        src = sync.Sources(dep, args.kernel, args.module, args.base_kernel, args.cli)
-    except sync.SyncError as exc:
-        print(f"catalyst: {exc}", file=sys.stderr)
-        return 1
     try:
         commands = sync.commands_dir(dep, args.commands_dir)
-        if args.sync_command == "plan":
+        if plan_only:
             p = sync.plan(dep, src, commands)
             print(json.dumps(p.as_dict(), indent=2) if args.json else sync.render(p), end="" if not args.json else "\n")
             return 0
@@ -459,6 +476,54 @@ def cmd_module(args) -> int:
     from catalyst import modules
 
     dep = open_deployment(args)
+    if args.module_command in ("install", "upgrade"):
+        from module_loader import REPO_ROOT
+
+        args.kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
+        if not (args.kernel / "rules-of-rules.template.md").is_file() and args.kernel.suffix != ".zip":
+            print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
+            return 2
+    if args.module_command == "install":
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import resolve_signer
+
+        try:
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            done = modules.install(
+                dep, args.kernel, args.source, str(signer.get("git_username") or signer.get("name")), args.intent or []
+            )
+        except (modules.ModuleError, IdError, JournalError) as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(done, indent=2))
+        else:
+            where = f" from {done['source']}" if done["source"] else ""
+            print(f"installed module {done['id']} {done['version']}{where} ({done['files']} file(s), journaled)")
+            print("Next: a DEPLOYMENT.md history line, then `catalyst check`.")
+        return 0
+    if args.module_command == "upgrade":
+        installed = dep.module.id if dep.module is not None else None
+        if args.id != installed:
+            print(
+                f"catalyst: no module '{args.id}' here"
+                + (f" (installed: {installed})" if installed else ": `catalyst module install` adds one"),
+                file=sys.stderr,
+            )
+            return 1
+        source = args.source
+        if not source:
+            recorded = next((e.get("source") for e in modules.read_record(dep.root) if e["id"] == args.id), None)
+            if not recorded or not modules.is_url(recorded):
+                print(
+                    f"catalyst: pass the release to upgrade {args.id} to (a directory, a release zip or a git "
+                    "URL[@ref]): its record names no repository to fetch from",
+                    file=sys.stderr,
+                )
+                return 1
+            source = recorded
+        args.base_kernel = args.base_kernel or args.kernel  # the kernel stays: only the module moves
+        return _sync(args, dep, source, args.plan)
     try:
         findings = modules.verify(dep.root, getattr(args, "id", None))
     except modules.ModuleError as exc:
@@ -1342,10 +1407,17 @@ def cmd_init(args) -> int:
         print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
         return 2
     project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
-    if not args.module:  # never chosen for the user: list what is here
+    if args.module and args.no_module:
+        print("catalyst: --module and --no-module exclude each other", file=sys.stderr)
+        return 2
+    if not args.module and not args.no_module:  # never chosen for the user: list what is here
         found = local_modules(project)
         listing = "; ".join(f"{m} ({d})" for m, d in found.items()) or "none next to the project or catalyst"
-        print(f"catalyst: pass --module <id> (and --module-dir if it is elsewhere). Found: {listing}", file=sys.stderr)
+        print(
+            f"catalyst: pass --module <id> (and --module-dir if it is elsewhere), or --no-module to install one "
+            f"later with `catalyst module install`. Found: {listing}",
+            file=sys.stderr,
+        )
         return 2
     user = args.user or git_user_name(project)
     if not user:
@@ -1360,7 +1432,7 @@ def cmd_init(args) -> int:
             InitRequest(
                 project=project,
                 name=args.name,
-                module_id=args.module,
+                module_id=args.module or None,
                 user=user,
                 kernel=kernel,
                 module=args.module_dir,
@@ -1538,6 +1610,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--kernel", type=Path, help="framework/kernel of a catalyst checkout or release (default: this checkout's)"
     )
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
+    p.add_argument(
+        "--no-module",
+        action="store_true",
+        help="install the kernel only; `catalyst module install` adds a module later",
+    )
     p.add_argument("--userid", help=argparse.SUPPRESS)  # fixed first userid: reproducible examples
     p.set_defaults(func=cmd_init)
 
@@ -1845,7 +1922,7 @@ def build_parser() -> argparse.ArgumentParser:
             required=True,
             help="the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip",
         )
-        q.add_argument("--module", type=Path, help="the target module: its directory or release zip")
+        q.add_argument("--module", help="the target module: its directory, release zip, or git URL[@ref]")
         q.add_argument(
             "--base-kernel",
             type=Path,
@@ -1866,6 +1943,25 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("module", help="the modules this criterion holds: its record, and each tree against it")
     mods = p.add_subparsers(dest="module_command", required=True)
     q = mods.add_parser("list", help="each installed module: id, version, source, commit, hash (no network)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_module)
+    q = mods.add_parser("install", help="install a module into a deployment that has none (seeded as init does)")
+    q.add_argument("source", help="the module: its directory, release zip, or git URL[@ref]")
+    q.add_argument("--kernel", type=Path, help="framework/kernel of the release this deployment is at")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_module)
+    q = mods.add_parser("upgrade", help="move the installed module to another release, through `sync plan|apply`")
+    q.add_argument("id", help="the installed module")
+    q.add_argument("source", nargs="?", help="directory, release zip or git URL[@ref] (default: the recorded URL)")
+    q.add_argument("--kernel", type=Path, help="framework/kernel of the release this deployment is at")
+    q.add_argument("--base-kernel", type=Path, help="the kernel the deployment was composed from (default: --kernel)")
+    q.add_argument("--cli", type=Path, help=argparse.SUPPRESS)
+    q.add_argument("--commands-dir", type=Path, help=argparse.SUPPRESS)
+    q.add_argument("--plan", action="store_true", help="list what would change, write nothing")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_module)
     q = mods.add_parser(

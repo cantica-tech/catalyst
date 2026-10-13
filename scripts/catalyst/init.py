@@ -67,7 +67,7 @@ def local_modules(project: Path) -> dict[str, Path]:
 class InitRequest:
     project: Path
     name: str
-    module_id: str
+    module_id: str | None  # None: a deployment with the kernel's types only (`--no-module`)
     user: str
     kernel: Path  # framework/kernel of a catalyst checkout or release
     module: Path | None = None  # the module's directory (found if None)
@@ -155,7 +155,7 @@ def _module_dir(req: InitRequest) -> Path:
         return req.module
     from module_loader import find_module_dir
 
-    found = find_module_dir(req.project, req.module_id)
+    found = find_module_dir(req.project, req.module_id) if req.module_id else None
     if found is None:
         raise InitError(f"module '{req.module_id}' not found — pass --module-dir")
     return found
@@ -238,6 +238,89 @@ def init(req: InitRequest) -> list[str]:
         raise InitError(f"install failed and was rolled back: {exc}") from exc
 
 
+def _freeze_definitions(source: Path, defs: Path) -> None:
+    """The latest version of each type's definition under `source`, as
+    `definitions/<type>.md`."""
+    for type_dir in sorted(d for d in source.iterdir() if d.is_dir()) if source.is_dir() else []:
+        latest = _latest_definition(type_dir)
+        if latest is not None:
+            shutil.copyfile(latest, defs / f"{type_dir.name}.md")
+
+
+def seed_module(
+    root: Path,
+    tree: Path,
+    manifest,
+    params: compose.Params,
+    stamp: str,
+    source: str | None = None,
+    commit: str | None = None,
+) -> None:
+    """Everything a module adds to the criterion at `root`, the same at
+    `init` and at `catalyst module install`: its tree (`tree`: what a release
+    ships, `modules.release_tree`) and its record, a folder per entity type
+    with index, templates catalog and README, the paths it requires, the
+    definition of each of its types, and its invariants."""
+    from catalyst import generate, modules
+
+    global PARAMS
+    PARAMS = params
+    shutil.copytree(tree, root / "modules" / manifest.id)
+    modules.record(root, manifest.id, source, commit)
+    # --- module entity folders --------------------------------------------
+    templates = {t.entity_type: [] for t in manifest.templates}
+    for t in manifest.templates:
+        templates[t.entity_type].append(tree / t.template_path)
+    for prefix, etd in sorted((e.id_prefix, e) for e in manifest.entity_types.values()):
+        rel = f"{etd.location}/{etd.folder}" if etd.location else etd.folder
+        srcs = templates.get(prefix, [])
+        # with two templates, the index one is named after the folder
+        # (<folder>.template.md); a single template is the item's, unless
+        # the type is generated (v3): then it can only be the index's
+        index_src = next(
+            (t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None
+        )
+        item = next((t for t in srcs if t is not index_src), None)
+        index_text = (
+            ""
+            if etd.naming == "free-form"
+            else (
+                index_src.read_text(encoding="utf-8")
+                if index_src and index_src.is_file()
+                else f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n"
+            )
+        )
+        type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
+
+        _type_folder(
+            root,
+            rel,
+            type_name,
+            item,
+            index_text,
+            f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see `CODE-OF-CONDUCT.md` §3/§4.\n",
+            stamp,
+            generate.template(etd) if etd.generated and etd.naming != "free-form" else None,
+        )
+    for rp in manifest.required_paths:
+        target = root / rp.path
+        if not target.exists():
+            seed = tree / rp.seed if rp.seed else None
+            # a seed is used only when it is that file's own template
+            # (x.template.md for x.md); otherwise the path gets an empty index
+            own = seed is not None and seed.is_file() and seed.name.split(".")[0].lower() == target.stem.lower()
+            _write(target, seed.read_text(encoding="utf-8") if own else f"# {target.stem.title()}\n\n*(none yet)*\n")
+    defs = root / "definitions"
+    defs.mkdir(parents=True, exist_ok=True)
+    _freeze_definitions(tree / "definitions", defs)
+    for etd in manifest.entity_types.values():  # a v3 type's definition, unless the module ships one
+        target = defs / f"{generate.type_slug(etd)}.md"
+        if etd.generated and not target.exists():
+            _write(target, generate.definition(etd))
+    if (tree / "INVARIANTS.module.md").is_file():
+        shutil.copyfile(tree / "INVARIANTS.module.md", root / "INVARIANTS.module.md")
+
+
 def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if not NAME_RE.match(req.name):
         raise InitError(f"--name '{req.name}' must be letters, digits, '.', '_' or '-' (no path)")
@@ -264,9 +347,9 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     kernel = req.kernel.resolve()
     if not (kernel / "rules-of-rules.template.md").is_file():
         raise InitError(f"{kernel} is not a catalyst kernel (no rules-of-rules.template.md)")
-    module_src = _module_dir(req).resolve()
-    manifest = load_module(module_dir=module_src)
-    if manifest is None:
+    module_src = _module_dir(req).resolve() if req.module_id else None
+    manifest = load_module(module_dir=module_src) if module_src else None
+    if module_src is not None and manifest is None:
         raise InitError(f"{module_src} has no readable module.yaml")
     if (kernel / "manifest.json").is_file():  # a kernel release
         version = json.loads((kernel / "manifest.json").read_text(encoding="utf-8"))["version"]
@@ -276,7 +359,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         raise InitError(f"cannot tell the kernel version of {kernel}")
     from catalyst.versions import satisfies
 
-    if not satisfies(version, manifest.kernel_version):
+    if manifest is not None and not satisfies(version, manifest.kernel_version):
         raise InitError(
             f"{manifest.id} {manifest.version} works with kernel {manifest.kernel_version}, not {version}: "
             "install a module release that does, or a kernel inside that range"
@@ -317,7 +400,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         raise InitError(f"userid '{userid}' is not 8 letters/digits with an uppercase letter")
     rule_docs = req.rule_docs or [(f"{re.sub(r'[^a-z0-9]+', '-', req.name.lower()).strip('-')}-rules.md", "br")]
     params = compose.Params(
-        manifest.id, userid, [d for d, _ in rule_docs], req.test_locations or compose.Params.test_locations
+        manifest.id if manifest else "",
+        userid,
+        [d for d, _ in rule_docs],
+        req.test_locations or compose.Params.test_locations,
     )
     _write(root / "CODE-OF-CONDUCT.md", compose.code_of_conduct(kernel, module_src, params))
     _write(root / "rules" / "Rules-of-Rules.md", compose.rules_of_rules(kernel, module_src, params))
@@ -327,18 +413,6 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     global PARAMS
     PARAMS = params
     steps.append("composed CODE-OF-CONDUCT.md, rules/Rules-of-Rules.md, ACCESS-CONTROL.md, Taskfile.common.yml")
-
-    # --- the module, seeded whole -----------------------------------------
-    # what a release of it ships, as `sync` seeds it, and the record of it
-    import tempfile
-
-    from catalyst import modules
-
-    mod_dest = root / "modules" / manifest.id
-    with tempfile.TemporaryDirectory(prefix="catalyst-init-") as tmp:
-        shutil.copytree(modules.release_tree(module_src, Path(tmp) / "module", version), mod_dest)
-    modules.record(root, manifest.id, *modules.source_of(module_src))
-    steps.append(f"seeded module {manifest.id} {manifest.version} (recorded in {modules.RECORD})")
 
     # --- kernel entity folders --------------------------------------------
     kt = kernel / "templates"
@@ -390,71 +464,28 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             stamp,
         )
 
-    # --- module entity folders --------------------------------------------
-    templates = {t.entity_type: [] for t in manifest.templates}
-    for t in manifest.templates:
-        templates[t.entity_type].append(module_src / t.template_path)
-    for prefix, etd in sorted((e.id_prefix, e) for e in manifest.entity_types.values()):
-        rel = f"{etd.location}/{etd.folder}" if etd.location else etd.folder
-        srcs = templates.get(prefix, [])
-        # with two templates, the index one is named after the folder
-        # (<folder>.template.md); a single template is the item's, unless
-        # the type is generated (v3): then it can only be the index's
-        index_src = next(
-            (t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None
-        )
-        item = next((t for t in srcs if t is not index_src), None)
-        index_text = (
-            ""
-            if etd.naming == "free-form"
-            else (
-                index_src.read_text(encoding="utf-8")
-                if index_src and index_src.is_file()
-                else f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n"
-            )
-        )
-        type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
-        from catalyst import generate
-
-        _type_folder(
-            root,
-            rel,
-            type_name,
-            item,
-            index_text,
-            f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see `CODE-OF-CONDUCT.md` §3/§4.\n",
-            stamp,
-            generate.template(etd) if etd.generated and etd.naming != "free-form" else None,
-        )
-    for rp in manifest.required_paths:
-        target = root / rp.path
-        if not target.exists():
-            seed = module_src / rp.seed if rp.seed else None
-            # a seed is used only when it is that file's own template
-            # (x.template.md for x.md); otherwise the path gets an empty index
-            own = seed is not None and seed.is_file() and seed.name.split(".")[0].lower() == target.stem.lower()
-            _write(target, seed.read_text(encoding="utf-8") if own else f"# {target.stem.title()}\n\n*(none yet)*\n")
-    steps.append(
-        f"created every entity folder ({len(manifest.entity_types)} module, 5 kernel) "
-        "with index, templates catalog and README"
-    )
+    steps.append("created the kernel's entity folders, each with index, templates catalog and README")
 
     # --- definitions ------------------------------------------------------
     defs = root / "definitions"
     defs.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(kernel / "definitions" / "README.md", defs / "README.md")
-    for source in (kernel / "definitions", module_src / "definitions"):
-        for type_dir in sorted(d for d in source.iterdir() if d.is_dir()) if source.is_dir() else []:
-            latest = _latest_definition(type_dir)
-            if latest is not None:
-                shutil.copyfile(latest, defs / f"{type_dir.name}.md")
-    from catalyst import generate
+    _freeze_definitions(kernel / "definitions", defs)
+    steps.append("froze the latest definition of every kernel type (INV-23)")
 
-    for etd in manifest.entity_types.values():  # a v3 type's definition, unless the module ships one
-        target = defs / f"{generate.type_slug(etd)}.md"
-        if etd.generated and not target.exists():
-            _write(target, generate.definition(etd))
-    steps.append("froze the latest definition of every kernel and module type (INV-23)")
+    # --- the module: its tree, record, entity folders, definitions, invariants
+    if manifest is not None and module_src is not None:
+        import tempfile
+
+        from catalyst import modules
+
+        with tempfile.TemporaryDirectory(prefix="catalyst-init-") as tmp:
+            tree = modules.release_tree(module_src, Path(tmp) / "module", version)
+            seed_module(root, tree, manifest, params, stamp, *modules.source_of(module_src))
+        steps.append(
+            f"seeded module {manifest.id} {manifest.version} (recorded in {modules.RECORD}): "
+            f"{len(manifest.entity_types)} entity folder(s), definitions, invariants"
+        )
 
     # --- IAM --------------------------------------------------------------
     for kind, template in (("users", "users.template.json"), ("roles", "roles.template.json")):
@@ -484,7 +515,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     _write(
         root / "DEPLOYMENT.md",
         f"# Deployment\n\n- Project: `{req.name}`\n- Kernel: {version}\n"
-        f"- Active module: `{manifest.id}` v{manifest.version}\n- Installed: {stamp} by {req.user} "
+        + (f"- Active module: `{manifest.id}` v{manifest.version}\n" if manifest else "- Active module: none\n")
+        + f"- Installed: {stamp} by {req.user} "
         f"with `catalyst init`\n- Shared: no (local-only; `catalyst criterion create <url>` shares it)\n",
     )
     _write(
@@ -499,13 +531,9 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     shutil.copyfile(kernel / "ANALYSIS-PLAYBOOK.md", root / "ANALYSIS-PLAYBOOK.md")
     # the invariants, printed at every session start (`catalyst hook start`)
     shutil.copyfile(kernel / "INVARIANTS.md", root / "INVARIANTS.md")
-    grounding = ["INVARIANTS.md"]
-    if (module_src / "INVARIANTS.module.md").is_file():
-        shutil.copyfile(module_src / "INVARIANTS.module.md", root / "INVARIANTS.module.md")
-        grounding.append("INVARIANTS.module.md")
     steps.append(
         "wrote the journal, version.txt, DEPLOYMENT.md, README.md, ANALYSIS-PLAYBOOK.md, "
-        f"{', '.join(grounding)}; vendored bin/catalyst.pyz"
+        "INVARIANTS.md; vendored bin/catalyst.pyz"
     )
 
     # --- the project side ---------------------------------------------------
@@ -515,7 +543,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         "project_name": req.name,
         "format": FORMAT,
         "kernel_version": version,
-        "module": manifest.id,
+        "module": manifest.id if manifest else None,
         "agent": req.agent,
         "repoed": False,
         "catalyst_repo": None,
@@ -585,6 +613,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
 
         venv, _ = rt.install_into(root, version, root / "bin" / "catalyst.pyz")
         steps.append(f"filled the criterion's runtime {venv} (catalyst {version}, git-ignored)")
+    what = f"kernel {version}, " + (f"module {manifest.id} {manifest.version}" if manifest else "no module")
     _git(root, "init", "-q")
     _git(root, "add", "-A")
     _git(
@@ -596,7 +625,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         "commit",
         "-q",
         "-m",
-        f"catalyst init: {req.name} (kernel {version}, module {manifest.id} {manifest.version})",
+        f"catalyst init: {req.name} ({what})",
     )
     from catalyst import journal
     from catalyst.deployment import load
@@ -609,10 +638,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             action="create",
             artifact=f"deployment of {req.name}",
             targets=[],
-            intent=[
-                f"Install catalyst (kernel {version}, module {manifest.id} {manifest.version}) into "
-                f"{req.name}, on the user's explicit request (INV-2)."
-            ],
+            intent=[f"Install catalyst ({what}) into {req.name}, on the user's explicit request (INV-2)."],
             files=(
                 [str(pointer_path)] + ([str(project / ".gitignore")] if not home_store else [])
                 if _is_repo(project)
