@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.57.1 — 2026-10-13
+
+Three fixes found while releasing 0.57.0. No layout change, no migration.
+
+- `catalyst sync plan|apply` refuse a module that needs a kernel newer than
+  the one the shared criterion's gate runs, and say what to do: sync the
+  kernel alone, publish and merge it, pull, then sync the module. The gate
+  checks a pull request with the CLI of its base branch.
+- `catalyst sync apply` brings the criterion's own runtime to the vendored
+  CLI. The launcher and the Stop hook kept running the old version, which
+  could misread what the sync had deployed.
+- `catalyst share push` says when the branch is pushed but no pull request
+  was opened, and why. It printed nothing, so the publish looked finished.
+
 ## 0.57.0 — 2026-10-12
 
 Module v3, steps M3 to M5: module format 3, a module's own namespace, and a

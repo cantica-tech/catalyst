@@ -224,6 +224,23 @@ def _module_range(dep: Deployment, src: Sources) -> tuple[str | None, str]:
     return None, ""
 
 
+def gate_version(dep: Deployment) -> str | None:
+    """The kernel version that checks this criterion's pull requests, or None
+    when nothing does: the gate runs the CLI of the shared branch as last
+    fetched (CLI.md, "The CI workflow"), not the one a sync brings."""
+    from catalyst import criterion as cr
+
+    if not (dep.root / cr.CI_WORKFLOW).is_file():
+        return None
+    res = subprocess.run(
+        ["git", "-C", str(dep.root), "show", f"origin/{cr.shared_branch(dep)}:version.txt"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return res.stdout.strip() or None if res.returncode == 0 else None
+
+
 def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     from catalyst.versions import satisfies
 
@@ -232,6 +249,13 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         raise SyncError(
             f"{which} works with kernel {requires}, not {src.version}: sync a module release that does "
             f"(--module), or a kernel inside that range"
+        )
+    gate = gate_version(dep) if src.module is not None else None
+    if gate and not satisfies(gate, requires):
+        raise SyncError(
+            f"{which} needs kernel {requires}, and the shared criterion's gate still runs {gate}: it checks "
+            f"every pull request with the CLI of the shared branch, which could not read this module. "
+            f"Sync the kernel alone first (without --module), publish and merge it, pull, then sync the module"
         )
     mod = dep.module
     new_mod_version = (
@@ -542,6 +566,21 @@ def apply(
             ),
         )
     return p, touched
+
+
+def refresh_runtime(dep: Deployment) -> str | None:
+    """Bring the criterion's own runtime (`.venv`) to its vendored CLI, when
+    it has one: the launcher and the hooks run that runtime, and one older
+    than what a sync deployed misreads it. The version now installed, or
+    None when nothing changed."""
+    from catalyst import runtime as rt
+
+    pyz = dep.root / "bin" / "catalyst.pyz"
+    if not (dep.root / ".venv").is_dir() or not pyz.is_file():
+        return None
+    version = rt.pyz_version(pyz)
+    _, changed = rt.install_into(dep.root, version, pyz)
+    return version if changed else None
 
 
 # --- text -----------------------------------------------------------------

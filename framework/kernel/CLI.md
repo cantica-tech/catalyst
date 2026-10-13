@@ -539,7 +539,15 @@ the deployed version; `--base-kernel` names it otherwise.
 - `apply` does it and journals one `/sync-framework` entry. A command file catalyst wrote
   but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
-  The migrations' judgment steps stay with the agent.
+  The migrations' judgment steps stay with the agent. A criterion with its
+  own runtime (`.venv`) has it brought to the vendored CLI, so the launcher
+  and the hooks run the version just deployed.
+- Both refuse a module that needs a kernel newer than the one the shared
+  criterion's gate runs (the `version.txt` of the shared branch as last
+  fetched, when the criterion has the CI workflow): the gate checks every
+  pull request with the CLI of its base branch, which could not read that
+  module. Sync the kernel alone, publish and merge it, pull, then sync the
+  module.
 
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 
@@ -848,7 +856,8 @@ remote, or a project file naming its repository, uses `git`, any other
   this criterion's changes (git: `criterion push`). Without `--yes` it
   prints what it would publish — uncommitted changes, local commits, and
   whether they are added to the open topic branch (its pull request: one
-  batch) or start a new one — and exits `3` (INV-4).
+  batch) or start a new one — and exits `3` (INV-4). When the branch is
+  pushed but no pull request could be opened, it says so and why.
 - `create <url> [--branch <name>] [--protect] [--yes]`: publish a local-only
   criterion for the first time (git: `criterion create <url>`); `--protect`
   also makes pull requests and the `catalyst` check required on the shared
@@ -1065,8 +1074,8 @@ order:
 7. Pushes the topic branch with an explicit lease (the remote branch must
    still be what the push built on), shares the journal pins, and, unless
    `--no-pr`, opens a pull request with `gh` (or reports the one
-   already open for the branch). Without `gh`, it prints the branch to
-   open a pull request from.
+   already open for the branch). Without `gh`, or when `gh` fails, it
+   prints the branch to open a pull request from, and the reason.
 
 Once the pull request is merged, `sync` brings the result back.
 

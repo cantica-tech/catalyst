@@ -682,3 +682,24 @@ def test_ordinary_urls_are_accepted():
         "C:\\repos\\r.git",
     ):
         assert cr.check_url(url) == url
+
+
+def test_a_pull_request_that_could_not_be_opened_says_why(tmp_path, monkeypatch):
+    """BUG-000009: the branch is pushed either way; the caller must be able
+    to say that no pull request exists, and why."""
+    monkeypatch.setattr(cr.shutil, "which", lambda name: None)
+    assert cr.open_pull_request(tmp_path, "criterion", "topic", "t") == (None, "the GitHub CLI `gh` is not installed")
+    monkeypatch.setattr(cr.shutil, "which", lambda name: "/usr/bin/gh")
+    calls = []
+
+    def fake(cmd, **kw):
+        calls.append(cmd[:3])
+        return subprocess.CompletedProcess(cmd, 1, "", "no pull requests found\nerror connecting to api.github.com\n")
+
+    monkeypatch.setattr(cr.subprocess, "run", fake)
+    assert cr.open_pull_request(tmp_path, "criterion", "topic", "t") == (None, "error connecting to api.github.com")
+    assert calls == [["gh", "pr", "view"], ["gh", "pr", "create"]]
+    monkeypatch.setattr(
+        cr.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, "https://example.test/pr/1\n", "")
+    )
+    assert cr.open_pull_request(tmp_path, "criterion", "topic", "t") == ("https://example.test/pr/1", None)

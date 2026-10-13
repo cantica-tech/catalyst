@@ -176,3 +176,23 @@ def test_verbatim_kernel_documents_follow_the_release_unless_edited(tmp_path):
     root = project / ".criterion"
     assert (root / "ANALYSIS-PLAYBOOK.md").read_text(encoding="utf-8") == "playbook 9.9.9\n"
     assert (root / "definitions" / "README.md").read_text(encoding="utf-8") == "my notes\n"
+
+
+def test_apply_brings_the_criterions_runtime_to_the_vendored_cli(tmp_path, monkeypatch):
+    """BUG-000010: the launcher and the hooks run the criterion's `.venv`."""
+    from catalyst import runtime as rt
+
+    project, _ = _deployment(tmp_path)
+    root = project / ".criterion"
+    (root / "bin").mkdir(exist_ok=True)
+    (root / "bin" / "catalyst.pyz").write_bytes(b"pyz")
+    assert sync.refresh_runtime(load(project)) is None  # no runtime of its own: nothing to refresh
+    (root / ".venv").mkdir()
+    (root / ".venv" / rt.MARKER).write_text("0.1.0\n", encoding="utf-8")
+    asked = []
+    monkeypatch.setattr(rt, "pyz_version", lambda pyz: "9.9.9")
+    monkeypatch.setattr(rt, "install_into", lambda c, v, pyz: (asked.append((c, v)), (c / ".venv", True))[1])
+    assert sync.refresh_runtime(load(project)) == "9.9.9"
+    assert asked == [(root, "9.9.9")]
+    monkeypatch.setattr(rt, "install_into", lambda c, v, pyz: (c / ".venv", False))
+    assert sync.refresh_runtime(load(project)) is None  # already there
