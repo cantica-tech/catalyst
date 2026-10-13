@@ -23,7 +23,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from module_loader import parse_simple_yaml
+from module_loader import DEFAULT_TIERS, parse_simple_yaml
 
 RECORD = "modules/modules.json"
 NOT_SHIPPED = ("node_modules", "dist", "catalyst", "__pycache__")
@@ -254,6 +254,18 @@ def read_record(root: Path) -> list[dict]:
     return [e for e in entries if isinstance(e, dict) and e.get("id")] if isinstance(entries, list) else []
 
 
+def installed_ids(root: Path) -> list[str]:
+    """The ids of the modules under the criterion's `modules/`, in install
+    order: the record's order, then any it does not list, by name."""
+    mods = root / "modules"
+    present = sorted(d.name for d in mods.iterdir() if (d / "module.yaml").is_file()) if mods.is_dir() else []
+    try:
+        recorded = [e["id"] for e in read_record(root)]
+    except ModuleError:
+        recorded = []
+    return [i for i in recorded if i in present] + [i for i in present if i not in recorded]
+
+
 def deployed_identity(tree: Path) -> dict:
     """id and version of a deployed module tree (its manifest, else its yaml)."""
     manifest = tree / "manifest.json"
@@ -294,7 +306,8 @@ def record(root: Path, module_id: str, source: str | None, commit: str | None) -
     if source is None and old is not None:
         source, commit = old.get("source"), None
     entry = entry_for(root, module_id, source, commit)
-    entries = sorted([e for e in entries if e["id"] != module_id] + [entry], key=lambda e: e["id"])
+    # install order is kept: a module's part is composed after those installed before it
+    entries = [entry if e["id"] == module_id else e for e in entries] if old is not None else [*entries, entry]
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"modules": entries}, indent=2) + "\n", encoding="utf-8")
     return path
@@ -323,7 +336,8 @@ def verify(root: Path, only: str | None = None) -> list[Finding]:
     recorded = {e["id"]: e for e in read_record(root)}
     present = sorted(d.name for d in mods.iterdir() if (d / "module.yaml").is_file()) if mods.is_dir() else []
     findings = []
-    for module_id in sorted(set(present) | set(recorded)):
+    order = installed_ids(root) + [i for i in recorded if i not in present]  # install order, then the missing
+    for module_id in order:
         if only and module_id != only:
             continue
         entry = recorded.get(module_id)
@@ -356,11 +370,83 @@ def _snapshot(root: Path) -> dict[Path, bytes]:
     }
 
 
+COMMAND_RE = re.compile(r"^- `/([a-z0-9][a-z0-9-]*)", re.M)
+
+
+def command_names(module_dir: Path) -> set[str]:
+    """The slash commands a module brings: those its catalogue part lists,
+    and the create command catalyst generates for each of its v3 types."""
+    from catalyst import compose, generate
+
+    part = module_dir / "code-of-conduct.module.md"
+    text = part.read_text(encoding="utf-8") if part.is_file() else ""
+    generated = {generate.create_command(e) for e in compose.generated_commands(module_dir, text)}
+    return set(COMMAND_RE.findall(text)) | generated
+
+
+META_RULE_RE = re.compile(r"^#{2,3} (?:\d+\. )?`(rr-[A-Z]+-\d+)", re.M)
+
+
+def meta_rules(directory: Path, name: str = "rules-of-rules.module.md") -> set[str]:
+    """The meta-rule IDs a module's handbook part defines."""
+    part = directory / name
+    return set(META_RULE_RE.findall(part.read_text(encoding="utf-8"))) if part.is_file() else set()
+
+
+def collision(manifest, tree: Path, kernel: Path, kernel_types: dict, installed: list, root: Path) -> str | None:
+    """What the module at `tree` shares with the kernel or an installed
+    module and must not (None: nothing): its id, an entity type, a folder,
+    a definition, a namespace, a command, a tier, or its grounding type."""
+    if any(m.id == manifest.id for m in installed):
+        return f"it is already installed (`catalyst module upgrade {manifest.id}` moves it to another release)"
+    owners = [("the kernel", kernel_types)] + [(f"the module {m.id}", m.entity_types) for m in installed]
+    for etd in manifest.entity_types.values():
+        for owner, types in owners:
+            if etd.id_prefix in types:
+                return f"its type {etd.id_prefix} is also a type of {owner}"
+            if etd.folder in {e.folder for e in types.values()}:
+                return f"its folder {etd.folder} (type {etd.id_prefix}) is also a folder of {owner}"
+    defs = tree / "definitions"
+    for name in sorted(d.name for d in defs.iterdir() if d.is_dir()) if installed and defs.is_dir() else []:
+        if (root / "definitions" / f"{name}.md").exists():
+            return f"its definition `{name}` already exists in this criterion"
+    for m in installed:
+        if manifest.namespace and manifest.namespace == m.namespace:
+            return f"its namespace {manifest.namespace} is also the namespace of the module {m.id}"
+        if manifest.grounding_type != m.grounding_type:
+            return (
+                f"it grounds on `{manifest.grounding_type}` and the module {m.id} on `{m.grounding_type}`: "
+                "the modules of one deployment ground on the same type"
+            )
+        theirs = {t.id: t for t in m.tiers or DEFAULT_TIERS}
+        for tier in manifest.tiers or DEFAULT_TIERS:
+            other = theirs.get(tier.id)
+            if other is not None and (other.artifact, other.commit) != (tier.artifact, tier.commit):
+                return f"its tier `{tier.id}` means something else in the module {m.id}"
+    rules = meta_rules(tree)
+    for owner, theirs in [("the kernel", meta_rules(kernel, "rules-of-rules.template.md"))] + [
+        (f"the module {m.id}", meta_rules(root / "modules" / m.id)) for m in installed
+    ]:
+        shared = sorted(rules & theirs)
+        if shared and owner != "the kernel":
+            return f"its meta-rule {shared[0]} is also a meta-rule of {owner}"
+    template = (kernel / "rules-of-development.template.md").read_text(encoding="utf-8")
+    mine = command_names(tree)
+    others = [("the kernel", set(COMMAND_RE.findall(template)))]
+    others += [(f"the module {m.id}", command_names(root / "modules" / m.id)) for m in installed]
+    for owner, theirs in others:
+        shared = sorted(mine & theirs)
+        if shared:
+            return f"its command /{shared[0]} is also a command of {owner}"
+    return None
+
+
 def install(dep, kernel: Path, spec: str, actor: str, intent: list[str]) -> dict:
-    """Install the module `spec` names into a deployment that has none
-    (`catalyst module install`): fetch, check, seed as `init` does,
-    recompose the governing documents, name it in the project file, journal
-    one entry. Every refusal comes before anything is written."""
+    """Install the module `spec` names (`catalyst module install`), as the
+    deployment's first module or beside those it has: fetch, check, seed as
+    `init` does, recompose the governing documents, name a first module in
+    the project file, journal one entry. Every refusal comes before
+    anything is written."""
     import tempfile
 
     from catalyst import compose, init, journal, sync
@@ -368,13 +454,7 @@ def install(dep, kernel: Path, spec: str, actor: str, intent: list[str]) -> dict
     from module_loader import load_kernel_entities, load_module
 
     root = dep.root
-    present = sorted(d.name for d in (root / "modules").iterdir() if d.is_dir()) if (root / "modules").is_dir() else []
-    if dep.module is not None or present:
-        have = dep.module.id if dep.module is not None else present[0]
-        raise ModuleError(
-            f"this criterion already has the module {have}: several modules in one deployment come with a later "
-            f"release (roadmap R4.9, step N3). `catalyst module upgrade {have}` moves it to a newer release"
-        )
+    installed = dep.installed()
     if not (kernel / "rules-of-rules.template.md").is_file():
         raise ModuleError("pass --kernel <framework/kernel of the catalyst release this deployment is at>")
     deployed = (root / "version.txt").read_text(encoding="utf-8").strip()
@@ -405,18 +485,17 @@ def install(dep, kernel: Path, spec: str, actor: str, intent: list[str]) -> dict
                 f"{which} needs kernel {manifest.kernel_version}, and the shared criterion's gate still runs {gate}: "
                 "publish and merge the kernel sync, pull, then install the module"
             )
-        kernel_types = load_kernel_entities()
-        taken_prefixes = set(kernel_types)
-        taken_folders = {e.folder for e in kernel_types.values()}
-        for etd in manifest.entity_types.values():
-            if etd.id_prefix in taken_prefixes or etd.folder in taken_folders:
-                raise ModuleError(
-                    f"{which} declares the type {etd.id_prefix} (folder {etd.folder}), which the kernel already has"
-                )
-        params = compose.deployed_params(root, "")
-        params.module_id = manifest.id
+        clash = collision(manifest, tree, kernel, load_kernel_entities(), installed, root)
+        if clash:
+            raise ModuleError(f"{which} cannot be installed here: {clash}")
+        params = compose.deployed_params(root, installed[0].id if installed else "")
+        if not installed:
+            params.module_id = manifest.id
+        have = dep.module_dirs()
         conflicts = [
-            r.path for r in compose.recompose(root, params, (kernel, None), (kernel, tree), write=False) if r.conflicts
+            r.path
+            for r in compose.recompose(root, params, (kernel, have), (kernel, [*have, tree]), write=False)
+            if r.conflicts
         ]
         if conflicts:
             raise ModuleError(
@@ -424,15 +503,16 @@ def install(dep, kernel: Path, spec: str, actor: str, intent: list[str]) -> dict
                 "resolve with `catalyst recompose` by hand, then install"
             )
         before = _snapshot(root)
-        init.seed_module(root, tree, manifest, params, datetime.date.today().isoformat(), source, commit)
-        compose.recompose(root, params, (kernel, None), (kernel, tree))
+        stamp = datetime.date.today().isoformat()
+        init.seed_module(root, tree, manifest, params, stamp, source, commit, first=not installed)
+        compose.recompose(root, params, (kernel, have), (kernel, [*have, tree]))
         (root / compose.PARAMS_FILE).write_text(json.dumps(params.as_dict(), indent=2) + "\n", encoding="utf-8")
     after = _snapshot(root)
     touched = sorted(f for f, digest in after.items() if before.get(f) != digest)
     import project_file
 
     pointer = project_file.find(dep.project_root)
-    if pointer is not None and not dep.standalone:
+    if pointer is not None and not dep.standalone and not installed:  # the project file names the first module
         data = project_file.read(pointer)
         data["module"] = manifest.id
         data["updated"] = datetime.date.today().isoformat()

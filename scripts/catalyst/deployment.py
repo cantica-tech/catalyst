@@ -42,6 +42,16 @@ class Deployment:
     module: ModuleManifest | None
     etds: dict[str, ETD] = field(default_factory=dict)  # by id prefix
     standalone: bool = False  # a bare working copy, with no project around it
+    # every installed module, in install order; `module` is the first (the one the project file names)
+    modules: list[ModuleManifest] = field(default_factory=list)
+
+    def installed(self) -> list[ModuleManifest]:
+        """Every installed module, in install order (the first is `module`)."""
+        return self.modules or ([self.module] if self.module is not None else [])
+
+    def module_dirs(self) -> list[Path]:
+        """Each installed module's deployed directory, in install order."""
+        return [self.root / "modules" / m.id for m in self.installed()]
 
     def folder(self, etd: ETD) -> Path | None:
         """The ETD's folder in the working copy: at the root, or nested one
@@ -94,11 +104,32 @@ def load(start: Path | None = None) -> Deployment:
             "run catalyst from the project instead"
         )
     module = load_module(project_root)
+    modules = _installed(root, module)
+    return Deployment(project_root, root, read_pointer(project_root), module, _types(modules), modules=modules)
+
+
+def _installed(root: Path, first: ModuleManifest | None) -> list[ModuleManifest]:
+    """Every installed module, in install order: `first` (the one the
+    project file names, wherever it was found), then the others under the
+    criterion's `modules/`."""
+    from catalyst import modules as installed
+
+    found = [first] if first is not None else []
+    for module_id in installed.installed_ids(root):
+        if first is not None and module_id == first.id:
+            continue
+        manifest = load_module(module_dir=root / "modules" / module_id)
+        if manifest is not None:
+            found.append(manifest)
+    return found
+
+
+def _types(modules: list[ModuleManifest]) -> dict[str, ETD]:
     etds = dict(load_kernel_entities())
-    if module is not None:
+    for module in modules:
         for etd in module.entity_types.values():
             etds[etd.id_prefix] = etd
-    return Deployment(project_root, root, read_pointer(project_root), module, etds)
+    return etds
 
 
 def load_working_copy(path: Path) -> Deployment:
@@ -108,14 +139,6 @@ def load_working_copy(path: Path) -> Deployment:
     root = Path(os.path.abspath(path))
     if not (root / "version.txt").is_file() or not (root / "rules").is_dir():
         raise DeploymentNotFound(f"{root} is not a catalyst working copy")
-    mods = (
-        sorted(d for d in (root / "modules").glob("*") if (d / "module.yaml").is_file())
-        if (root / "modules").is_dir()
-        else []
-    )
-    module = load_module(module_dir=mods[0]) if len(mods) == 1 else None
-    etds = dict(load_kernel_entities())
-    if module is not None:
-        for etd in module.entity_types.values():
-            etds[etd.id_prefix] = etd
-    return Deployment(root, root, {}, module, etds, standalone=True)
+    modules = _installed(root, None)
+    module = modules[0] if modules else None
+    return Deployment(root, root, {}, module, _types(modules), standalone=True, modules=modules)

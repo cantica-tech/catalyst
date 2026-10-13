@@ -146,9 +146,10 @@ def _definition_type(name: str) -> str:
     return "-".join(name.lower().split())
 
 
-def build_model(module: ModuleManifest | None = None) -> DeploymentModel:
+def build_model(module: ModuleManifest | None = None, others: tuple[ModuleManifest, ...] = ()) -> DeploymentModel:
     """Derive the DeploymentModel from the kernel's entity types and the
-    given active module manifest (None = kernel only)."""
+    installed modules: `module` (None = kernel only), then `others`, the
+    modules installed beside it."""
     kernel = load_kernel_entities()
     dirs = list(KERNEL_CHECKED_DIRS)
     index_names = set(INDEX_NAMES)
@@ -164,28 +165,30 @@ def build_model(module: ModuleManifest | None = None) -> DeploymentModel:
         return DeploymentModel(tuple(dirs), index_names, tuple(types), free_form)
 
     module_folders: list[str] = []
-    for etd in module.entity_types.values():
-        module_folders.append(etd.folder)
-        if etd.folder not in dirs:
-            dirs.append(etd.folder)
-        index_names.add(f"{etd.folder}.md")
-        if etd.naming == "free-form":
-            free_form.add(etd.folder)
-    # Definition types: the module's definitions/<type>/ directories when it
-    # ships them (they may cover non-entity concepts too), else one per ETD.
-    defs_dir = module.path / "definitions" if module.path else None
-    if defs_dir is not None and defs_dir.is_dir():
-        module_types = sorted(d.name for d in defs_dir.iterdir() if d.is_dir())
-    else:
-        module_types = [_definition_type(e.name) for e in module.entity_types.values()]
-    for t in module_types:
-        if t not in types:
-            types.append(t)
-    for req in module.required_paths:
-        index_names.add(Path(req.path).name)
-    return DeploymentModel(
-        tuple(dirs), index_names, tuple(types), free_form, tuple(module_folders), list(module.required_paths), module.id
-    )
+    required: list = []
+    for mod in (module, *others):
+        for etd in mod.entity_types.values():
+            module_folders.append(etd.folder)
+            if etd.folder not in dirs:
+                dirs.append(etd.folder)
+            index_names.add(f"{etd.folder}.md")
+            if etd.naming == "free-form":
+                free_form.add(etd.folder)
+        # Definition types: the module's definitions/<type>/ directories when it
+        # ships them (they may cover non-entity concepts too), else one per ETD.
+        defs_dir = mod.path / "definitions" if mod.path else None
+        if defs_dir is not None and defs_dir.is_dir():
+            module_types = sorted(d.name for d in defs_dir.iterdir() if d.is_dir())
+        else:
+            module_types = [_definition_type(e.name) for e in mod.entity_types.values()]
+        for t in module_types:
+            if t not in types:
+                types.append(t)
+        for req in mod.required_paths:
+            index_names.add(Path(req.path).name)
+            required.append(req)
+    names = ", ".join(m.id for m in (module, *others))
+    return DeploymentModel(tuple(dirs), index_names, tuple(types), free_form, tuple(module_folders), required, names)
 
 
 def _resolve_pointer(pointer_path: Path) -> Path | None:
@@ -605,14 +608,18 @@ def check_version_drift(root: Path, project_root: Path | None) -> list[str]:
 
 
 def structural_errors(
-    root: Path, project_root: Path | None, module: ModuleManifest | None = None
+    root: Path,
+    project_root: Path | None,
+    module: ModuleManifest | None = None,
+    others: list[ModuleManifest] | None = None,
 ) -> tuple[list[str], str]:
     """Every structural check against the working copy at `root`, and the
-    scope they ran with ("module <id>" or "kernel only"). `module` overrides
-    the one the project declares (a bare working copy has no pointer)."""
+    scope they ran with ("module <id>", "modules <id>, <id>" or "kernel
+    only"). `module` overrides the one the project declares (a bare working
+    copy has no pointer); `others` are the modules installed beside it."""
     if module is None and project_root:
         module = load_module(project_root)
-    model = build_model(module)
+    model = build_model(module, tuple(others or ()))
 
     errors: list[str] = []
     errors += check_naming(root, model)
@@ -628,7 +635,8 @@ def structural_errors(
     errors += check_journal_exists(root)
     errors += check_definitions_exist(root, model)
     errors += check_version_drift(root, project_root)
-    scope = f"module {model.module_id}" if model.module_id else "kernel only"
+    several = bool(others) and module is not None
+    scope = f"{'modules' if several else 'module'} {model.module_id}" if model.module_id else "kernel only"
     return errors, scope
 
 

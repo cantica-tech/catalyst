@@ -149,12 +149,12 @@ def test_every_refusal_leaves_the_criterion_untouched(tmp_path, capsys):
     shutil.copytree(module, clash)
     schema = clash / "schemas" / "item.yaml"
     write(schema, schema.read_text(encoding="utf-8").replace("id_prefix: ITEM", "id_prefix: RECON"))
-    assert "which the kernel already has" in refused(clash)
+    assert "its type RECON is also a type of the kernel" in refused(clash)
 
     assert _install(project, module) == 0
     capsys.readouterr()
-    assert _install(project, module) == 1  # one module per deployment, until several are supported
-    assert "already has the module example-process" in capsys.readouterr().err
+    assert _install(project, module) == 1  # the same module twice
+    assert "it is already installed" in capsys.readouterr().err
 
 
 def test_upgrade_goes_through_sync(tmp_path, capsys):

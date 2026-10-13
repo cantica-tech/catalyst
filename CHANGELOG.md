@@ -6,6 +6,27 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.60.0 — 2026-10-13
+
+Module install, step N3: several modules in one deployment. No migration:
+a deployment with one module is unchanged, and its composed documents are
+the same.
+
+- A deployment holds several modules. `catalyst module install` adds one
+  beside those already there; each module's types, tiers, aliases,
+  namespace, commands, meta-rules and laws are loaded and composed, in
+  install order, under its own `From module <id>` heading.
+- What two modules must not share is refused before anything is written:
+  an id, an entity type or folder, a definition, a namespace, a meta-rule
+  ID, a command, a tier with another meaning, or a different grounding
+  type.
+- `catalyst sync --module` and `catalyst module upgrade` move the one
+  module the source names and leave the others; a kernel-only sync
+  recomposes with every module. A source naming a module that is not
+  installed is refused (it replaced the installed one's tree).
+- `catalyst check` reports its scope as `modules <id>, <id>` when there are
+  several, and checks each module's kernel range.
+
 ## 0.59.0 — 2026-10-13
 
 Module install, step N2: a module installed into a deployment that has

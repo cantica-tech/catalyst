@@ -255,12 +255,14 @@ def seed_module(
     stamp: str,
     source: str | None = None,
     commit: str | None = None,
+    first: bool = True,
 ) -> None:
     """Everything a module adds to the criterion at `root`, the same at
     `init` and at `catalyst module install`: its tree (`tree`: what a release
     ships, `modules.release_tree`) and its record, a folder per entity type
     with index, templates catalog and README, the paths it requires, the
-    definition of each of its types, and its invariants."""
+    definition of each of its types, and its invariants (`first`: it is the
+    deployment's first module)."""
     from catalyst import generate, modules
 
     global PARAMS
@@ -317,7 +319,9 @@ def seed_module(
         target = defs / f"{generate.type_slug(etd)}.md"
         if etd.generated and not target.exists():
             _write(target, generate.definition(etd))
-    if (tree / "INVARIANTS.module.md").is_file():
+    # the first module's invariants sit at the criterion's root; a module
+    # installed beside it keeps its own in its folder (`laws.files`)
+    if first and (tree / "INVARIANTS.module.md").is_file():
         shutil.copyfile(tree / "INVARIANTS.module.md", root / "INVARIANTS.module.md")
 
 
