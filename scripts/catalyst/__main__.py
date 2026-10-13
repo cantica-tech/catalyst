@@ -503,11 +503,11 @@ def cmd_module(args) -> int:
             print("Next: a DEPLOYMENT.md history line, then `catalyst check`.")
         return 0
     if args.module_command == "upgrade":
-        installed = dep.module.id if dep.module is not None else None
-        if args.id != installed:
+        installed = [m.id for m in dep.installed()]
+        if args.id not in installed:
             print(
                 f"catalyst: no module '{args.id}' here"
-                + (f" (installed: {installed})" if installed else ": `catalyst module install` adds one"),
+                + (f" (installed: {', '.join(installed)})" if installed else ": `catalyst module install` adds one"),
                 file=sys.stderr,
             )
             return 1
@@ -1528,13 +1528,28 @@ def cmd_recompose(args) -> int:
         print("catalyst: the deployment has no active module", file=sys.stderr)
         return 1
     params = deployed_params(dep.root, dep.module.id)
-    new_module = args.module_dir or dep.module.path
+    new_module = args.module_dir or dep.module.path or dep.root / "modules" / dep.module.id
+    base_modules, new_modules = args.base_module, new_module
+    if len(dep.installed()) > 1:
+        # several modules: the two directories stand for the one module they
+        # name (the first when they name none); the others are as deployed
+        from catalyst import modules
+
+        try:
+            named = modules.identity(args.base_module)["id"]
+        except modules.ModuleError:
+            named = dep.module.id
+        if named not in [m.id for m in dep.installed()]:
+            named = dep.module.id
+        deployed = {m.id: dep.root / "modules" / m.id for m in dep.installed()}
+        base_modules = [args.base_module if i == named else d for i, d in deployed.items()]
+        new_modules = [new_module if i == named else d for i, d in deployed.items()]
     try:
         results = recompose(
             dep.root,
             params,
-            (args.base_kernel, args.base_module),
-            (args.kernel, new_module),
+            (args.base_kernel, base_modules),
+            (args.kernel, new_modules),
             write=not args.check,
             force=args.force,
         )

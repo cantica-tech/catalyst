@@ -21,8 +21,12 @@ meta-rules, invariants and migrations. The kernel never names a specific
 module or any of its entities (`INVARIANTS.md` INV-30); it only speaks of
 "the active module" and `<entity-type>`.
 
-A deployment activates exactly one module, named by the `module` field of its
-`<app-name>.catalyst` pointer.
+A deployment has one module or several. Its project file's `module` field
+names the first; the criterion's `modules/modules.json` records each one, in
+install order, and `catalyst module install` adds one beside the others. Two
+modules of one deployment share no entity type, folder, definition,
+namespace, meta-rule ID or command, give a tier id one meaning, and ground on
+the same type (`CLI.md`, `catalyst module install`).
 
 ---
 

@@ -27,10 +27,22 @@ def brief(text: str) -> str:
     return text.split(MARKER, 1)[0].rstrip() + "\n"
 
 
+def files(root: Path) -> list[str]:
+    """The laws files of the criterion at `root`, in reading order: the
+    kernel's, the first module's (deployed at the root), then the file each
+    module installed beside it carries in its own folder."""
+    from catalyst import modules
+
+    found = [f for f in FILES if (root / f).is_file()]
+    for module_id in modules.installed_ids(root)[1:]:
+        if (root / "modules" / module_id / FILES[1]).is_file():
+            found.append(f"modules/{module_id}/{FILES[1]}")
+    return found
+
+
 def session_brief(root: Path) -> str:
-    """The kernel's and the module's briefs, as a session start shows them."""
-    parts = [brief(p.read_text(encoding="utf-8", errors="replace")) for p in (root / f for f in FILES) if p.is_file()]
-    return "\n".join(parts)
+    """The kernel's and each module's briefs, as a session start shows them."""
+    return "\n".join(brief((root / f).read_text(encoding="utf-8", errors="replace")) for f in files(root))
 
 
 def _bullets(text: str, pattern: re.Pattern) -> dict[str, str]:
@@ -92,7 +104,7 @@ def why(root: Path, item: str) -> str | None:
 
 
 def _why(root: Path, item: str) -> str | None:
-    texts = [(f, (root / f).read_text(encoding="utf-8", errors="replace")) for f in FILES if (root / f).is_file()]
+    texts = [(f, (root / f).read_text(encoding="utf-8", errors="replace")) for f in files(root)]
     key = item.strip()
     if re.fullmatch(r"(?:[A-Za-z]+-)?[Ll]\d+", key):
         key = key.upper()

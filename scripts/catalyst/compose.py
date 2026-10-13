@@ -59,11 +59,36 @@ def sign_meta_ids(text: str, userid: str, namespaces: tuple[str, ...] = ()) -> s
     return text
 
 
-def module_namespaces(module: Path | None) -> tuple[str, ...]:
+Modules = Path | list[Path] | None  # one module's directory, several in install order, or none
+
+
+def module_dirs(module: Modules) -> list[Path]:
+    """The modules to compose with, in install order."""
+    if module is None:
+        return []
+    return list(module) if isinstance(module, list) else [module]
+
+
+def _module_id(module: Path, p: Params, alone: bool) -> str:
+    """The id a module's part is headed with: the deployment's own when it
+    has one module (as always), else each module's."""
+    if alone:
+        return p.module_id
+    from module_loader import parse_simple_yaml
+
+    data = parse_simple_yaml((module / "module.yaml").read_text(encoding="utf-8"))
+    return str(data.get("id") or module.name) if isinstance(data, dict) else module.name
+
+
+def module_namespaces(module: Modules) -> tuple[str, ...]:
     from module_loader import load_module
 
-    manifest = load_module(module_dir=module) if module is not None else None
-    return (manifest.namespace,) if manifest is not None and manifest.namespace else ()
+    found = []
+    for mod in module_dirs(module):
+        manifest = load_module(module_dir=mod)
+        if manifest is not None and manifest.namespace and manifest.namespace not in found:
+            found.append(manifest.namespace)
+    return tuple(found)
 
 
 def resolve(text: str, p: Params) -> str:
@@ -150,46 +175,74 @@ def generated_commands(module: Path | None, existing: str) -> list:
     ]
 
 
-def code_of_conduct(kernel: Path, module: Path | None, p: Params) -> str:
+def code_of_conduct(kernel: Path, module: Modules, p: Params) -> str:
+    from catalyst import generate
+
     text = (kernel / "rules-of-development.template.md").read_text(encoding="utf-8")
     note = (
         "Instantiates the catalyst kernel's development-rules template "
         "(`framework/kernel/rules-of-development.template.md` in the `catalyst` repository)"
     )
-    contribution = ""
-    if module is not None and (module / "code-of-conduct.module.md").is_file():
-        contribution = (module / "code-of-conduct.module.md").read_text(encoding="utf-8")
-    from catalyst import generate
-
-    generated = "\n".join(generate.catalogue_entry(e) for e in generated_commands(module, contribution))
-    if contribution or generated:
+    mods = module_dirs(module)
+    contributed = []
+    for mod in mods:
+        contribution = ""
+        if (mod / "code-of-conduct.module.md").is_file():
+            contribution = (mod / "code-of-conduct.module.md").read_text(encoding="utf-8")
+        generated = "\n".join(generate.catalogue_entry(e) for e in generated_commands(mod, contribution))
+        if not (contribution or generated):
+            continue
+        mid = _module_id(mod, p, len(mods) == 1)
+        contributed.append(mid)
         for n in (4, 3):  # 4 first: inserting §3 would shift nothing, but keep order explicit
             body = section_body(contribution, n) if contribution else ""
             if n == 4 and generated:
                 body = (body.rstrip("\n") + "\n\n" if body.strip() else "") + generated
             if body:
-                text = insert_at_section_end(text, n, f"### From module {p.module_id}\n\n{body}")
+                text = insert_at_section_end(text, n, f"### From module {mid}\n\n{body}")
+    if len(contributed) == 1 and len(mods) == 1:
         note += (
             f", with the active module's `code-of-conduct.module.md` §3 and §4 inserted at the "
-            f"end of the matching sections under `### From module {p.module_id}` "
+            f"end of the matching sections under `### From module {contributed[0]}` "
             "(`MODULE-SPECIFICATION.md` §6.2)"
+        )
+    elif contributed:
+        note += (
+            ", with each installed module's `code-of-conduct.module.md` §3 and §4 inserted at the "
+            "end of the matching sections under its own `### From module <id>` heading, in install order: "
+            + ", ".join(f"`{m}`" for m in contributed)
+            + " (`MODULE-SPECIFICATION.md` §6.2)"
         )
     text = replace_notice(text, note + ".")
     return sign_meta_ids(resolve(text, p), p.userid, module_namespaces(module))
 
 
-def rules_of_rules(kernel: Path, module: Path | None, p: Params) -> str:
+def rules_of_rules(kernel: Path, module: Modules, p: Params) -> str:
     text = (kernel / "rules-of-rules.template.md").read_text(encoding="utf-8")
     note = (
         "Instantiates the catalyst kernel's rules-of-rules template "
         "(`framework/kernel/rules-of-rules.template.md` in the `catalyst` repository)"
     )
-    if module is not None and (module / "rules-of-rules.module.md").is_file():
-        body = module_body((module / "rules-of-rules.module.md").read_text(encoding="utf-8"))
-        text = text.rstrip("\n") + f"\n\n---\n\n### From module {p.module_id}\n\n{body}\n"
+    mods = module_dirs(module)
+    contributed = []
+    for mod in mods:
+        if not (mod / "rules-of-rules.module.md").is_file():
+            continue
+        mid = _module_id(mod, p, len(mods) == 1)
+        contributed.append(mid)
+        body = module_body((mod / "rules-of-rules.module.md").read_text(encoding="utf-8"))
+        text = text.rstrip("\n") + f"\n\n---\n\n### From module {mid}\n\n{body}\n"
+    if len(contributed) == 1 and len(mods) == 1:
         note += (
             f", with the active module's `rules-of-rules.module.md` appended under "
-            f"`### From module {p.module_id}` (`MODULE-SPECIFICATION.md` §6.1)"
+            f"`### From module {contributed[0]}` (`MODULE-SPECIFICATION.md` §6.1)"
+        )
+    elif contributed:
+        note += (
+            ", with each installed module's `rules-of-rules.module.md` appended under its own "
+            "`### From module <id>` heading, in install order: "
+            + ", ".join(f"`{m}`" for m in contributed)
+            + " (`MODULE-SPECIFICATION.md` §6.1)"
         )
     text = replace_notice(text, note + ".")
     return sign_meta_ids(resolve(text, p), p.userid, module_namespaces(module))
@@ -199,24 +252,27 @@ def access_control(kernel: Path, p: Params) -> str:
     return sign_meta_ids((kernel / "ACCESS-CONTROL.md").read_text(encoding="utf-8"), p.userid)
 
 
-def taskfile(kernel: Path, module: Path | None, p: Params) -> str:
-    text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
-    tasks = ""
-    if module is not None and (module / "Taskfile.module.yml").is_file():
-        mod = (module / "Taskfile.module.yml").read_text(encoding="utf-8")
-        m = re.search(r"^tasks:\s*\n", mod, re.M)
-        tasks = mod[m.end() :] if m else ""
-    contribution = (
-        (module / "code-of-conduct.module.md").read_text(encoding="utf-8")
-        if module is not None and (module / "code-of-conduct.module.md").is_file()
-        else ""
-    )
+def taskfile(kernel: Path, module: Modules, p: Params) -> str:
     from catalyst import generate
 
-    for etd in generated_commands(module, contribution):
-        tasks = tasks.rstrip("\n") + ("\n\n" if tasks.strip() else "") + generate.task(etd)
-    if module is not None and tasks.strip():
-        text += f"\n\n  # --- From module {p.module_id} " + "-" * 20 + "\n" + tasks.rstrip("\n")
+    text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
+    mods = module_dirs(module)
+    for mod in mods:
+        tasks = ""
+        if (mod / "Taskfile.module.yml").is_file():
+            own = (mod / "Taskfile.module.yml").read_text(encoding="utf-8")
+            m = re.search(r"^tasks:\s*\n", own, re.M)
+            tasks = own[m.end() :] if m else ""
+        contribution = (
+            (mod / "code-of-conduct.module.md").read_text(encoding="utf-8")
+            if (mod / "code-of-conduct.module.md").is_file()
+            else ""
+        )
+        for etd in generated_commands(mod, contribution):
+            tasks = tasks.rstrip("\n") + ("\n\n" if tasks.strip() else "") + generate.task(etd)
+        if tasks.strip():
+            mid = _module_id(mod, p, len(mods) == 1)
+            text += f"\n\n  # --- From module {mid} " + "-" * 20 + "\n" + tasks.rstrip("\n")
     # the file sits in the criterion and is run on its own: a task works in
     # the project it was called from, not in the criterion
     text = TASK_RE.sub(lambda m: m.group(0) + "    dir: '{{.USER_WORKING_DIR}}'\n", text)
@@ -287,8 +343,8 @@ def frozen_paths(root: Path) -> set[str]:
 def recompose(
     root: Path,
     params: Params,
-    base: tuple[Path, Path | None],
-    new: tuple[Path, Path | None],
+    base: tuple[Path, Modules],
+    new: tuple[Path, Modules],
     write: bool = True,
     force: bool = False,
 ) -> list[Recomposed]:
