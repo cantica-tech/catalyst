@@ -683,6 +683,15 @@ writes. Each takes `--json`.
   rules no open item targets.
 - `catalyst journal show [--since <date>] [--artifact <id>] [--actor <name>]
   [--rule <id>]`: journal entries in time order, filtered.
+- `catalyst journal show --artifact <id> --content`: the history of one
+  entity (an artifact or a rule; a short ID resolves). Every journal entry
+  that changed its file, whatever it is labelled with, in the journal's
+  causal order, each with who, when, the command, the intent and the file's
+  content before and after, taken from the blobs the journal names. As text
+  each change is a unified diff; `--json` gives the payload described by
+  `spec/history.schema.json` in the catalyst repository. Content whose blob
+  is no longer available is `null`, its hash kept. A rule's history is that
+  of the document that holds it. `--content` needs `--artifact`.
 - `catalyst graph`: the whole chain in one answer — `rules` (with their
   domain, `title` and `status` line), `domains` (each `{code, file, title}`),
   `artifacts` (each `list` row plus `links`, the IDs each reference field
@@ -986,8 +995,10 @@ code over the server's current files, so a client needs no parser of its
 own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 `GET view/<id>` (`catalyst view`), `GET backlog`, and
 `GET journal?since=&artifact=&actor=&rule=` (`catalyst journal show`),
-`GET graph` (`catalyst graph`) and
-`GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`). Each
+`GET graph` (`catalyst graph`),
+`GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`) and
+`GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
+server the content comes from the blobs it holds). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an
 unknown type or ID is a 404 with the CLI's message. `GET events` is a
 server-sent event stream: the current batch on connect, then each new batch

@@ -327,6 +327,12 @@ def test_the_read_side_answers_what_the_cli_answers(machines, server, capsys):
     assert _get(server, "/backlog") == _cli_json(capsys, "backlog")
     assert _get(server, "/journal?actor=bob") == _cli_json(capsys, "journal", "show", "--actor", "bob")
     assert _get(server, "/graph") == _cli_json(capsys, "graph")
+    assert _get(server, f"/impact/{item}?direction=up") == _cli_json(capsys, "impact", item, "--up")
+    # a served criterion has no git of its own: an entity's history takes its content from the server's blobs
+    pushed = max(row["id"] for row in _get(server, "/list?type=ITEM"))
+    served = _get(server, f"/history/{pushed}")
+    assert served == _cli_json(capsys, "journal", "show", "--artifact", pushed, "--content")
+    assert served["entries"] and all(e["content_after"] for e in served["entries"])
     with pytest.raises(serve.ServeError) as err:
         _get(server, "/check")
     assert err.value.status == 501 and "--local" in str(err.value)
