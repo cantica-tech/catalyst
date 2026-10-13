@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.63.0 — 2026-10-14
+
+`catalyst inbox`: what waits for a person. No layout change, no migration.
 
 - `catalyst inbox`: what waits for a person, each item with its evidence
   and the commands that settle it. Commits made outside catalyst, changed
