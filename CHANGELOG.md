@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.57.1 — 2026-10-13
+
+Three fixes found while releasing 0.57.0. No layout change, no migration.
 
 - `catalyst sync plan|apply` refuse a module that needs a kernel newer than
   the one the shared criterion's gate runs, and say what to do: sync the
