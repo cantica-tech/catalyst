@@ -666,7 +666,7 @@ back-references, regenerates the indexes and writes one journal entry
 - `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
   when the field declares a back-reference, cite this artifact back.
 
-### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`
+### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`
 
 Computed from the working copy and the entity type definitions; none of them
 writes. Each takes `--json`.
@@ -692,6 +692,17 @@ writes. Each takes `--json`.
   list. Every rule and artifact also has `mentions`: the IDs its own text
   cites in backticks (a rule: its section, or its file), resolved like field
   links, itself left out.
+- `catalyst impact <id> [--up|--down] [--depth <n>]`: what an entity (an
+  artifact, a rule or a domain; a short ID resolves) rests on, `upstream`,
+  and what rests on it, `downstream`, followed transitively. A link runs
+  from an entity to what one of its reference fields cites, and from a rule
+  to its domain; a derived field mirrors its source and adds none. Each
+  entry has its `depth` and `via`: the entity one step nearer (`id`), the
+  `field`, and the entity that carries it (`on`). `--up` or `--down` gives
+  one side, `--depth` stops after that many links. IDs cited in prose only
+  are listed apart (`mentions`, `mentioned_by`) and never followed. An
+  unknown ID exits `1`. The payload is described by
+  `spec/impact.schema.json` in the catalyst repository.
 
 ### `catalyst unrecorded [<range>] [--json]`
 
@@ -974,8 +985,9 @@ The read side answers what the read commands answer, with the CLI's own
 code over the server's current files, so a client needs no parser of its
 own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 `GET view/<id>` (`catalyst view`), `GET backlog`, and
-`GET journal?since=&artifact=&actor=&rule=` (`catalyst journal show`) and
-`GET graph` (`catalyst graph`). Each
+`GET journal?since=&artifact=&actor=&rule=` (`catalyst journal show`),
+`GET graph` (`catalyst graph`) and
+`GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an
 unknown type or ID is a 404 with the CLI's message. `GET events` is a
 server-sent event stream: the current batch on connect, then each new batch
