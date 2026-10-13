@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.61.0 — 2026-10-13
+
+`catalyst impact`: what an entity rests on and what rests on it. No layout
+change, no migration.
+
+- `catalyst impact <id>`: what an entity rests on and what rests on it,
+  transitively, each entry with its depth and the link that reached it
+  (`--up`, `--down`, `--depth`, `--json`). IDs cited in prose only are
+  listed apart and not followed. Read-only.
+- `catalyst serve` answers `GET /v1/impact/<id>` with the same payload.
+- `spec/impact.schema.json` describes that payload: the first of the
+  schemas a client can generate its types from.
+
 ## 0.60.0 — 2026-10-13
 
 Module install, step N3: several modules in one deployment. No migration:

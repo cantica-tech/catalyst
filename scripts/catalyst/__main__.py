@@ -552,6 +552,23 @@ def cmd_module(args) -> int:
     return 1 if args.module_command == "verify" and bad else 0
 
 
+def cmd_impact(args) -> int:
+    """`impact <id>` (roadmap R5.6): what an entity rests on and what rests
+    on it, read-only."""
+    from catalyst import impact, views
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    direction = "up" if args.up else "down" if args.down else "both"
+    try:
+        found = impact.impact(dep, load_corpus(dep), args.id, direction, args.depth)
+    except views.ViewError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(found, indent=2) if args.json else impact.render(found), end="\n" if args.json else "")
+    return 0
+
+
 def cmd_where(args) -> int:
     """Where the project's criterion is (roadmap R3.1): the project file, its
     name, and the criterion it resolves to — the home store, or legacy."""
@@ -1954,6 +1971,15 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
         q.set_defaults(func=cmd_sync)
+
+    p = sub.add_parser("impact", help="what an entity rests on and what rests on it, transitively (read-only)")
+    p.add_argument("id", help="an artifact, a rule or a domain")
+    way = p.add_mutually_exclusive_group()
+    way.add_argument("--up", action="store_true", help="only what it rests on")
+    way.add_argument("--down", action="store_true", help="only what rests on it")
+    p.add_argument("--depth", type=int, help="stop after this many links (default: all)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_impact)
 
     p = sub.add_parser("module", help="the modules this criterion holds: its record, and each tree against it")
     mods = p.add_subparsers(dest="module_command", required=True)

@@ -197,6 +197,11 @@ class Reads:
                 data = views.view(dep, corpus, item)
             elif what == "graph":
                 data = views.graph(dep, corpus)
+            elif what == "impact":
+                from catalyst import impact
+
+                depth = one("depth")
+                data = impact.impact(dep, corpus, item, one("direction") or "both", int(depth) if depth else None)
             elif what == "backlog":
                 data = views.backlog(dep, corpus)
             else:
@@ -663,7 +668,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._events()
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
-            if method == "GET" and (path in ("/list", "/backlog", "/journal", "/graph") or path.startswith("/view/")):
+            if method == "GET" and (
+                path in ("/list", "/backlog", "/journal", "/graph") or path.startswith(("/view/", "/impact/"))
+            ):
                 what, _, item = path.strip("/").partition("/")
                 seq, data = self.app.read(what, urllib.parse.parse_qs(url.query), urllib.parse.unquote(item))
                 return self._send(200, data, batch=seq)
