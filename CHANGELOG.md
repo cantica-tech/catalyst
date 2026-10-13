@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.59.0 — 2026-10-13
+
+Module install, step N2: a module installed into a deployment that has
+none, and upgraded, by its own verbs. No migration.
 
 - `catalyst module install <source>[@<ref>]` installs a module into a
   deployment that has none: from a directory, a release zip or a git
