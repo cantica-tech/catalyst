@@ -306,7 +306,7 @@ def migrate_definition(
 ) -> tuple[str, int]:
     """Overwrite `definitions/<entity>.md` with that exact version, from the
     kernel's or the deployed module's `definitions/<entity>/`."""
-    sources = [kernel] + ([dep.root / "modules" / dep.module.id] if dep.module else [])
+    sources = [kernel, *dep.module_dirs()]
     versions = definition_versions(sources, entity)
     if not versions:
         known = sorted(

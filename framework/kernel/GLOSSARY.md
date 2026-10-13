@@ -139,8 +139,9 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 - **Process module.** A separately versioned repository contributing a
   deployment's development-artifact types — ETDs, templates, definitions,
   commands, meta-rules, invariants, tasks, migrations — composed into it
-  at install and sync (`MODULE-SPECIFICATION.md`). A deployment has exactly
-  one active module, named in its pointer.
+  at install and sync (`MODULE-SPECIFICATION.md`). A deployment has one or
+  several modules, composed in install order; its project file names the
+  first, and `modules/modules.json` in the criterion records them all.
 - **RECON (reconciliation case).** `RECON-NNNNNN`: the durable record of two
   diverging versions of an entity and the human decision settling it,
   resolved with `/reconcile` (INV-21).

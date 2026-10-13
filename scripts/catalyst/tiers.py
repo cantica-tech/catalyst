@@ -12,8 +12,17 @@ from module_loader import DEFAULT_TIERS, Tier
 
 
 def tiers_for(dep) -> list[Tier]:
-    module = getattr(dep, "module", None)
-    return list(module.tiers) if module is not None and module.tiers else list(DEFAULT_TIERS)
+    """The union of the installed modules' tiers, in install order (a tier
+    two modules declare is the first one's: `module install` refuses two
+    meanings for one id); the kernel's default when none declares any."""
+    one = getattr(dep, "module", None)
+    alone = [one] if one is not None else []
+    modules = getattr(dep, "installed", lambda: alone)()
+    found: dict[str, Tier] = {}
+    for module in modules:
+        for tier in module.tiers or DEFAULT_TIERS:  # a module that declares none has the default ones
+            found.setdefault(tier.id, tier)
+    return list(found.values()) or list(DEFAULT_TIERS)
 
 
 def ids(dep) -> list[str]:
@@ -26,7 +35,7 @@ def check(dep, tier: str | None) -> None:
         return
     known = ids(dep)
     if tier not in known:
-        raise ValueError(f"tier '{tier}' is not one of {', '.join(known)} (the active module's tiers)")
+        raise ValueError(f"tier '{tier}' is not one of {', '.join(known)} (the installed modules' tiers)")
 
 
 def commit_prefixes(dep=None) -> tuple[str, ...]:

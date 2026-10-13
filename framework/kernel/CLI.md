@@ -540,7 +540,11 @@ the deployed version; `--base-kernel` names it otherwise.
   hooks in `.claude/settings.json`), definitions of new types, versions — and the kernel and module
   migrations between the two versions, in order. It writes nothing.
 - `apply` does it and journals one `/sync-framework` entry, the module's
-  record (`modules/modules.json`) with it. A command file catalyst wrote
+  record (`modules/modules.json`) with it.
+- With several modules installed, `--module` moves the one its source
+  names and leaves the others as they are; a source naming a module that
+  is not installed is refused. Without `--module`, the governing documents
+  are recomposed with every installed module. A command file catalyst wrote
   but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
   The migrations' judgment steps stay with the agent. A criterion with its
@@ -555,8 +559,8 @@ the deployed version; `--base-kernel` names it otherwise.
 
 ### `catalyst module install <source>[@<ref>] [--kernel <dir>]`
 
-Installs a module into a deployment that has none, only ever on the user's
-explicit request (INV-2). `<source>` is the module's directory, a release
+Installs a module into a deployment, as its first module or beside those
+it has, only ever on the user's explicit request (INV-2). `<source>` is the module's directory, a release
 zip, or a git repository (a URL, or a bare repository on this machine) with
 an optional `@<ref>`: a branch, a tag or a commit. A repository is cloned
 shallow into a temporary directory, removed afterwards. `--kernel` is the
@@ -568,18 +572,35 @@ per entity type, its definitions and invariants — merges the module's part
 into the governing documents, names the module in the project file, and
 journals one entry (`--as`, `--intent`, `--json`).
 
-It refuses, before writing anything, when the deployment already has a
-module (several modules per deployment are not supported yet); when the
-module's kernel range excludes the deployed kernel, or the one the shared
-criterion's gate runs; when one of its entity prefixes or folders is a
-kernel one; when `--kernel` is not the deployed version; when the merge
-into a governing document would conflict with local edits; or when a URL
-or ref could be read by git as an option.
+It refuses, before writing anything, when the module's kernel range
+excludes the deployed kernel, or the one the shared criterion's gate runs;
+when `--kernel` is not the deployed version; when the merge into a
+governing document would conflict with local edits; when a URL or ref
+could be read by git as an option; or when the module shares with the
+kernel or an installed module something two modules must not share:
+
+- its id (it is already installed: `module upgrade` moves it);
+- an entity type prefix, an entity folder, or a definition;
+- a namespace, or a meta-rule ID;
+- a slash command, listed or generated;
+- a tier id with another artifact or commit prefix (a module that declares
+  no tier has the default ones);
+- or when it grounds on another type than the modules already there.
+
+**Several modules.** A deployment loads every module under its `modules/`,
+in install order (the order of `modules/modules.json`); the project file
+names the first. Entity types, tiers, aliases and namespaces are the union
+of the modules'. The catalogue, the handbook and the Taskfile carry each
+module's part under its own `From module <id>` heading, in install order.
+The first module's invariants sit at the criterion's root
+(`INVARIANTS.module.md`); a module installed beside it keeps its own in
+its folder, and the session brief and `catalyst why` read them all.
+`catalyst check` reports its scope as `modules <id>, <id>`.
 
 ### `catalyst module upgrade <id> [<source>[@<ref>]] [--kernel <dir>] [--plan]`
 
-Moves the installed module to another release through `sync plan|apply`
-(the kernel stays): `--plan` lists what would change and writes nothing.
+Moves one installed module to another release through `sync plan|apply`
+(the kernel and the other modules stay): `--plan` lists what would change and writes nothing.
 Without `<source>`, the repository its record names is fetched; a record
 that names a directory or a zip gives nothing to fetch, and the source must
 be passed. Every refusal of `sync` applies.

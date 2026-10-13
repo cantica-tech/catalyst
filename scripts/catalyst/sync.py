@@ -86,16 +86,54 @@ class Sources:
         self.deployed = (dep.root / "version.txt").read_text(encoding="utf-8").strip()
         self.version = self._kernel_version(self.kernel, kernel)
         self.base_kernel = self._open(base_kernel, "base-kernel") if base_kernel else self._find_base()
-        mod_id = dep.module.id if dep.module else None
-        self.base_module = None
-        if mod_id:
-            deployed_mod = dep.root / "modules" / mod_id
-            self.base_module = self.tmp / "base-module"
-            if deployed_mod.is_dir():
-                shutil.copytree(deployed_mod, self.base_module)
         self.module_arg = module  # as given: where the module comes from (the record's source)
         self.module = self._open_module(module) if module else None
+        installed = dep.installed()
+        # the module this sync moves: the installed one the source names; with no source, none moves
+        self.target = installed[0] if installed else None
+        if self.module is not None and installed:
+            from catalyst import modules
+
+            named = modules.deployed_identity(self.module)["id"]
+            self.target = next((m for m in installed if m.id == named), None)
+            if self.target is None:
+                raise SyncError(
+                    f"{named} is not installed here (installed: {', '.join(m.id for m in installed)}): "
+                    "`catalyst module install` adds a module"
+                )
+        # each installed module as deployed, before anything is written
+        self.base_modules: dict[str, Path] = {}
+        for m in installed:
+            deployed_mod = dep.root / "modules" / m.id
+            if deployed_mod.is_dir():
+                self.base_modules[m.id] = self.tmp / "base-modules" / m.id
+                shutil.copytree(deployed_mod, self.base_modules[m.id])
+        self.base_module = self.base_modules.get(self.target.id) if self.target else None
         self.cli = cli or self._find_cli()
+
+    def moves(self, module) -> bool:
+        """Whether this sync brings a new tree for `module`."""
+        return self.module is not None and self.target is not None and module.id == self.target.id
+
+    def base_list(self, dep: Deployment) -> list[Path]:
+        """The installed modules as deployed, in install order."""
+        return [self.base_modules[m.id] for m in dep.installed() if m.id in self.base_modules]
+
+    def new_list(self, dep: Deployment) -> list[Path]:
+        """The installed modules as the sync leaves them, in install order."""
+        return [
+            self.module if self.module is not None and self.moves(m) else dep.root / "modules" / m.id
+            for m in dep.installed()
+        ]
+
+    def root_invariants(self, dep: Deployment) -> Path | None:
+        """Where the criterion's root `INVARIANTS.module.md` comes from: the
+        first module (the others keep theirs in their own folder)."""
+        first = dep.module
+        if first is None:
+            return None
+        moved = self.module if self.module is not None and self.moves(first) else None
+        return (moved or dep.root / "modules" / first.id) / "INVARIANTS.module.md"
 
     def _open(self, path: Path, name: str) -> Path:
         if path.suffix == ".zip":
@@ -214,14 +252,18 @@ def _command_sources(kernel: Path | None, module: Path | None) -> dict[str, Path
     return found
 
 
-def _module_range(dep: Deployment, src: Sources) -> tuple[str | None, str]:
-    """(the kernel range of the module the sync leaves in place, which module)."""
-    if src.module is not None and (src.module / "manifest.json").is_file():
-        data = json.loads((src.module / "manifest.json").read_text(encoding="utf-8"))
-        return data.get("kernelVersion"), f"{data.get('id', 'the module')} {data.get('version', '')}".strip()
-    if dep.module is not None:
-        return dep.module.kernel_version, f"{dep.module.id} {dep.module.version}"
-    return None, ""
+def _module_ranges(dep: Deployment, src: Sources) -> list[tuple[str | None, str, bool]]:
+    """(kernel range, which module, whether the sync brings it) for each
+    module the sync leaves in place."""
+    found = []
+    for m in dep.installed():
+        if src.module is not None and src.moves(m) and (src.module / "manifest.json").is_file():
+            data = json.loads((src.module / "manifest.json").read_text(encoding="utf-8"))
+            which = f"{data.get('id', 'the module')} {data.get('version', '')}".strip()
+            found.append((data.get("kernelVersion"), which, True))
+        else:
+            found.append((m.kernel_version, f"{m.id} {m.version}", False))
+    return found
 
 
 def gate_version(dep: Deployment) -> str | None:
@@ -244,20 +286,20 @@ def gate_version(dep: Deployment) -> str | None:
 def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     from catalyst.versions import satisfies
 
-    requires, which = _module_range(dep, src)
-    if not satisfies(src.version, requires):
-        raise SyncError(
-            f"{which} works with kernel {requires}, not {src.version}: sync a module release that does "
-            f"(--module), or a kernel inside that range"
-        )
     gate = gate_version(dep) if src.module is not None else None
-    if gate and not satisfies(gate, requires):
-        raise SyncError(
-            f"{which} needs kernel {requires}, and the shared criterion's gate still runs {gate}: it checks "
-            f"every pull request with the CLI of the shared branch, which could not read this module. "
-            f"Sync the kernel alone first (without --module), publish and merge it, pull, then sync the module"
-        )
-    mod = dep.module
+    for requires, which, brought in _module_ranges(dep, src):
+        if not satisfies(src.version, requires):
+            raise SyncError(
+                f"{which} works with kernel {requires}, not {src.version}: sync a module release that does "
+                f"(--module), or a kernel inside that range"
+            )
+        if brought and gate and not satisfies(gate, requires):
+            raise SyncError(
+                f"{which} needs kernel {requires}, and the shared criterion's gate still runs {gate}: it checks "
+                f"every pull request with the CLI of the shared branch, which could not read this module. "
+                f"Sync the kernel alone first (without --module), publish and merge it, pull, then sync the module"
+            )
+    mod = src.target
     new_mod_version = (
         (src.module / "version.txt").read_text(encoding="utf-8").strip()
         if src.module and (src.module / "version.txt").is_file()
@@ -267,10 +309,9 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     root = dep.root
     if src.cli is not None and not _same(src.cli, root / "bin" / "catalyst.pyz"):
         p.actions.append(Action("cli", ".criterion/bin/catalyst.pyz", "update", f"catalyst {src.version}"))
-    module_dir = src.module or (root / "modules" / mod.id if mod else None)
     for name, source in (
         ("INVARIANTS.md", src.kernel / "INVARIANTS.md"),
-        ("INVARIANTS.module.md", module_dir / "INVARIANTS.module.md" if module_dir else None),
+        ("INVARIANTS.module.md", src.root_invariants(dep)),
     ):
         if source is not None and source.is_file() and not _same(source, root / name):
             p.actions.append(
@@ -308,23 +349,26 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
     if mod is not None:
         from catalyst import modules
 
-        if any(a.kind == "module" for a in p.actions) or modules.needs_record(root, mod.id):
+        unrecorded = [m.id for m in dep.installed() if modules.needs_record(root, m.id)]
+        if any(a.kind == "module" for a in p.actions) or unrecorded:
+            moved = [mod.id] if any(a.kind == "module" for a in p.actions) else []
+            named = ", ".join(dict.fromkeys(moved + unrecorded))
             p.actions.append(
                 Action(
                     "record",
                     f".criterion/{modules.RECORD}",
                     "update" if (root / modules.RECORD).is_file() else "add",
-                    f"what {mod.id} is and where it came from",
+                    f"what {named} is and where it came from",
                 )
             )
     moving = p.from_kernel != p.to_kernel or any(a.kind == "module" for a in p.actions)
     if mod is not None and moving and src.base_kernel is not None:
-        params = compose.deployed_params(root, mod.id)
+        params = compose.deployed_params(root, dep.module.id if dep.module else mod.id)
         for r in compose.recompose(
             root,
             params,
-            (src.base_kernel, src.base_module),
-            (src.kernel, src.module or root / "modules" / mod.id),
+            (src.base_kernel, src.base_list(dep)),
+            (src.kernel, src.new_list(dep)),
             write=False,
         ):
             if r.changed or r.frozen:
@@ -485,7 +529,7 @@ def apply(
             + ": resolve with `catalyst recompose` by hand, then sync"
         )
     root, touched = dep.root, []
-    mod = dep.module
+    mod = src.target
     for a in p.actions:
         if a.kind == "cli":
             shutil.copyfile(src.cli, root / "bin" / "catalyst.pyz")
@@ -497,7 +541,7 @@ def apply(
             touched.append(root / rel)
         elif a.kind == "invariants":
             name = Path(a.target).name
-            source = src.kernel / name if name == "INVARIANTS.md" else (src.module or root / "modules" / mod.id) / name
+            source = src.kernel / name if name == "INVARIANTS.md" else src.root_invariants(dep)
             shutil.copyfile(source, root / name)
             touched.append(root / name)
     if any(a.kind == "module" for a in p.actions):
@@ -514,11 +558,15 @@ def apply(
     if mod is not None and any(a.kind == "record" for a in p.actions):
         from catalyst import modules
 
-        touched.append(modules.record(root, mod.id, *modules.source_of(src.module_arg)))
+        if any(a.kind == "module" for a in p.actions) or modules.needs_record(root, mod.id):
+            touched.append(modules.record(root, mod.id, *modules.source_of(src.module_arg)))
+        for other in dep.installed():  # one installed before the record existed: recorded as it is
+            if other.id != mod.id and modules.needs_record(root, other.id):
+                touched.append(modules.record(root, other.id, None, None))
     if mod is not None and src.base_kernel is not None and any(a.kind == "document" for a in p.actions):
-        params = compose.deployed_params(root, mod.id)
+        params = compose.deployed_params(root, dep.module.id if dep.module else mod.id)
         for r in compose.recompose(
-            root, params, (src.base_kernel, src.base_module), (src.kernel, root / "modules" / mod.id)
+            root, params, (src.base_kernel, src.base_list(dep)), (src.kernel, dep.module_dirs())
         ):
             if r.changed:
                 touched.append(root / r.path)

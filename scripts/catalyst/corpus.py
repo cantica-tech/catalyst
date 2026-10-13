@@ -281,8 +281,8 @@ def load_corpus(dep: Deployment) -> Corpus:
     corpus.rules, corpus.indexed_rules = _rules(dep.root)
     corpus.domains = _domains(dep.root)
     corpus.users = _users(dep.root)
-    if dep.module is not None:
-        for old, new in dep.module.aliases.items():
+    for module in dep.installed():
+        for old, new in module.aliases.items():
             ko, kn = meta_key(old), meta_key(new)
             if ko and kn:
                 corpus.aliases[ko] = kn

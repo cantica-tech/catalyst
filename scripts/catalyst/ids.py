@@ -115,7 +115,7 @@ def next_rule_id(
 ) -> str:
     """The next rule ID in `domain` (numbers are unique within the DOMAIN,
     never reused). `reserve` as for next_entity_id."""
-    meta = {"META"} | ({dep.module.namespace} if dep.module is not None and dep.module.namespace else set())
+    meta = {"META"} | {m.namespace for m in dep.installed() if m.namespace}
     if domain not in corpus.domains and domain not in meta:
         raise IdError(f"domain '{domain}' is not registered in rules/domains/domains.md")
     userid = _signer_userid(signer)

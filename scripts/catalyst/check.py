@@ -62,20 +62,24 @@ def run(dep: Deployment) -> Report:
                 f"scope: {dep.project_root.name} has a pointer but is opted out of catalyst "
                 f"by a {IGNORE_FILE} — remove one or the other"
             )
-    if dep.module is not None and dep.module.kernel_version and (dep.root / "version.txt").is_file():
+    for module in dep.installed() if (dep.root / "version.txt").is_file() else []:
+        if not module.kernel_version:
+            continue
         from catalyst.versions import VersionError, satisfies
 
         deployed = (dep.root / "version.txt").read_text(encoding="utf-8").strip()
         try:
-            inside = satisfies(deployed, dep.module.kernel_version)
+            inside = satisfies(deployed, module.kernel_version)
         except VersionError:
             inside = True  # an unreadable version is the structure check's to report
         if not inside:
             report.errors.append(
-                f"module: {dep.module.id} {dep.module.version} works with kernel {dep.module.kernel_version}, "
+                f"module: {module.id} {module.version} works with kernel {module.kernel_version}, "
                 f"but this deployment is at {deployed} — sync a module release that matches (fw-STRUCTURE-000016)"
             )
-    structure, report.scope = structural_errors(dep.root, None if dep.standalone else dep.project_root, dep.module)
+    structure, report.scope = structural_errors(
+        dep.root, None if dep.standalone else dep.project_root, dep.module, dep.installed()[1:]
+    )
     report.errors += [f"structure: {e}" for e in structure]
     corpus = load_corpus(dep)
     for f in validate(dep, corpus):
