@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst journal show --artifact <id> --content`: the history of one
+  entity. Every journal entry that changed its file, whatever it is
+  labelled with, each with the file's content before and after; as text,
+  a unified diff per change. Read-only.
+- `catalyst serve` answers `GET /v1/history/<id>` with the same payload;
+  a served criterion takes the content from the blobs the server holds.
+- `spec/history.schema.json` describes that payload.
+
 ## 0.61.0 — 2026-10-13
 
 `catalyst impact`: what an entity rests on and what rests on it. No layout
