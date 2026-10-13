@@ -453,6 +453,40 @@ def cmd_sync(args) -> int:
     return 0
 
 
+def cmd_module(args) -> int:
+    """`module list|verify` (roadmap R4.9, N1): the criterion's record of its
+    modules, and each module's tree against it."""
+    from catalyst import modules
+
+    dep = open_deployment(args)
+    try:
+        findings = modules.verify(dep.root, getattr(args, "id", None))
+    except modules.ModuleError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    bad = [f for f in findings if f.state in ("changed", "missing")]
+    if args.json:
+        print(json.dumps([f.as_dict() for f in findings], indent=2))
+    elif not findings:
+        print("no module installed")
+    elif args.module_command == "list":
+        for f in findings:
+            where = f.source or ("not recorded: the next `catalyst sync apply` records it" if not f.sha256 else "?")
+            print(f"{f.id} {f.version or '?'}  {where}" + (f" @ {f.commit[:12]}" if f.commit else ""))
+            if f.sha256:
+                print(f"    sha256 {f.sha256}")
+    else:
+        said = {
+            "ok": "matches its record",
+            "changed": "differs from its record: a file under its folder changed outside `catalyst sync`",
+            "unrecorded": "not recorded (installed before the record existed): the next `catalyst sync apply` records it",
+            "missing": "recorded, but its folder is gone",
+        }
+        for f in findings:
+            print(f"{f.id} {f.version or '?'}: {said[f.state]}")
+    return 1 if args.module_command == "verify" and bad else 0
+
+
 def cmd_where(args) -> int:
     """Where the project's criterion is (roadmap R3.1): the project file, its
     name, and the criterion it resolves to — the home store, or legacy."""
@@ -1828,6 +1862,18 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
         q.set_defaults(func=cmd_sync)
+
+    p = sub.add_parser("module", help="the modules this criterion holds: its record, and each tree against it")
+    mods = p.add_subparsers(dest="module_command", required=True)
+    q = mods.add_parser("list", help="each installed module: id, version, source, commit, hash (no network)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_module)
+    q = mods.add_parser(
+        "verify", help="recompute each module's hash and compare it with the record (exit 1 on a difference)"
+    )
+    q.add_argument("id", nargs="?", help="one module (default: all)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_module)
 
     p = sub.add_parser("where", help="the project's criterion: the home store, or a legacy working copy")
     p.add_argument("--json", action="store_true")

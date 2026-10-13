@@ -27,7 +27,6 @@ from catalyst import compose
 from catalyst.ids import generate_userid
 from module_loader import load_module
 
-SHIPPED_EXCLUDE = {".git", "catalyst", "node_modules", "dist", "__pycache__"}
 KERNEL_TYPES = {  # kernel entity folders, their template source and index
     "rules": ("RULE", "rule.template.md"),
     "rules/domains": ("DOMAIN", "domain.template.md"),
@@ -330,9 +329,16 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     steps.append("composed CODE-OF-CONDUCT.md, rules/Rules-of-Rules.md, ACCESS-CONTROL.md, Taskfile.common.yml")
 
     # --- the module, seeded whole -----------------------------------------
+    # what a release of it ships, as `sync` seeds it, and the record of it
+    import tempfile
+
+    from catalyst import modules
+
     mod_dest = root / "modules" / manifest.id
-    shutil.copytree(module_src, mod_dest, ignore=lambda d, names: [n for n in names if n in SHIPPED_EXCLUDE])
-    steps.append(f"seeded module {manifest.id} {manifest.version}")
+    with tempfile.TemporaryDirectory(prefix="catalyst-init-") as tmp:
+        shutil.copytree(modules.release_tree(module_src, Path(tmp) / "module", version), mod_dest)
+    modules.record(root, manifest.id, *modules.source_of(module_src))
+    steps.append(f"seeded module {manifest.id} {manifest.version} (recorded in {modules.RECORD})")
 
     # --- kernel entity folders --------------------------------------------
     kt = kernel / "templates"
