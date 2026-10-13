@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.62.0 — 2026-10-13
+
+The history of one entity, with its content before and after each change.
+No layout change, no migration.
 
 - `catalyst journal show --artifact <id> --content`: the history of one
   entity. Every journal entry that changed its file, whatever it is
