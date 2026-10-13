@@ -200,7 +200,13 @@ class GitShare:
             res = cr.push(self.dep, signer, message, open_pr=open_pr)
         except cr.NeedsURL:
             raise ShareError(NOT_SHARED) from None
-        return {"branch": res.branch, "commits": res.commits, "pull_request": res.pr, "regenerated": res.regenerated}
+        return {
+            "branch": res.branch,
+            "commits": res.commits,
+            "pull_request": res.pr,
+            "pull_request_note": res.pr_note,
+            "regenerated": res.regenerated,
+        }
 
 
 DRIVERS: dict[str, type] = {"local": LocalShare, "git": GitShare}
