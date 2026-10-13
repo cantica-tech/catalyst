@@ -133,6 +133,11 @@ def _is_repository(path: Path) -> bool:
     return path.is_dir() and _git(path, "rev-parse", "--git-dir") is not None and not (path / "module.yaml").is_file()
 
 
+# The clone holds the files as the repository stores them: a machine that
+# converts line endings on checkout would otherwise seed a different tree.
+AS_STORED = ("-c", "core.autocrlf=false", "-c", "core.eol=lf")
+
+
 def fetch(spec: str, tmp: Path) -> tuple[Path, str | None, str | None]:
     """A module source as (directory or zip, source, commit): a directory or
     a release zip as they are; a git repository (a URL, or a bare repository
@@ -149,16 +154,31 @@ def fetch(spec: str, tmp: Path) -> tuple[Path, str | None, str | None]:
     if ref is not None and not REF_RE.match(ref):
         raise ModuleError(f"{ref!r} is not a usable branch, tag or commit")
     dest = tmp / "clone"
-    shallow = ["git", "clone", "-q", "--depth", "1", *(["--branch", ref] if ref else []), "--", repo, str(dest)]
+    shallow = [
+        "git",
+        *AS_STORED,
+        "clone",
+        "-q",
+        "--depth",
+        "1",
+        *(["--branch", ref] if ref else []),
+        "--",
+        repo,
+        str(dest),
+    ]
     res = subprocess.run(shallow, capture_output=True, text=True, encoding="utf-8", check=False)
     if res.returncode != 0 and ref:  # a commit is not a branch: clone whole, then check it out
         shutil.rmtree(dest, ignore_errors=True)
         res = subprocess.run(
-            ["git", "clone", "-q", "--", repo, str(dest)], capture_output=True, text=True, encoding="utf-8", check=False
+            ["git", *AS_STORED, "clone", "-q", "--", repo, str(dest)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
         )
         if res.returncode == 0:
             res = subprocess.run(
-                ["git", "-C", str(dest), "checkout", "-q", "--detach", ref],
+                ["git", *AS_STORED, "-C", str(dest), "checkout", "-q", "--detach", ref],
                 capture_output=True,
                 text=True,
                 encoding="utf-8",

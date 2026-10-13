@@ -195,6 +195,21 @@ def test_sync_takes_a_git_repository_for_the_module(tmp_path, capsys):
     assert "could not fetch example-process.git@nope" in capsys.readouterr().err
 
 
+def test_a_clone_holds_the_files_as_the_repository_stores_them(tmp_path, monkeypatch):
+    """A machine that converts line endings on checkout (git on Windows by
+    default) must seed the same tree as any other."""
+    module = tmp_path / "example-process"
+    write(module / "module.yaml", "id: example-process\n")
+    bare, _ = _repository(tmp_path, module)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.autocrlf")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "true")
+    clone, _, _ = modules.fetch(f"{bare}@v1", tmp_path / "fetched")
+    assert b"\r\n" not in (clone / "module.yaml").read_bytes()
+    clone, _, _ = modules.fetch(str(bare), tmp_path / "fetched-again")
+    assert b"\r\n" not in (clone / "module.yaml").read_bytes()
+
+
 @pytest.mark.parametrize(
     ("spec", "source", "ref"),
     [

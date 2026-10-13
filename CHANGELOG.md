@@ -23,6 +23,10 @@ none, and upgraded, by its own verbs. No migration.
   another release through `sync` (`--plan` only plans); without a source
   it fetches the repository the record names.
 - `catalyst sync --module` takes a git repository with an optional `@<ref>`.
+- A module reaches a criterion with the line endings its repository
+  stores: a clone ignores the machine's conversion on checkout, and `sync`
+  takes a file whose line endings alone differ as unchanged, as the
+  journal does.
 
 ## 0.58.0 — 2026-10-13
 

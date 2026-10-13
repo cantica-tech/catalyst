@@ -160,7 +160,14 @@ class Sources:
 
 # --- planning -------------------------------------------------------------
 def _same(a: Path, b: Path) -> bool:
-    return a.is_file() and b.is_file() and filecmp.cmp(a, b, shallow=False)
+    """The same content, as the journal sees it: a text file whose line
+    endings alone differ (a checkout that converts them) is the same."""
+    if not (a.is_file() and b.is_file()):
+        return False
+    if filecmp.cmp(a, b, shallow=False):
+        return True
+    one, other = a.read_bytes(), b.read_bytes()
+    return b"\0" not in one and b"\0" not in other and one.replace(b"\r\n", b"\n") == other.replace(b"\r\n", b"\n")
 
 
 def _tree_changes(new: Path, old: Path) -> list[str]:
