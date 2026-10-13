@@ -6,7 +6,11 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.60.0 — 2026-10-13
+
+Module install, step N3: several modules in one deployment. No migration:
+a deployment with one module is unchanged, and its composed documents are
+the same.
 
 - A deployment holds several modules. `catalyst module install` adds one
   beside those already there; each module's types, tiers, aliases,
