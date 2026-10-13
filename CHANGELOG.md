@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.61.0 — 2026-10-13
+
+`catalyst impact`: what an entity rests on and what rests on it. No layout
+change, no migration.
 
 - `catalyst impact <id>`: what an entity rests on and what rests on it,
   transitively, each entry with its depth and the link that reached it
