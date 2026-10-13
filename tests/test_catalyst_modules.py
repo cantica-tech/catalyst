@@ -43,6 +43,21 @@ def test_init_and_sync_seed_the_same_tree(tmp_path):
     assert "module" not in kinds and "record" not in kinds
 
 
+def test_a_module_checked_out_with_other_line_endings_is_the_same_module(tmp_path):
+    """A checkout that converts line endings (git on Windows by default)
+    must not make `sync` see, and try to journal, a change in every file."""
+    project, deployed = _deployment(tmp_path)
+    converted = tmp_path / "converted" / "example-process"
+    shutil.copytree(tmp_path / "example-process", converted)
+    for f in converted.rglob("*"):
+        if f.is_file():
+            f.write_bytes(f.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+    dep = load(project)
+    src = sync.Sources(dep, _release(tmp_path, deployed), converted, None, None)
+    assert not {a.kind for a in sync.plan(dep, src, None).actions} & {"module", "record"}
+    src.close()
+
+
 def test_the_hash_does_not_depend_on_line_endings(tmp_path):
     project, _ = _deployment(tmp_path)
     tree = project / ".criterion" / "modules" / "example-process"

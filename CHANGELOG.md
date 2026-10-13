@@ -6,6 +6,28 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.59.0 — 2026-10-13
+
+Module install, step N2: a module installed into a deployment that has
+none, and upgraded, by its own verbs. No migration.
+
+- `catalyst module install <source>[@<ref>]` installs a module into a
+  deployment that has none: from a directory, a release zip or a git
+  repository (a branch, a tag or a commit). It seeds the module as `init`
+  does, merges its part into the governing documents and journals one
+  entry; every refusal comes before anything is written.
+- `catalyst init --no-module` installs the kernel's types only. `init`
+  without `--module` or `--no-module` still refuses and lists the modules
+  it finds.
+- `catalyst module upgrade <id> [<source>]` moves the installed module to
+  another release through `sync` (`--plan` only plans); without a source
+  it fetches the repository the record names.
+- `catalyst sync --module` takes a git repository with an optional `@<ref>`.
+- A module reaches a criterion with the line endings its repository
+  stores: a clone ignores the machine's conversion on checkout, and `sync`
+  takes a file whose line endings alone differ as unchanged, as the
+  journal does.
+
 ## 0.58.0 — 2026-10-13
 
 Module install, step N1: one way to seed a module, and a record of what a
