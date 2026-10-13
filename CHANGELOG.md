@@ -6,7 +6,11 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.58.0 — 2026-10-13
+
+Module install, step N1: one way to seed a module, and a record of what a
+criterion holds. No migration: a sync writes the record for a deployment
+that has none.
 
 - `catalyst init` and `catalyst sync apply` seed a module the same way: what
   its release ships, with the manifest a release carries. `init` copied the
