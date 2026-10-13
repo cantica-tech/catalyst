@@ -536,7 +536,8 @@ the deployed version; `--base-kernel` names it otherwise.
   into the project to retire (`.claude/commands/`, or `--commands-dir`, and the
   hooks in `.claude/settings.json`), definitions of new types, versions — and the kernel and module
   migrations between the two versions, in order. It writes nothing.
-- `apply` does it and journals one `/sync-framework` entry. A command file catalyst wrote
+- `apply` does it and journals one `/sync-framework` entry, the module's
+  record (`modules/modules.json`) with it. A command file catalyst wrote
   but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a plugin catalog is never touched.
   The migrations' judgment steps stay with the agent. A criterion with its
@@ -548,6 +549,23 @@ the deployed version; `--base-kernel` names it otherwise.
   pull request with the CLI of its base branch, which could not read that
   module. Sync the kernel alone, publish and merge it, pull, then sync the
   module.
+
+### `catalyst module list|verify [<id>] [--json]`
+
+The modules a criterion holds. `init` and `sync apply` seed a module the
+same way — what its release ships, with the manifest a release carries —
+and record it in `modules/modules.json`: id, version, source (a repository
+URL, a release file's name or a directory's name, never a path), the commit
+when the source is a git checkout, and the sha256 of the deployed tree
+(text files counted with LF line endings, so every platform agrees).
+
+- `list` prints the record; no network.
+- `verify` recomputes each tree's hash and exits `1` when one differs from
+  its record, or when a recorded module's folder is gone. `catalyst check`
+  reports both as errors.
+- A deployment installed before the record existed is listed as not
+  recorded, which is not an error: its next `sync apply` records it (the
+  source stays empty when that sync names no `--module`).
 
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 

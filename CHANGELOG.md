@@ -6,6 +6,21 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst init` and `catalyst sync apply` seed a module the same way: what
+  its release ships, with the manifest a release carries. `init` copied the
+  checkout minus a few folders and wrote no manifest.
+- A criterion records the modules it holds in `modules/modules.json`: id,
+  version, source (never a path), commit and the sha256 of the deployed
+  tree. `init` writes it; `sync apply` updates it, and writes it for a
+  deployment that has none.
+- `catalyst module list` prints that record; `catalyst module verify`
+  recomputes each tree's hash and exits `1` on a difference, which
+  `catalyst check` reports as an error.
+- `catalyst sync` with a module checkout no longer needs catalyst's
+  packaging script, which the shipped CLI does not carry.
+
 ## 0.57.1 — 2026-10-13
 
 Three fixes found while releasing 0.57.0. No layout change, no migration.

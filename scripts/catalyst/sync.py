@@ -93,6 +93,7 @@ class Sources:
             self.base_module = self.tmp / "base-module"
             if deployed_mod.is_dir():
                 shutil.copytree(deployed_mod, self.base_module)
+        self.module_arg = module  # as given: where the module comes from (the record's source)
         self.module = self._open_module(module) if module else None
         self.cli = cli or self._find_cli()
 
@@ -109,20 +110,12 @@ class Sources:
     def _open_module(self, path: Path) -> Path:
         """A module release: its zip, or a checkout reduced to what its release
         ships (plus the manifest the release would carry)."""
-        if path.suffix == ".zip":
-            return self._open(path, "module")
-        import package_release
+        from catalyst import modules
 
-        info = package_release.module_info_at(path)
-        if info is None:
-            raise SyncError(f"{path} is not a module (no module.yaml)")
-        out = self.tmp / "module"
-        for file, arcname in package_release.shipped_files(path):
-            (out / arcname).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(file, out / arcname)
-        manifest = package_release.module_manifest(info, info.kernel_version or f">={self.version}")
-        (out / "manifest.json").write_bytes(json.dumps(manifest, indent=2).encode("utf-8"))
-        return out
+        try:
+            return modules.release_tree(path, self.tmp / "module", self.version)
+        except modules.ModuleError as exc:
+            raise SyncError(str(exc)) from None
 
     @staticmethod
     def _kernel_version(kernel: Path, arg: Path) -> str:
@@ -303,6 +296,18 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
                     f".criterion/modules/{mod.id}",
                     "update",
                     f"{len(changed)} file(s), {p.from_module} -> {p.to_module}",
+                )
+            )
+    if mod is not None:
+        from catalyst import modules
+
+        if any(a.kind == "module" for a in p.actions) or modules.needs_record(root, mod.id):
+            p.actions.append(
+                Action(
+                    "record",
+                    f".criterion/{modules.RECORD}",
+                    "update" if (root / modules.RECORD).is_file() else "add",
+                    f"what {mod.id} is and where it came from",
                 )
             )
     moving = p.from_kernel != p.to_kernel or any(a.kind == "module" for a in p.actions)
@@ -499,6 +504,10 @@ def apply(
             for f in sorted(before | after)
             if f not in after or f not in before or not _same(target / f, src.base_module / f)
         ]
+    if mod is not None and any(a.kind == "record" for a in p.actions):
+        from catalyst import modules
+
+        touched.append(modules.record(root, mod.id, *modules.source_of(src.module_arg)))
     if mod is not None and src.base_kernel is not None and any(a.kind == "document" for a in p.actions):
         params = compose.deployed_params(root, mod.id)
         for r in compose.recompose(

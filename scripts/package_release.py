@@ -129,15 +129,11 @@ def run_cmd(cmd: list[str], cwd: Path) -> str:
 
 
 def shipped_files(src: Path):
-    """(file, archive name) for what a release ships from `src`: no hidden
-    files, no node_modules, dist or packaged releases (`catalyst/`)."""
-    for file in sorted(src.rglob("*")):
-        if not file.is_file():
-            continue
-        rel_path = file.relative_to(src)
-        if any(p.startswith(".") or p in ("node_modules", "dist", "catalyst") for p in rel_path.parts):
-            continue
-        yield file, rel_path.as_posix()
+    """(file, archive name) for what a release ships from `src` (one
+    definition, shared with what `init` and `sync` seed)."""
+    from catalyst.modules import shipped_files as shipped
+
+    return shipped(src)
 
 
 def module_manifest(module: ModuleInfo, requires: str) -> dict:

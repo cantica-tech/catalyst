@@ -130,6 +130,7 @@ submodule or a directory), read for one minor.
 | `ANALYSIS-PLAYBOOK.md` | The analysis process's phases, prompts and findings format, verbatim from the kernel (`/run-analysis`). | — |
 | `definitions/<type>.md` | One frozen definition per kernel and module entity type, plus `definitions/README.md` (INV-23). | Structure: one per type. |
 | `modules/<module-id>/` | The whole active module tree, as released. | — |
+| `modules/modules.json` | The record of each installed module: id, version, source, commit, sha256 of its tree, date. Written by `init` and `sync apply`; read by `catalyst module list\|verify` and `check`. | — |
 | `.gitattributes` | Shared deployments: the union-merge block (§8). | — |
 | `.github/workflows/catalyst.yml` | Shared deployments: the criterion repository's CI (`CLI.md`). | — |
 | `.frozen` | Optional: items `/sync-framework` leaves alone (§9). | — |

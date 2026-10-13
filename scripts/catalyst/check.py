@@ -128,6 +128,16 @@ def run(dep: Deployment) -> Report:
             f"index: .criterion/{c.path.relative_to(dep.root)} is out of date (`catalyst index regen`)"
         )
     report.errors += [f"integrity: {p}" for p in merge_integrity(dep)]
+    from catalyst import modules
+
+    for f in modules.verify(dep.root):
+        if f.state == "changed":
+            report.errors.append(
+                f"module: {f.id} differs from its record in {modules.RECORD}: a file under modules/{f.id}/ "
+                "changed outside `catalyst sync` (`catalyst module verify`)"
+            )
+        elif f.state == "missing":
+            report.errors.append(f"module: {f.id} is recorded in {modules.RECORD} but modules/{f.id}/ is gone")
     return report
 
 
