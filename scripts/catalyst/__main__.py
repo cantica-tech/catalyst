@@ -435,11 +435,21 @@ def cmd_sync(args) -> int:
         return 1
     finally:
         src.close()
+    from catalyst import runtime as rt
+
+    try:
+        runtime, runtime_note = sync.refresh_runtime(dep), None
+    except (rt.RuntimeError_, OSError, subprocess.CalledProcessError) as exc:
+        runtime, runtime_note = None, f"the criterion's runtime was not refreshed ({exc}): run `catalyst open`"
     if args.json:
-        print(json.dumps({**p.as_dict(), "touched": [str(t) for t in touched]}, indent=2))
+        print(json.dumps({**p.as_dict(), "touched": [str(t) for t in touched], "runtime": runtime}, indent=2))
     else:
         sys.stdout.write(sync.render(p, applied=True))
+        if runtime:
+            print(f"    update  runtime    .criterion/.venv  (catalyst {runtime})")
         print("Next: the migrations' judgment steps above, a DEPLOYMENT.md history line, then `catalyst check`.")
+    if runtime_note:
+        print(f"catalyst: {runtime_note}", file=sys.stderr)
     return 0
 
 
@@ -1125,6 +1135,7 @@ def cmd_criterion(args) -> int:
             f"pull request: {res.pr}"
             if res.pr
             else f"open a pull request from {res.branch} into {cr.shared_branch(dep)}"
+            + (f" ({res.pr_note})" if res.pr_note else "")
         )
         return 0
     if sub == "sync":
@@ -1227,6 +1238,12 @@ def cmd_share(args) -> int:
         print(f"published {res['commits']} commit(s) on {res['branch']} ({share.driver})")
         if res.get("pull_request"):
             print(f"pull request: {res['pull_request']}")
+        elif not args.no_pr:
+            why = res.get("pull_request_note")
+            print(
+                f"no pull request was opened{f' ({why})' if why else ''}: open one from {res['branch']} into "
+                f"{share.info().get('branch')}, or run `catalyst share push` again"
+            )
     return 0
 
 

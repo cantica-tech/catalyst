@@ -619,6 +619,7 @@ class PushResult:
     commits: int
     pr: str | None
     regenerated: list[str]
+    pr_note: str | None = None  # why no pull request was opened, when one was asked for
 
 
 def _topic(user: str) -> str:
@@ -794,8 +795,8 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True, chec
         share_pins(wc)
     except CriterionError as exc:  # the pins go with the next push; the work is safe
         print(f"catalyst: journal pins not shared yet ({exc})")
-    pr = open_pull_request(wc, branch, topic, message) if open_pr else None
-    return PushResult(topic, commits, pr, regenerated)
+    pr, note = open_pull_request(wc, branch, topic, message) if open_pr else (None, None)
+    return PushResult(topic, commits, pr, regenerated, note)
 
 
 def _check(dep: Deployment) -> str:
@@ -805,9 +806,11 @@ def _check(dep: Deployment) -> str:
     return "\n".join(report.errors)
 
 
-def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
+def open_pull_request(wc: Path, base: str, head: str, title: str) -> tuple[str | None, str | None]:
+    """(the pull request's URL, None), or (None, why none was opened): the
+    branch is pushed either way, and the caller says what is left to do."""
     if shutil.which("gh") is None:
-        return None
+        return None, "the GitHub CLI `gh` is not installed"
     existing = subprocess.run(
         ["gh", "pr", "view", head, "--json", "url", "--jq", ".url"],
         cwd=wc,
@@ -816,7 +819,7 @@ def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
         encoding="utf-8",
     )
     if existing.returncode == 0 and existing.stdout.strip():
-        return existing.stdout.strip()
+        return existing.stdout.strip(), None
     res = subprocess.run(
         [
             "gh",
@@ -837,7 +840,10 @@ def open_pull_request(wc: Path, base: str, head: str, title: str) -> str | None:
         text=True,
         encoding="utf-8",
     )
-    return res.stdout.strip().splitlines()[-1] if res.returncode == 0 and res.stdout.strip() else None
+    if res.returncode == 0 and res.stdout.strip():
+        return res.stdout.strip().splitlines()[-1], None
+    said = (res.stderr or res.stdout).strip().splitlines()
+    return None, said[-1] if said else f"`gh pr create` exited {res.returncode}"
 
 
 # --- create / join ----------------------------------------------
