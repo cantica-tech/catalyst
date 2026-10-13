@@ -558,6 +558,17 @@ def cmd_module(args) -> int:
     return 1 if args.module_command == "verify" and bad else 0
 
 
+def cmd_inbox(args) -> int:
+    """`inbox` (roadmap R5.7): what waits for a person, read-only."""
+    from catalyst import inbox
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    found = inbox.inbox(dep, load_corpus(dep))
+    print(json.dumps(found, indent=2) if args.json else inbox.render(found), end="\n" if args.json else "")
+    return 0
+
+
 def cmd_impact(args) -> int:
     """`impact <id>` (roadmap R5.6): what an entity rests on and what rests
     on it, read-only."""
@@ -1982,6 +1993,10 @@ def build_parser() -> argparse.ArgumentParser:
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
         q.set_defaults(func=cmd_sync)
+
+    p = sub.add_parser("inbox", help="what waits for a person, with its evidence and what settles it (read-only)")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_inbox)
 
     p = sub.add_parser("impact", help="what an entity rests on and what rests on it, transitively (read-only)")
     p.add_argument("id", help="an artifact, a rule or a domain")

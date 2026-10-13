@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst inbox`: what waits for a person, each item with its evidence
+  and the commands that settle it. Commits made outside catalyst, changed
+  files not journaled yet, reconciliation cases that are not closed, and
+  analyses to decide. It lists and settles nothing.
+- `catalyst serve` answers `GET /v1/inbox`; a server has no project
+  history, so its inbox holds the cases and the analyses only.
+- `spec/inbox.schema.json` describes the payload.
+
 ## 0.62.0 — 2026-10-13
 
 The history of one entity, with its content before and after each change.

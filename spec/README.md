@@ -8,6 +8,7 @@ them; a test in `tests/` checks each verb's output against its schema.
 |---|---|---|
 | `impact.schema.json` | `catalyst impact <id> --json` | `GET /v1/impact/<id>` |
 | `history.schema.json` | `catalyst journal show --artifact <id> --content --json` | `GET /v1/history/<id>` |
+| `inbox.schema.json` | `catalyst inbox --json` | `GET /v1/inbox` |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`).
