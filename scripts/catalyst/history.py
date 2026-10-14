@@ -16,7 +16,7 @@ import subprocess
 from collections.abc import Callable
 
 from catalyst import journal, views
-from catalyst.corpus import Corpus, meta_key
+from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
 Blob = Callable[[str], bytes | None]
@@ -34,17 +34,13 @@ def git_blob(dep: Deployment) -> Blob:
 
 def _subject(dep: Deployment, corpus: Corpus, item_id: str) -> tuple[str, str, str]:
     """(id, type, criterion-relative file) of an artifact or a rule."""
-    arts = corpus.artifacts.get(item_id)
-    if not arts:
-        short = [i for i in corpus.artifacts if i.startswith(item_id + "-")]
-        arts = corpus.artifacts[short[0]] if len(short) == 1 else None
-    if arts:
-        return arts[0].id, arts[0].prefix, arts[0].file.relative_to(dep.root).as_posix()
-    key = meta_key(item_id)
-    rule = corpus.rule_id(item_id) or next((r for r in corpus.rules if key and meta_key(r) == key), None)
-    if rule is None:
+    found = views.resolve(corpus, item_id)
+    if found in corpus.artifacts:
+        art = corpus.artifacts[found][0]
+        return art.id, art.prefix, art.file.relative_to(dep.root).as_posix()
+    if found is None:
         raise views.ViewError(f"no artifact or rule '{item_id}' in this deployment")
-    return rule, "rule", corpus.rules[rule][0].file.relative_to(dep.root).as_posix()
+    return found, "rule", corpus.rules[found][0].file.relative_to(dep.root).as_posix()
 
 
 def history(dep: Deployment, corpus: Corpus, item_id: str, blob: Blob | None = None) -> dict:

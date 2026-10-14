@@ -669,7 +669,10 @@ back-references, regenerates the indexes and writes one journal entry
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
-writes. Each takes `--json`; each payload, and `check --json`'s, is
+writes. `view`, `impact` and `journal show --artifact <id> --content` take an
+ID as people write it: in full, short (`REQ-000030`, when one artifact has
+that number), or a meta-rule as the handbook writes it (`rr-META-015`); a
+short form two artifacts share is refused with both IDs. Each takes `--json`; each payload, and `check --json`'s, is
 described by a JSON Schema in the catalyst repository's `spec/` (its
 `README.md` maps each schema to its verb and route), which a client can
 generate its types from.

@@ -426,8 +426,15 @@ def test_local_mode_follows_the_criterion_and_says_so(local):
         item = project / ".criterion" / "items" / "ITEM-000001-first-item.md"
         time.sleep(0.05)
         item.write_text(item.read_text(encoding="utf-8").replace("First item", "Renamed item"), encoding="utf-8")
-        seen = [next(lines) for _ in range(4)]
-        assert f"data: {first + 1}\n".encode() in seen, seen
+        # the next batch it reports is a later one; one write may be polled as
+        # two changes (emptied, then written), so its number is not fixed
+        later = None
+        for _ in range(12):
+            line = next(lines)
+            if line.startswith(b"data: "):
+                later = int(line[len(b"data: ") :])
+                break
+        assert later is not None and later > first, later
     titles = {row["id"]: row["title"] for row in client.call("GET", "/list?type=ITEM")}
     assert titles[f"ITEM-000001-{USERID}"] == "Renamed item"
 
