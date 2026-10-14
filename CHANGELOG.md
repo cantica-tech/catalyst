@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.65.0 — 2026-10-14
+
+Schemas for every read payload. No layout change, no migration, no change
+of behaviour.
 
 - `spec/` describes every read payload: `list`, `view`, `backlog`, `graph`,
   `journal show` and `check` join `impact`, the history and `inbox`. A
