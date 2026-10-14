@@ -1407,13 +1407,19 @@ def cmd_serve(args) -> int:
             raise SystemExit(f"catalyst: no active token {args.who}")
         print(f"token {args.who} revoked")
         return 0
+    if args.static and not args.local:
+        raise SystemExit("catalyst: --static goes with --local: a page is served beside one project's criterion")
     if args.local:
         if args.host != "127.0.0.1":
             raise SystemExit("catalyst: serve --local listens on 127.0.0.1 only")
         project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
-        server, token = serve.make_local(project, args.port or 0)
+        try:
+            server, token = serve.make_local(project, args.port or 0, static=args.static)
+        except serve.ServeError as exc:
+            raise SystemExit(f"catalyst: {exc}") from None
         url = f"http://127.0.0.1:{server.server_address[1]}"
-        print(json.dumps({"url": url, "token": token, "pid": os.getpid()}), flush=True)  # the client reads this line
+        line = serve.start_line(url, token, os.getpid(), args.static is not None)
+        print(json.dumps(line), flush=True)  # the client reads this line
         try:
             server.serve_forever()
         except KeyboardInterrupt:
@@ -2215,6 +2221,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="serve this project's own criterion read-only, on 127.0.0.1, for a client on this machine",
     )
     p.add_argument("--project", help="--local: the project (default: the current directory)")
+    p.add_argument(
+        "--static",
+        type=Path,
+        help="--local: also serve this directory's files outside /v1 (`/` is its index.html); "
+        "the start line gives the page's URL with the token",
+    )
     vs = p.add_subparsers(dest="serve_command")
     q = vs.add_parser("token", help="issue, list or revoke the tokens users sign with")
     q.add_argument("action", choices=("issue", "list", "revoke"))

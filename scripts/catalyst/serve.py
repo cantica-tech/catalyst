@@ -174,6 +174,8 @@ def entry_shas(entry: dict) -> list[tuple[str, str]]:
 class Reads:
     """The read side, over whatever `loaded()` gives: the CLI's own views."""
 
+    static: Path | None = None  # a directory of files served beside the API (`serve --local --static`)
+
     def loaded(self) -> tuple:  # (batch, deployment, corpus)
         raise NotImplementedError
 
@@ -618,16 +620,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self, format, *args):  # quiet: a server for a few people, not a web log
         pass
 
-    def _send(self, status: int, payload: object = None, raw: bytes | None = None, batch: int | None = None) -> None:
+    def _send(
+        self,
+        status: int,
+        payload: object = None,
+        raw: bytes | None = None,
+        batch: int | None = None,
+        kind: str | None = None,
+    ) -> None:
         if raw is None:
             payload = {} if payload is None else payload
             raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
             kind = "application/json"
-        else:
-            kind = "application/octet-stream"
         self.send_response(status)
-        self.send_header("Content-Type", kind)
+        self.send_header("Content-Type", kind or "application/octet-stream")
         self.send_header("Content-Length", str(len(raw)))
+        self.send_header("X-Content-Type-Options", "nosniff")  # the type is the one sent, never a guess
         if batch is not None:
             self.send_header("X-Catalyst-Batch", str(batch))
         self.end_headers()
@@ -655,13 +663,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError, OSError):
             return  # the client left
 
+    def _static(self, path: str) -> None:
+        """A file of the `--static` directory (`/` is its `index.html`):
+        no token, since the page is what brings the token to the API. A
+        path that leaves the directory, or a file not there, is a 404."""
+        import mimetypes
+
+        root = self.app.static
+        if root is None:
+            return self._send(404, {"error": "no such file"})
+        relative = urllib.parse.unquote(path).lstrip("/") or "index.html"
+        target = (root / relative).resolve()
+        if not target.is_relative_to(root) or not target.is_file():
+            return self._send(404, {"error": "no such file"})
+        kind = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        return self._send(
+            200, raw=target.read_bytes(), kind=kind + ("; charset=utf-8" if kind.startswith("text/") else "")
+        )
+
+    def _foreign(self) -> bool:
+        """With `--static`, the API answers its own page only: a request from
+        another origin (a page elsewhere in the browser) is refused."""
+        origin = self.headers.get("Origin")
+        if getattr(self.app, "static", None) is None or origin is None:
+            return False
+        port = getattr(self.server, "server_port", None)
+        return origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
+
     def _route(self, method: str) -> None:
         try:
+            url = urllib.parse.urlparse(self.path)
+            if getattr(self.app, "static", None) is not None and method == "GET" and not url.path.startswith(API):
+                return self._static(url.path)
+            if self._foreign():
+                raise ServeError(403, "this server answers its own page only (a request from another origin)")
             auth = self.headers.get("Authorization", "")
             userid = self.app.user_for(auth[7:]) if auth.startswith("Bearer ") else None
             if userid is None:
                 raise ServeError(401, "a valid token is required (`catalyst share login`)")
-            url = urllib.parse.urlparse(self.path)
             path = url.path.removeprefix(API)
             if getattr(self.app, "read_only", False) and (
                 path in ("/changes", "/have", "/push") or path.startswith("/blobs/")
@@ -716,12 +755,29 @@ def make_server(db: Path, host: str = "127.0.0.1", port: int = 8765) -> http.ser
     return http.server.ThreadingHTTPServer((host, port), handler)
 
 
-def make_local(project: Path, port: int = 0, poll: float = 1.0) -> tuple[http.server.ThreadingHTTPServer, str]:
+def make_local(
+    project: Path, port: int = 0, poll: float = 1.0, static: Path | None = None
+) -> tuple[http.server.ThreadingHTTPServer, str]:
     """A read-only server over one project's criterion, on loopback only, and
-    its token (fresh per run, never stored)."""
+    its token (fresh per run, never stored). `static`: a directory whose
+    files it also serves, outside `/v1` (roadmap R5.8)."""
+    if static is not None and not Path(static).is_dir():
+        raise ServeError(400, f"--static {Path(static).name}: not a directory")
     token = "cst_" + secrets.token_urlsafe(32)
-    handler = type("LocalHandler", (Handler,), {"app": LocalReader(project, token, poll)})
+    app = LocalReader(project, token, poll)
+    app.static = Path(static).resolve() if static is not None else None
+    handler = type("LocalHandler", (Handler,), {"app": app})
     return http.server.ThreadingHTTPServer(("127.0.0.1", port), handler), token
+
+
+def start_line(url: str, token: str, pid: int, static: bool) -> dict:
+    """What `serve --local` prints first, for the client that started it.
+    With `--static`, `page` is the page's URL with the token in its fragment,
+    which a browser never sends to the server."""
+    line = {"url": url, "token": token, "pid": pid}
+    if static:
+        line["page"] = f"{url}/#token={token}"
+    return line
 
 
 def default_db() -> Path:
