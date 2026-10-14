@@ -23,6 +23,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from catalyst import proc
 from module_loader import DEFAULT_TIERS, parse_simple_yaml
 
 RECORD = "modules/modules.json"
@@ -199,7 +200,7 @@ def fetch(spec: str, tmp: Path) -> tuple[Path, str | None, str | None]:
 
 # --- where a module came from ---------------------------------------------------
 def _git(src: Path, *args: str) -> str | None:
-    res = subprocess.run(["git", "-C", str(src), *args], capture_output=True, text=True, encoding="utf-8", check=False)
+    res = proc.git(src, *args)
     return res.stdout.strip() if res.returncode == 0 else None
 
 

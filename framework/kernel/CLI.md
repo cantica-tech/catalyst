@@ -167,10 +167,11 @@ An unknown command exits `1`.
 
 `--budget <words>` checks every command's spec against a word budget and
 exits `1`, listing each command over it. catalyst holds its own deployment
-to **1,000 words** per command: its end-of-turn check runs
-`catalyst spec --budget 1000` (`SPEC_BUDGET` in `scripts/stop_hook.py`), so a
-command whose procedure outgrows the budget is split or tightened, not
-left to grow.
+to **1,000 words** per command: `tests/test_token_budgets.py` runs
+`catalyst spec --budget 1000` on a fresh install of the in-repo sample
+module, and of a production module whose checkout is beside catalyst, so a
+command whose procedure outgrows the budget is split or tightened, not left
+to grow.
 
 ### `catalyst check [--strict] [--json]`
 

@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 
 import project_file
-from catalyst import journal
+from catalyst import journal, proc
 from catalyst.deployment import load
 
 
@@ -29,7 +29,7 @@ class MoveError(Exception):
 
 
 def _git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
+    res = proc.git(repo, *args)
     if check and res.returncode != 0:
         raise MoveError(f"git {' '.join(args)} failed in {repo}: {res.stderr.strip()}")
     return res
