@@ -197,6 +197,10 @@ class Reads:
                 data = views.view(dep, corpus, item)
             elif what == "graph":
                 data = views.graph(dep, corpus)
+            elif what == "inbox":
+                from catalyst import inbox
+
+                data = inbox.inbox(dep, corpus)
             elif what == "history":
                 from catalyst import history
 
@@ -676,7 +680,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
-                path in ("/list", "/backlog", "/journal", "/graph")
+                path in ("/list", "/backlog", "/journal", "/graph", "/inbox")
                 or path.startswith(("/view/", "/impact/", "/history/"))
             ):
                 what, _, item = path.strip("/").partition("/")
