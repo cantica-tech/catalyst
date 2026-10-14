@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.65.1 — 2026-10-14
+
+`catalyst view` takes an ID as `impact` and the history do. No layout change, no migration.
 
 - `catalyst view` takes a short ID (`REQ-000030`) and a meta-rule as the
   handbook writes it (`rr-META-015`), as `impact` and the history already
