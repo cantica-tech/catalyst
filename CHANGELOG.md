@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.65.2 — 2026-10-15
+
+Python consolidation (R3.8): one git runner, catalyst's own YAML reader on every machine, the legacy Stop hook script gone. No layout change, no migration.
 
 - A module file is read by catalyst's own YAML reader on every machine. It
   used PyYAML when installed, which keeps the final newline of a block
