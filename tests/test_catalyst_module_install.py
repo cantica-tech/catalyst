@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import zipfile
@@ -36,11 +37,15 @@ def _bare(tmp: Path, userid: str = USERID):
 
 
 def _files(root: Path, skip=(".git", "journal", "bin")) -> dict[str, str]:
-    return {
-        f.relative_to(root).as_posix(): hashlib.sha256(f.read_bytes()).hexdigest()
-        for f in sorted(root.rglob("*"))
-        if f.is_file() and not set(skip) & set(f.relative_to(root).parts)
-    }
+    """Every file under `root` and its hash, never entering a skipped
+    directory: git may repack `.git` while the walk runs."""
+    found = {}
+    for top, dirs, names in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in skip)
+        for name in names:
+            f = Path(top) / name
+            found[f.relative_to(root).as_posix()] = hashlib.sha256(f.read_bytes()).hexdigest()
+    return dict(sorted(found.items()))
 
 
 def _install(project: Path, source, *extra: str) -> int:
