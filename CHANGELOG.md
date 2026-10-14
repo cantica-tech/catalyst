@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.65.0 — 2026-10-14
+
+Schemas for every read payload. No layout change, no migration, no change
+of behaviour.
+
+- `spec/` describes every read payload: `list`, `view`, `backlog`, `graph`,
+  `journal show` and `check` join `impact`, the history and `inbox`. A
+  test checks each verb's output against its schema; the schemas allow a
+  module's own fields without naming them.
+- The three earlier schemas state that they allow no property beyond those
+  they describe, as their tests already required.
+
 ## 0.64.0 — 2026-10-14
 
 `catalyst serve --local --static`: a page served beside the local API. No

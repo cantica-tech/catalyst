@@ -669,7 +669,10 @@ back-references, regenerates the indexes and writes one journal entry
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
-writes. Each takes `--json`.
+writes. Each takes `--json`; each payload, and `check --json`'s, is
+described by a JSON Schema in the catalyst repository's `spec/` (its
+`README.md` maps each schema to its verb and route), which a client can
+generate its types from.
 
 - `catalyst list <type> [--filter KEY=VALUE ...] [--type <family>]`:
   artifacts of an entity type (its prefix, name or folder), or `rule`,

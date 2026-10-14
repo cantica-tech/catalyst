@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cantica-tech/catalyst/spec/view.schema.json",
+  "title": "catalyst view",
+  "description": "What `catalyst view <id> --json` prints and `GET /v1/view/<id>` returns: one artifact or rule, what it links to (`links`), what links to it (`linked_from`: the entity and its field), and the journal entries labelled with it or targeting it.",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/artifact"
+    },
+    {
+      "$ref": "#/$defs/rule"
+    }
+  ],
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "title",
+        "file",
+        "links",
+        "linked_from",
+        "journal"
+      ],
+      "description": "An artifact: its ID, its type's prefix, its title, its file in the criterion, then each field of its document by name, as written (the module's fields, never listed here).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "links": {
+          "type": "object",
+          "description": "Each reference field of the entity's type that it fills, and the IDs it cites.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "linked_from": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "field"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "journal": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "timestamp",
+              "actor",
+              "command",
+              "action",
+              "intent"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "timestamp": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "actor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "command": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "action": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "intent": {
+                "type": [
+                  "array",
+                  "string",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "rule": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "file",
+        "line",
+        "retired",
+        "links",
+        "linked_from",
+        "journal"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "const": "rule"
+        },
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "retired": {
+          "type": "boolean"
+        },
+        "links": {
+          "type": "object",
+          "description": "Each reference field of the entity's type that it fills, and the IDs it cites.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "linked_from": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "field"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "journal": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "timestamp",
+              "actor",
+              "command",
+              "action",
+              "intent"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "timestamp": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "actor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "command": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "action": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "intent": {
+                "type": [
+                  "array",
+                  "string",
+                  "null"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
