@@ -4,62 +4,142 @@
   "title": "catalyst inbox",
   "description": "What `catalyst inbox --json` prints and `GET /v1/inbox` returns: what waits for a person, each item with its evidence and the commands that settle it. The inbox lists; it settles nothing.",
   "type": "object",
-  "required": ["items", "counts"],
+  "required": [
+    "items",
+    "counts"
+  ],
   "properties": {
-    "items": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
     "counts": {
       "type": "object",
       "description": "How many items of each kind.",
-      "required": ["unrecorded-commit", "unrecorded-change", "reconciliation", "analysis"],
+      "required": [
+        "unrecorded-commit",
+        "unrecorded-change",
+        "reconciliation",
+        "analysis"
+      ],
       "properties": {
-        "unrecorded-commit": {"type": "integer", "minimum": 0},
-        "unrecorded-change": {"type": "integer", "minimum": 0},
-        "reconciliation": {"type": "integer", "minimum": 0},
-        "analysis": {"type": "integer", "minimum": 0}
-      }
+        "unrecorded-commit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unrecorded-change": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reconciliation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "analysis": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
     "item": {
       "type": "object",
-      "required": ["kind", "id", "title", "evidence", "settle"],
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "evidence",
+        "settle"
+      ],
       "properties": {
         "kind": {
           "type": "string",
-          "enum": ["unrecorded-commit", "unrecorded-change", "reconciliation", "analysis"]
+          "enum": [
+            "unrecorded-commit",
+            "unrecorded-change",
+            "reconciliation",
+            "analysis"
+          ]
         },
-        "id": {"type": "string", "description": "A short commit, a project path, or an artifact ID."},
-        "title": {"type": "string"},
+        "id": {
+          "type": "string",
+          "description": "A short commit, a project path, or an artifact ID."
+        },
+        "title": {
+          "type": "string"
+        },
         "evidence": {
           "type": "object",
           "description": "What the item rests on. A commit: `commit`, `author`, `files` (each `path`, `before`, `after`). A change: `path`. A case: `status`, `entity`. An analysis: `status`, `scope`.",
           "properties": {
-            "commit": {"type": "string"},
-            "author": {"type": "string"},
+            "commit": {
+              "type": "string"
+            },
+            "author": {
+              "type": "string"
+            },
             "files": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["path", "before", "after"],
+                "required": [
+                  "path",
+                  "before",
+                  "after"
+                ],
                 "properties": {
-                  "path": {"type": "string"},
-                  "before": {"type": ["string", "null"]},
-                  "after": {"type": ["string", "null"]}
+                  "path": {
+                    "type": "string"
+                  },
+                  "before": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "after": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
                 }
               }
             },
-            "path": {"type": "string"},
-            "status": {"type": "string"},
-            "entity": {"type": ["string", "null"]},
-            "scope": {"type": ["string", "null"]}
+            "path": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "entity": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "scope": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
           }
         },
         "settle": {
           "type": "array",
           "description": "The commands, or the action, that settle the item. A person chooses.",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         }
-      }
+      },
+      "additionalProperties": false
     }
-  }
+  },
+  "additionalProperties": false
 }

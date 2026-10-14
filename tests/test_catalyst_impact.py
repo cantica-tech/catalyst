@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 from catalyst import impact, serve, views
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
@@ -85,27 +86,9 @@ def test_what_is_only_cited_in_prose_is_reported_apart(tmp_path):
     assert impact.impact(dep, corpus, SUB, "up", 1)["upstream"][0]["id"] == ITEM  # the mention is not followed
 
 
-def _valid(value, schema: dict, root: dict, at: str = "$") -> list[str]:
-    """The part of JSON Schema `spec/impact.schema.json` uses."""
-    if "$ref" in schema:
-        return _valid(value, root["$defs"][schema["$ref"].rsplit("/", 1)[1]], root, at)
-    kinds = schema.get("type")
-    names = {"object": dict, "array": list, "string": str, "integer": int, "null": type(None)}
-    problems = []
-    if kinds and not isinstance(value, tuple(names[k] for k in ([kinds] if isinstance(kinds, str) else kinds))):
-        return [f"{at}: not {kinds}"]
-    if isinstance(value, dict):
-        problems += [f"{at}: no {k}" for k in schema.get("required", []) if k not in value]
-        problems += [f"{at}: unknown {k}" for k in value if k not in schema.get("properties", {})]
-        for k, v in value.items():
-            if k in schema.get("properties", {}):
-                problems += _valid(v, schema["properties"][k], root, f"{at}.{k}")
-    if isinstance(value, list) and "items" in schema:
-        for i, v in enumerate(value):
-            problems += _valid(v, schema["items"], root, f"{at}[{i}]")
-    if isinstance(value, int) and "minimum" in schema and value < schema["minimum"]:
-        problems.append(f"{at}: below {schema['minimum']}")
-    return problems
+def _valid(value, schema: dict, root: dict | None = None) -> list[str]:
+    """The shared checker of `spec/` schemas (`tests/schema_check.py`)."""
+    return schema_check.problems(value, schema, root)
 
 
 def test_the_verb_prints_what_the_schema_describes(tmp_path, monkeypatch, capsys):
