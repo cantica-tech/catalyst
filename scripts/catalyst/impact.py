@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections import deque
 
 from catalyst import derived, views
-from catalyst.corpus import Corpus, meta_key
+from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
 DIRECTIONS = ("both", "up", "down")
@@ -80,13 +80,9 @@ def impact(dep: Deployment, corpus: Corpus, item_id: str, direction: str = "both
         raise views.ViewError("depth is a number of links, 1 or more")
     g = views.graph(dep, corpus)
     nodes = _nodes(g)
-    subject = item_id if item_id in nodes else (corpus.rule_id(item_id) or "")
+    subject = item_id if item_id in nodes else views.resolve(corpus, item_id)  # a domain is its code
     if subject not in nodes:
-        key = meta_key(item_id)  # a meta-rule as the handbook writes it: `rr-META-015`
-        short = [i for i in nodes if i.startswith(item_id + "-") or (key and meta_key(i) == key)]
-        if len(short) != 1:
-            raise views.ViewError(f"no artifact, rule or domain '{item_id}' in this deployment")
-        subject = short[0]
+        raise views.ViewError(f"no artifact, rule or domain '{item_id}' in this deployment")
     rests_on: dict[str, list[tuple[str, str]]] = {}
     rested_on: dict[str, list[tuple[str, str]]] = {}
     linked: set[tuple[str, str]] = set()

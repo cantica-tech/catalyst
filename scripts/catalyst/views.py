@@ -165,7 +165,30 @@ def _ref_fields(dep: Deployment, prefix: str) -> list[str]:
     return [f.name for f in (etd.fields if etd else []) if f.kind in REF_KINDS]
 
 
+def resolve(corpus: Corpus, item_id: str) -> str | None:
+    """The artifact or rule an ID names, however it is written: in full,
+    short (`REQ-000030`, when one artifact has it), a rule as its document
+    cites it, or a meta-rule as the handbook writes it (`rr-META-015`).
+    None when nothing has it; ViewError when a short form names several."""
+    from catalyst.corpus import meta_key
+
+    if item_id in corpus.artifacts:
+        return item_id
+    rule = corpus.rule_id(item_id)
+    if rule:
+        return rule
+    key = meta_key(item_id)
+    found = sorted(
+        {i for i in corpus.artifacts if i.startswith(item_id + "-")}
+        | {r for r in corpus.rules if r.startswith(item_id + "-") or (key and meta_key(r) == key)}
+    )
+    if len(found) > 1:
+        raise ViewError(f"'{item_id}' names several: {', '.join(found)}")
+    return found[0] if found else None
+
+
 def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
+    item_id = resolve(corpus, item_id) or item_id
     arts = corpus.artifacts.get(item_id)
     if arts:
         art = arts[0]
