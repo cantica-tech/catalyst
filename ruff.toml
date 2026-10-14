@@ -33,7 +33,6 @@ extend-exclude = ["framework/kernel/plugins/repository/*"]   # plugin submodules
 "scripts/measure_tokens.py" = ["PLW1510"]
 "scripts/module_loader.py" = ["PLW2901", "S110", "SIM102"]
 "scripts/package_release.py" = ["F841", "PLW1510", "S110"]
-"scripts/stop_hook.py" = ["PLW1510"]
 "tests/catalyst_fixtures.py" = ["E731"]
 "tests/conftest.py" = ["E402"]
 "tests/test_catalyst_admin.py" = ["E731"]

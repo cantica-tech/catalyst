@@ -29,7 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import __version__, journal
+from catalyst import __version__, journal, proc
 from catalyst.deployment import Deployment
 from catalyst.scope import governs
 
@@ -92,7 +92,7 @@ def level(dep: Deployment) -> str:
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
+    return proc.git(repo, *args)
 
 
 def recorded(dep: Deployment) -> Journaled:

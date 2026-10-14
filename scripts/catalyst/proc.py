@@ -15,3 +15,9 @@ def run(cmd: list[str], *, input: str | None = None, **kwargs) -> subprocess.Com
     res = subprocess.run(cmd, input=None if input is None else input.encode("utf-8"), capture_output=True, **kwargs)
     decode = lambda b: b.decode("utf-8", "replace").replace("\r\n", "\n") if b is not None else ""
     return subprocess.CompletedProcess(res.args, res.returncode, decode(res.stdout), decode(res.stderr))
+
+
+def git(repo, *args: str, input: str | None = None) -> subprocess.CompletedProcess:
+    """`git -C <repo> <args>`, its output decoded as `run` does. Each caller
+    decides what a failure means; this never raises on one."""
+    return run(["git", "-C", str(repo), *args], input=input)

@@ -205,17 +205,10 @@ def repo_place(project_root: Path) -> tuple[Path, str]:
     """The repository top holding the project, and the project's prefix in it
     (`""` at the top, else `sub/dir/`): `.gitmodules` lives at the top and
     names the working copy `<prefix>.criterion` (fw-STRUCTURE-000017)."""
-    top = subprocess.run(
-        ["git", "-C", str(project_root), "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    ).stdout.strip()
+    top = proc.git(project_root, "rev-parse", "--show-toplevel").stdout.strip()
     if not top:
         return Path(project_root), ""
-    prefix = subprocess.run(
-        ["git", "-C", str(project_root), "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
-    ).stdout.strip()
+    prefix = proc.git(project_root, "rev-parse", "--show-prefix").stdout.strip()
     return Path(top), prefix
 
 

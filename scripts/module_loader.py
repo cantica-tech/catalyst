@@ -184,8 +184,9 @@ def _fold_block_scalars(lines: list[str]) -> list[str]:
 
 
 def parse_simple_yaml(text: str) -> dict[str, Any]:
-    """Lightweight YAML parser for simple nested dicts/lists without external dependencies.
-    Supports basic key: value, lists (- item), and simple nested maps. Also handles JSON fallback."""
+    """catalyst's YAML reader for module and entity files, with no external
+    dependency: maps, lists, flow lists and maps, folded and literal blocks
+    (whose final newline it drops). A text starting with `{` is read as JSON."""
     text = text.strip()
     if not text:
         return {}
@@ -195,15 +196,8 @@ def parse_simple_yaml(text: str) -> dict[str, Any]:
         except json.JSONDecodeError:
             pass
 
-    try:
-        import yaml
-
-        res = yaml.safe_load(text)
-        if isinstance(res, dict):
-            return res
-    except Exception:
-        pass
-
+    # always catalyst's own reader, never an optional library: a module file
+    # parses the same on every machine
     lines = _fold_block_scalars(text.splitlines())
     root: dict[str, Any] = {}
     stack: list[tuple[int, Any]] = [(-1, root)]

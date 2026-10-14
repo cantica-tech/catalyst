@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import check_token_budgets as budgets
 
@@ -33,3 +35,28 @@ def test_command_specs_are_measured_in_any_checkout():
 
     names = {b.name for b in measure_command_specs()}
     assert {"spec: /share", "spec: /check-rules", "spec: --general"} <= names and len(names) > 20
+
+
+SAMPLE = Path(__file__).resolve().parents[1] / "framework" / "modules" / "sample-process"
+SIBLING = Path(__file__).resolve().parents[2] / "catalyst-software-engineering"
+
+
+@pytest.mark.parametrize("module", [SAMPLE, SIBLING], ids=["sample-process", "software-engineering"])
+def test_no_command_of_a_fresh_install_needs_more_than_1000_words(tmp_path, module, capsys):
+    """CLI.md: catalyst holds a deployment to 1,000 words per command
+    (`catalyst spec --budget 1000`), checked on a fresh install of each
+    module the repository can reach (the software-engineering module when
+    its checkout is beside catalyst)."""
+    from catalyst.__main__ import main
+    from catalyst.init import init
+    from module_loader import load_module
+    from test_catalyst_init import request
+
+    if not (module / "module.yaml").is_file():
+        pytest.skip(f"{module.name} is not checked out beside catalyst")
+    manifest = load_module(module_dir=module)
+    assert manifest is not None
+    req = request(tmp_path, module_id=manifest.id, module=module, rule_docs=[])
+    init(req)
+    capsys.readouterr()
+    assert main(["--project", str(req.project), "spec", "--budget", "1000"]) == 0, capsys.readouterr().out

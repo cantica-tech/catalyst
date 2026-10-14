@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from catalyst import version_string
+from catalyst import proc, version_string
 from catalyst.analysis import AnalysisError
 from catalyst.criterion import CriterionError
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load, logical_cwd
@@ -167,12 +167,7 @@ def cmd_journal(args) -> int:
 
         repos = [dep.root] + ([] if dep.standalone else [dep.project_root])
         for repo in repos:
-            if (
-                subprocess.run(
-                    ["git", "-C", str(repo), "remote", "get-url", "origin"], check=False, capture_output=True
-                ).returncode
-                != 0
-            ):
+            if proc.git(repo, "remote", "get-url", "origin").returncode != 0:
                 continue
             try:
                 print(f"{repo.name}: {share_pins(repo)} blob(s) pinned on the remote")
