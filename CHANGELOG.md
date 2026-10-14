@@ -6,7 +6,10 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.64.0 — 2026-10-14
+
+`catalyst serve --local --static`: a page served beside the local API. No
+layout change, no migration.
 
 - `catalyst serve --local --static <dir>`: the local server also serves a
   directory's files outside `/v1` (`/` is its `index.html`), so a browser
