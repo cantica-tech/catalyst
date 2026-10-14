@@ -22,10 +22,10 @@ import datetime
 import difflib
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from catalyst import proc
 from catalyst.corpus import Artifact, Corpus, load_corpus
 from catalyst.deployment import Deployment
 from catalyst.scope import governs
@@ -79,7 +79,7 @@ def _write(path: Path, data) -> Path:
 
 
 def _git(repo: Path, *args: str) -> str:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
+    res = proc.git(repo, *args)
     if res.returncode != 0:
         raise AnalysisError(f"git {' '.join(args)} failed: {res.stderr.strip()}")
     return res.stdout

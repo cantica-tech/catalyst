@@ -14,8 +14,8 @@ the project's active module (resolved through module_loader from the
 are declared in its module.yaml `required_paths:`. When no module resolves,
 only the kernel checks run.
 
-Exit 0 = clean, exit 1 = violations found (fails CI; scripts/stop_hook.py
-turns it into a blocking Claude Code Stop hook). No reachable deployment is
+Exit 0 = clean, exit 1 = violations found (fails CI; `catalyst hook stop`
+runs the same checks at the end of an agent's turn). No reachable deployment is
 skipped (exit 0) unless `--require` is passed, as CI does: then it fails.
 
 Scope note: only checks the structural invariants that are machine-verifiable

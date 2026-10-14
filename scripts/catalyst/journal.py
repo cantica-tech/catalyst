@@ -393,7 +393,7 @@ def blob_exists(repo: Path, sha: str) -> bool:
     if not object_id(sha):
         return False  # never hand a (merged, third-party) value to git as is
     if key not in _EXISTS:
-        res = subprocess.run(["git", "-C", str(repo), "cat-file", "-e", f"{sha}^{{blob}}"], capture_output=True)
+        res = proc.git(repo, "cat-file", "-e", f"{sha}^{{blob}}")
         _EXISTS[key] = res.returncode == 0
     return _EXISTS[key]
 

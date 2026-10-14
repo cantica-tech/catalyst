@@ -6,6 +6,22 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.65.2 — 2026-10-15
+
+Python consolidation (R3.8): one git runner, catalyst's own YAML reader on every machine, the legacy Stop hook script gone. No layout change, no migration.
+
+- A module file is read by catalyst's own YAML reader on every machine. It
+  used PyYAML when installed, which keeps the final newline of a block
+  text where catalyst's reader drops it; neither CI nor a deployment's
+  runtime has PyYAML, so this is what they already read.
+- `scripts/stop_hook.py`, the Stop hook before `catalyst hook stop`, is
+  gone with its tests; nothing ran it. The 1,000-word budget per command
+  it checked is a test on fresh installs.
+- One way to run git (`proc.git`): the text-mode git calls decode UTF-8 and
+  line endings the same on every platform, and `catalyst check` hands
+  `cat-file --batch-check` its paths as bytes (a text pipe on Windows sends
+  `\r\n`).
+
 ## 0.65.1 — 2026-10-14
 
 `catalyst view` takes an ID as `impact` and the history do. No layout change, no migration.

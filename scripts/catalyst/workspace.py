@@ -18,13 +18,21 @@ import subprocess
 from pathlib import Path
 
 import project_file
-from catalyst import journal
+from catalyst import journal, proc
 from catalyst.deployment import load_working_copy
 from catalyst.ids import generate_userid
 
 
 class WorkspaceError(Exception):
     pass
+
+
+def _git(root: Path, *args: str) -> None:
+    """git in the workspace criterion; a failure raises, as a step of
+    creating it must not be skipped."""
+    res = proc.git(root, *args)
+    if res.returncode != 0:
+        raise subprocess.CalledProcessError(res.returncode, ["git", *args], res.stdout, res.stderr)
 
 
 def _strip_jsonc(text: str) -> str:
@@ -129,7 +137,7 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
         "userid": generate_userid(set()),
     }
     written = _skeleton(root, kernel, user)
-    subprocess.run(["git", "-C", str(root), "init", "-q"], check=True, capture_output=True)
+    _git(root, "init", "-q")
     steps = [f"created the workspace criterion {root}"]
     for project in projects:
         toml = project / project_file.NAME
@@ -159,7 +167,7 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
             tier="chore",
         ),
     )
-    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
+    _git(root, "add", "-A")
     subprocess.run(
         [
             "git",

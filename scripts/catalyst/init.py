@@ -23,7 +23,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import compose
+from catalyst import compose, proc
 from catalyst.ids import generate_userid
 from module_loader import load_module
 
@@ -43,9 +43,7 @@ class InitError(Exception):
 
 def git_user_name(project: Path) -> str | None:
     """`git config user.name` as the project's repository sees it, or None."""
-    res = subprocess.run(
-        ["git", "-C", str(project), "config", "user.name"], capture_output=True, text=True, encoding="utf-8"
-    )
+    res = proc.git(project, "config", "user.name")
     return (res.stdout.strip() or None) if res.returncode == 0 else None
 
 
@@ -672,10 +670,10 @@ PRODUCT_GIT_NOTICE = (
 
 
 def _is_repo(path: Path) -> bool:
-    return subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"], capture_output=True).returncode == 0
+    return proc.git(path, "rev-parse", "--git-dir").returncode == 0
 
 
 def _git(repo: Path, *args: str) -> None:
-    res = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, encoding="utf-8")
+    res = proc.git(repo, *args)
     if res.returncode != 0:
         raise InitError(f"git {' '.join(args)} failed: {res.stderr.strip()}")

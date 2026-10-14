@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import journal
+from catalyst import journal, proc
 from catalyst.corpus import load_corpus
 from catalyst.deployment import Deployment
 from catalyst.indexes import regenerate
@@ -150,14 +150,11 @@ def merge_integrity(dep: Deployment) -> list[str]:
     merge ref in CI), nothing either side recorded — IDs, index rows,
     journal lines — may be missing from it (`criterion integrity`). The
     result is kept per HEAD, so the end-of-turn check stays cheap."""
-    import subprocess
 
     from catalyst import criterion as cr, lock
 
     def git(*args: str) -> str:
-        res = subprocess.run(
-            ["git", "-C", str(dep.root), *args], capture_output=True, text=True, encoding="utf-8", check=False
-        )
+        res = proc.git(dep.root, *args)
         return res.stdout.strip() if res.returncode == 0 else ""
 
     top = git("rev-parse", "--show-toplevel")
@@ -184,7 +181,6 @@ def _matching_head(dep: Deployment, paths) -> set[str]:
     """Of these journal paths, those whose working-tree content is what HEAD
     commits (edited, then committed as is): one `hash-object` and one
     `cat-file --batch-check` per repository, whatever the number of files."""
-    import subprocess
 
     by_repo: dict[Path, dict[str, str]] = {}
     for path in paths:
@@ -195,20 +191,9 @@ def _matching_head(dep: Deployment, paths) -> set[str]:
     for repo, rels in by_repo.items():
         current = journal.current_hashes(repo, list(rels))
         names = list(rels)
-        prefix = subprocess.run(  # a project below the repository's top level
-            ["git", "-C", str(repo), "rev-parse", "--show-prefix"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
-        ).stdout.strip()
-        res = subprocess.run(
-            ["git", "-C", str(repo), "cat-file", "--batch-check=%(objectname)"],
-            input="".join(f"HEAD:{prefix}{rel}\n" for rel in names),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            check=False,
+        prefix = proc.git(repo, "rev-parse", "--show-prefix").stdout.strip()  # a project below the top level
+        res = proc.git(  # stdin as bytes: a text pipe on Windows would send "\r\n", which git reads as data
+            repo, "cat-file", "--batch-check=%(objectname)", input="".join(f"HEAD:{prefix}{rel}\n" for rel in names)
         )
         lines = res.stdout.splitlines() if res.returncode == 0 else []
         for rel, line in zip(names, lines, strict=False):  # no lines when git failed
@@ -222,24 +207,16 @@ def unrecorded_changes(dep: Deployment) -> list[str]:
     """Product files git sees as changed or new whose current content is not
     what the journal last recorded — work that has not been journaled yet
     (edits to already-journaled files are journal-verify errors instead)."""
-    import subprocess
 
     from catalyst.scope import governs
 
     if dep.standalone:
         return []
     root = str(dep.project_root)
-    prefix = subprocess.run(
-        ["git", "-C", root, "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
-    )
+    prefix = proc.git(root, "rev-parse", "--show-prefix")
     # porcelain paths are relative to the repository top: keep the project's own
     # (`-- .`) and make them relative to the project, as the journal records them
-    res = subprocess.run(
-        ["git", "-C", root, "status", "--porcelain", "-uall", "-z", "--", "."],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    res = proc.git(root, "status", "--porcelain", "-uall", "-z", "--", ".")
     if prefix.returncode != 0 or res.returncode != 0:
         return []
     top = prefix.stdout.strip()
