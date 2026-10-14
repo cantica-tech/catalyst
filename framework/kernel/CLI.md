@@ -666,7 +666,7 @@ back-references, regenerates the indexes and writes one journal entry
 - `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
   when the field declares a back-reference, cite this artifact back.
 
-### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`
+### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
 writes. Each takes `--json`.
@@ -712,6 +712,16 @@ writes. Each takes `--json`.
   are listed apart (`mentions`, `mentioned_by`) and never followed. An
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
+- `catalyst inbox`: what waits for a person, each item with its `evidence`
+  and `settle`, the commands that settle it. Four kinds: a commit made
+  outside catalyst whose changes the journal does not record
+  (`unrecorded-commit`: adopt it or revert it); a changed or new project
+  file not journaled yet (`unrecorded-change`); a reconciliation case that
+  is not closed (`reconciliation`: the decisions `catalyst reconcile`
+  takes); an analysis in its deciding phase (`analysis`). It lists and
+  settles nothing, and exits `0` whether or not anything waits. A bare
+  working copy has no project history and lists the last two kinds only.
+  The payload is described by `spec/inbox.schema.json`.
 
 ### `catalyst unrecorded [<range>] [--json]`
 
@@ -998,7 +1008,9 @@ own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 `GET graph` (`catalyst graph`),
 `GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`) and
 `GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
-server the content comes from the blobs it holds). Each
+server the content comes from the blobs it holds), and `GET inbox`
+(`catalyst inbox`; a server has no project history, so its inbox holds the
+reconciliation cases and the analyses only). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an
 unknown type or ID is a 404 with the CLI's message. `GET events` is a
 server-sent event stream: the current batch on connect, then each new batch

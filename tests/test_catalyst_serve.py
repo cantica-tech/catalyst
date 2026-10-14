@@ -333,6 +333,9 @@ def test_the_read_side_answers_what_the_cli_answers(machines, server, capsys):
     served = _get(server, f"/history/{pushed}")
     assert served == _cli_json(capsys, "journal", "show", "--artifact", pushed, "--content")
     assert served["entries"] and all(e["content_after"] for e in served["entries"])
+    # a server has no project history: its inbox holds the cases and the analyses only
+    waiting = _get(server, "/inbox")
+    assert waiting["items"] == [] and waiting["counts"]["unrecorded-commit"] == 0
     with pytest.raises(serve.ServeError) as err:
         _get(server, "/check")
     assert err.value.status == 501 and "--local" in str(err.value)
