@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst view` takes a short ID (`REQ-000030`) and a meta-rule as the
+  handbook writes it (`rr-META-015`), as `impact` and the history already
+  did (BUG-000012). The three verbs resolve an ID with the same code, and a
+  short form two artifacts share is refused with both IDs.
+
 ## 0.65.0 — 2026-10-14
 
 Schemas for every read payload. No layout change, no migration, no change

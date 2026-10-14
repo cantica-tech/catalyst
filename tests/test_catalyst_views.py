@@ -215,3 +215,34 @@ def test_graph_reads_a_one_file_rule_and_a_domain_document(tmp_path):
         "file": "rules/domains/cor-CORE.INGEST-ingest.md",
         "title": "`CORE.INGEST` — Ingest",
     }
+
+
+def test_view_takes_an_id_as_people_write_it(tmp_path, capsys):
+    """BUG-000012: view, impact and the history resolve an ID the same way."""
+    dep, corpus = _dep(tmp_path)
+    assert views.view(dep, corpus, "ITEM-000001")["id"] == ITEM  # short
+    assert views.view(dep, corpus, RULE)["id"] == RULE
+    assert views.resolve(corpus, "SUB-000001") == SUB
+    assert views.resolve(corpus, "NOPE-000001") is None
+    with pytest.raises(views.ViewError, match="no artifact or rule 'NOPE-000001'"):
+        views.view(dep, corpus, "NOPE-000001")
+    # the same number signed by two people: the short form names both, and says so
+    other = "ITEM-000001-Zz9yX8wV"
+    write(
+        dep.root / "items" / "ITEM-000001-another.md",
+        artifact(other, "Another", {"ID": f"`{other}`", "Status": "Open", "Targets": f"`{RULE}`", "Domain": "`AUTH`"}),
+    )
+    corpus = load_corpus(load(dep.project_root))
+    with pytest.raises(views.ViewError, match=f"'ITEM-000001' names several: {ITEM}, {other}"):
+        views.resolve(corpus, "ITEM-000001")
+    assert views.view(dep, corpus, other)["id"] == other  # the full ID is never ambiguous
+
+
+def test_view_takes_a_meta_rule_as_the_handbook_writes_it(tmp_path):
+    project = make_project(tmp_path)
+    write(
+        project / ".criterion" / "rules" / "Rules-of-Rules.md",
+        f"# Handbook\n\n## 15. `rr-META-000015-{USERID}` Shape\n\nText.\n",
+    )
+    dep = load(project)
+    assert views.view(dep, load_corpus(dep), "rr-META-015")["id"] == f"rr-META-000015-{USERID}"
