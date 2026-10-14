@@ -4,7 +4,6 @@ with it, and what two modules must not share is refused."""
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -81,11 +80,11 @@ def _errors(project: Path) -> list[str]:
 
 
 def _files(root: Path) -> dict[str, str]:
-    return {
-        f.relative_to(root).as_posix(): hashlib.sha256(f.read_bytes()).hexdigest()
-        for f in sorted(root.rglob("*"))
-        if f.is_file() and ".git" not in f.relative_to(root).parts
-    }
+    """Every file under `root` but `.git`, and its hash (`.git` is never
+    entered: git may repack it while the walk runs)."""
+    from test_catalyst_module_install import _files as listed
+
+    return listed(root, skip=(".git",))
 
 
 def test_a_second_module_installs_beside_the_first(tmp_path):

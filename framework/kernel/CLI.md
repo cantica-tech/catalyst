@@ -1025,7 +1025,7 @@ only its signers are not checked.
 
 Tokens are managed on the server's host, by whoever runs the server.
 
-`catalyst serve --local [--project <dir>] [--port <n>]` serves a project's
+`catalyst serve --local [--project <dir>] [--port <n>] [--static <dir>]` serves a project's
 own criterion read-only, for a client on this machine that reads every
 criterion the same way, served or not. It listens on 127.0.0.1 only, on a
 port the system picks unless `--port` names one, and prints one JSON line,
@@ -1034,6 +1034,17 @@ The read endpoints and `events` answer as on a server, `GET check` returns
 `catalyst check --json`, and `push`, `have`, `changes` and `blobs` answer
 405. Its batch is a change counter: it moves when a criterion file changes
 (checked every second), and `events` sends it.
+
+`--static <dir>` (with `--local` only) also serves a directory's files,
+for every path outside `/v1`; `/` is its `index.html`. The kernel ships no
+page: the directory is the client's. A file needs no token (the page is
+what brings the token to the API), a path that leaves the directory or a
+missing file is a 404, and the content type follows the extension with
+`X-Content-Type-Options: nosniff`. The start line gains `page`, the page's
+URL with the token in its fragment (`#token=…`), which a browser never
+sends to the server. In this mode an API request whose `Origin` is not the
+server's own is refused (403), so another page in the browser cannot read
+the criterion even with the token.
 
 ### `catalyst criterion <subcommand>`
 
