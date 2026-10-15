@@ -20,6 +20,10 @@ One `/create <type>`, a command with parts; meta-tags dropped (R2, ADR-021). Mig
   definition or template. `catalyst sync apply` removes a deployment's
   `development/meta-tags/` and `definitions/meta-tag.md` when the folder
   holds no tag, and keeps them when it holds some.
+- `catalyst sync apply` and `recompose` merge what catalyst itself
+  generates (a module type's catalogue entry, its old task) from the form
+  the deployment holds, so a change to the generator reaches the deployment;
+  before, the three-way merge saw no change and kept the old form.
 - Migration `0.69.0/one-create-command.md`.
 
 ## 0.68.1 — 2026-10-15
