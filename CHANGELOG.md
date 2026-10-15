@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.66.1 — 2026-10-15
+
+Generated sections in the reference documents (R4.4, first step). No layout change, no migration.
 
 - `CLI.md` opens its command reference with an index of every command and
   its options, and `FORMAT.md` §10 with the kernel's entity types, both
