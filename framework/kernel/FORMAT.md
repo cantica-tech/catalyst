@@ -497,6 +497,18 @@ unless forced (`SYNCHRONIZE.md`, `/freeze`). Not checked.
 
 ## 10. Entity Type Definitions
 
+<!-- generated: kernel-types (scripts/gen_docs.py; do not edit by hand) -->
+
+The kernel's own entity types, from `framework/kernel/entities/`; a module adds its own.
+
+| Prefix | Type | Folder | States | Closed |
+|---|---|---|---|---|
+| `ANALYSIS` | Analysis | `analyses/` | Extracting, Reconciling, Deciding, Closed, Abandoned | Closed, Abandoned |
+| `RECON` | Reconciliation | `reconciliations/` | Open, Under Review, Resolved-Accepted, Resolved-Accepted-with-Edits, Resolved-Rejected, Closed | Resolved-Accepted, Resolved-Accepted-with-Edits, Resolved-Rejected, Closed |
+| `WORKFLOW` | Workflow | `workflows/` | Draft, Active, Deprecated | Deprecated |
+
+<!-- end generated: kernel-types -->
+
 An ETD is a YAML file in the module (`schemas/<entity>.yaml`, listed in
 `module.yaml`) or the kernel (`entities/`). Its fields — `id_prefix`,
 `name`, `plural_name`, `folder`, `location`, `naming`, `grounding`,
