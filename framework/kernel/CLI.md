@@ -81,7 +81,7 @@ Commands that write a signed value (`id next`, `id next-rule`,
 (`CODE-OF-CONDUCT.md` §2): `--as <name|git_username>` when given, else
 the only active user. It never guesses from git config: with several
 users and no `--as`, the command fails and the agent asks who is
-signing. An unregistered user fails with a pointer to `/user-add`.
+signing. An unregistered user fails with a pointer to `/user add`.
 
 ## Commands
 
@@ -892,7 +892,7 @@ accepted).
 
 ### `catalyst userid gen`
 
-Prints a new userid for `/user-add`: 8 characters drawn uniformly from
+Prints a new userid for `/user add`: 8 characters drawn uniformly from
 `[A-Za-z0-9]` with a cryptographic random source, redrawn if it has no
 uppercase letter or collides with a registered userid (INV-26).
 

@@ -28,7 +28,7 @@ noted rather than gated. Two things are hard exceptions, enforced regardless
 of role or identity:
 
 - **INV-16** — a write that would leave zero active users in
-  `IAM/users/users.json` is refused outright (`/user-remove`'s last-user
+  `IAM/users/users.json` is refused outright (`/user remove`'s last-user
   case).
 - **INV-21 / `rr-META-016`** — resolving a `RECON-` reconciliation case is
   gated by the actor's `reconciliation` field (`full`/`propose`/`none`) in
@@ -52,14 +52,14 @@ which `catalyst criterion protect` turns on (§4).
 | QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/status` on verification items | `propose` |
 | Stakeholder | everything | propose ideas and planning items to the active module | `none` |
 | Release Manager | everything | `/sync-framework`, cutting releases | `full` |
-| Admin | everything | `/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`, `/user-list`, `/role-add`, `/role-modify`, `/freeze`, `/share create`, `/reconcile` | `full` |
+| Admin | everything | `/user`, `/role`, `/freeze`, `/share create`, `/reconcile` | `full` |
 
 The "Write" column is each role's *typical* scope (`IAM/roles/roles.json`'s
 `actions` field) — a signal for what to expect and note on mismatch, not an
 enforced boundary. Only the "Reconciliation" column is a real gate. The
 active process module names its own commands for these typical actions in
 its documentation; a deployment may list them in `roles.json` via
-`/role-modify`.
+`/role modify`.
 
 Role does not scope what `/share push` carries: every contributor's
 push holds their whole change, and the pull request is where it is
@@ -93,7 +93,7 @@ the deployment. Signing identity is session-resolved per §3.
 In a shared deployment (`rr-META-013`):
 
 - **Registration comes first.** A contributor is registered with
-  `/user-add` (which draws their `userid`) before signing anything; the
+  `/user add` (which draws their `userid`) before signing anything; the
   registration lands through a pull request like any other change. Their
   `userid` suffixes every ID they allocate, which is what keeps IDs unique
   across contributors (`Rules-of-Rules.md` §6).

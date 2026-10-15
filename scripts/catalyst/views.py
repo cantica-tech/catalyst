@@ -3,7 +3,7 @@
 links, and the entity types that give them meaning: what a client draws the
 chain from, with no parser or type list of its own).
 
-What `/list`, `/user-list`, `/journal` and a module's backlog summary asked
+What `/list`, `/user list`, `/journal` and a module's backlog summary asked
 an agent to work out by reading files is computed here, from the working copy
 and the entity type definitions (ETDs) alone, so no module entity is named in
 this file. Nothing here writes.

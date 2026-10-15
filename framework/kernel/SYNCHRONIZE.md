@@ -186,16 +186,16 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
      refreshed only by the command the module names for it)
    - `meta-tags/meta-tags.md`
    - `IAM/roles/roles.json` (from `templates/roles.template.json` on
-     first deploy; entries added/changed by `/role-add`/`/role-modify` —
+     first deploy; entries added/changed by `/role add|modify` —
      never overwritten by synchronization once it exists, same
      project-owned-state treatment as an installed plugin directory) and
      `IAM/users/users.json` (from `templates/users.template.json` on
      first deploy; entries added/updated by
-     `/user-add`/`-remove`/`-modify`/`-assign-role` — see `INVARIANTS.md`
+     `/user add|remove|modify|assign-role` — see `INVARIANTS.md`
      INV-16). A deployed project that predates this requirement gets both
      created from their templates on its next sync, not silently skipped
      — and if that leaves `users.json` with zero active users, prompt to
-     run `/user-add` before considering the sync complete (INV-16's hard
+     run `/user add` before considering the sync complete (INV-16's hard
      "at least one active user" requirement applies regardless of how the
      file came to exist).
    - The journal (`development/journal/`, one shard per actor, machine and

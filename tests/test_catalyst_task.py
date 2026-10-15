@@ -42,7 +42,7 @@ def test_task_dispatches_from_the_project_root(tmp_path, monkeypatch, capfd):
     monkeypatch.setenv("AGENT_CMD", "echo")
     (project / "sub").mkdir()
     monkeypatch.chdir(project / "sub")
-    assert main(["task", "user-list", "--", "--active-only"]) == 0
-    assert "/user-list --active-only" in capfd.readouterr().out
-    assert main(["task"]) == 0 and "user-list" in capfd.readouterr().out
+    assert main(["task", "user", "--", "list", "--active-only"]) == 0
+    assert "/user list --active-only" in capfd.readouterr().out
+    assert main(["task"]) == 0 and "user" in capfd.readouterr().out
     assert sorted(p.name for p in project.iterdir() if p.name.lower().startswith("taskfile")) == []

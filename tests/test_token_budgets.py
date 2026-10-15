@@ -34,7 +34,7 @@ def test_command_specs_are_measured_in_any_checkout():
     from measure_tokens import measure_command_specs
 
     names = {b.name for b in measure_command_specs()}
-    assert {"spec: /share", "spec: /check-rules", "spec: --general"} <= names and len(names) > 20
+    assert {"spec: /share", "spec: /check-rules", "spec: --general"} <= names and len(names) >= 15
 
 
 SAMPLE = Path(__file__).resolve().parents[1] / "framework" / "modules" / "sample-process"

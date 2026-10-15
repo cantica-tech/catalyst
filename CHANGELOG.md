@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- Fewer slash commands, with the old names kept as aliases (roadmap R2,
+  ADR-020). `/user add|remove|modify|assign-role|list` replaces the five
+  `/user-*` commands, `/role add|modify` the two `/role-*`, `/check-rules
+  <file>` absorbs `/audit`, `/help` absorbs `/commands`, and `/journal
+  restore` absorbs `/journal-restore`. The kernel goes from 23 commands to
+  15, and its command specs from 8,494 tokens to 6,958. `catalyst spec
+  <old name>` still resolves. The common tasks follow: `catalyst task user
+  -- add <name> <role>` replaces `catalyst task user-add`, and the task
+  names of the absorbed commands are gone. The parity check counts the
+  command a §4 bullet defines; its aliases need no task.
+
 ## 0.67.0 — 2026-10-15
 
 `catalyst journal redact`: content journaled by mistake redacted as an auditable tombstone (R3.7, decision A5). No layout change, no migration.
