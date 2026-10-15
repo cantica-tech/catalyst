@@ -60,9 +60,9 @@ only ever refers to them generically (`INVARIANTS.md` INV-30).
 
 Every artifact the framework creates — active-module artifact or work item
 — carries a `Signed-off-by` field, resolved against
-`IAM/users/users.json` (managed by `/user-add`/`-remove`/`-modify`/
-`-assign-role`) and `IAM/roles/roles.json` (the role → typical-action
-mapping, `/role-add`/`-modify`). A deployment must always have at least
+`IAM/users/users.json` (managed by `/user add|remove|modify|
+assign-role|list`) and `IAM/roles/roles.json` (the role → typical-action
+mapping, `/role add|modify`). A deployment must always have at least
 one active user; beyond that, role checks are advisory, not access
 control — see `Rules-of-Rules.md` §11.
 
@@ -76,7 +76,7 @@ Every rule-linked change also appends one entry to the journal
 (`development/journal/`), an append-only, transaction-log-grade
 record: exact git content hashes before/after per touched file, the
 rule(s) it served, and the actual intent behind it. Precise enough that
-`/journal-restore <timestamp>` can materialize the tree as it stood at
+`/journal restore <timestamp>` can materialize the tree as it stood at
 any point into a side directory — real reconstruction, not narrative.
 Entries are written by `catalyst journal append` ([`CLI.md`](CLI.md)),
 never by hand. See `Rules-of-Rules.md` §12.

@@ -39,11 +39,12 @@ TASKS_HEADING_RE = re.compile(r"^tasks:\s*$")
 TASK_KEY_RE = re.compile(r"^  ([a-z][a-z0-9-]*):")
 
 
-def extract_section4_commands(coc_text: str) -> set[str] | None:
-    """Command names referenced by top-level bullets under CODE-OF-CONDUCT.md's
-    '## 4.' heading, up to the next '## N.' heading. Returns None if no
-    '## 4.' heading is found at all (reported distinctly from an empty
-    section by the caller)."""
+def extract_section4_bullets(coc_text: str) -> list[set[str]] | None:
+    """The command names of each top-level bullet under CODE-OF-CONDUCT.md's
+    '## 4.' heading, up to the next '## N.' heading: the names before its "—",
+    one command and its aliases (ADR-020). Returns None if no '## 4.' heading
+    is found at all (reported distinctly from an empty section by the
+    caller)."""
     lines = coc_text.splitlines()
     start = end = None
     for i, line in enumerate(lines):
@@ -55,14 +56,22 @@ def extract_section4_commands(coc_text: str) -> set[str] | None:
     if start is None:
         return None
 
-    names: set[str] = set()
+    bullets: list[set[str]] = []
     for line in lines[start : end or len(lines)]:
         # Column-0 "- " only: a 2-space-indented sub-bullet (/catalyzer's
         # subcommands) or a bold prose paragraph naming commands mid-sentence
         # (e.g. the work-items-are-plugin-territory callout) must not count.
         if line.startswith("- "):
-            names.update(COMMAND_TOKEN_RE.findall(line))
-    return names
+            found = set(COMMAND_TOKEN_RE.findall(line.split("—", 1)[0]))
+            if found:
+                bullets.append(found)
+    return bullets
+
+
+def extract_section4_commands(coc_text: str) -> set[str] | None:
+    """Every command name, alias or not, the §4 bullets define."""
+    bullets = extract_section4_bullets(coc_text)
+    return None if bullets is None else set().union(*bullets)
 
 
 def extract_taskfile_commands(taskfile_text: str) -> set[str] | None:
@@ -110,8 +119,8 @@ def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
     if not code_of_conduct.is_file():
         return [f"taskfile parity: {code_of_conduct} is missing"]
 
-    coc_names = extract_section4_commands(code_of_conduct.read_text(encoding="utf-8", errors="ignore"))
-    if coc_names is None:
+    bullets = extract_section4_bullets(code_of_conduct.read_text(encoding="utf-8", errors="ignore"))
+    if bullets is None:
         return [f"taskfile parity: {code_of_conduct} has no '## 4.' section"]
 
     if not taskfile.is_file():
@@ -122,11 +131,12 @@ def check_taskfile_parity(taskfile: Path, code_of_conduct: Path) -> list[str]:
         return [f"taskfile parity: {taskfile} has no 'tasks:' block"]
 
     errors: list[str] = []
-    for name in sorted(coc_names - task_names):
-        errors.append(
-            f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{name} but {taskfile.name} has no matching task"
-        )
-    for name in sorted(task_names - coc_names - UTILITY_TASKS):
+    for names in bullets:
+        if not names & task_names:  # one task per command; its aliases need none
+            errors.append(
+                f"taskfile parity: CODE-OF-CONDUCT.md §4 references /{min(names)} but {taskfile.name} has no matching task"
+            )
+    for name in sorted(task_names - set().union(*bullets) - UTILITY_TASKS):
         errors.append(
             f"taskfile parity: {taskfile.name} has a '{name}' task but it is not referenced in CODE-OF-CONDUCT.md §4"
         )

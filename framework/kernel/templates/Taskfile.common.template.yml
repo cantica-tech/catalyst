@@ -31,40 +31,15 @@ vars:
   AGENT_CMD: '{{.AGENT_CMD | default "claude -p"}}'
 
 tasks:
-  user-add:
-    desc: "Register a new user: <name> <role>"
+  user:
+    desc: "Users: add <name> <role> | remove <name> | modify <name> <field> <value> | assign-role <name> <role> | list"
     cmds:
-      - '{{.AGENT_CMD}} "/user-add {{.CLI_ARGS}}"'
+      - '{{.AGENT_CMD}} "/user {{.CLI_ARGS}}"'
 
-  user-remove:
-    desc: "Deactivate a user: <name>"
+  role:
+    desc: "Roles: add <role> <actions> [full|propose|none] | modify <role> <actions>"
     cmds:
-      - '{{.AGENT_CMD}} "/user-remove {{.CLI_ARGS}}"'
-
-  user-modify:
-    desc: "Edit a user's notes or active field: <name> <field> <value>"
-    cmds:
-      - '{{.AGENT_CMD}} "/user-modify {{.CLI_ARGS}}"'
-
-  user-assign-role:
-    desc: "Add a role to an existing user: <name> <role>"
-    cmds:
-      - '{{.AGENT_CMD}} "/user-assign-role {{.CLI_ARGS}}"'
-
-  user-list:
-    desc: "List registered users [--role <role>] [--active-only]"
-    cmds:
-      - '{{.AGENT_CMD}} "/user-list {{.CLI_ARGS}}"'
-
-  role-add:
-    desc: "Add a new role: <role> <actions>"
-    cmds:
-      - '{{.AGENT_CMD}} "/role-add {{.CLI_ARGS}}"'
-
-  role-modify:
-    desc: "Replace an existing role's actions: <role> <actions>"
-    cmds:
-      - '{{.AGENT_CMD}} "/role-modify {{.CLI_ARGS}}"'
+      - '{{.AGENT_CMD}} "/role {{.CLI_ARGS}}"'
 
   meta-tag:
     desc: "Create a meta-tag artifact linked to an artifact: <artifact-id>"
@@ -106,11 +81,6 @@ tasks:
     cmds:
       - '{{.AGENT_CMD}} "/status {{.CLI_ARGS}}"'
 
-  audit:
-    desc: "Analyze the change-impact of a file: <file-name>"
-    cmds:
-      - '{{.AGENT_CMD}} "/audit {{.CLI_ARGS}}"'
-
   run-analysis:
     desc: "Four-eyes analysis of existing code (domains, rules, defects): [<path>...] [--bootstrap|--incremental]"
     cmds:
@@ -122,27 +92,17 @@ tasks:
       - '{{.AGENT_CMD}} "/sync-framework {{.CLI_ARGS}}"'
 
   check-rules:
-    desc: "Verify rules, domains, and artifact links remain consistent"
+    desc: "Verify rules, domains and links are consistent [<file>: that file's change-impact]"
     cmds:
       - '{{.AGENT_CMD}} "/check-rules {{.CLI_ARGS}}"'
 
-  commands:
-    desc: "List every slash command available in this deployment"
-    cmds:
-      - '{{.AGENT_CMD}} "/commands {{.CLI_ARGS}}"'
-
   journal:
-    desc: "Read-only filter/report over the journal"
+    desc: "Read-only: the journal's entries, filtered | restore <timestamp>"
     cmds:
       - '{{.AGENT_CMD}} "/journal {{.CLI_ARGS}}"'
 
-  journal-restore:
-    desc: "Reconstruct the tree as it stood at a timestamp into a side directory"
-    cmds:
-      - '{{.AGENT_CMD}} "/journal-restore {{.CLI_ARGS}}"'
-
   help:
-    desc: "Return help documentation for the framework or a specific command"
+    desc: "Every command and artifact type [<command>: that command's help]"
     cmds:
       - '{{.AGENT_CMD}} "/help {{.CLI_ARGS}}"'
 

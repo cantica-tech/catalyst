@@ -178,3 +178,12 @@ def test_a_back_reference_row_an_older_artifact_lacks_is_added(tmp_path):
     dep, corpus = _state(project)
     res = edit.new(dep, corpus, "SUB", "Late sub", {"Item": ITEM}, _signer(corpus), [])
     assert f"| **Subs** | `{res.id}` |" in item.read_text(encoding="utf-8")
+
+
+def test_a_slug_never_ends_in_a_bare_number():
+    # INV-7 reads a name ending in "-<digits>" as a bare ID
+    assert edit.slug("Fewer slash commands, the old names kept as aliases (R2, ADR-020)") == (
+        "fewer-slash-commands-the-old-names-kept-as-aliases-r2-adr"
+    )
+    assert edit.slug("Upgrade to Python 3 11") == "upgrade-to-python"
+    assert edit.slug("2026") == "item"

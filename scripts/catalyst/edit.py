@@ -40,7 +40,8 @@ class Result:
 
 # --- helpers --------------------------------------------------------------
 def slug(text: str) -> str:
-    return SLUG_RE.sub("-", text.lower()).strip("-")[:60].strip("-") or "item"
+    # never ending in "-<digits>", which INV-7 reads as a bare ID ("… r2 adr-020" cut to "…-adr-02")
+    return re.sub(r"(?:(?:^|-)\d+)+$", "", SLUG_RE.sub("-", text.lower()).strip("-")[:60].strip("-")) or "item"
 
 
 def etd_named(dep: Deployment, name: str) -> ETD:

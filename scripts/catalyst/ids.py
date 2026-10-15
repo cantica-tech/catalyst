@@ -44,7 +44,7 @@ def resolve_signer(dep: Deployment, corpus: Corpus, as_user: str | None = None) 
     if as_user:
         user = corpus.user(as_user)
         if user is None:
-            raise IdError(f"'{as_user}' is not a registered user — /user-add first")
+            raise IdError(f"'{as_user}' is not a registered user — /user add first")
         return user
     active = [u for u in corpus.users if u.get("active", True)]
     if len(active) == 1:

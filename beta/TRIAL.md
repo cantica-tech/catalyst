@@ -24,7 +24,7 @@ Show, on a real project, that a shared deployment:
 ## Setup
 
 - **People:** at least **two**, each with their own registered user
-  (`/user-add`), working on the same product repository. At least one of
+  (`/user add`), working on the same product repository. At least one of
   them has not used catalyst before and starts with
   [`QUICKSTART.md`](QUICKSTART.md).
 - **Duration:** at least **four weeks** of ordinary work, not a
@@ -46,7 +46,7 @@ Show, on a real project, that a shared deployment:
      (`framework/kernel/CLI.md`, `catalyst trace`), checking out the
      `.criterion` submodule so IDs resolve.
 - **Each participant**, in their own clone: `catalyst criterion join`,
-  `/user-add` themselves (through a pull request), and
+  `/user add` themselves (through a pull request), and
   `catalyst hook install`.
 - Record the start: the date, the commit it starts from (existing history
   is not checked), and each participant's userid.

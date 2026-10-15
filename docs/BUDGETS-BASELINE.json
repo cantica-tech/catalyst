@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-10T12:16:13+00:00",
+  "timestamp": "2026-10-15T12:11:44+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -21,21 +21,9 @@
       "category": "command-spec"
     },
     {
-      "name": "spec: /audit",
-      "bytes": 1467,
-      "tokens": 366,
-      "category": "command-spec"
-    },
-    {
       "name": "spec: /check-rules",
-      "bytes": 1417,
-      "tokens": 354,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /commands",
-      "bytes": 1529,
-      "tokens": 382,
+      "bytes": 2117,
+      "tokens": 529,
       "category": "command-spec"
     },
     {
@@ -46,20 +34,14 @@
     },
     {
       "name": "spec: /help",
-      "bytes": 1219,
-      "tokens": 304,
+      "bytes": 1747,
+      "tokens": 436,
       "category": "command-spec"
     },
     {
       "name": "spec: /journal",
-      "bytes": 1110,
-      "tokens": 277,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /journal-restore",
-      "bytes": 1372,
-      "tokens": 343,
+      "bytes": 1809,
+      "tokens": 452,
       "category": "command-spec"
     },
     {
@@ -87,15 +69,9 @@
       "category": "command-spec"
     },
     {
-      "name": "spec: /role-add",
-      "bytes": 1161,
-      "tokens": 290,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /role-modify",
-      "bytes": 1023,
-      "tokens": 255,
+      "name": "spec: /role",
+      "bytes": 1444,
+      "tokens": 361,
       "category": "command-spec"
     },
     {
@@ -123,33 +99,9 @@
       "category": "command-spec"
     },
     {
-      "name": "spec: /user-add",
-      "bytes": 1394,
-      "tokens": 348,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /user-assign-role",
-      "bytes": 1011,
-      "tokens": 252,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /user-list",
-      "bytes": 965,
-      "tokens": 241,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /user-modify",
-      "bytes": 1198,
-      "tokens": 299,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /user-remove",
-      "bytes": 1115,
-      "tokens": 278,
+      "name": "spec: /user",
+      "bytes": 2700,
+      "tokens": 675,
       "category": "command-spec"
     },
     {
