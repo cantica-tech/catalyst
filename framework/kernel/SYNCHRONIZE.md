@@ -184,7 +184,6 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
    - any non-artifact file the active module's meta-rules or invariants
      require (created from the module's `templates/` if missing, and
      refreshed only by the command the module names for it)
-   - `meta-tags/meta-tags.md`
    - `IAM/roles/roles.json` (from `templates/roles.template.json` on
      first deploy; entries added/changed by `/role add|modify` —
      never overwritten by synchronization once it exists, same

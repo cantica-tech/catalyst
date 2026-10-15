@@ -154,3 +154,46 @@ def test_bullet_without_a_command_name_is_skipped(tmp_path):
     p = make_project(tmp_path)
     write(p / ".criterion" / "CODE-OF-CONDUCT.md", "## 4. C\n\n- `/x|y` — odd.\n- `/ok` — fine.\n\n## 5. N\n")
     assert commands(load(p)) == ["ok"]
+
+
+PARTED = """# Rules of Development
+
+## 4. Slash-command entry points
+
+- `/create <type> <title>` — create an artifact; each type is a part.
+- `/user` (`/user-add`, `/user-list`) — users: `add <name>`, `list`.
+
+When the user enters `/create <type> <title>`, follow that type's part.
+
+When the user enters `/user add <name>`, run `catalyst user add`.
+
+### From module example
+
+- `/create bug <title>` (`/create-bug`) — a bug.
+- `/create req <title>` (`/create-req`, `/create-requirement`) — a requirement.
+
+When the user enters `/create bug: ...` or `/create-bug: ...`, run `catalyst new BUG`.
+
+Then write the bug's sections, as `/create` requires.
+
+When the user enters `/create-req:` or `/create-requirement: ...`, run `catalyst new REQ`.
+
+## 5. Next
+"""
+
+
+def test_a_command_with_parts_reads_one_part(tmp_path):
+    from catalyst.spec import parse, spec_text
+
+    s = parse(PARTED)
+    bug = spec_text(s, "create-bug")
+    assert "a bug." in bug and "catalyst new BUG" in bug and "the bug's sections" in bug
+    assert "follow that type's part" in bug and "catalyst new REQ" not in bug and "a requirement." not in bug
+    assert spec_text(s, "create", "bug") == bug
+    req = spec_text(s, "create-requirement")
+    assert "catalyst new REQ" in req and "catalyst new BUG" not in req and "the bug's sections" not in req
+    whole = spec_text(s, "create")
+    assert "a bug." in whole and "a requirement." in whole and "catalyst new" not in whole
+    assert "`catalyst spec create <part>`" in whole and "create-bug" in whole
+    # a command without parts reads whole, whatever the part asked
+    assert spec_text(s, "user", "add") == spec_text(s, "user") and "`/user-add`" in spec_text(s, "user")

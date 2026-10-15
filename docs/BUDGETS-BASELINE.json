@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-15T12:11:44+00:00",
+  "timestamp": "2026-10-15T19:41:08+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -27,6 +27,12 @@
       "category": "command-spec"
     },
     {
+      "name": "spec: /create",
+      "bytes": 1228,
+      "tokens": 307,
+      "category": "command-spec"
+    },
+    {
       "name": "spec: /freeze",
       "bytes": 1229,
       "tokens": 307,
@@ -48,12 +54,6 @@
       "name": "spec: /list",
       "bytes": 1272,
       "tokens": 318,
-      "category": "command-spec"
-    },
-    {
-      "name": "spec: /meta-tag",
-      "bytes": 1389,
-      "tokens": 347,
       "category": "command-spec"
     },
     {
@@ -130,8 +130,8 @@
     },
     {
       "name": "framework/kernel/INSTANTIATION-GUIDE.md",
-      "bytes": 22705,
-      "tokens": 5676,
+      "bytes": 22613,
+      "tokens": 5653,
       "category": "install"
     },
     {

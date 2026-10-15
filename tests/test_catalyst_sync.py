@@ -196,3 +196,31 @@ def test_apply_brings_the_criterions_runtime_to_the_vendored_cli(tmp_path, monke
     assert asked == [(root, "9.9.9")]
     monkeypatch.setattr(rt, "install_into", lambda c, v, pyz: (c / ".venv", False))
     assert sync.refresh_runtime(load(project)) is None  # already there
+
+
+def test_a_dropped_kernel_type_leaves_a_deployment_that_holds_none_of_it(tmp_path):
+    project, deployed = _deployment(tmp_path)
+    root = project / ".criterion"
+    for rel in ("development/meta-tags/meta-tags.md", "development/meta-tags/templates/TEMPLATE-META-TAG-v1.md"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("# a seeded file\n", encoding="utf-8")
+    (root / "definitions" / "meta-tag.md").write_text("# Meta-tag\n", encoding="utf-8")
+    git = ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "add", "-A"], check=True)
+    subprocess.run([*git, "commit", "-qm", "an older kernel's meta-tags"], check=True)
+    base, new = _release(tmp_path, deployed), _release(tmp_path, "9.9.9")
+    dep = load(project)
+    src = sync.Sources(dep, new, None, base, None)
+    assert ("retired-type", "remove") in {(a.kind, a.change) for a in sync.plan(dep, src, None).actions}
+    _, touched = sync.apply(dep, src, None, "ada", [])
+    src.close()
+    assert not (root / "development" / "meta-tags").exists() and not (root / "definitions" / "meta-tag.md").exists()
+    assert root / "definitions" / "meta-tag.md" in touched  # journaled with the sync
+
+    (root / "development" / "meta-tags").mkdir(parents=True)
+    (root / "development" / "meta-tags" / "tag-owner-REQ-000001.md").write_text("# a tag\n", encoding="utf-8")
+    dep = load(project)
+    src = sync.Sources(dep, new, None, new, None)
+    actions = [(a.kind, a.change) for a in sync.plan(dep, src, None).actions]
+    src.close()
+    assert ("retired-type", "skip") in actions and ("retired-type", "remove") not in actions

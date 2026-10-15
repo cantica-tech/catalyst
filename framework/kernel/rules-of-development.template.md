@@ -26,9 +26,8 @@ advisory, except for reconciliation (§16 there). The registry files:
 ## 3. Standard document types
 
 The kernel's own types are rules and domains (`rules/`), reconciliation
-cases (`RECON-`), workflows (`WORKFLOW-`), analyses (`ANALYSIS-`), meta-tags
-(`tag-<key>-<artefact-id>`, `development/meta-tags/`) and the user and role
-registries (`IAM/`). Formats are in `FORMAT.md`, meanings in
+cases (`RECON-`), workflows (`WORKFLOW-`), analyses (`ANALYSIS-`) and the
+user and role registries (`IAM/`). Formats are in `FORMAT.md`, meanings in
 `definitions/`. The active module's types follow.
 
 ## 4. Slash-command entry points
@@ -69,9 +68,10 @@ A product commit made for the change cites the artifact or rule it serves
   `IAM/roles/roles.json`: `add <role> <actions> [full|propose|none]` adds one
   with its `reconciliation` level (refused if it exists); `modify <role>
   <actions>` replaces a role's actions (refused if it does not exist).
-- `/meta-tag` — create a new meta-tag artifact, save it as
-  `tag-<key>-<artefact-id>`, register it in `meta-tags/meta-tags.md`, and
-  link it to the specified artifact.
+- `/create <type> <title>` — create an artifact of a type the active
+  modules declare. Each type is a part of this command, listed after the
+  kernel's commands as `/create <type>` with its alias `/create-<type>`;
+  `catalyst spec create <type>` gives that part alone.
 - `/list <type> [--filter ...]` — list artifacts, work items, rules, or
   templates of the requested type. Use `all` to list everything. Each
   `--filter` is a property filter expressed as `key=value` or
@@ -168,14 +168,11 @@ When the user enters `/role modify <role> <actions>: ...`, run `catalyst role
 modify "<role>" --action <a> ... --intent "<why>"`: it replaces the role's
 actions and never changes a `Signed-off-by` already recorded.
 
-When the user enters `/meta-tag <artefact-id>`, create a new meta-tag artifact
-immediately, save it as `tag-<key>-<artefact-id>`, register it in
-`meta-tags/meta-tags.md`, and link it to the specified artifact. If the key
-is not supplied explicitly, prompt for it. A meta-tag is named by its key
-and target, not numbered, so no ID is allocated; `meta-tags/meta-tags.md`
-is not an entity index, so its row is added here rather than by
-`catalyst index regen`. Then journal the change with
-`catalyst journal append --command /meta-tag --action create ...`.
+When the user enters `/create <type> <title>`, follow that type's part
+(`catalyst spec create <type>`): every part allocates the ID with
+`catalyst new <PREFIX>`, which fills and signs the template, indexes and
+journals it. A type the modules do not declare is refused; `/help` lists
+the types.
 
 When the user enters `/list <type> [--filter ...]`, run `catalyst list
 <type> [--filter ...]` (`--type <family>` for templates) and report what it

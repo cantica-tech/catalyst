@@ -208,8 +208,16 @@ def test_each_v3_type_gets_a_create_command_in_the_catalogue_and_the_taskfile(tm
     spec = capsys.readouterr().out
     assert "catalyst new CASE --title" in spec and "--field Targets=<IDs>" in spec
     assert "entering `Closed` is guarded" in spec
+    assert "catalyst new TASK" not in spec  # one part of `/create`, not every type's (ADR-021)
+    assert main(["spec", "create", "case"]) == 0
+    assert capsys.readouterr().out.replace("/create-case (alias of /create)", "") == spec.replace(
+        "/create-case (alias of /create)", ""
+    )
+    assert main(["spec", "create"]) == 0
+    whole = capsys.readouterr().out
+    assert "`/create case <title>`" in whole and "`/create task <title>`" in whole and "catalyst new CASE" not in whole
     taskfile = (req.at / "Taskfile.common.yml").read_text(encoding="utf-8")
-    assert "create-case:" in taskfile and "create-task:" in taskfile
+    assert "\n  create:\n" in taskfile and "create-case:" not in taskfile and "create-task:" not in taskfile
     parity = subprocess.run(
         ["python3", str(KERNEL.parent.parent / "scripts" / "check_command_parity.py"), "--require"],
         cwd=req.project,

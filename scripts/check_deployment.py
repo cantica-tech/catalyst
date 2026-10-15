@@ -114,7 +114,6 @@ KERNEL_ENTITY_TYPES = (
     "user",
     "role",
     "reconciliation",
-    "meta-tag",
     "journal",
     "ledger",
     "slash-command",

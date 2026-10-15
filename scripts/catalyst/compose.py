@@ -253,8 +253,6 @@ def access_control(kernel: Path, p: Params) -> str:
 
 
 def taskfile(kernel: Path, module: Modules, p: Params) -> str:
-    from catalyst import generate
-
     text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
     mods = module_dirs(module)
     for mod in mods:
@@ -263,14 +261,7 @@ def taskfile(kernel: Path, module: Modules, p: Params) -> str:
             own = (mod / "Taskfile.module.yml").read_text(encoding="utf-8")
             m = re.search(r"^tasks:\s*\n", own, re.M)
             tasks = own[m.end() :] if m else ""
-        contribution = (
-            (mod / "code-of-conduct.module.md").read_text(encoding="utf-8")
-            if (mod / "code-of-conduct.module.md").is_file()
-            else ""
-        )
-        for etd in generated_commands(mod, contribution):
-            tasks = tasks.rstrip("\n") + ("\n\n" if tasks.strip() else "") + generate.task(etd)
-        if tasks.strip():
+        if tasks.strip():  # a module's create commands are parts of the kernel's `create` task
             mid = _module_id(mod, p, len(mods) == 1)
             text += f"\n\n  # --- From module {mid} " + "-" * 20 + "\n" + tasks.rstrip("\n")
     # the file sits in the criterion and is run on its own: a task works in

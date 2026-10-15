@@ -104,15 +104,6 @@ the surrounding deploy-procedure text.
             README.md
             <folder>.md
             [...]
-        meta-tags/
-            templates/
-                README.md
-                templates-meta-tag.md
-                TEMPLATE-META-TAG-v1.md
-                ...
-            README.md
-            meta-tags.md                 # meta-tags catalog
-            [...]
         README.md
         journal/                         # not an artifact type (INV-17): <actor>@<machine>/<YYYY-MM>.jsonl shards
 ```

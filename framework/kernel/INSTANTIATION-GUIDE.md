@@ -92,7 +92,7 @@ first user, and, afterwards, its first rules.
      index — the kernel's `rules/` (with `rules.md` listing the rule
      documents, and each rule document seeded with `## Contents` and
      `## Linked Artifacts — Quick Index`), `rules/domains/`,
-     `reconciliations/`, `workflows/` and `development/meta-tags/`, plus one
+     `reconciliations/` and `workflows/`, plus one
      per module entity type at the place its ETD names (`location`), and
      every path the module's manifest requires;
    - copies the latest definition of every kernel and module type to
@@ -162,7 +162,6 @@ first user, and, afterwards, its first rules.
        roles/               # templates/, README.md, roles.json
      development/
        <folder>/            # a module entity type with `location: development`
-       meta-tags/           # templates/, README.md, meta-tags.md
        journal/             # <actor>@<machine>/<YYYY-MM>.jsonl shards (INV-17)
    ```
 

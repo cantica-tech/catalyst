@@ -8,9 +8,7 @@ This folder contains the reusable document templates that seed the deployed cata
   module ships the templates for its own entity types (its `templates/`,
   referenced from its `module.yaml`; `MODULE-SPECIFICATION.md` §2–§3) and
   they are deployed alongside the kernel's. This folder holds only the
-  kernel's own templates, such as [`meta-tag.template.md`](meta-tag.template.md)
-  — the lightweight annotation governed by `CODE-OF-CONDUCT.md` for every
-  artifact type.
+  kernel's own templates, such as [`rule.template.md`](rule.template.md).
 - **Work-item templates are not here anymore.** They moved to
   `plugins/_prototyping/project-management/agile/templates/` — `work-items/`
   is plugin-territory, not core (`Rules-of-Rules.md` §8, INV-22); see

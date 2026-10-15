@@ -88,13 +88,14 @@ def _field_args(etd: ETD) -> str:
 def catalogue_entry(etd: ETD) -> str:
     """The command's bullet and procedure for the command catalogue (§4)."""
     name = create_command(etd)
+    part = name.removeprefix("create-")
     required = [f.name for f in etd.fields if f.required and f.name not in ("ID", "Status")]
     sections = ", ".join(f"`{h}`" for h, _ in etd.sections) or "none"
     closed = ", ".join(f"`{s}`" for s in etd.workflow.closed_states) or "none"
     return (
-        f"- `/{name}` — create a new {etd.name.lower()} (`{etd.id_prefix}-NNNNNN`) immediately, "
-        f"register it in its index and journal it (generated from the module's `module.yaml`).\n\n"
-        f'When the user enters `/{name}: ...`, run `catalyst new {etd.id_prefix} --title "<t>" '
+        f"- `/create {part} <title>` (`/{name}`) — create a new {etd.name.lower()} (`{etd.id_prefix}-NNNNNN`) "
+        f"immediately, register it in its index and journal it (generated from the module's `module.yaml`).\n\n"
+        f'When the user enters `/create {part}: ...` or `/{name}: ...`, run `catalyst new {etd.id_prefix} --title "<t>" '
         f"{_field_args(etd)} --command /{name} --as <signer>`, then write its sections ({sections}). "
         f"Required fields: {', '.join(f'`{r}`' for r in required) or 'none'}. "
         f"It starts `{etd.workflow.initial}`; closed states: {closed}"
@@ -104,15 +105,4 @@ def catalogue_entry(etd: ETD) -> str:
             else ""
         )
         + ".\n"
-    )
-
-
-def task(etd: ETD) -> str:
-    """The command's composed Taskfile task."""
-    name = create_command(etd)
-    return (
-        f"  {name}:\n"
-        f'    desc: "Create a new {etd.name.lower()} ({etd.id_prefix}) — generated from module.yaml"\n'
-        f"    cmds:\n"
-        f"      - '{{{{.AGENT_CMD}}}} \"/{name} {{{{.CLI_ARGS}}}}\"'\n"
     )
