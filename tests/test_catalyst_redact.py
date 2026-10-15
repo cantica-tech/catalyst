@@ -5,6 +5,7 @@ every reader of the journal treating it as redacted."""
 from __future__ import annotations
 
 import json
+import stat
 import subprocess
 
 import pytest
@@ -65,6 +66,7 @@ def test_the_readers_treat_it_as_redacted(secret, tmp_path, capsys):
     # once git has dropped it, verify notes the redaction and reports no missing blob
     obj = dep.root / ".git" / "objects" / sha[:2] / sha[2:]
     if obj.exists():
+        obj.chmod(stat.S_IWRITE)  # git writes objects read-only, which Windows refuses to delete
         obj.unlink()
     j._EXISTS.clear()
     issues = j.verify(load(project))
