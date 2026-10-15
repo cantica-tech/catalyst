@@ -95,3 +95,7 @@ def test_the_claude_code_plugin_runs_what_the_installer_writes(home):
     stop = plugin["hooks"]["Stop"][0]["hooks"][0]["command"]
     assert stop.endswith('/.catalyst/bin/catalyst" hook stop')
     assert agents.changes("claude-code")[0].value[0]["hooks"][0]["command"].endswith("hook stop")
+    start = plugin["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert start.endswith('/.catalyst/bin/catalyst" hook start --quiet')
+    session_start = agents.changes("claude-code")[1].value
+    assert isinstance(session_start, list) and session_start[0]["hooks"][0]["command"].endswith("hook start --quiet")
