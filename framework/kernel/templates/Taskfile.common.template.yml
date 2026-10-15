@@ -8,13 +8,11 @@
 # `task -t <criterion>/Taskfile.common.yml ...`). Every task runs in the
 # directory it was called from (`USER_WORKING_DIR`), not in the criterion.
 #
-# One task per kernel command in the deployed `CODE-OF-CONDUCT.md` §4; the
-# active module's own tasks (its `Taskfile.module.yml`, one per module
-# command) are appended to the `tasks:` block below on deployment and on
-# `/sync-framework` (`MODULE-SPECIFICATION.md` §6.5). The deployed §4 is the
-# canonical list — `scripts/check_command_parity.py` diffs this file
-# against it. Each task is a thin, non-interactive dispatch to the actual
-# slash command, so day-to-day catalyst operations are scriptable from a
+# One task per command of the deployed `CODE-OF-CONDUCT.md` §4, kernel and
+# modules alike, generated from it on deployment and on `/sync-framework`
+# (ADR-021): §4 is the one command registry, and this template holds only
+# what is not a command. Each task is a thin, non-interactive dispatch to
+# the slash command, so day-to-day catalyst operations are scriptable from a
 # shell or CI job without an interactive session.
 #
 # Usage: catalyst task <command-name> -- <arguments>
@@ -31,81 +29,6 @@ vars:
   AGENT_CMD: '{{.AGENT_CMD | default "claude -p"}}'
 
 tasks:
-  user:
-    desc: "Users: add <name> <role> | remove <name> | modify <name> <field> <value> | assign-role <name> <role> | list"
-    cmds:
-      - '{{.AGENT_CMD}} "/user {{.CLI_ARGS}}"'
-
-  role:
-    desc: "Roles: add <role> <actions> [full|propose|none] | modify <role> <actions>"
-    cmds:
-      - '{{.AGENT_CMD}} "/role {{.CLI_ARGS}}"'
-
-  create:
-    desc: "Create an artifact of a module's type: <type> <title>"
-    cmds:
-      - '{{.AGENT_CMD}} "/create {{.CLI_ARGS}}"'
-
-  list:
-    desc: "List artifacts, work items, rules, or templates: <type> [--filter ...]"
-    cmds:
-      - '{{.AGENT_CMD}} "/list {{.CLI_ARGS}}"'
-
-  freeze:
-    desc: "Protect an item from /sync-framework: <item-id|item-path|type|template-name>"
-    cmds:
-      - '{{.AGENT_CMD}} "/freeze {{.CLI_ARGS}}"'
-
-  migrate-definition:
-    desc: "Update a deployed entity definition to a specific version, only if it exists: <entity-type> <version>"
-    cmds:
-      - '{{.AGENT_CMD}} "/migrate-definition {{.CLI_ARGS}}"'
-
-  share:
-    desc: "Share the criterion: <info|status|pull|push <message>|create <url> [--protect]|join [<url>]>"
-    cmds:
-      - '{{.AGENT_CMD}} "/share {{.CLI_ARGS}}"'
-
-  reconcile:
-    desc: "Decide a reconciliation case (role-gated): <RECON-id> <accept|accept-with-edits|reject|propose <text>|close>"
-    cmds:
-      - '{{.AGENT_CMD}} "/reconcile {{.CLI_ARGS}}"'
-
-  adopt:
-    desc: "List product changes committed outside catalyst and accept (journal) or reject each: [<commit>|<range>]"
-    cmds:
-      - '{{.AGENT_CMD}} "/adopt {{.CLI_ARGS}}"'
-
-  status:
-    desc: "Update an artifact or work item's Status field"
-    cmds:
-      - '{{.AGENT_CMD}} "/status {{.CLI_ARGS}}"'
-
-  run-analysis:
-    desc: "Four-eyes analysis of existing code (domains, rules, defects): [<path>...] [--bootstrap|--incremental]"
-    cmds:
-      - '{{.AGENT_CMD}} "/run-analysis {{.CLI_ARGS}}"'
-
-  sync-framework:
-    desc: "Synchronize the deployed framework: [latest|<version>]"
-    cmds:
-      - '{{.AGENT_CMD}} "/sync-framework {{.CLI_ARGS}}"'
-
-  check-rules:
-    desc: "Verify rules, domains and links are consistent [<file>: that file's change-impact]"
-    cmds:
-      - '{{.AGENT_CMD}} "/check-rules {{.CLI_ARGS}}"'
-
-  journal:
-    desc: "Read-only: the journal's entries, filtered | restore <timestamp>"
-    cmds:
-      - '{{.AGENT_CMD}} "/journal {{.CLI_ARGS}}"'
-
-  help:
-    desc: "Every command and artifact type [<command>: that command's help]"
-    cmds:
-      - '{{.AGENT_CMD}} "/help {{.CLI_ARGS}}"'
-
   # Not a slash command: a direct pass-through to the catalyst CLI
   # (framework/kernel/CLI.md), through the launcher in $CATALYST_HOME/bin.
   catalyst:

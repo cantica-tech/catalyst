@@ -252,18 +252,27 @@ def access_control(kernel: Path, p: Params) -> str:
     return sign_meta_ids((kernel / "ACCESS-CONTROL.md").read_text(encoding="utf-8"), p.userid)
 
 
+def _task(name: str, bullets: list[str]) -> str:
+    """A §4 command's task: its name, the first sentence of its bullet, and
+    the dispatch to the slash command."""
+    first = " ".join(line.strip() for line in bullets[0].splitlines())
+    text = first.split("—", 1)[1].strip() if "—" in first else first.lstrip("- ")
+    desc = re.split(r"(?<=\.)\s|:\s(?=`)", text, maxsplit=1)[0].rstrip(".")
+    desc = desc if len(desc) <= 110 else desc[:107].rstrip() + "..."
+    desc = desc.replace("\\", "\\\\").replace('"', '\\"')
+    return f'  {name}:\n    desc: "{desc}"\n    cmds:\n      - \'{{{{.AGENT_CMD}}}} "/{name} {{{{.CLI_ARGS}}}}"\'\n'
+
+
 def taskfile(kernel: Path, module: Modules, p: Params) -> str:
-    text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
-    mods = module_dirs(module)
-    for mod in mods:
-        tasks = ""
-        if (mod / "Taskfile.module.yml").is_file():
-            own = (mod / "Taskfile.module.yml").read_text(encoding="utf-8")
-            m = re.search(r"^tasks:\s*\n", own, re.M)
-            tasks = own[m.end() :] if m else ""
-        if tasks.strip():  # a module's create commands are parts of the kernel's `create` task
-            mid = _module_id(mod, p, len(mods) == 1)
-            text += f"\n\n  # --- From module {mid} " + "-" * 20 + "\n" + tasks.rstrip("\n")
+    """The criterion's Taskfile: the template's header and utility tasks, and
+    one task per command of the composed §4 (ADR-021: §4 is the registry)."""
+    from catalyst import spec
+
+    template = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
+    head, utility = template.split("\ntasks:\n", 1)
+    s = spec.parse(code_of_conduct(kernel, module, p))
+    tasks = "\n".join(_task(name, bullets) for name, bullets in s.bullets.items())
+    text = f"{head}\ntasks:\n{tasks}\n{utility}"
     # the file sits in the criterion and is run on its own: a task works in
     # the project it was called from, not in the criterion
     text = TASK_RE.sub(lambda m: m.group(0) + "    dir: '{{.USER_WORKING_DIR}}'\n", text)
@@ -332,14 +341,11 @@ def frozen_paths(root: Path) -> set[str]:
 
 
 # What catalyst generates into a composed document, never edited by hand:
-# a v3 type's catalogue entry and, before 0.69.0, its task
+# a v3 type's catalogue entry
 GENERATED_ENTRY = re.compile(
     r"^- `/create[ -][^\n]*\(generated from the module's `module\.yaml`\)\.\n\nWhen the user enters [^\n]*\n", re.M
 )
-GENERATED_TASK = re.compile(
-    r"\n\n  (create-[a-z0-9-]+):\n(?:    dir: [^\n]*\n)?"
-    r'    desc: "[^"\n]*— generated from module\.yaml"\n    cmds:\n      - [^\n]*'
-)
+GENERATED_DOCUMENT = "Taskfile.common.yml"
 
 
 def _entry_key(entry: str) -> str:
@@ -347,15 +353,13 @@ def _entry_key(entry: str) -> str:
     return m.group(1) if m else entry
 
 
-def _as_generated(rel: str, old: str, fresh: str, deployed: str) -> tuple[str, str]:
+def _as_generated(rel: str, old: str, deployed: str) -> tuple[str, str]:
     """The base and the deployed text with what catalyst generated taken as
     the deployment holds it: a change to the generator itself then reaches the
     deployment through the merge, as a template change does. Returns (base, ours)."""
     if rel == "CODE-OF-CONDUCT.md":
         mine = {_entry_key(m.group(0)): m.group(0) for m in GENERATED_ENTRY.finditer(deployed)}
         old = GENERATED_ENTRY.sub(lambda m: mine.get(_entry_key(m.group(0)), m.group(0)), old)
-    elif rel == "Taskfile.common.yml":  # a generated task the new composition no longer has
-        deployed = GENERATED_TASK.sub(lambda m: m.group(0) if f"\n  {m.group(1)}:\n" in fresh else "", deployed)
     return old, deployed
 
 
@@ -383,7 +387,13 @@ def recompose(
             results.append(Recomposed(rel, False, 0, frozen=True))
             continue
         old, fresh = build(*base, params), build(*new, params)
-        old, deployed = _as_generated(rel, old, fresh, target.read_text(encoding="utf-8"))
+        if rel == GENERATED_DOCUMENT:  # wholly generated from §4, never edited by hand: written as composed
+            changed = fresh != target.read_text(encoding="utf-8")
+            if write and changed:
+                target.write_text(fresh, encoding="utf-8")
+            results.append(Recomposed(rel, changed, 0))
+            continue
+        old, deployed = _as_generated(rel, old, target.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
             ours = Path(tmp) / "ours"
             ours.write_text(deployed, encoding="utf-8")
