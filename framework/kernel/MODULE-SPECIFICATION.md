@@ -54,7 +54,7 @@ catalyst-<module-id>/
 ├── rules-of-rules.module.md    # Module meta-rules (§6.1)
 ├── code-of-conduct.module.md   # Module document types and commands (§6.2)
 ├── INVARIANTS.module.md        # Module invariants (§6.4)
-├── Taskfile.module.yml         # Module command tasks (§6.5)
+├── Taskfile.module.yml         # Not read since kernel 0.70.0 (§6.5)
 ├── migrations/                 # Module migrations + migrations.md index (§6.6)
 └── skills/                     # Optional agent skills
     └── <skill-name>/SKILL.md
@@ -118,7 +118,6 @@ contributions:
   rules_of_rules: rules-of-rules.module.md
   code_of_conduct: code-of-conduct.module.md
   invariants: INVARIANTS.module.md
-  taskfile: Taskfile.module.yml
   migrations: migrations/
 ```
 
@@ -142,8 +141,9 @@ generates what the module would otherwise ship (module v3, M3):
   when it runs to several paragraphs, lists or tables).
 - **Its definition**: `definition:` composed into the frozen definition
   document (§6.3).
-- **Its create command**: `/create-<type>` in the command catalogue and the
-  Taskfile, unless the module's `code-of-conduct.module.md` defines it.
+- **Its create command**: a part of the kernel's `/create` in the command
+  catalogue, `/create <type> <title>` (`/create-<type>`), unless the module's
+  `code-of-conduct.module.md` defines it (ADR-021).
 
 A file the module still ships for a type — a template, a definition — wins
 over the generated one. For a generated type, a shipped template named
@@ -276,11 +276,15 @@ extends.
 
 Two sections, `## 3. Standard document types` and
 `## 4. Slash-command entry points`. Each is inserted at the end of the
-matching section of the deployed `CODE-OF-CONDUCT.md`. Every command bullet in
-the module's §4 must match an entry in `module.yaml`'s `commands`; the deployed
-§4 (kernel plus module) is the canonical command list: the `catalyst mcp`
-server's prompts are read from it, and the Taskfile tasks are checked against
-it (`scripts/check_command_parity.py`).
+matching section of the deployed `CODE-OF-CONDUCT.md`. The deployed §4
+(kernel plus modules) is the one command registry: the `catalyst mcp`
+server's prompts are read from it and the criterion's Taskfile is generated
+from it (§6.5). A bullet's head names the command, then its aliases in
+parentheses. A module adds a type to the kernel's `/create` as a part: a
+bullet `/create <type> <title>` (`/create-<type>`), and procedures that name
+`/create <type>` or the alias, so `catalyst spec create <type>` reads that
+part alone (ADR-021). `module.yaml`'s `commands`, when present, must match
+§4's names (`scripts/check_command_parity.py`).
 
 ### 6.3 Definitions (`definitions/`)
 
@@ -293,13 +297,13 @@ Module invariants, read together with the kernel's `INVARIANTS.md`. An
 invariant that moved from the kernel keeps its `INV-N` number; the kernel never
 reuses it.
 
-### 6.5 Taskfile tasks (`Taskfile.module.yml`)
+### 6.5 Taskfile tasks
 
-A `tasks:` block with one thin dispatch task per module command, in the same
-shape as the kernel's `templates/Taskfile.common.template.yml`. Its tasks are
-appended to the criterion's `Taskfile.common.yml`, each given
-`dir: '{{.USER_WORKING_DIR}}'` by the composer; `catalyst task` runs them.
-They never reach the project's own `Taskfile.yml`.
+The criterion's `Taskfile.common.yml` holds one thin dispatch task per
+command of the deployed §4, kernel and modules alike, generated from it
+(kernel 0.70.0): a module ships no task. A `Taskfile.module.yml` an older
+module ships is not read. `catalyst task` runs the tasks from the project's
+root; they never reach the project's own `Taskfile.yml`.
 
 ### 6.6 Migrations (`migrations/`)
 
