@@ -436,14 +436,24 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
 
 # Kernel types a release dropped: their folder and definition leave a
 # deployment that holds none of them; one that holds some keeps them (L7).
-RETIRED_TYPES = {"meta-tag": ("development/meta-tags", "tag-*.md")}  # decision B4, kernel 0.69.0
+RETIRED_TYPES = {"meta-tag": ("development/meta-tags", "tag-*.md", "0.69.0")}  # decision B4
 
 
 def _retired_types(dep: Deployment) -> list[Action]:
-    out = []
-    for name, (folder, pattern) in RETIRED_TYPES.items():
+    out, gate = [], gate_version(dep)
+    for name, (folder, pattern, since) in RETIRED_TYPES.items():
         where, definition = dep.root / folder, dep.root / "definitions" / f"{name}.md"
         if not (where.is_dir() or definition.is_file()):
+            continue
+        if gate is not None and vt(gate) < vt(since):  # the shared gate's older checker still requires the type
+            out.append(
+                Action(
+                    "retired-type",
+                    f".criterion/{folder}",
+                    "skip",
+                    f"the {name} type is dropped: removed at the next sync, once the shared criterion runs {since}",
+                )
+            )
             continue
         if where.is_dir() and any(where.rglob(pattern)):
             out.append(
@@ -628,7 +638,7 @@ def apply(
                         (root / "definitions" / f"{name}.md").write_text(generate.definition(etd), encoding="utf-8")
                         touched.append(root / "definitions" / f"{name}.md")
         elif a.kind == "retired-type" and a.change == "remove":
-            name = next(n for n, (folder, _) in RETIRED_TYPES.items() if a.target == f".criterion/{folder}")
+            name = next(n for n, (folder, *_) in RETIRED_TYPES.items() if a.target == f".criterion/{folder}")
             where, definition = root / RETIRED_TYPES[name][0], root / "definitions" / f"{name}.md"
             gone = [f for f in where.rglob("*") if f.is_file()] if where.is_dir() else []
             gone += [definition] if definition.is_file() else []

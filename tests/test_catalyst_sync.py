@@ -224,3 +224,14 @@ def test_a_dropped_kernel_type_leaves_a_deployment_that_holds_none_of_it(tmp_pat
     actions = [(a.kind, a.change) for a in sync.plan(dep, src, None).actions]
     src.close()
     assert ("retired-type", "skip") in actions and ("retired-type", "remove") not in actions
+
+
+def test_a_dropped_type_stays_while_the_shared_gate_runs_an_older_kernel(tmp_path, monkeypatch):
+    project, deployed = _deployment(tmp_path)
+    root = project / ".criterion"
+    (root / "definitions" / "meta-tag.md").write_text("# Meta-tag\n", encoding="utf-8")
+    monkeypatch.setattr(sync, "gate_version", lambda dep: "0.68.1")
+    actions = [(a.kind, a.change, a.detail) for a in sync._retired_types(load(project))]
+    assert actions[0][:2] == ("retired-type", "skip") and "once the shared criterion runs 0.69.0" in actions[0][2]
+    monkeypatch.setattr(sync, "gate_version", lambda dep: "0.69.0")
+    assert [(a.kind, a.change) for a in sync._retired_types(load(project))] == [("retired-type", "remove")]

@@ -19,7 +19,8 @@ One `/create <type>`, a command with parts; meta-tags dropped (R2, ADR-021). Mig
 - Meta-tags are dropped (decision B4): no `/meta-tag`, no meta-tag type,
   definition or template. `catalyst sync apply` removes a deployment's
   `development/meta-tags/` and `definitions/meta-tag.md` when the folder
-  holds no tag, and keeps them when it holds some.
+  holds no tag, and keeps them when it holds some. On a shared criterion it
+  waits until the gate runs 0.69.0: the older checker requires the type.
 - `catalyst sync apply` and `recompose` merge what catalyst itself
   generates (a module type's catalogue entry, its old task) from the form
   the deployment holds, so a change to the generator reaches the deployment;
