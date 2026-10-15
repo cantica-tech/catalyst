@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- The kernel purity check denies a module command whose name is one plain
+  word only in its slash form: a module's `/board` in kernel text is
+  flagged, the word "board" in prose is not. A hyphenated name is still
+  denied as a word.
+
 ## 0.68.0 — 2026-10-15
 
 Fewer slash commands: `/user`, `/role`, and `/check-rules`, `/help` and `/journal` absorbing `/audit`, `/commands` and `/journal-restore`, the old names kept as aliases (R2, ADR-020). No layout change, no migration.
