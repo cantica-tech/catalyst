@@ -19,6 +19,8 @@ def _write_module(base: Path) -> Path:
         "  - name: create-item\n"
         "    description: Create an item\n"
         "    spec_path: commands/create-item.md\n"
+        "  - name: board\n"
+        "    description: The item board\n"
         "templates:\n"
         "  - entity_type: ITEM\n"
         "    template_path: templates/item.template.md\n",
@@ -92,3 +94,13 @@ def test_prefix_inside_other_words_is_not_flagged(tmp_path: Path):
     root = _repo(tmp_path, "ITEMS_TOTAL and SUBITEM are unrelated identifiers.\n")
     errors, _ = _run(root)
     assert errors == []
+
+
+def test_a_plain_word_command_is_flagged_only_as_a_slash_command(tmp_path: Path):
+    _write_module(tmp_path)
+    root = _repo(tmp_path, "The board of roadmap R6, on a dashboard/board page.\n")
+    errors, _ = _run(root)
+    assert errors == []
+    (root / "framework" / "kernel" / "GUIDE.md").write_text("Run `/board` to see it.\n", encoding="utf-8")
+    errors, _ = _run(root)
+    assert any("module command 'board'" in e for e in errors)
