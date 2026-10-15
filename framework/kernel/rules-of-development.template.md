@@ -57,26 +57,18 @@ Every command that creates or changes an artifact, rule, domain or
 A product commit made for the change cites the artifact or rule it serves
 (or its subject starts `chore:`) — §9, "Traced commits".
 
-- `/user-add <name> <role>` — register a new user in
-  `IAM/users/users.json` with an initial role from
-  `IAM/roles/roles.json`. Refuses if `<name>` is already registered —
-  use `/user-modify`/`/user-assign-role` instead.
-- `/user-remove <name>` — set `<name>`'s `active` field to `false` in
-  `IAM/users/users.json`. Never deletes the entry (see §2). Refuses if
-  this would leave zero active users.
-- `/user-modify <name> <field> <value>` — edit `<name>`'s `notes` or other
-  descriptive fields. Refuses `roles` (use `/user-assign-role`), the
-  identity fields `name`, `registered` and `userid`, and `active` set to
-  false (use `/user-remove`).
-- `/user-assign-role <name> <role>` — add `<role>` to `<name>`'s `roles`
-  array (additive; doesn't remove their other roles).
-- `/user-list [--role <role>] [--active-only]` — list registered users,
-  optionally filtered.
-- `/role-add <role> <actions> [full|propose|none]` — add a new role
-  entry, with its `reconciliation` level, to `IAM/roles/roles.json`. Refuses if `<role>` already exists — use
-  `/role-modify` instead.
-- `/role-modify <role> <actions>` — replace an existing role's `actions`.
-  Refuses if `<role>` doesn't exist — use `/role-add` instead.
+- `/user` (`/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`,
+  `/user-list`) — the users of `IAM/users/users.json`: `add <name> <role>`
+  registers one with a role from `IAM/roles/roles.json` (refused if the name
+  is registered); `remove <name>` sets `active` to `false`, never deletes
+  (§2), and is refused for the last active user; `modify <name> <field>
+  <value>` edits descriptive fields (not `roles`, the identity fields, nor
+  `active` set to false); `assign-role <name> <role>` adds a role;
+  `list [--role <role>] [--active-only]` lists them.
+- `/role` (`/role-add`, `/role-modify`) — the roles of
+  `IAM/roles/roles.json`: `add <role> <actions> [full|propose|none]` adds one
+  with its `reconciliation` level (refused if it exists); `modify <role>
+  <actions>` replaces a role's actions (refused if it does not exist).
 - `/meta-tag` — create a new meta-tag artifact, save it as
   `tag-<key>-<artefact-id>`, register it in `meta-tags/meta-tags.md`, and
   link it to the specified artifact.
@@ -111,10 +103,6 @@ A product commit made for the change cites the artifact or rule it serves
 - `/status` — update an artifact or work item's `Status` field, then
   regenerate indexes and journal the change. Refuses a `RECON-` case:
   its `Status` changes only through `/reconcile` (role-gated).
-- `/audit <file-name>` — analyze the change-impact of the specified file by
-  checking the current repository state, the file's role in the framework,
-  and the rules or artifacts that depend on it, then return a concise impact
-  summary.
 - `/run-analysis [<path>...] [--bootstrap|--incremental]` — analyse
   existing code to infer domains, rules and the defects where the code
   breaks a rule, with a four-eyes process: two independent blind passes,
@@ -126,59 +114,57 @@ A product commit made for the change cites the artifact or rule it serves
   with the requested kernel version. If the argument is `latest`, use the
   newest kernel version available from the framework source. If no argument
   is provided, synchronize against the currently installed local version.
-- `/check-rules` — verify that rules, domains, and artifact links remain
-  consistent and do not conflict: `catalyst check` for the mechanical
-  checks, then the judgment ones.
-- `/commands list [--filter ...]` — list every slash command available in
-  this deployment (name, one-line purpose), sourced from this document's
-  §4 — kernel and active-module entries alike. `/help` with no argument delegates here for its command listing
-  rather than re-describing it.
+- `/check-rules [<file>]` (`/audit`) — verify that rules, domains, and
+  artifact links remain consistent and do not conflict: `catalyst check` for
+  the mechanical checks, then the judgment ones. With a file, report that
+  file's change-impact: its role, and the rules and artifacts that depend on
+  it.
 - `/journal [--since <date>] [--artifact <id>] [--actor <name>] [--rule
-  <id>]` — read-only: filter and report the journal's
-  entries. Never writes to the journal (see §9).
-- `/journal-restore <timestamp>` — read-only: reconstruct the tree as it
-  stood at `<timestamp>` into a side directory with
-  `catalyst journal restore` (`Rules-of-Rules.md` §12). Never overwrites
-  the live working tree.
+  <id>] | restore <timestamp>` (`/journal-restore`) — read-only: filter and
+  report the journal's entries, or reconstruct the tree as it stood at
+  `<timestamp>` into a side directory (`catalyst journal restore`,
+  `Rules-of-Rules.md` §12). Never writes to the journal (see §9) and never
+  overwrites the live working tree.
 - `/adopt [<commit>|<range>]` — list the product changes committed
   outside catalyst (`catalyst unrecorded`) and resolve each with the user:
   accept it into the journal (`catalyst journal adopt`) or reject it by
   reverting the commit (§9, "Changes made outside catalyst").
-- `/help` — return help documentation for the framework or for a specific
-  command when provided.
+- `/help [<command>]` (`/commands`) — every command of this deployment with
+  its one-line purpose (from this section: kernel and module entries alike)
+  and the artifact types; with a command, that command's help.
 
-When the user enters `/user-add <name> <role>: ...`, run `catalyst user add
+When the user enters `/user add <name> <role>: ...`, run `catalyst user add
 "<name>" "<role>" [--git-username <u>] --intent "<why>"`. It refuses a name
 already registered and a role `IAM/roles/roles.json` lacks (then ask
-whether to pick an existing role or `/role-add` it first), creates the IAM
+whether to pick an existing role or `/role add` it first), creates the IAM
 files from their templates when missing, draws the userid (INV-26) and
 journals. If this is the project's first registered user, note that the
 "at least one active user" requirement (§2) is now satisfied.
 
-When the user enters `/user-remove <name>`, run `catalyst user remove
+When the user enters `/user remove <name>`, run `catalyst user remove
 "<name>" --intent "<why>"`: it deactivates, never deletes (signatures stay
 resolvable), and refuses to deactivate the only active user (§2) — then
-point at `/user-add` for a replacement first.
+point at `/user add` for a replacement first.
 
-When the user enters `/user-modify <name> <field> <value>: ...`, run
+When the user enters `/user modify <name> <field> <value>: ...`, run
 `catalyst user modify "<name>" <field> "<value>" --intent "<why>"`. It refuses
-`roles` (use `/user-assign-role`), the identity fields `name`/`registered`/
-`userid`, and `active` set to false (use `/user-remove`).
+`roles` (use `/user assign-role`), the identity fields `name`/`registered`/
+`userid`, and `active` set to false (use `/user remove`).
 
-When the user enters `/user-assign-role <name> <role>: ...`, run `catalyst user
+When the user enters `/user assign-role <name> <role>: ...`, run `catalyst user
 assign-role "<name>" "<role>" --intent "<why>"`; on an unknown role, ask
-whether to pick an existing one or `/role-add` it first.
+whether to pick an existing one or `/role add` it first.
 
-When the user enters `/user-list [--role <role>] [--active-only]`, run
+When the user enters `/user list [--role <role>] [--active-only]`, run
 `catalyst list user` (`--filter roles=<role>`, `--filter active=true`) and
 report what it prints; never add users it does not list.
 
-When the user enters `/role-add <role> <actions>: ...`, run `catalyst role add
+When the user enters `/role add <role> <actions>: ...`, run `catalyst role add
 "<role>" --action <a> ... [--reconciliation full|propose|none] --intent
 "<why>"` (`propose` when not given, never silently `full`;
-`Rules-of-Rules.md` §16). It refuses a role that exists (use `/role-modify`).
+`Rules-of-Rules.md` §16). It refuses a role that exists (use `/role modify`).
 
-When the user enters `/role-modify <role> <actions>: ...`, run `catalyst role
+When the user enters `/role modify <role> <actions>: ...`, run `catalyst role
 modify "<role>" --action <a> ... --intent "<why>"`: it replaces the role's
 actions and never changes a `Signed-off-by` already recorded.
 
@@ -251,7 +237,7 @@ When the user enters `/share join [<url>]`: in a clone of the product
 repository, run `catalyst open` — it clones the criterion `catalyst.toml`
 names into this machine's catalyst home — or `catalyst share join <url>`
 when `catalyst.toml` names none. A person not yet in `IAM/users/users.json`
-registers with `/user-add` before signing anything, and lands that with
+registers with `/user add` before signing anything, and lands that with
 `/share push`.
 
 When the user enters `/share pull`: run `catalyst share pull`. If it
@@ -275,7 +261,7 @@ refuses a `RECON-` case even with `--force` (only `/reconcile` changes one,
 `Rules-of-Rules.md` §16), regenerates the indexes and journals the change;
 on a refusal, change nothing by hand.
 
-When the user enters `/audit <file-name>`, inspect the repository and the
+When the user enters `/check-rules <file-name>`, inspect the repository and the
 current framework state to determine the impact of changes against the named
 file. The command must identify whether the file is a rule, template,
 artifact, or other framework asset; inspect related indexes,
@@ -329,10 +315,10 @@ artifacts whose content no longer matches the rule they cite. Report
 both parts; never hand-edit an index to clear a finding —
 `catalyst index regen` does that.
 
-When the user enters `/commands list [--filter ...]`, list every slash
+When the user enters `/help` alone, list every slash
 command available in this deployment — name, one-line purpose — sourced
 from this document's §4 (the canonical list; never re-enumerate a
-subset). Apply `--filter` the same way `/list` does. If this session is
+subset). If this session is
 working on catalyst's own repository (`framework/` present
 at the root) rather than a deployed project, also list
 catalyst-development-only commands that exist there but aren't part of
@@ -344,7 +330,7 @@ When the user enters `/journal [--since <date>] [--artifact <id>]
 filters and report what it prints, in its order; for integrity too, run
 `catalyst journal verify`. Never append to the journal.
 
-When the user enters `/journal-restore <timestamp>`, run
+When the user enters `/journal restore <timestamp>`, run
 `catalyst journal restore <timestamp> <side-dir>` with a new, empty side
 directory outside the project (e.g. `$TMPDIR/journal-restore-<timestamp>/`) — it
 materialises every journaled file as of that time and **never writes
@@ -352,10 +338,8 @@ into the live working tree**. Report the side directory's path and which
 files it contains. Report every path the CLI lists as a missing blob as
 unrecoverable rather than silently omitting it.
 
-When the user enters `/help` without any additional entry, run `/commands
-list` for the command listing rather than re-describing it, then list
-every artifact type and its purpose in a compact reference format. When
-the user enters `/help <command>`,
+After the command listing, `/help` alone lists every artifact type and its
+purpose in a compact reference format. When the user enters `/help <command>`,
 return the detailed help documentation for that command only, including its
 syntax, behavior, and prerequisites. If the command is unknown, respond that
 it is unsupported and suggest the available commands.

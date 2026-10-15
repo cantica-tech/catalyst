@@ -181,7 +181,7 @@ to the active module keeps a one-line placeholder here
   `Signed-off-by` field. Role checks against `roles.json` are advisory — a
   mismatch proceeds anyway, noted rather than paused for (INV-25), never
   a hard block, since catalyst cannot verify who is actually typing.
-  `/user-remove` never deletes a user's entry; it sets `"active": false`,
+  `/user remove` never deletes a user's entry; it sets `"active": false`,
   and refuses if doing so would leave zero active users — this specific
   case isn't advisory, since it would break this invariant's own hard
   requirement (INV-25's fundamental-invariant exception).
@@ -201,7 +201,7 @@ to the active module keeps a one-line placeholder here
   it's retrievable independent of any commit; `null` for create/delete).
   This makes the journal transaction-log-grade: replaying entries up to
   any timestamp and materializing each file's last `after` hash as of
-  that point reconstructs the exact tree state then, via `/journal-restore`
+  that point reconstructs the exact tree state then, via `/journal restore`
   into a side directory — never overwriting the live tree outright.
   Entries are immutable once written: never edited, deleted, or reordered.
   A product commit after the pointer's `journal_since` whose result is not
@@ -318,7 +318,7 @@ to the active module keeps a one-line placeholder here
 - **INV-26 — Signed entity IDs.** Every registered user
   (`IAM/users/users.json`) carries a `userid`: 8 characters,
   case-sensitive alphanumeric, containing at least one uppercase
-  letter, drawn cryptographically at `/user-add` time and regenerated
+  letter, drawn cryptographically at `/user add` time and regenerated
   on collision against every existing `userid` in the registry
   (`Rules-of-Rules.md` rr-META-011). From that point on, every rule,
   `WORKFLOW-`, and `RECON-` ID, and every ID of an active-module entity

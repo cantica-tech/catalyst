@@ -37,7 +37,7 @@ catalyst check passed: 0 error(s), 0 warning(s)
 ```
 
 Months later, `/journal --rule br-AUTH-000003-Ab3xR9pQ` lists every change
-made for that rule, and `/journal-restore <timestamp>` rebuilds the tree as
+made for that rule, and `/journal restore <timestamp>` rebuilds the tree as
 it stood. The terms used here are defined in the
 [glossary](framework/kernel/GLOSSARY.md).
 
@@ -94,15 +94,15 @@ kernel only fixes the shape every such type shares — a permanent
 `<PREFIX>-NNNNNN` ID, its own folder and index in the working copy, a
 versioned definition, a `Signed-off-by`, and a grounding link down to a
 rule, direct or through a parent artifact — and the commands that work on any of them (`/status`, `/list`,
-`/meta-tag`, `/audit`). The module's own commands (listed in its
+`/meta-tag`). The module's own commands (listed in its
 `code-of-conduct.module.md` §4) are added to the deployment alongside the
 kernel's.
 
 ## Accountability: users, roles, signing
 
 Every artifact carries a `Signed-off-by` field, resolved against a
-registered-user list (`/user-add`/`-remove`/`-modify`/`-assign-role`) and a
-role → typical-action mapping (`/role-add`/`-modify`, seeded with a default
+registered-user list (`/user add|remove|modify|assign-role`) and a
+role → typical-action mapping (`/role add|modify`, seeded with a default
 agile-role set). A project must always have at least one active user — the
 one hard requirement — but role checks themselves are advisory, not access
 control: catalyst has no way to verify who's actually typing, so a mismatch
@@ -116,7 +116,7 @@ The journal (`development/journal/`, one shard per actor, machine and month) is 
 of every rule-linked change — not a changelog. Each entry carries the exact
 git content hash before and after, per touched file, plus the rule(s) it
 served and the actual intent behind it (the goal, not a label). Because the
-pointers are exact, `/journal-restore <timestamp>` can materialize the tree
+pointers are exact, `/journal restore <timestamp>` can materialize the tree
 as it stood at any point into a side directory for inspection — a real
 point-in-time reconstruction, never a guess, and never applied to the live
 tree automatically. `/journal` is the read-only query side.

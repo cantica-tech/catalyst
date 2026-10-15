@@ -58,6 +58,18 @@ def test_append_records_real_hashes_and_pins(project):
     assert f["after"] in j.pinned(dep.root)
 
 
+def test_an_empty_or_directory_file_is_refused(project):
+    dep = load(project)
+    for files, message in (
+        ([""], "names no file"),
+        (["."], "is a directory"),
+        ([".criterion/items"], "is a directory"),
+    ):
+        with pytest.raises(j.JournalError, match=message):
+            j.append(dep, req(files))
+    assert entries(dep) == []
+
+
 def test_before_chains_from_the_previous_entry(project):
     dep = load(project)
     path = ".criterion/items/ITEM-000001-first-item.md"

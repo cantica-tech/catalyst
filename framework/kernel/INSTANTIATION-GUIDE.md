@@ -204,7 +204,7 @@ first user, and, afterwards, its first rules.
    meta-rules or invariants require at instantiation (for example a
    generated summary) still carries template `{{PLACEHOLDER}}` text, run
    the command the module names to populate it. Additional users are added
-   with `/user-add`.
+   with `/user add`.
 7. **Definitions stay frozen.** `catalyst init` copied only the *latest*
    `DEFINITION-<TYPE>-vN.md` of each kernel and module type into
    `.criterion/definitions/<type>.md` (flat; the versioned subfolders are

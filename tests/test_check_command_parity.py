@@ -28,6 +28,21 @@ def test_extract_section4_commands_parses_simple_bullets():
 def test_extract_section4_commands_handles_alias_bullet():
     text = "## 4. Slash-command entry points\n\n- `/create-item` or `/create-new-item` — create an item.\n"
     assert ccp.extract_section4_commands(text) == {"create-item", "create-new-item"}
+    assert ccp.extract_section4_bullets(text) == [{"create-item", "create-new-item"}]
+
+
+def test_taskfile_parity_needs_one_task_per_command_not_per_alias(tmp_path):
+    coc = tmp_path / "CODE-OF-CONDUCT.md"
+    coc.write_text(
+        "## 4. Commands\n\n- `/user` (`/user-add`, `/user-list`) — users.\n- `/create-req` or `/create-requirement` — req.\n"
+    )
+    taskfile = tmp_path / "Taskfile.common.yml"
+    taskfile.write_text("tasks:\n  user:\n    cmds: []\n  create-requirement:\n    cmds: []\n")
+    assert ccp.check_taskfile_parity(taskfile, coc) == []
+    taskfile.write_text("tasks:\n  user:\n    cmds: []\n")
+    assert ccp.check_taskfile_parity(taskfile, coc) == [
+        "taskfile parity: CODE-OF-CONDUCT.md §4 references /create-req but Taskfile.common.yml has no matching task"
+    ]
 
 
 def test_extract_section4_commands_collapses_repeated_subcommand_bullets():

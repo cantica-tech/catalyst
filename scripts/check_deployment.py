@@ -467,7 +467,7 @@ def check_users_and_roles_exist(root: Path) -> list[str]:
 
     users = data.get("users", []) if isinstance(data, dict) else []
     if not any(isinstance(u, dict) and u.get("active") for u in users):
-        errors.append("INV-16: IAM/users/users.json has no active user — a project must have at least one (/user-add)")
+        errors.append("INV-16: IAM/users/users.json has no active user — a project must have at least one (/user add)")
     return errors
 
 

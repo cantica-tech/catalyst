@@ -39,14 +39,14 @@ This folder contains the reusable document templates that seed the deployed cata
 - [`roles.template.json`](roles.template.json) — copy to
   `IAM/roles/roles.json` on first deploy (`INVARIANTS.md` INV-16), filled
   in with its default agile-role mapping (phrased generically; the active
-  module's own commands can be listed via `/role-modify`). JSON, not markdown, because it's
-  managed by `/role-add`/`/role-modify` rather than hand-edited.
+  module's own commands can be listed via `/role modify`). JSON, not markdown, because it's
+  managed by `/role add|modify` rather than hand-edited.
 - [`users.template.json`](users.template.json) — copy to
   `IAM/users/users.json` on first deploy (`INVARIANTS.md` INV-16), empty
   array. Managed only by
-  `/user-add`/`/user-remove`/`/user-modify`/`/user-assign-role`/`/user-list`
+  `/user add|remove|modify|assign-role|list`
   — see `Rules-of-Rules.md` §11. **Hard requirement:** deployment isn't
-  complete until `/user-add` has registered at least one active user.
+  complete until `/user add` has registered at least one active user.
   `IAM/users/` and `IAM/roles/` each get the same `templates/` treatment
   as every other artifact type (`INVARIANTS.md` INV-20).
 - The project file, `catalyst.toml` — the only catalyst file a project
