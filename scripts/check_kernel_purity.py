@@ -121,7 +121,9 @@ def build_denylist(module_dir: Path) -> Denylist:
     for cmd in manifest.get("commands") or []:
         name = str(cmd.get("name", "")) if isinstance(cmd, dict) else ""
         if name:
-            deny.errors.append(Pattern(re.compile(_word(name)), f"module command '{name}'"))
+            # a coined name ("create-item") is denied as a word; a plain one ("board") as `/board` only
+            pattern = _word(name) if "-" in name else r"(?<![\w/-])/" + re.escape(name) + r"(?![\w-])"
+            deny.errors.append(Pattern(re.compile(pattern), f"module command '{name}'"))
 
     for tpl in manifest.get("templates") or []:
         path = str(tpl.get("template_path", "")) if isinstance(tpl, dict) else ""
