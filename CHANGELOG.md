@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.67.0 — 2026-10-15
+
+`catalyst journal redact`: content journaled by mistake redacted as an auditable tombstone (R3.7, decision A5). No layout change, no migration.
 
 - `catalyst journal redact <blob>... --intent <why>`: content journaled by
   mistake (a secret) is redacted as an auditable tombstone (roadmap R3.7,
