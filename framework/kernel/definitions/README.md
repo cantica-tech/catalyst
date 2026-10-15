@@ -42,7 +42,7 @@ to definitions instead of instance templates.
 ## Entity types covered
 
 `entity` (base entity definition extended by all other entity definitions),
-`rule`, `domain`, `user`, `role`, `reconciliation`, `meta-tag`, `journal`,
+`rule`, `domain`, `user`, `role`, `reconciliation`, `journal`,
 `ledger`, `slash-command`, `templates-catalog`, `workflow` — every real,
 deployed kernel entity type. The active process module ships the
 definitions of its own entity types in its `definitions/` folder, with the

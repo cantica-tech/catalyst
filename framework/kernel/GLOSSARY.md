@@ -123,9 +123,6 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   (`repoed: true`) lives in a criterion repository, mounted as the product's
   `.criterion` git submodule, and changes land through pull requests
   (INV-18).
-- **Meta-tag.** A lightweight `comment`/`version`/`link-to` annotation
-  attached to an existing artifact, stored as `tag-<key>-<artefact-id>`
-  (`/meta-tag`).
 - **Pin.** Keeping every journaled blob reachable under
   `refs/catalyst/journal`, so `git gc` never prunes the history
   point-in-time restore needs (`catalyst journal pin`, `CLI.md`).

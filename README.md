@@ -45,7 +45,7 @@ it stood. The terms used here are defined in the
 
 The framework is the **kernel** plus one **process module** per deployment.
 The kernel is process-agnostic: it owns rules and domains, reconciliation
-cases (`RECON-`), workflows (`WORKFLOW-`), meta-tags, users and roles, the
+cases (`RECON-`), workflows (`WORKFLOW-`), users and roles, the
 journal, repoed sync, plugins, and entity definitions as a mechanism. The
 active module adds its development-artifact types — their templates,
 definitions, commands, meta-rules, invariants and migrations — and is named
@@ -93,8 +93,8 @@ be measured against a rule, and which day-to-day views summarize them. The
 kernel only fixes the shape every such type shares — a permanent
 `<PREFIX>-NNNNNN` ID, its own folder and index in the working copy, a
 versioned definition, a `Signed-off-by`, and a grounding link down to a
-rule, direct or through a parent artifact — and the commands that work on any of them (`/status`, `/list`,
-`/meta-tag`). The module's own commands (listed in its
+rule, direct or through a parent artifact — and the commands that work on any of them (`/create`, `/status`,
+`/list`). The module's own commands (listed in its
 `code-of-conduct.module.md` §4) are added to the deployment alongside the
 kernel's.
 

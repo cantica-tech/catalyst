@@ -112,7 +112,7 @@ def test_each_modules_part_is_composed_in_install_order(tmp_path):
     assert handbook.index("### From module example-process") < handbook.index("### From module notes-process")
     assert "`rr-NT-000001-" in handbook  # the second module's meta-rule, widened and signed
     taskfile = (root / "Taskfile.common.yml").read_text(encoding="utf-8")
-    assert "From module notes-process" in taskfile and "create-note:" in taskfile
+    assert "\n  create:\n" in taskfile and "create-note:" not in taskfile  # a part of the kernel's `create`
     # its laws: in the session brief and explained by `why`, from its own folder
     assert not (root / "INVARIANTS.module.md").exists()  # the example module has none: the root file is the first's
     assert "NT-L1" in laws.session_brief(root)

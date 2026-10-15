@@ -197,3 +197,26 @@ def test_a_client_that_splits_arguments_gets_word_slots(tmp_path):
     )
     assert len(out[1]["result"]["prompts"][0]["arguments"]) == 16
     assert "with the arguments: flaky checkout test," in out[2]["result"]["messages"][0]["content"]["text"]
+
+
+def test_a_prompt_for_a_command_with_parts_carries_the_asked_part(tmp_path):
+    from test_catalyst_spec import PARTED
+
+    project = _project(tmp_path)
+    write(project / ".criterion" / "CODE-OF-CONDUCT.md", PARTED)
+    out = _session(
+        [
+            _init(),
+            {"jsonrpc": "2.0", "id": 2, "method": "prompts/list"},
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "prompts/get",
+                "params": {"name": "create", "arguments": {"arguments": "bug The export drops a row"}},
+            },
+        ],
+        project,
+    )
+    assert [p["name"] for p in out[1]["result"]["prompts"]] == ["create", "user"]
+    text = out[2]["result"]["messages"][0]["content"]["text"]
+    assert "catalyst new BUG" in text and "catalyst new REQ" not in text

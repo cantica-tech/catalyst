@@ -18,8 +18,8 @@
 # shell or CI job without an interactive session.
 #
 # Usage: catalyst task <command-name> -- <arguments>
-#   e.g. catalyst task meta-tag -- <artifact-id>
-#        catalyst task user-add -- olivier admin
+#   e.g. catalyst task create -- bug "The export drops the last row"
+#        catalyst task user -- add olivier admin
 #
 # Agent-generic dispatch: `AGENT_CMD` is the agent's non-interactive
 # command. `catalyst task` passes it from `catalyst.toml`'s "agent" field;
@@ -41,10 +41,10 @@ tasks:
     cmds:
       - '{{.AGENT_CMD}} "/role {{.CLI_ARGS}}"'
 
-  meta-tag:
-    desc: "Create a meta-tag artifact linked to an artifact: <artifact-id>"
+  create:
+    desc: "Create an artifact of a module's type: <type> <title>"
     cmds:
-      - '{{.AGENT_CMD}} "/meta-tag {{.CLI_ARGS}}"'
+      - '{{.AGENT_CMD}} "/create {{.CLI_ARGS}}"'
 
   list:
     desc: "List artifacts, work items, rules, or templates: <type> [--filter ...]"

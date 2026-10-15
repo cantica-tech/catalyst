@@ -422,6 +422,7 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         target = f".criterion/definitions/{generate.type_slug(etd)}.md"
         if target not in planned and not (deployed_defs / f"{generate.type_slug(etd)}.md").exists():
             p.actions.append(Action("definition", target, "add", "new entity type, defined in module.yaml (generated)"))
+    p.actions += _retired_types(dep)
     if p.from_kernel != p.to_kernel:
         p.actions.append(
             Action("version", ".criterion/version.txt + pointer", "update", f"{p.from_kernel} -> {p.to_kernel}")
@@ -431,6 +432,40 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         p.migrations += migrations(src.module / "migrations" / "migrations.md", src.deployed, src.version, "module")
     p.migrations.sort(key=lambda m: (vt(m["to"]), m["owner"] != "kernel"))
     return p
+
+
+# Kernel types a release dropped: their folder and definition leave a
+# deployment that holds none of them; one that holds some keeps them (L7).
+RETIRED_TYPES = {"meta-tag": ("development/meta-tags", "tag-*.md", "0.69.0")}  # decision B4
+
+
+def _retired_types(dep: Deployment) -> list[Action]:
+    out, gate = [], gate_version(dep)
+    for name, (folder, pattern, since) in RETIRED_TYPES.items():
+        where, definition = dep.root / folder, dep.root / "definitions" / f"{name}.md"
+        if not (where.is_dir() or definition.is_file()):
+            continue
+        if gate is not None and vt(gate) < vt(since):  # the shared gate's older checker still requires the type
+            out.append(
+                Action(
+                    "retired-type",
+                    f".criterion/{folder}",
+                    "skip",
+                    f"the {name} type is dropped: removed at the next sync, once the shared criterion runs {since}",
+                )
+            )
+            continue
+        if where.is_dir() and any(where.rglob(pattern)):
+            out.append(
+                Action(
+                    "retired-type", f".criterion/{folder}", "skip", f"the {name} type is dropped; kept, it holds some"
+                )
+            )
+            continue
+        out.append(
+            Action("retired-type", f".criterion/{folder}", "remove", f"the {name} type is dropped; it holds none")
+        )
+    return out
 
 
 def _retired_commands(dep: Deployment, src: Sources, commands: Path) -> list[Action]:
@@ -602,6 +637,15 @@ def apply(
                     if generate.type_slug(etd) == name:
                         (root / "definitions" / f"{name}.md").write_text(generate.definition(etd), encoding="utf-8")
                         touched.append(root / "definitions" / f"{name}.md")
+        elif a.kind == "retired-type" and a.change == "remove":
+            name = next(n for n, (folder, *_) in RETIRED_TYPES.items() if a.target == f".criterion/{folder}")
+            where, definition = root / RETIRED_TYPES[name][0], root / "definitions" / f"{name}.md"
+            gone = [f for f in where.rglob("*") if f.is_file()] if where.is_dir() else []
+            gone += [definition] if definition.is_file() else []
+            if where.is_dir():
+                shutil.rmtree(where)
+            definition.unlink(missing_ok=True)
+            touched += gone
         elif a.kind == "version":
             (root / "version.txt").write_text(src.version + "\n", encoding="utf-8")
             touched.append(root / "version.txt")

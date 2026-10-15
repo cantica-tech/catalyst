@@ -102,7 +102,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
-| `catalyst spec <command>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general` |
+| `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general` |
 | `catalyst id next <prefix>` | next <PREFIX>-NNNNNN-<userid> for an entity type | `--as` |
 | `catalyst id next-rule <doc_prefix> <domain>` | next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID | `--as` |
 | `catalyst journal append` | append one entry with real hashes and time | `--action`, `--allow-unchanged`, `--artifact`, `--as`, `--command`, `--file`, `--intent`, `--json`, `--target`, `--tier` |

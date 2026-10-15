@@ -253,8 +253,6 @@ def access_control(kernel: Path, p: Params) -> str:
 
 
 def taskfile(kernel: Path, module: Modules, p: Params) -> str:
-    from catalyst import generate
-
     text = (kernel / "templates" / "Taskfile.common.template.yml").read_text(encoding="utf-8").rstrip("\n")
     mods = module_dirs(module)
     for mod in mods:
@@ -263,14 +261,7 @@ def taskfile(kernel: Path, module: Modules, p: Params) -> str:
             own = (mod / "Taskfile.module.yml").read_text(encoding="utf-8")
             m = re.search(r"^tasks:\s*\n", own, re.M)
             tasks = own[m.end() :] if m else ""
-        contribution = (
-            (mod / "code-of-conduct.module.md").read_text(encoding="utf-8")
-            if (mod / "code-of-conduct.module.md").is_file()
-            else ""
-        )
-        for etd in generated_commands(mod, contribution):
-            tasks = tasks.rstrip("\n") + ("\n\n" if tasks.strip() else "") + generate.task(etd)
-        if tasks.strip():
+        if tasks.strip():  # a module's create commands are parts of the kernel's `create` task
             mid = _module_id(mod, p, len(mods) == 1)
             text += f"\n\n  # --- From module {mid} " + "-" * 20 + "\n" + tasks.rstrip("\n")
     # the file sits in the criterion and is run on its own: a task works in
@@ -340,6 +331,34 @@ def frozen_paths(root: Path) -> set[str]:
     return found
 
 
+# What catalyst generates into a composed document, never edited by hand:
+# a v3 type's catalogue entry and, before 0.69.0, its task
+GENERATED_ENTRY = re.compile(
+    r"^- `/create[ -][^\n]*\(generated from the module's `module\.yaml`\)\.\n\nWhen the user enters [^\n]*\n", re.M
+)
+GENERATED_TASK = re.compile(
+    r"\n\n  (create-[a-z0-9-]+):\n(?:    dir: [^\n]*\n)?"
+    r'    desc: "[^"\n]*— generated from module\.yaml"\n    cmds:\n      - [^\n]*'
+)
+
+
+def _entry_key(entry: str) -> str:
+    m = re.search(r"`/(create-[a-z0-9-]+)`", entry)
+    return m.group(1) if m else entry
+
+
+def _as_generated(rel: str, old: str, fresh: str, deployed: str) -> tuple[str, str]:
+    """The base and the deployed text with what catalyst generated taken as
+    the deployment holds it: a change to the generator itself then reaches the
+    deployment through the merge, as a template change does. Returns (base, ours)."""
+    if rel == "CODE-OF-CONDUCT.md":
+        mine = {_entry_key(m.group(0)): m.group(0) for m in GENERATED_ENTRY.finditer(deployed)}
+        old = GENERATED_ENTRY.sub(lambda m: mine.get(_entry_key(m.group(0)), m.group(0)), old)
+    elif rel == "Taskfile.common.yml":  # a generated task the new composition no longer has
+        deployed = GENERATED_TASK.sub(lambda m: m.group(0) if f"\n  {m.group(1)}:\n" in fresh else "", deployed)
+    return old, deployed
+
+
 def recompose(
     root: Path,
     params: Params,
@@ -364,9 +383,10 @@ def recompose(
             results.append(Recomposed(rel, False, 0, frozen=True))
             continue
         old, fresh = build(*base, params), build(*new, params)
+        old, deployed = _as_generated(rel, old, fresh, target.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
             ours = Path(tmp) / "ours"
-            ours.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+            ours.write_text(deployed, encoding="utf-8")
             (Path(tmp) / "base").write_text(old, encoding="utf-8")
             (Path(tmp) / "theirs").write_text(fresh, encoding="utf-8")
             res = subprocess.run(
