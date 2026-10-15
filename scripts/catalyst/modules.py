@@ -371,18 +371,25 @@ def _snapshot(root: Path) -> dict[Path, bytes]:
     }
 
 
-COMMAND_RE = re.compile(r"^- `/([a-z0-9][a-z0-9-]*)", re.M)
+BULLET_RE = re.compile(r"^- `/.*?(?: —|\n(?! ))", re.M | re.S)
+HEAD_NAME_RE = re.compile(r"`/([a-z0-9][a-z0-9-]*)")
+KERNEL_COMMANDS_WITH_PARTS = {"create"}  # a module's bullet for one is a part (ADR-021)
 
 
 def command_names(module_dir: Path) -> set[str]:
-    """The slash commands a module brings: those its catalogue part lists,
-    and the create command catalyst generates for each of its v3 types."""
+    """The slash commands a module brings: each catalogue bullet's names, its
+    aliases included, and the create command catalyst generates for each of
+    its v3 types. A part of a kernel command (`/create item` (`/create-item`),
+    ADR-021) brings its aliases, not the kernel command."""
     from catalyst import compose, generate
 
     part = module_dir / "code-of-conduct.module.md"
     text = part.read_text(encoding="utf-8") if part.is_file() else ""
-    generated = {generate.create_command(e) for e in compose.generated_commands(module_dir, text)}
-    return set(COMMAND_RE.findall(text)) | generated
+    names = {generate.create_command(e) for e in compose.generated_commands(module_dir, text)}
+    for head in BULLET_RE.findall(text):
+        found = HEAD_NAME_RE.findall(head)
+        names |= set(found[1:] if found[0] in KERNEL_COMMANDS_WITH_PARTS else found)
+    return names
 
 
 META_RULE_RE = re.compile(r"^#{2,3} (?:\d+\. )?`(rr-[A-Z]+-\d+)", re.M)
@@ -433,7 +440,7 @@ def collision(manifest, tree: Path, kernel: Path, kernel_types: dict, installed:
             return f"its meta-rule {shared[0]} is also a meta-rule of {owner}"
     template = (kernel / "rules-of-development.template.md").read_text(encoding="utf-8")
     mine = command_names(tree)
-    others = [("the kernel", set(COMMAND_RE.findall(template)))]
+    others = [("the kernel", {n for head in BULLET_RE.findall(template) for n in HEAD_NAME_RE.findall(head)})]
     others += [(f"the module {m.id}", command_names(root / "modules" / m.id)) for m in installed]
     for owner, theirs in others:
         shared = sorted(mine & theirs)

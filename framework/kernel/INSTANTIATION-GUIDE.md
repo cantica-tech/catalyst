@@ -80,7 +80,7 @@ first user, and, afterwards, its first rules.
      `### From module <module-id>`), `rules/Rules-of-Rules.md` (the kernel's
      `rules-of-rules.template.md` with the module's
      `rules-of-rules.module.md` appended), `ACCESS-CONTROL.md` (verbatim) and
-     `Taskfile.common.yml` (the kernel's tasks, then the module's), resolving
+     `Taskfile.common.yml` (one task per §4 command), resolving
      `{{RULES_DIR}}`, `{{RULE_DOCS_LIST}}` and `{{TEST_LOCATIONS}}` and
      signing meta-rule IDs with the first user's userid
      (`MODULE-SPECIFICATION.md` §6);

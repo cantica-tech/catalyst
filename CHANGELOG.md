@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- The deployed `CODE-OF-CONDUCT.md` §4 is the one command registry (roadmap
+  R2): the criterion's `Taskfile.common.yml` is generated from it, one task
+  per command, kernel and modules alike, its description the bullet's first
+  phrase. A module ships no task, and a `Taskfile.module.yml` is no longer
+  read. `sync apply` and `recompose` write the Taskfile as composed, unless
+  it is frozen.
+- A module's commands, for the collision check, are every name in its
+  bullets' heads, aliases included; a part of `/create` brings its alias,
+  not `/create`, so two modules with create parts no longer collide.
+
 ## 0.69.0 — 2026-10-15
 
 One `/create <type>`, a command with parts; meta-tags dropped (R2, ADR-021). Migration `0.69.0/one-create-command.md`.
