@@ -25,8 +25,9 @@ the criterion. Add
 `--module-dir <dir>` when the module is not checked out next to the project
 or catalyst as `catalyst-<module-id>`, and one `--rule-doc` per rule
 document. Once per machine, `catalyst agent install claude-code` wires
-Claude Code at user level (the `catalyst mcp` server and the Stop hook;
-`agents/claude-code/plugin` is the same as a plugin) — nothing goes into
+Claude Code at user level (the `catalyst mcp` server, the Stop hook and a
+silent session-start hook; `agents/claude-code/plugin` is the same as a
+plugin) — nothing goes into
 the project. Then carry on with the judgment steps of `BOOTSTRAP.md` §2.
 
 Capabilities you have (use them per `BOOTSTRAP.md §1`):
@@ -58,7 +59,10 @@ Capabilities you have (use them per `BOOTSTRAP.md §1`):
   the project's root, and `catalyst task` lists them.
 - **Hooks:** `catalyst agent install claude-code` registers
   `catalyst hook stop` as the user-level Stop hook (it exits `0` outside a
-  deployment); the server's instructions carry the invariants. You do not
+  deployment) and `catalyst hook start --quiet` as the session-start hook,
+  which records what the check already fails on so the Stop hook blocks
+  only on what the session breaks (ADR-002); the server's instructions
+  carry the invariants. You do not
   need to simulate these; the harness runs them. Never add catalyst hooks
   to a project's `.claude/settings.json`.
 

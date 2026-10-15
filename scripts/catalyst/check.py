@@ -6,6 +6,7 @@ pass shaped for an agent's end-of-turn hook."""
 from __future__ import annotations
 
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -269,6 +270,54 @@ def hook_block(reason: str, fmt: str = "exit2") -> int:
     return 0
 
 
+SESSION_KEYS = ("session_id", "sessionId", "conversation_id", "conversationId")
+BASELINE_DAYS = 7
+
+
+def session_of(data: dict) -> str | None:
+    """The agent's session id in its hook input, when it gives one."""
+    for key in SESSION_KEYS:
+        value = data.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9._-]{1,128}", value):
+            return value
+    return None
+
+
+def _baselines(dep: Deployment) -> Path:
+    from catalyst import lock
+
+    return lock.state_dir(dep.root) / "sessions"
+
+
+def record_baseline(dep: Deployment, session: str, report: Report) -> Path:
+    """What `check` fails on as a session starts (ADR-002), in the
+    criterion's own git directory: never shared, never in the project.
+    Baselines older than a week are removed."""
+    import datetime
+    import time
+
+    folder = _baselines(dep)
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.json"):
+        if time.time() - old.stat().st_mtime > BASELINE_DAYS * 86400:
+            old.unlink(missing_ok=True)
+    path = folder / f"{session}.json"
+    at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
+    path.write_text(json.dumps({"at": at, "errors": report.errors, "warnings": report.warnings}), encoding="utf-8")
+    return path
+
+
+def read_baseline(dep: Deployment, session: str | None) -> dict | None:
+    if session is None:
+        return None
+    path = _baselines(dep) / f"{session}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def hook_stop(dep: Deployment, data: dict | None = None, strict: bool = False, fmt: str = "exit2") -> int:
     """Block the stop with the failures so the agent keeps working; let
     the stop through when a stop hook already blocked this stop, so an
@@ -287,8 +336,34 @@ def hook_stop(dep: Deployment, data: dict | None = None, strict: bool = False, f
         report = Report(errors=[f"check crashed: {type(exc).__name__}: {exc}"])
     if not report.failing(strict):
         return 0
-    body = report.text() if strict else "\n".join(f"ERROR   {e}" for e in report.errors)
+    lines = [f"ERROR   {e}" for e in report.errors] + ([f"WARNING {w}" for w in report.warnings] if strict else [])
     if data.get("stop_hook_active"):
-        print(f"catalyst checks still failing (not blocking again):\n{body}", file=sys.stderr)
+        print("catalyst checks still failing (not blocking again):\n" + "\n".join(lines), file=sys.stderr)
         return 0
-    return hook_block(f"catalyst checks failed — fix these before stopping:\n{body}", fmt)
+    # ADR-002: a session blocks on what it broke, not on what it found
+    session = session_of(data)
+    base = read_baseline(dep, session)
+    if base is None:
+        why = (
+            "no session id from the agent"
+            if session is None
+            else "no baseline for this session (`catalyst agent install <agent>` adds the session-start hook)"
+        )
+        return hook_block(
+            "catalyst checks failed — fix these before stopping:\n"
+            + "\n".join(lines)
+            + f"\n({why}: every failure counts)",
+            fmt,
+        )
+    known = {f"ERROR   {e}" for e in base.get("errors") or []} | {f"WARNING {w}" for w in base.get("warnings") or []}
+    new = [line for line in lines if line not in known]
+    found = [line for line in lines if line in known]
+    if not new:
+        print(
+            f"catalyst: {len(found)} failure(s) were already there when this session started; not blocking:\n"
+            + "\n".join(found),
+            file=sys.stderr,
+        )
+        return 0
+    tail = f"\n({len(found)} more were already there when this session started)" if found else ""
+    return hook_block("catalyst checks failed — fix these before stopping:\n" + "\n".join(new) + tail, fmt)

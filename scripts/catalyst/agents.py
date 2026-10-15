@@ -66,7 +66,12 @@ def changes(agent: str) -> list[Change]:
     home = Path.home()
     server = {"command": launcher(), "args": ["mcp"]}
     if agent == "claude-code":  # the MCP server goes through `claude mcp add --scope user`
-        return [Change(home / ".claude" / "settings.json", ("hooks", "Stop"), [_hook(_cmd("hook", "stop"))])]
+        settings = home / ".claude" / "settings.json"
+        return [
+            Change(settings, ("hooks", "Stop"), [_hook(_cmd("hook", "stop"))]),
+            # the session's baseline (ADR-002); the MCP server already carries the laws, so it prints nothing
+            Change(settings, ("hooks", "SessionStart"), [_hook(_cmd("hook", "start", "--quiet"))]),
+        ]
     if agent == "copilot":  # Copilot CLI; its hooks directory is read by VS Code's agent too
         return [
             Change(
