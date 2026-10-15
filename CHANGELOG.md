@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- A session's Stop hook blocks on what that session broke, not on what it
+  found (ADR-002, roadmap R0.5). `catalyst hook start` records what
+  `catalyst check` fails on as the session starts, keyed by the agent's
+  session id, in the criterion's git directory; `catalyst hook stop`
+  reports those failures without blocking and blocks on the new ones.
+  Without a session id or a baseline, every failure blocks, as before.
+- `catalyst hook start --quiet` records the baseline and prints nothing.
+  `catalyst agent install claude-code` (and the Claude Code plugin)
+  registers it as the session-start hook: run `agent install` again to
+  get it.
+
 ## 0.65.2 — 2026-10-15
 
 Python consolidation (R3.8): one git runner, catalyst's own YAML reader on every machine, the legacy Stop hook script gone. No layout change, no migration.

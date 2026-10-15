@@ -244,6 +244,14 @@ deployment it exits `0`. It fails closed: an unexpected error inside the
 hook (a corrupt journal, say) exits `2` with the reason, never `1`,
 which agents treat as non-blocking. See [Hooks](#hooks).
 
+A session blocks on what it broke, not on what it found (ADR-002). When
+the hook input carries the agent's session id (`session_id`, `sessionId`,
+`conversation_id`) and `catalyst hook start` recorded a baseline for that
+session, a failure that was already there when the session started is
+reported but does not block, and only new failures block; the message
+counts the older ones. Without a session id or a baseline, every failure
+blocks, and the message says why.
+
 While `catalyst.toml` says `governance = "suspended"` (an owner's
 decision), it reports that and exits `0` without checking.
 
@@ -254,7 +262,7 @@ same with `"deny"` (Gemini CLI's end-of-turn hook); `cursor`
 `{"followup_message": ...}`. The project is the hook input's `cwd` (or
 Cursor's `workspace_roots`) when `--project` is not given.
 
-### `catalyst hook start [--format text|json|cursor]`
+### `catalyst hook start [--format text|json|cursor] [--quiet]`
 
 The agent's session-start hook: prints where the project stands (the
 report of [`catalyst open`](#catalyst-open---fetch---agent-id---json),
@@ -268,6 +276,14 @@ always exits `0`, prints nothing outside a project, and only the report
 machine.
 `--format json` wraps the text as `hookSpecificOutput.additionalContext`
 (Codex, Copilot, Gemini CLI), `cursor` as `additional_context`.
+
+When the hook input carries the agent's session id, it also records what
+`catalyst check` fails on as the session's baseline, for `catalyst hook
+stop`: in the criterion's git directory (`catalyst/sessions/`), never shared
+and never in the project; baselines older than a week are removed. A
+failure to record changes nothing else. `--quiet` records the baseline and
+prints nothing, for an agent whose session already carries the laws
+(Claude Code, through the MCP server's instructions).
 
 ### `catalyst why <L1…L10 | INV-n | rr-META-n | rr-<NS>-n | ID>`
 

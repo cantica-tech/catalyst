@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import subprocess
 
+from catalyst.__main__ import main
 from catalyst.check import unrecorded_changes
 from catalyst.deployment import load
 from catalyst.scope import clear_cache
@@ -125,3 +126,89 @@ def test_a_suspended_governance_never_blocks_the_stop(tmp_path, monkeypatch, cap
     )
     assert _stop(project, monkeypatch) == 0
     assert "suspended" in capsys.readouterr().err
+
+
+def _broken(tmp_path, monkeypatch):
+    """The fixture project: `check` already fails on it (structure errors),
+    which is what a session finds when it starts."""
+    project = make_project(tmp_path, git=True)
+    monkeypatch.chdir(project)
+    return project
+
+
+def _stop_with(project, monkeypatch, data: dict, capsys) -> tuple[int, str]:
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
+    capsys.readouterr()
+    code = main(["--project", str(project), "hook", "stop"])
+    return code, capsys.readouterr().err
+
+
+def _start_with(project, monkeypatch, data: dict, capsys, *extra: str) -> str:
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
+    capsys.readouterr()
+    assert main(["--project", str(project), "hook", "start", *extra]) == 0
+    return capsys.readouterr().out
+
+
+def _fail(project) -> None:
+    """Add a failure `check` reports as an error: a file in an entity folder
+    that is not named `<id>-<short-summary>.md` (INV-7)."""
+    from catalyst.check import run
+
+    write(project / ".criterion" / "items" / "stray notes.md", "# notes\n")
+    assert any("stray notes.md" in e for e in run(load(project)).errors)
+
+
+def test_a_session_does_not_block_on_what_it_found(tmp_path, monkeypatch, capsys):
+    """ADR-002 (REQ-000035): a failure already there at session start is
+    reported at stop but does not block."""
+    project = _broken(tmp_path, monkeypatch)
+    _fail(project)
+    assert _start_with(project, monkeypatch, {"session_id": "s-1"}, capsys, "--quiet") == ""  # quiet: nothing printed
+    code, err = _stop_with(project, monkeypatch, {"session_id": "s-1"}, capsys)
+    assert code == 0 and "already there when this session started; not blocking" in err
+
+
+def test_a_session_blocks_on_what_it_broke(tmp_path, monkeypatch, capsys):
+    project = _broken(tmp_path, monkeypatch)
+    _start_with(project, monkeypatch, {"session_id": "s-2"}, capsys, "--format", "json")
+    _fail(project)
+    code, err = _stop_with(project, monkeypatch, {"session_id": "s-2"}, capsys)
+    assert code == 2 and "fix these before stopping" in err and "stray notes.md" in err
+    # what was there at the start is counted, not listed: the new failure is what the agent must fix
+    assert "INV-16" not in err and "more were already there when this session started" in err
+
+
+def test_without_a_session_or_its_baseline_every_failure_blocks(tmp_path, monkeypatch, capsys):
+    project = _broken(tmp_path, monkeypatch)
+    _fail(project)
+    code, err = _stop_with(project, monkeypatch, {}, capsys)
+    assert code == 2 and "no session id from the agent: every failure counts" in err
+    code, err = _stop_with(project, monkeypatch, {"session_id": "never-started"}, capsys)
+    assert code == 2 and "no baseline for this session" in err
+    code, _ = _stop_with(project, monkeypatch, {"session_id": "never-started", "stop_hook_active": True}, capsys)
+    assert code == 0  # a second stop after a block is still let through
+
+
+def test_baselines_stay_local_and_expire(tmp_path, monkeypatch, capsys):
+    import os
+    import time
+
+    from catalyst import check, lock
+
+    project = _broken(tmp_path, monkeypatch)
+    dep = load(project)
+    _start_with(project, monkeypatch, {"sessionId": "copilot.1"}, capsys, "--quiet")  # another agent's key
+    folder = lock.state_dir(dep.root) / "sessions"
+    assert (folder / "copilot.1.json").is_file() and ".git" in folder.parts  # inside the criterion's git dir
+    old = folder / "old.json"
+    old.write_text("{}", encoding="utf-8")
+    week = time.time() - (check.BASELINE_DAYS + 1) * 86400
+    os.utime(old, (week, week))
+    _start_with(project, monkeypatch, {"session_id": "s-3"}, capsys, "--quiet")
+    assert not old.exists() and (folder / "s-3.json").is_file()
+    assert check.session_of({"session_id": "../etc/passwd"}) is None  # never a path

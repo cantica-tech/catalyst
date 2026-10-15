@@ -1500,7 +1500,7 @@ def cmd_hook_start(args) -> int:
     from catalyst.check import hook_input
     from catalyst.open import open_project
 
-    data = hook_input() if args.format != "text" else {}
+    data = hook_input() if args.format != "text" or args.quiet else {}
     args = _hook_project(args, data)
     start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
     project = project_file.find_up(start)
@@ -1515,9 +1515,18 @@ def cmd_hook_start(args) -> int:
     except (WorkingCopyMissing, DeploymentNotFound):
         text = report
     else:
+        from catalyst.check import record_baseline, run, session_of
         from catalyst.laws import session_brief
 
         text = "\n".join([report, session_brief(dep.root)])
+        session = session_of(data)
+        if session is not None:  # ADR-002: the Stop hook blocks on what this session breaks
+            try:
+                record_baseline(dep, session, run(dep))
+            except Exception as exc:  # a session must start whatever happens here
+                print(f"catalyst: no baseline recorded for this session ({exc})", file=sys.stderr)
+    if args.quiet:
+        return 0
     if args.format == "text":
         print(text)
     elif args.format == "cursor":
@@ -1701,6 +1710,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("text", "json", "cursor"),
         default="text",
         help="plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's",
+    )
+    q.add_argument(
+        "--quiet",
+        action="store_true",
+        help="record the session's baseline (from the hook input) and print nothing: for an agent "
+        "whose session already carries the laws",
     )
     q.set_defaults(func=cmd_hook_start)
 
