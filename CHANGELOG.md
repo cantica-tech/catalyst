@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.69.0 — 2026-10-15
+
+One `/create <type>`, a command with parts; meta-tags dropped (R2, ADR-021). Migration `0.69.0/one-create-command.md`.
 
 - One `/create <type> <title>` (roadmap R2, ADR-021): each type a module
   declares is a part of it (`/create item <title>`, alias `/create-item`).
