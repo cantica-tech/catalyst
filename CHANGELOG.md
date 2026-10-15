@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.70.0 — 2026-10-16
+
+Section 4 is the one command registry: the Taskfile is generated from it (R2). No layout change, no migration: `catalyst sync apply` rewrites the Taskfile.
 
 - The deployed `CODE-OF-CONDUCT.md` §4 is the one command registry (roadmap
   R2): the criterion's `Taskfile.common.yml` is generated from it, one task
