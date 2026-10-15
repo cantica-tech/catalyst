@@ -1704,7 +1704,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
     q.set_defaults(func=cmd_hook)
-    q = hk.add_parser("start", help="session-start hook: print the deployment's invariants")
+    q = hk.add_parser("start", help="session-start hook: print the invariants, record the session's baseline")
     q.add_argument(
         "--format",
         choices=("text", "json", "cursor"),

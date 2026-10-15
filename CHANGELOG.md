@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `CLI.md` opens its command reference with an index of every command and
+  its options, and `FORMAT.md` §10 with the kernel's entity types, both
+  generated from the code by `scripts/gen_docs.py` between markers; a test
+  fails when either is stale (run `python3 scripts/gen_docs.py` after
+  changing a command, an option or a kernel type).
+- `catalyst hook start`'s help says it also records the session's baseline.
+
 ## 0.66.0 — 2026-10-15
 
 A session's Stop hook blocks on what that session broke, not on what it found (ADR-002, R0.5). No layout change, no migration: run `catalyst agent install claude-code` again to get the new session-start hook.
