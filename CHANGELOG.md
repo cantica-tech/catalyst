@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.67.0 — 2026-10-15
+
+`catalyst journal redact`: content journaled by mistake redacted as an auditable tombstone (R3.7, decision A5). No layout change, no migration.
+
+- `catalyst journal redact <blob>... --intent <why>`: content journaled by
+  mistake (a secret) is redacted as an auditable tombstone (roadmap R3.7,
+  decision A5). One `redact` entry names the blobs; they leave the pins of
+  the criterion and the product repository, whose pin ref is rewritten
+  without history. No entry, hash or commit changes. `journal verify`,
+  `check`, pinning, the pin merge, the history and `journal restore` treat
+  the content as redacted from then on. A commit holding the file still
+  holds the blob: rotate the secret; purging history is the owner's call.
+- The history payload (`spec/history.schema.json`) gains `redacted`.
+
 ## 0.66.1 — 2026-10-15
 
 Generated sections in the reference documents (R4.4, first step). No layout change, no migration.

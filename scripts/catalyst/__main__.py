@@ -81,6 +81,31 @@ def cmd_journal(args) -> int:
     from catalyst import journal as j
 
     dep = open_deployment(args)
+    if args.journal_command == "redact":
+        from catalyst import tiers
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import resolve_signer
+
+        try:
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            chore = args.tier or next((t.id for t in tiers.tiers_for(dep) if not t.needs_artifact), None)
+            entry = j.redact(
+                dep, args.blobs, args.intent or [], str(signer.get("git_username") or signer.get("name")), chore
+            )
+        except (j.JournalError, IdError) as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(entry, indent=2))
+            return 0
+        print(f"redacted {len(entry['redacted'])} blob(s) of {', '.join(entry['paths'])}; journaled")
+        print(f"unpinned in: {', '.join(entry['unpinned_in']) or 'nothing (not pinned)'}")
+        print(
+            "Not done, and not catalyst's to do: a commit that holds the file still holds the blob, here and on "
+            "every clone. Rotate the secret; purging history (`git filter-repo`) is the owner's call. The pins "
+            "change on the shared copy at the next publish."
+        )
+        return 0
     if args.journal_command == "append":
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
@@ -1822,6 +1847,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_view, view="journal")
+    q = js.add_parser("redact", help="redact journaled content: a tombstone entry, the blobs out of the pins")
+    q.add_argument("blobs", nargs="+", metavar="blob", help="a git blob the journal names (40 hex characters)")
+    q.add_argument("--intent", action="append", help="why (repeatable; required)")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument("--tier", help="the change's ceremony tier (default: the module's tier with no artifact)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_journal)
     q = js.add_parser("pin", help="pin every referenced blob so git gc keeps it")
     q.add_argument(
         "--share",

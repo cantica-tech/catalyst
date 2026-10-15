@@ -110,6 +110,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst journal verify` | check hash chains, blobs, pins and unjournaled edits | `--json`, `--legacy`, `--strict` |
 | `catalyst journal restore <timestamp> <out>` | materialise journaled files as of a timestamp | — |
 | `catalyst journal show` | read-only: journal entries, filtered, in time order | `--actor`, `--artifact`, `--content`, `--json`, `--rule`, `--since` |
+| `catalyst journal redact <blob>` | redact journaled content: a tombstone entry, the blobs out of the pins | `--as`, `--intent`, `--json`, `--tier` |
 | `catalyst journal pin` | pin every referenced blob so git gc keeps it | `--share` |
 | `catalyst list <type>` | read-only: artifacts of a type, rules, users, roles or templates | `--filter`, `--json`, `--type` |
 | `catalyst view <id>` | read-only: one artifact or rule, its links both ways and its history | `--json` |
@@ -979,6 +980,28 @@ for a file first journaled later, that first entry's `before` (a file created
 later is absent). `<out>` must be absent or an empty directory: restore never
 touches the live tree, never overwrites and never writes outside `<out>`. Exits `1` and lists the paths whose blob
 is missing from the object store.
+
+### `catalyst journal redact <blob>... --intent <why>`
+
+Redacts content the journal names, such as a secret journaled by mistake
+(decision A5): an auditable tombstone, never a rewrite. It appends one entry
+(action `redact`, the blobs under `redacted`, who and why; `--intent` is
+required) and takes the blobs out of the pins of the criterion and of the
+product repository, rewriting the pin ref as one commit without history so
+that no older pin commit keeps them. Every entry, hash and commit stays as
+it is, so the journal's chain still verifies. A blob the journal does not
+name is refused.
+
+From then on the readers treat the content as redacted: `journal verify` and
+`check` note the redaction and report no missing blob for it, `journal pin`
+and the pin merge of `share`/`criterion` never pin it again, the history
+(`journal show --artifact <id> --content`) shows it as `null` with
+`redacted: true`, and `journal restore` skips it.
+
+What it does not do: a commit that holds the file still holds the blob,
+here and on every clone, until the history is rewritten (`git
+filter-repo`), which is the owner's call. Rotate the secret first. The
+shared copy's pins change at the next publish.
 
 ### `catalyst journal pin`
 

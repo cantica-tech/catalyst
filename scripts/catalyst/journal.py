@@ -55,7 +55,7 @@ SHARDS = "development/journal"
 LOCK_STALE = 300.0  # an append hashes and pins every file it names
 PIN_REF = "refs/catalyst/journal"
 WC = ".criterion/"
-ACTIONS = ("create", "update", "close", "retire", "status-change", "sync")
+ACTIONS = ("create", "update", "close", "retire", "status-change", "sync", "redact")
 REQUIRED = ("timestamp", "actor", "command", "action", "artifact", "targets", "intent", "files")
 
 
@@ -365,6 +365,57 @@ def last_after(dep: Deployment) -> dict[str, str | None]:
 
 
 # --- pinning -------------------------------------------------------------
+def redacted_in(repo: Path) -> set[str]:
+    """The blobs the journal of `repo` says are redacted (R3.7, decision A5):
+    every `redact` entry's `redacted` list. For a product repository, its
+    criterion's journal is read."""
+    import project_file
+
+    roots = [repo]
+    criterion = project_file.resolve(repo) if project_file.is_project(repo) else None
+    if criterion is not None:
+        roots.append(criterion)
+    found: set[str] = set()
+    for root in roots:
+        sources = [root / "development" / "journal.jsonl", *sorted((root / "development" / "journal").rglob("*.jsonl"))]
+        for source in sources:
+            if not source.is_file():
+                continue
+            for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+                if '"redact"' not in line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(entry, dict) and entry.get("action") == "redact":
+                    found |= {s for s in entry.get("redacted") or [] if isinstance(s, str)}
+    return found
+
+
+def unpin(repo: Path, shas: set[str]) -> bool:
+    """Take blobs out of the pins. The pin ref is rewritten as one commit
+    without history: an older pin commit would keep the blob reachable.
+    Returns whether anything changed."""
+    have = pinned(repo)
+    if not have & shas:
+        return False
+    tree = git(repo, "mktree", input="".join(f"100644 blob {s}\t{s}\n" for s in sorted(have - shas)))
+    commit = git(
+        repo,
+        "-c",
+        "user.name=catalyst",
+        "-c",
+        "user.email=catalyst@localhost",
+        "commit-tree",
+        tree,
+        "-m",
+        f"catalyst journal: redact {len(have & shas)} blob(s)",
+    )
+    git(repo, "update-ref", PIN_REF, commit)
+    return True
+
+
 def pinned(repo: Path) -> set[str]:
     if not git(repo, "rev-parse", "--verify", "-q", PIN_REF, check=False):
         return set()
@@ -417,7 +468,8 @@ def current_hashes(repo: Path, rels: list[str]) -> dict[str, str | None]:
 def pin(repo: Path, shas: set[str]) -> int:
     """Add blobs to refs/catalyst/journal; returns how many were new."""
     have = pinned(repo)
-    new = {s for s in shas if s and s not in have and blob_exists(repo, s)}
+    gone = redacted_in(repo)  # never pinned again once redacted
+    new = {s for s in shas if s and s not in have and s not in gone and blob_exists(repo, s)}
     if not new:
         return 0
     for _ in range(5):  # compare-and-swap: a concurrent pin never loses blobs
@@ -541,6 +593,46 @@ def _append(dep: Deployment, req: AppendRequest) -> dict:
     return entry
 
 
+def redact(dep: Deployment, shas: list[str], intent: list[str], actor: str, tier: str | None = None) -> dict:
+    """Redact content the journal names (R3.7, decision A5): one `redact`
+    entry naming the blobs, and the blobs out of the pins of the criterion
+    and of the product repository. No entry, hash or commit is rewritten; a
+    commit holding the file may still hold the blob (see the CLI)."""
+    if not intent or not all(i.strip() for i in intent):
+        raise JournalError("at least one non-empty --intent is required: why the content is redacted")
+    named: dict[str, set[str]] = {}
+    for _, entry, _ in read(dep):
+        for f in (entry or {}).get("files", []) or []:
+            if isinstance(f, dict):
+                for sha in (f.get("before"), f.get("after")):
+                    if sha:
+                        named.setdefault(sha, set()).add(str(f.get("path")))
+    wanted = list(dict.fromkeys(shas))
+    unknown = [s for s in wanted if s not in named]
+    if unknown:
+        raise JournalError(f"not a blob the journal names: {', '.join(unknown)} (full 40-character hashes)")
+    check_tier(dep, tier)
+    entry = {
+        "timestamp": now(),
+        "actor": actor,
+        "command": "catalyst journal redact",
+        "action": "redact",
+        "artifact": "journal",
+        "targets": [],
+        "intent": intent,
+        "files": [],
+        "redacted": wanted,
+        "writer": f"catalyst/{__version__}",
+    }
+    if tier:
+        entry["tier"] = tier
+    write(dep, entry)
+    repos = [dep.root] + ([] if dep.standalone else [dep.project_root])
+    entry["unpinned_in"] = [r.name for r in dict.fromkeys(repos) if unpin(r, set(wanted))]
+    entry["paths"] = sorted({p for s in wanted for p in named[s]})
+    return entry
+
+
 def unjournaled(dep: Deployment) -> list[str]:
     """Journal paths whose current content differs from their last entry."""
     last = last_after(dep)
@@ -583,11 +675,21 @@ def verify(dep: Deployment) -> list[Issue]:
         return "error" if strict else "warning"
 
     entries = read_checked(dep)
+    redacted = {
+        s
+        for _, e, _ in entries
+        if isinstance(e, dict) and e.get("action") == "redact"
+        for s in e.get("redacted") or []
+        if isinstance(s, str)
+    }
 
     for n, entry, _ in entries:
         if entry is None:
             issues.append(Issue("error", "malformed", n, "not a JSON object"))
             continue
+        if entry.get("action") == "redact":  # history, never a problem: what was removed, by whom, why
+            count = len(entry.get("redacted") or [])
+            issues.append(Issue("note", "redacted", n, f"{count} blob(s) redacted by {entry.get('actor')}"))
         cli = str(entry.get("writer", "")).startswith("catalyst/")
         missing = [k for k in REQUIRED if k not in entry]
         if missing:
@@ -642,6 +744,8 @@ def verify(dep: Deployment) -> list[Issue]:
             if where is not None:
                 repo = where[0]
                 for sha in (before, after):
+                    if sha and sha in redacted:
+                        continue  # redacted (R3.7): gone on purpose, reported once below
                     if sha and not blob_exists(repo, sha):
                         # a before inherited from a legacy entry carries that entry's gap
                         inherited = sha == before and path in last and not last[path][2]
@@ -656,7 +760,7 @@ def verify(dep: Deployment) -> list[Issue]:
                                 not strict,
                             )
                         )
-                if cli and after:
+                if cli and after and after not in redacted:
                     if repo not in pins:
                         pins[repo] = pinned(repo)
                     if after not in pins[repo]:
@@ -716,13 +820,14 @@ def restore(dep: Deployment, timestamp: str, out: Path) -> tuple[list[str], list
     for path, sha in later_before.items():
         state.setdefault(path, sha)
     restored, missing = [], []
+    gone = redacted_in(dep.root)
     for path, sha in sorted(state.items()):
         where = locate(dep, path)
         if sha is None or where is None:
             continue
         repo = where[0]
-        if not object_id(sha):
-            missing.append(path)
+        if not object_id(sha) or sha in gone:
+            missing.append(path)  # a redacted blob is never restored, even while git still has it
             continue
         res = subprocess.run(["git", "-C", str(repo), "cat-file", "blob", sha], capture_output=True)
         if res.returncode != 0:
