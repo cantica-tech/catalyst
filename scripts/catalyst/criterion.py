@@ -374,8 +374,12 @@ def _share_pins_once(wc: Path, publish: bool) -> int:
                 "catalyst journal: merge pins",
             )
             run(wc, "update-ref", journal.PIN_REF, commit, local)
+    # a redacted blob never comes back through another machine's pins, and the
+    # ref is rewritten without history so no older pin commit keeps it (R3.7)
+    rerooted = journal.unpin(wc, journal.redacted_in(wc))
     if publish and run(wc, "rev-parse", "-q", "--verify", journal.PIN_REF, check=False).returncode == 0:
-        run(wc, "push", "-q", "--", "origin", f"{journal.PIN_REF}:{journal.PIN_REF}")
+        lease = [f"--force-with-lease={journal.PIN_REF}:{remote}"] if rerooted and remote else []
+        run(wc, "push", "-q", *lease, "--", "origin", f"{journal.PIN_REF}:{journal.PIN_REF}")
     return len(journal.pinned(wc))
 
 

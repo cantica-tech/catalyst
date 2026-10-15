@@ -44,7 +44,8 @@
         "before",
         "after",
         "content_before",
-        "content_after"
+        "content_after",
+        "redacted"
       ],
       "properties": {
         "timestamp": {
@@ -109,13 +110,17 @@
             "string",
             "null"
           ],
-          "description": "The file before; null when there was none, or when its blob is no longer available."
+          "description": "The file before; null when there was none, when its blob is no longer available, or when it was redacted."
         },
         "content_after": {
           "type": [
             "string",
             "null"
           ]
+        },
+        "redacted": {
+          "type": "boolean",
+          "description": "Whether the content before or after was redacted (`catalyst journal redact`); its content is then null, whatever git still holds."
         }
       },
       "additionalProperties": false

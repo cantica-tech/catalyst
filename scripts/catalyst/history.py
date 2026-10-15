@@ -48,9 +48,10 @@ def history(dep: Deployment, corpus: Corpus, item_id: str, blob: Blob | None = N
     who, when, why and the file's content `before` and `after`."""
     subject, kind, rel = _subject(dep, corpus, item_id)
     fetch = blob or git_blob(dep)
+    gone = journal.redacted_in(dep.root)
 
     def text(sha: str | None) -> str | None:
-        data = fetch(sha) if sha else None
+        data = fetch(sha) if sha and sha not in gone else None  # a redacted content is never shown
         return data.decode("utf-8", errors="replace") if data is not None else None
 
     entries = []
@@ -76,6 +77,7 @@ def history(dep: Deployment, corpus: Corpus, item_id: str, blob: Blob | None = N
                 "after": touched.get("after"),
                 "content_before": text(touched.get("before")),
                 "content_after": text(touched.get("after")),
+                "redacted": bool({touched.get("before"), touched.get("after")} & gone),
             }
         )
     return {"id": subject, "type": kind, "file": rel, "entries": entries}
@@ -88,6 +90,9 @@ def render(h: dict) -> str:
         lines.append(f"{e['timestamp']}  {e['actor']}  {e['command']} {e['action']}  {e['artifact']}")
         lines += [f"    {why}" for why in e["intent"]]
         before, after = e["content_before"], e["content_after"]
+        if e["redacted"]:
+            lines.append("    (content redacted: `catalyst journal redact`)")
+            continue
         if (e["before"] and before is None) or (e["after"] and after is None):
             lines.append("    (content no longer available: the journal names it, the store no longer has it)")
             continue
