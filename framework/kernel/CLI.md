@@ -85,6 +85,99 @@ signing. An unregistered user fails with a pointer to `/user-add`.
 
 ## Commands
 
+<!-- generated: cli-index (scripts/gen_docs.py; do not edit by hand) -->
+
+Every command and its options, from the CLI itself; the sections below describe each.
+
+| Command | What it does | Options |
+|---|---|---|
+| `catalyst validate` | validate the traceability chain against the ETDs | `--json`, `--strict` |
+| `catalyst init` | install catalyst into this project (explicit only, INV-2) | `--agent`, `--at`, `--git-username`, `--kernel`, `--module`, `--module-dir`, `--name`, `--no-module`, `--no-runtime`, `--rule-doc`, `--test-locations`, `--user` |
+| `catalyst check` | run every check: structure, chain, journal, indexes | `--json`, `--strict` |
+| `catalyst hook stop` | end-of-turn hook: block the stop with the failures | `--format`, `--strict` |
+| `catalyst hook commit-msg <message_file>` | git commit-msg hook: the message must trace to the chain | `--route` |
+| `catalyst hook install` | install the commit-msg hook in the project's git repository | — |
+| `catalyst hook start` | session-start hook: print the invariants, record the session's baseline | `--format`, `--quiet` |
+| `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
+| `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
+| `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
+| `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
+| `catalyst spec <command>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general` |
+| `catalyst id next <prefix>` | next <PREFIX>-NNNNNN-<userid> for an entity type | `--as` |
+| `catalyst id next-rule <doc_prefix> <domain>` | next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID | `--as` |
+| `catalyst journal append` | append one entry with real hashes and time | `--action`, `--allow-unchanged`, `--artifact`, `--as`, `--command`, `--file`, `--intent`, `--json`, `--target`, `--tier` |
+| `catalyst journal adopt <revs>` | record commits made outside catalyst in the journal (origin manual) | `--artifact`, `--as`, `--intent`, `--json`, `--target`, `--tier` |
+| `catalyst journal verify` | check hash chains, blobs, pins and unjournaled edits | `--json`, `--legacy`, `--strict` |
+| `catalyst journal restore <timestamp> <out>` | materialise journaled files as of a timestamp | — |
+| `catalyst journal show` | read-only: journal entries, filtered, in time order | `--actor`, `--artifact`, `--content`, `--json`, `--rule`, `--since` |
+| `catalyst journal pin` | pin every referenced blob so git gc keeps it | `--share` |
+| `catalyst list <type>` | read-only: artifacts of a type, rules, users, roles or templates | `--filter`, `--json`, `--type` |
+| `catalyst view <id>` | read-only: one artifact or rule, its links both ways and its history | `--json` |
+| `catalyst backlog` | read-only: open work by type and status, missing links, idle rules | `--json` |
+| `catalyst repair derived` | every derived field (another type's back-reference) from its sources, journaled | `--as`, `--json`, `--tier` |
+| `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
+| `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--intent`, `--json`, `--tier`, `--title` |
+| `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--tier` |
+| `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
+| `catalyst user add <name> <role>` | register a user with a fresh userid and one role | `--as`, `--git-username`, `--intent`, `--json` |
+| `catalyst user remove <name>` | deactivate a user (never deleted; never the last active one) | `--as`, `--intent`, `--json` |
+| `catalyst user modify <name> <field> <value>` | change one field (not name, registered, userid or roles) | `--as`, `--intent`, `--json` |
+| `catalyst user assign-role <name> <role>` | add a role to a user | `--as`, `--intent`, `--json` |
+| `catalyst role add <name>` | add a role with its actions and reconciliation level | `--action`, `--as`, `--intent`, `--json`, `--reconciliation` |
+| `catalyst role modify <name>` | replace a role's actions | `--action`, `--as`, `--intent`, `--json` |
+| `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
+| `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
+| `catalyst definition migrate <entity> <version>` | move definitions/<type>.md to a version that exists (INV-23) | `--as`, `--intent`, `--json`, `--kernel` |
+| `catalyst sync plan` | list what a sync would change, and the migrations to run | `--as`, `--base-kernel`, `--cli`, `--commands-dir`, `--intent`, `--json`, `--kernel`, `--module` |
+| `catalyst sync apply` | do the mechanical half of /sync-framework, then journal it | `--as`, `--base-kernel`, `--cli`, `--commands-dir`, `--intent`, `--json`, `--kernel`, `--module` |
+| `catalyst inbox` | what waits for a person, with its evidence and what settles it (read-only) | `--json` |
+| `catalyst impact <id>` | what an entity rests on and what rests on it, transitively (read-only) | `--depth`, `--down`, `--json`, `--up` |
+| `catalyst module list` | each installed module: id, version, source, commit, hash (no network) | `--json` |
+| `catalyst module install <source>` | install a module into a deployment that has none (seeded as init does) | `--as`, `--intent`, `--json`, `--kernel` |
+| `catalyst module upgrade <id> <source>` | move the installed module to another release, through `sync plan\|apply` | `--as`, `--base-kernel`, `--intent`, `--json`, `--kernel`, `--plan` |
+| `catalyst module verify <id>` | recompute each module's hash and compare it with the record (exit 1 on a difference) | `--json` |
+| `catalyst where` | the project's criterion: the home store, or a legacy working copy | `--json` |
+| `catalyst agent install <agent>` | add catalyst to the agent's user-level configuration | — |
+| `catalyst agent uninstall <agent>` | remove catalyst's entries from it | — |
+| `catalyst agent status` | which agents have catalyst | `--json` |
+| `catalyst mcp` | serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants | — |
+| `catalyst task <name> <task_args>` | run a criterion task (Taskfile.common.yml) from the project's root | — |
+| `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
+| `catalyst runtime status` | runtimes, launcher and the criterion's runtime version | `--json` |
+| `catalyst move` | move a legacy deployment into $HOME/.catalyst, or rename a project | `--as`, `--name`, `--no-runtime`, `--to-home` |
+| `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--git-username`, `--kernel`, `--user` |
+| `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
+| `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
+| `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--mode`, `--name` |
+| `catalyst analysis record <id> <file>` | store one independent pass's findings (JSON) | `--as`, `--pass`, `--replace` |
+| `catalyst analysis diff <id>` | match the two passes: agreed, conflicting, A-only, B-only | `--as` |
+| `catalyst analysis reconcile <id> <file>` | store the reconciler's list (every finding accounted for) | `--as` |
+| `catalyst analysis decide <id> <finding> <verdict>` | record the user's decision on one reconciled finding | `--artifact`, `--as`, `--reason` |
+| `catalyst analysis close <id>` | close once every finding is decided and accepted ones exist | `--as` |
+| `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
+| `catalyst analysis status <id>` | an analysis's phase and what it still needs | — |
+| `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--intent`, `--text` |
+| `catalyst why <item>` | explain a law (L1…), an invariant (INV-n), a meta-rule or an ID | — |
+| `catalyst open` | make the project ready on this machine (join, runtime) and say where it stands | `--agent`, `--fetch`, `--json` |
+| `catalyst share info` | the driver, where the shared copy is, what it can do | `--json` |
+| `catalyst share status` | this criterion against its shared copy | `--fetch`, `--json` |
+| `catalyst share pull` | bring in what the shared copy has (refuses with unpublished work) | — |
+| `catalyst share push` | publish this criterion's changes (git: a topic branch and a pull request) | `--as`, `--json`, `--message`, `--no-pr`, `--yes` |
+| `catalyst share create <url>` | publish a local-only criterion for the first time (git, or a server) | `--as`, `--branch`, `--driver`, `--protect`, `--yes` |
+| `catalyst share join <url>` | bring a shared criterion to this machine (a project with catalyst.toml) | — |
+| `catalyst share login <url>` | keep this user's token for a catalyst serve server (in catalyst's home) | `--token` |
+| `catalyst serve token <action> <who>` | issue, list or revoke the tokens users sign with | — |
+| `catalyst criterion status` | the working copy against the shared branch | `--fetch` |
+| `catalyst criterion create <url>` | version the working copy for sharing; with a URL, publish it as the .criterion submodule | `--branch`, `--yes` |
+| `catalyst criterion join` | check out a shared deployment in a clone of the product | `--url` |
+| `catalyst criterion push` | commit, rebase, check, push a topic branch, open a pull request | `--as`, `--message`, `--no-pr`, `--url`, `--yes` |
+| `catalyst criterion sync` | fast-forward to the shared branch (refuses with local work) | `--url`, `--yes` |
+| `catalyst criterion integrity` | fail if a merge lost any ID, index row or journal line | `--head`, `--parent` |
+| `catalyst criterion protect` | branch protection for the shared branch (GitHub) | `--yes` |
+| `catalyst userid gen` | draw a new unique userid (INV-26) | — |
+
+<!-- end generated: cli-index -->
+
 ### `catalyst init`
 
 ```
