@@ -542,6 +542,8 @@ def _validate(req: AppendRequest) -> None:
         raise JournalError("at least one non-empty --intent is required: the goal, not a label")
     if not req.files:
         raise JournalError("at least one --file is required")
+    if not all(str(f).strip() for f in req.files):
+        raise JournalError("an empty --file names no file")
     parse_time(req.timestamp)
 
 
@@ -550,6 +552,8 @@ def _append(dep: Deployment, req: AppendRequest) -> dict:
     files, to_pin, seen = [], {}, set()
     for raw in req.files:
         path = canonical(dep, raw)
+        if Path(os.path.abspath(raw)).is_dir():
+            raise JournalError(f"{raw} is a directory: name each file")
         if path in seen:
             continue  # the same file named twice (or under two spellings)
         seen.add(path)

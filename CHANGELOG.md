@@ -20,6 +20,9 @@ Fewer slash commands: `/user`, `/role`, and `/check-rules`, `/help` and `/journa
   -- add <name> <role>` replaces `catalyst task user-add`, and the task
   names of the absorbed commands are gone. The parity check counts the
   command a §4 bullet defines; its aliases need no task.
+- `catalyst new` no longer names a file `check` rejects: a name never ends
+  in `-<digits>`, which INV-7 reads as a bare ID. `catalyst journal append`
+  refuses an empty `--file` and a directory.
 
 ## 0.67.0 — 2026-10-15
 
