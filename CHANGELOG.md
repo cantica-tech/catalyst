@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.68.0 — 2026-10-15
+
+Fewer slash commands: `/user`, `/role`, and `/check-rules`, `/help` and `/journal` absorbing `/audit`, `/commands` and `/journal-restore`, the old names kept as aliases (R2, ADR-020). No layout change, no migration.
 
 - Fewer slash commands, with the old names kept as aliases (roadmap R2,
   ADR-020). `/user add|remove|modify|assign-role|list` replaces the five
