@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.68.1 — 2026-10-15
+
+The kernel purity check stops flagging a module command's plain-word name in prose (BUG-000014). No layout change, no migration.
 
 - The kernel purity check denies a module command whose name is one plain
   word only in its slash form: a module's `/board` in kernel text is
