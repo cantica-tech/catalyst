@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.66.0 — 2026-10-15
+
+A session's Stop hook blocks on what that session broke, not on what it found (ADR-002, R0.5). No layout change, no migration: run `catalyst agent install claude-code` again to get the new session-start hook.
 
 - A session's Stop hook blocks on what that session broke, not on what it
   found (ADR-002, roadmap R0.5). `catalyst hook start` records what
