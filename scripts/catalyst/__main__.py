@@ -1562,18 +1562,19 @@ def cmd_hook_start(args) -> int:
 
 
 def cmd_spec(args) -> int:
-    from catalyst.spec import SpecError, commands, general, spec
+    from catalyst.spec import SpecError, commands, general, parts, spec
 
     dep = open_deployment(args)
     try:
         if args.budget is not None:
-            over = [(len(spec(dep, c).split()), c) for c in commands(dep)]
+            measured = [*commands(dep), *parts(dep)]  # a command with parts is read one part at a time
+            over = [(len(spec(dep, c).split()), c) for c in measured]
             over = sorted(o for o in over if o[0] > args.budget)
             for words, c in over:
                 print(f"ERROR   /{c}: {words} words (budget {args.budget})")
             print(
                 f"catalyst spec budget {'FAILED' if over else 'passed'}: "
-                f"{len(commands(dep))} commands, budget {args.budget} words each"
+                f"{len(measured)} commands and parts, budget {args.budget} words each"
             )
             return 1 if over else 0
         if args.general:
@@ -1582,7 +1583,7 @@ def cmd_spec(args) -> int:
         if not args.command:
             print("\n".join(f"/{c}" for c in commands(dep)))
             return 0
-        sys.stdout.write(spec(dep, args.command))
+        sys.stdout.write(spec(dep, args.command, args.part))
         return 0
     except SpecError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
@@ -1782,6 +1783,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("spec", help="print only what one command needs from CODE-OF-CONDUCT §4")
     p.add_argument("command", nargs="?", help="e.g. status or /check-rules (none: list commands)")
+    p.add_argument("part", nargs="?", help="one part of a command with parts, e.g. `create bug`")
     p.add_argument("--general", action="store_true", help="the §4 rules that apply to every command")
     p.add_argument(
         "--budget", type=int, metavar="WORDS", help="check every command's spec against a word budget (exit 1 if over)"

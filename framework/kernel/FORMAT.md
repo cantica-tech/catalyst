@@ -139,7 +139,7 @@ submodule or a directory), read for one minor.
 ### 2.2 Entity folders
 
 Every entity type — the kernel's (`rules/`, `rules/domains/`,
-`reconciliations/`, `workflows/`, `analyses/`, `development/meta-tags/`,
+`reconciliations/`, `workflows/`, `analyses/`,
 `IAM/users/`, `IAM/roles/`) and each of the active module's — has one
 folder of this shape (INV-20):
 

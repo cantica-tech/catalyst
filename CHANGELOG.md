@@ -6,6 +6,27 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.69.0 — 2026-10-15
+
+One `/create <type>`, a command with parts; meta-tags dropped (R2, ADR-021). Migration `0.69.0/one-create-command.md`.
+
+- One `/create <type> <title>` (roadmap R2, ADR-021): each type a module
+  declares is a part of it (`/create item <title>`, alias `/create-item`).
+  `catalyst spec create <type>`, `catalyst spec create-<type>` and the MCP
+  prompt `/create <type> …` read the shared text and that part alone;
+  `catalyst spec create` lists the parts; `spec --budget` checks each part.
+  One `create` task replaces the per-type tasks, generated ones included.
+- Meta-tags are dropped (decision B4): no `/meta-tag`, no meta-tag type,
+  definition or template. `catalyst sync apply` removes a deployment's
+  `development/meta-tags/` and `definitions/meta-tag.md` when the folder
+  holds no tag, and keeps them when it holds some. On a shared criterion it
+  waits until the gate runs 0.69.0: the older checker requires the type.
+- `catalyst sync apply` and `recompose` merge what catalyst itself
+  generates (a module type's catalogue entry, its old task) from the form
+  the deployment holds, so a change to the generator reaches the deployment;
+  before, the three-way merge saw no change and kept the old form.
+- Migration `0.69.0/one-create-command.md`.
+
 ## 0.68.1 — 2026-10-15
 
 The kernel purity check stops flagging a module command's plain-word name in prose (BUG-000014). No layout change, no migration.

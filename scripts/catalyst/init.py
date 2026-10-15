@@ -33,7 +33,6 @@ KERNEL_TYPES = {  # kernel entity folders, their template source and index
     "reconciliations": ("RECONCILIATION", "reconciliation.template.md"),
     "workflows": ("WORKFLOW", "workflow.template.md"),
     "analyses": ("ANALYSIS", "analysis.template.md"),
-    "development/meta-tags": ("META-TAG", "meta-tag.template.md"),
 }
 
 

@@ -244,7 +244,7 @@ class Server:
     def procedure(self, name: str, arguments: str, hint: str | None = None) -> str:
         dep, s = self.section4(hint)
         try:
-            text = spec_text(s, name)
+            text = spec_text(s, name, (arguments.split() or [None])[0])  # `/create item …` reads item's part
         except SpecError as exc:
             raise RpcError(-32602, str(exc)) from exc
         return (
