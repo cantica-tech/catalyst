@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst agent run <command> [<arguments>…]` dispatches a command to the
+  project's agent, non-interactively, from the project's root, and streams
+  what it does as events — text, tool calls and results — closed by `ok`,
+  turns, token usage, cost and the tools the user's own agent settings
+  denied (`--json`: `spec/run-event.schema.json`). catalyst widens no
+  permission. Claude Code has the first adapter; no `serve` route starts a
+  run (roadmap R5.5). The MCP prompts and the run share one procedure text.
+- `catalyst view <rule> --json` and `GET /v1/view/<rule>` give the rule's
+  `title`, `status`, `domain` and `text` — its own section, read as `graph`
+  reads rules — so a rule's page can show the rule itself (roadmap R6.14;
+  `spec/view.schema.json`).
+
 ## 0.75.2 — 2026-10-16
 
 The laws brief every session loads, tightened under its target, wording only. No layout change, no migration.

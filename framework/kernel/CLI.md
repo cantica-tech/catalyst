@@ -142,6 +142,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst agent install <agent>` | add catalyst to the agent's user-level configuration | — |
 | `catalyst agent uninstall <agent>` | remove catalyst's entries from it | — |
 | `catalyst agent status` | which agents have catalyst | `--json` |
+| `catalyst agent run <command> <arguments>` | dispatch a command to the project's agent; stream what it does and what it cost | `--agent`, `--json` |
 | `catalyst mcp` | serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants | — |
 | `catalyst task <name> <task_args>` | run a criterion task (Taskfile.common.yml) from the project's root | — |
 | `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
@@ -479,6 +480,32 @@ catalyst's entries change (found by the launcher path); each file is backed
 up once as `<file>.before-catalyst`; a file that is not plain JSON is left
 alone and the snippet to add is printed. `agents/claude-code/plugin` is the
 same wiring as a Claude Code plugin. `status` reports each agent.
+
+### `catalyst agent run <command> [<arguments>…] [--agent <id>] [--json]`
+
+Dispatches one command of the deployment's `CODE-OF-CONDUCT.md` §4 to the
+project's agent (the one `catalyst open --agent` records for this user;
+`--agent` for one run), non-interactively, from the project's root. The
+agent is given the command's procedure — the text the `catalyst mcp`
+prompts give — and runs under the user's own agent settings: catalyst
+passes no flag that widens its permissions, so a tool the settings do not
+allow is refused and reported as denied (laws L3, L4).
+
+Its output is normalized to events (`spec/run-event.schema.json`): `start`
+(agent, command, arguments), `session` (model, session), `text`, `tool` (a
+one-line summary of the call), `tool_result`, and `end` — `ok`, `turns`,
+token `usage` (`input`, `output`, `cache_read`, `cache_write`),
+`cost_usd`, `duration_ms`, the `denied` tools and the agent's last word.
+A run whose agent the user's settings denied a tool is not `ok`: it did not
+do its work, whatever the agent says; the tools are named, to be allowed in
+the agent's own settings.
+`--json` prints them one per line; without it, a person reads them, the
+cost last. Exit `0` when the agent reports success, `1` when it does not
+(or stops without a result, whose reason is the `end` event's), `2` when
+the run cannot start: an unknown command, an agent without an adapter, or
+its CLI not on `PATH`. Only Claude Code has an adapter
+(`claude -p … --output-format stream-json`). No route of `catalyst serve`
+starts a run (roadmap R5.5; whether the UI launches agents is open).
 
 ### What a deployment governs
 
@@ -830,7 +857,9 @@ generate its types from.
   A filter keeps items whose field matches, with `*`/`?` wildcards. An
   unknown type exits `1` and names the known ones.
 - `catalyst view <ID>`: one artifact or rule, its fields, the IDs it links
-  to, the artifacts linking to it and its journal entries.
+  to, the artifacts linking to it and its journal entries; a rule also
+  gives its `title`, `status`, `domain` and `text` (its own section, read
+  as `graph` reads it).
 - `catalyst backlog`: open items per type and status ("open" is any status
   outside the ETD's closed states), open items missing a required link, and
   rules no open item targets.
