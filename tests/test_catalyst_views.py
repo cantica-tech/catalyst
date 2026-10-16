@@ -246,3 +246,24 @@ def test_view_takes_a_meta_rule_as_the_handbook_writes_it(tmp_path):
     )
     dep = load(project)
     assert views.view(dep, load_corpus(dep), "rr-META-015")["id"] == f"rr-META-000015-{USERID}"
+
+
+def test_view_gives_a_rule_its_title_status_domain_and_text(tmp_path):
+    """R6.14: a rule's page shows the rule itself, read as `graph` reads it."""
+    from test_catalyst_rule_shapes import _per_file_rules
+
+    project = make_project(tmp_path, git=True)
+    rule, old = _per_file_rules(project)
+    write(
+        project / ".criterion" / "rules" / "Rules-of-Rules.md",
+        f"# Handbook\n\n## 15. `rr-META-000015-{USERID}` Shape\n\n✅ working. Text.\n\n## 16. Next\n",
+    )
+    dep = load(project)
+    corpus = load_corpus(dep)
+    one = views.view(dep, corpus, rule)
+    assert (one["title"], one["status"], one["domain"]) == ("Logs", "✅ implemented", "CORE.INGEST")
+    assert one["text"] == (project / ".criterion" / one["file"]).read_text(encoding="utf-8").rstrip("\n")  # its file
+    meta = views.view(dep, corpus, f"rr-META-000015-{USERID}")
+    assert (meta["title"], meta["status"]) == ("Shape", "✅ working. Text.")
+    assert meta["text"].startswith("## 15.") and "Text." in meta["text"] and "Next" not in meta["text"]
+    assert views.view(dep, corpus, old)["retired"] is True
