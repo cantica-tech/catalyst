@@ -187,6 +187,36 @@ def resolve(corpus: Corpus, item_id: str) -> str | None:
     return found[0] if found else None
 
 
+SECTION_RE = re.compile(r"^##\s+(.+?)\s*$", re.M)
+
+
+def _sections(text: str) -> list[dict]:
+    """A document's `## ` sections in order: each heading and its text, as written."""
+    marks = list(SECTION_RE.finditer(text))
+    return [
+        {
+            "heading": m.group(1),
+            "text": text[m.end() : marks[i + 1].start() if i + 1 < len(marks) else len(text)].strip(),
+        }
+        for i, m in enumerate(marks)
+    ]
+
+
+def _next_states(dep: Deployment, corpus: Corpus, art: Artifact) -> list[dict]:
+    """The states an artifact may move to from its own (its type's declared
+    transitions, or every other state when it declares none), each with what
+    its guards say blocks it now (`status set` refuses those, R6.7)."""
+    from catalyst.guards import failures
+
+    etd = dep.etds.get(art.prefix)
+    if etd is None:
+        return []
+    current = art.get("Status") or ""
+    declared = [t.to_state for t in etd.workflow.transitions if t.from_state == current]
+    states = declared if etd.workflow.transitions else [s for s in etd.workflow.states if s != current]
+    return [{"state": s, "blocked_by": failures(dep, corpus, art, s)} for s in dict.fromkeys(states)]
+
+
 def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
     item_id = resolve(corpus, item_id) or item_id
     arts = corpus.artifacts.get(item_id)
@@ -196,6 +226,8 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
         out["links"] = {
             name: ref_values(art.get(name) or "") for name in _ref_fields(dep, art.prefix) if art.get(name) is not None
         }
+        out["sections"] = _sections(art.file.read_text(encoding="utf-8"))
+        out["next"] = _next_states(dep, corpus, art)
     elif corpus.rule_id(item_id):
         item_id = corpus.rule_id(item_id) or item_id
         rule = corpus.rules[item_id][0]
@@ -451,6 +483,12 @@ def graph(dep: Deployment, corpus: Corpus) -> dict:
             "states": list(etd.workflow.states),
             "initial": etd.workflow.initial,
             "closed_states": list(etd.workflow.closed_states),
+            "transitions": [{"from": t.from_state, "to": t.to_state} for t in etd.workflow.transitions],
+            "guards": {
+                state: [{"condition": c, "argument": a} for c, a in conditions]
+                for state, conditions in etd.workflow.guards.items()
+            },
+            "sections": [heading for heading, _ in etd.sections],
         }
         for prefix, etd in sorted(dep.etds.items())
     }

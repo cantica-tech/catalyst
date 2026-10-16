@@ -6,6 +6,17 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.73.0 — 2026-10-16
+
+What an entity page shows: an artifact's sections and next states, a type's transitions, guards and sections (R6.7). No layout change, no migration.
+
+- What an entity page shows (roadmap R6.7): `catalyst view <id> --json` and
+  `GET /v1/view/<id>` give an artifact's `sections` (each heading and its
+  text) and `next`, the states it may move to from its own, each with what
+  its guards say blocks it now; `catalyst graph --json` gives each type's
+  `transitions`, `guards` and `sections`. `spec/view.schema.json` and
+  `spec/graph.schema.json` describe them.
+
 ## 0.72.0 — 2026-10-16
 
 The plugin system is removed from the kernel (R4.7, ADR-022). No layout change, no migration.
