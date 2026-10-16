@@ -5,7 +5,7 @@ type — what the type *is* and what it's for, distinct from the
 `templates/*.template.md` files (which define an artifact's *fields and
 shape*, not its meaning). Deployed once into a project at
 `.criterion/definitions/<type>.md` and then left alone (`INVARIANTS.md`
-INV-23): see `INSTANTIATION-GUIDE.md` §1 for the deploy step and
+INV-23): see `catalyst init` in `CLI.md` for the deploy step and
 `SYNCHRONIZE.md` for the freeze rule.
 
 ## Layout

@@ -2,9 +2,8 @@
 
 The canonical, illustrative tree for a deployed `.criterion/` under
 the uniform artifact-type layout (`Rules-of-Rules.md` §15, `INVARIANTS.md`
-INV-20). `INSTANTIATION-GUIDE.md` §1 is the authoritative prose — this
-file exists as a clean, standalone reference to the shape alone, without
-the surrounding deploy-procedure text.
+INV-20). `CLI.md` (`catalyst init`) says what an install writes; this
+file is the shape alone.
 
 ## Legend
 
@@ -133,8 +132,9 @@ that has one:
 
 ## See also
 
-- [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) §1 — the full deploy
-  procedure this tree is built by.
+- [`CLI.md`](CLI.md) `catalyst init` — what builds this tree;
+  [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) §1 — the judgment
+  around it.
 - [`INSTANTIATION-CHECKLIST.md`](INSTANTIATION-CHECKLIST.md) — the
   tickable version of the same steps.
 - [`rules-of-rules.template.md`](rules-of-rules.template.md) §15 — the
