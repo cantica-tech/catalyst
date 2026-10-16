@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst spec --json`, `GET /v1/commands` and `GET /v1/spec/<command>[/<part>]`
+  give the deployment's commands as data: each command's `usage`, one-line
+  `summary`, `aliases` and `parts` (`spec/commands.schema.json`), and one
+  command's or part's spec as `{command, part, text}`
+  (`spec/command-spec.schema.json`) — so a command palette reads what
+  `catalyst spec` reads, never a list of its own (roadmap R6.8). The MCP
+  server's prompt descriptions come from the same code.
+- A criterion without a `CODE-OF-CONDUCT.md` is said as such by
+  `catalyst spec` (and lists no command on the server), not a crash.
+
 ## 0.74.0 — 2026-10-16
 
 The local head says what the deployment runs (R6.5). No layout change, no migration.

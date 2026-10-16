@@ -411,6 +411,27 @@ def test_local_mode_answers_like_the_cli_and_refuses_writes(local, capsys):
     assert err.value.status == 401
 
 
+def test_local_mode_gives_the_commands_and_their_specs(local, capsys):
+    """R6.8: a command palette reads what `catalyst spec` reads."""
+    project, _, client = local
+    assert client.call("GET", "/commands") == {"commands": []}  # no §4 yet
+    with pytest.raises(serve.ServeError) as err:
+        client.call("GET", "/spec/alpha")
+    assert err.value.status == 404 and "no CODE-OF-CONDUCT.md" in str(err.value)
+    section4 = (
+        "# R\n\n## 4. Commands\n\n- `/alpha <x>` — do alpha.\n\nWhen the user enters `/alpha`, do it.\n\n## 5. Next\n"
+    )
+    write(project / ".criterion" / "CODE-OF-CONDUCT.md", section4)
+    assert client.call("GET", "/commands") == _cli_json(capsys, "spec")
+    names = [c["name"] for c in client.call("GET", "/commands")["commands"]]
+    assert names and all(not n.startswith("/") for n in names)
+    one = client.call("GET", f"/spec/{names[0]}")
+    assert one == _cli_json(capsys, "spec", names[0]) and one["text"].startswith(f"# /{names[0]}")
+    with pytest.raises(serve.ServeError) as err:
+        client.call("GET", "/spec/no-such-command")
+    assert err.value.status == 404 and "not in CODE-OF-CONDUCT.md" in str(err.value)
+
+
 def test_local_head_says_what_the_deployment_runs(local):
     """R6.5: a client sees a deployment behind the catalyst it reads it with."""
     from catalyst import __version__

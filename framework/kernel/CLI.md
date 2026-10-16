@@ -102,7 +102,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
-| `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general` |
+| `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general`, `--json` |
 | `catalyst id next <prefix>` | next <PREFIX>-NNNNNN-<userid> for an entity type | `--as`, `--count` |
 | `catalyst id next-rule <doc_prefix> <domain>` | next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID | `--as` |
 | `catalyst journal append` | append one entry with real hashes and time | `--action`, `--allow-unchanged`, `--artifact`, `--as`, `--command`, `--file`, `--intent`, `--json`, `--target`, `--tier` |
@@ -259,6 +259,13 @@ the full document is read only when the spec points elsewhere or a
 judgment needs the Rules-of-Rules sections it cites. `<command>` may be
 given with or without its `/`; without one, `spec` lists every command.
 An unknown command exits `1`.
+
+`--json` gives the same as data: without a command, every command with how
+it is typed (`usage`), its one-line `summary` (the MCP prompts' own
+descriptions), its `aliases` and its `parts`, each part with its own usage,
+summary and aliases (`spec/commands.schema.json`); with one, `{command,
+part, text}` (`spec/command-spec.schema.json`). A command palette reads
+these, never a list of its own.
 
 `--budget <words>` checks every command's spec against a word budget and
 exits `1`, listing each command over it. catalyst holds its own deployment
@@ -1147,7 +1154,9 @@ own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 `GET view/<id>` (`catalyst view`), `GET backlog`, and
 `GET journal?since=&artifact=&actor=&rule=` (`catalyst journal show`),
 `GET graph` (`catalyst graph`),
-`GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`) and
+`GET impact/<id>?direction=up|down|both&depth=<n>` (`catalyst impact`),
+`GET commands` and `GET spec/<command>[/<part>]` (`catalyst spec --json`;
+a criterion without a `CODE-OF-CONDUCT.md` lists no command), and
 `GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
 server the content comes from the blobs it holds), and `GET inbox`
 (`catalyst inbox`; a server has no project history, so its inbox holds the

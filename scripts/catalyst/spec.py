@@ -141,7 +141,11 @@ def _parted(s: Section4, name: str) -> bool:
 
 
 def load_section4(dep: Deployment) -> Section4:
-    return parse((dep.root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8"))
+    try:
+        text = (dep.root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise SpecError("this deployment has no CODE-OF-CONDUCT.md") from None
+    return parse(text)
 
 
 def spec_text(s: Section4, command: str, part: str | None = None) -> str:
@@ -181,6 +185,56 @@ def spec(dep: Deployment, command: str, part: str | None = None) -> str:
 def general(dep: Deployment) -> str:
     s = load_section4(dep)
     return "# Rules for every command — from CODE-OF-CONDUCT.md §4\n\n" + "\n\n".join(s.general) + "\n"
+
+
+def summary(bullets: list[str]) -> str:
+    """A command's one-line description: its §4 bullet, after the dash."""
+    first = " ".join(line.strip() for line in bullets[0].splitlines()) if bullets else ""
+    text = first.split("—", 1)[1].strip() if "—" in first else first.lstrip("- ")
+    return text if len(text) <= 300 else text[:297].rstrip() + "..."
+
+
+def _usage(bullet: str) -> str:
+    """How a bullet's command is typed: the first code span of its head (`/check-rules [<file>]`)."""
+    head = " ".join(line.strip() for line in bullet.splitlines()).split("—", 1)[0]
+    m = re.search(r"`(/[^`]+)`", head)
+    return m.group(1) if m else head.lstrip("- ").strip()
+
+
+def _part(name: str, bullet: str, tags: set[str]) -> dict:
+    """One part of a command (ADR-021): the word its usage types after the
+    command (`/create req <title>` is `req`), else its first alias's."""
+    usage = _usage(bullet)
+    words = usage.split()
+    typed = words[1] if len(words) > 1 and f"{name}-{words[1]}" in tags else None
+    return {
+        "part": typed or sorted(tags)[0].removeprefix(f"{name}-"),
+        "usage": usage,
+        "summary": summary([bullet]),
+        "aliases": sorted(tags),
+    }
+
+
+def catalogue(s: Section4) -> list[dict]:
+    """Every command, by name: how it is typed, its summary, its aliases and
+    its parts (ADR-021), as `GET /v1/commands` gives them."""
+    out = []
+    for name in sorted(s.bullets):
+        bullets = s.bullets[name]
+        tags = s.bullet_tags.get(name, [])
+        parted = _parted(s, name)
+        out.append(
+            {
+                "name": name,
+                "usage": next(
+                    (_usage(b) for b, t in zip(bullets, tags, strict=True) if not parted or not t), _usage(bullets[0])
+                ),
+                "summary": summary(bullets),
+                "aliases": sorted(a for a, primary in s.aliases.items() if primary == name),
+                "parts": [_part(name, b, t) for b, t in zip(bullets, tags, strict=True) if parted and t],
+            }
+        )
+    return out
 
 
 def commands(dep: Deployment) -> list[str]:
