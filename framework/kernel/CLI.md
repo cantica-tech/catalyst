@@ -192,8 +192,8 @@ catalyst init --name <name> (--module <module-id> | --no-module) [--user <name>]
 Installs catalyst into the project (the current directory, or
 `--project <dir>` given before `init`) — only ever on the user's explicit
 request (INV-2); nothing runs it on load. It is the mechanical half of
-`INSTANTIATION-GUIDE.md` §1 (step 4 lists everything it writes); the agent
-decides its inputs and does the judgment steps after it.
+an install; the agent decides its inputs and does the judgment steps after
+it (`INSTANTIATION-GUIDE.md` §1).
 
 - `--name` names the project; the pointer is `<name>.catalyst`.
 - `--module` is the active module's id; there is no default. Without it,
@@ -222,6 +222,33 @@ decides its inputs and does the judgment steps after it.
 - `--kernel` is the `framework/kernel` directory of a catalyst checkout or
   kernel release. It defaults to the checkout the CLI runs from, so it is
   required when running a vendored `catalyst.pyz`.
+
+What it writes, in order (the tree: `ARTIFACT-LAYOUT.md`):
+
+- the composed `CODE-OF-CONDUCT.md` (the kernel's
+  `rules-of-development.template.md` with the module's
+  `code-of-conduct.module.md` §3/§4 under `### From module <id>`),
+  `rules/Rules-of-Rules.md` (the kernel's template with the module's
+  `rules-of-rules.module.md` appended), `ACCESS-CONTROL.md` (verbatim) and
+  `Taskfile.common.yml` (one task per §4 command), with `{{RULES_DIR}}`,
+  `{{RULE_DOCS_LIST}}` and `{{TEST_LOCATIONS}}` resolved and the meta-rule
+  IDs signed by the first user (`MODULE-SPECIFICATION.md` §6);
+- the whole module, into `modules/<module-id>/`;
+- every entity folder, kernel and module, at the place its type names,
+  each with `templates/` (`README.md`, the catalog with a `v1` row,
+  `TEMPLATE-<TYPE>-v1.md`), `README.md` and its index (INV-20); `rules/`
+  with `rules.md` and each rule document seeded with `## Contents` and
+  `## Linked Artifacts — Quick Index` (INV-8); every path the module
+  requires;
+- the latest definition of every type at `definitions/<type>.md`, with
+  `definitions/README.md`, frozen from then on (INV-23);
+- `IAM/users/` and `IAM/roles/`, the first user as Admin and the default
+  role mapping (INV-16, INV-26);
+- `version.txt`, `DEPLOYMENT.md`, a root `README.md` stub,
+  `ANALYSIS-PLAYBOOK.md`, `INVARIANTS.md` (what `catalyst mcp` and the
+  session-start hook re-inject) and the CLI at `bin/catalyst.pyz`;
+- the criterion's runtime and git history, `catalyst.toml`, and the
+  install as the journal's first entry.
 
 It refuses (exit `1`, nothing written) if the project already has a
 `catalyst.toml` (or legacy pointer) or a `.criterion` — one holding only the

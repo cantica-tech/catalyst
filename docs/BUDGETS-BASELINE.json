@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-15T19:41:08+00:00",
+  "timestamp": "2026-10-16T16:24:46+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
@@ -10,8 +10,8 @@
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 7914,
-      "tokens": 1978,
+      "bytes": 3703,
+      "tokens": 925,
       "category": "grounding"
     },
     {
@@ -112,14 +112,14 @@
     },
     {
       "name": "command-file: dogfood.md",
-      "bytes": 3185,
-      "tokens": 796,
+      "bytes": 3118,
+      "tokens": 779,
       "category": "command-file"
     },
     {
       "name": "BOOTSTRAP.md",
-      "bytes": 7914,
-      "tokens": 1978,
+      "bytes": 3703,
+      "tokens": 925,
       "category": "install"
     },
     {
@@ -130,14 +130,14 @@
     },
     {
       "name": "framework/kernel/INSTANTIATION-GUIDE.md",
-      "bytes": 22613,
-      "tokens": 5653,
+      "bytes": 5348,
+      "tokens": 1337,
       "category": "install"
     },
     {
       "name": "framework/kernel/INSTANTIATION-CHECKLIST.md",
-      "bytes": 6148,
-      "tokens": 1537,
+      "bytes": 1979,
+      "tokens": 494,
       "category": "install"
     }
   ]
