@@ -184,9 +184,11 @@ class Reads:
 
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
-        backlog and journal."""
+        backlog, journal, graph, inbox, history, impact, and the commands
+        and their specs (`catalyst spec --json`)."""
         from catalyst import views
         from catalyst.journal import JournalError
+        from catalyst.spec import SpecError
 
         seq, dep, corpus = self.loaded()
         one = lambda key: (query.get(key) or [None])[0]  # noqa: E731
@@ -217,9 +219,27 @@ class Reads:
                 data = impact.impact(dep, corpus, item, one("direction") or "both", int(depth) if depth else None)
             elif what == "backlog":
                 data = views.backlog(dep, corpus)
+            elif what == "commands":
+                from catalyst import spec
+
+                try:
+                    data = {"commands": spec.catalogue(spec.load_section4(dep))}
+                except SpecError:
+                    data = {"commands": []}  # no §4 to read: no command to list
+            elif what == "spec":
+                from catalyst import spec
+
+                command, _, part = item.partition("/")
+                data = {
+                    "command": command.lstrip("/"),
+                    "part": part or None,
+                    "text": spec.spec(dep, command, part or None),
+                }
             else:
                 data = views.journal_entries(dep, one("since"), one("artifact"), one("actor"), one("rule"))
         except views.ViewError as e:
+            raise ServeError(404, str(e)) from None
+        except SpecError as e:
             raise ServeError(404, str(e)) from None
         except JournalError as e:
             raise ServeError(400, str(e)) from None
@@ -732,8 +752,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
-                path in ("/list", "/backlog", "/journal", "/graph", "/inbox")
-                or path.startswith(("/view/", "/impact/", "/history/"))
+                path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands")
+                or path.startswith(("/view/", "/impact/", "/history/", "/spec/"))
             ):
                 what, _, item = path.strip("/").partition("/")
                 seq, data = self.app.read(what, urllib.parse.parse_qs(url.query), urllib.parse.unquote(item))

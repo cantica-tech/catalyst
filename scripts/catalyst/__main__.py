@@ -1582,10 +1582,17 @@ def cmd_hook_start(args) -> int:
 
 
 def cmd_spec(args) -> int:
-    from catalyst.spec import SpecError, commands, general, parts, spec
+    from catalyst.spec import SpecError, catalogue, commands, general, load_section4, parts, spec
 
     dep = open_deployment(args)
     try:
+        if getattr(args, "json", False) and args.budget is None and not args.general:
+            if not args.command:
+                print(json.dumps({"commands": catalogue(load_section4(dep))}, indent=2))
+            else:
+                text = spec(dep, args.command, args.part)
+                print(json.dumps({"command": args.command.lstrip("/"), "part": args.part, "text": text}, indent=2))
+            return 0
         if args.budget is not None:
             measured = [*commands(dep), *parts(dep)]  # a command with parts is read one part at a time
             over = [(len(spec(dep, c).split()), c) for c in measured]
@@ -1808,6 +1815,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--budget", type=int, metavar="WORDS", help="check every command's spec against a word budget (exit 1 if over)"
     )
+    p.add_argument("--json", action="store_true", help="the commands, or one command's spec, as JSON")
     p.set_defaults(func=cmd_spec)
 
     p = sub.add_parser("id", help="allocate the next ID (never reused)")

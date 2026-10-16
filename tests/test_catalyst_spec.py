@@ -197,3 +197,31 @@ def test_a_command_with_parts_reads_one_part(tmp_path):
     assert "`catalyst spec create <part>`" in whole and "create-bug" in whole
     # a command without parts reads whole, whatever the part asked
     assert spec_text(s, "user", "add") == spec_text(s, "user") and "`/user-add`" in spec_text(s, "user")
+
+
+def test_the_catalogue_lists_each_command_and_each_part_once(tmp_path, capsys):
+    """R6.8: what a command palette reads, from the same §4 as `catalyst spec`."""
+    import json
+
+    import schema_check
+    from catalyst.spec import catalogue, parse
+
+    by = {c["name"]: c for c in catalogue(parse(PARTED))}
+    assert sorted(by) == ["create", "user"]
+    create = by["create"]
+    assert create["usage"] == "/create <type> <title>" and create["summary"].startswith("create an artifact")
+    assert [(p["part"], p["usage"], p["aliases"]) for p in create["parts"]] == [
+        ("bug", "/create bug <title>", ["create-bug"]),
+        ("req", "/create req <title>", ["create-req", "create-requirement"]),
+    ]
+    assert by["user"]["aliases"] == ["user-add", "user-list"] and by["user"]["parts"] == []
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", PARTED)
+    capsys.readouterr()
+    assert main(["--project", str(p), "spec", "--json"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert schema_check.problems(listed, schema_check.load("commands")) == []
+    assert main(["--project", str(p), "spec", "create", "bug", "--json"]) == 0
+    one = json.loads(capsys.readouterr().out)
+    assert schema_check.problems(one, schema_check.load("command-spec")) == []
+    assert one["part"] == "bug" and one["text"] == spec(load(p), "create", "bug")
