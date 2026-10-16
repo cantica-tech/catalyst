@@ -30,7 +30,7 @@ from urllib.parse import unquote, urlparse
 import project_file
 from catalyst import version_string
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
-from catalyst.spec import SpecError, load_section4, spec_text, summary as _summary
+from catalyst.spec import SpecError, load_section4, procedure, summary as _summary
 
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 # where a client names the project when it does not start the server in it
@@ -237,15 +237,9 @@ class Server:
     def procedure(self, name: str, arguments: str, hint: str | None = None) -> str:
         dep, s = self.section4(hint)
         try:
-            text = spec_text(s, name, (arguments.split() or [None])[0])  # `/create item …` reads item's part
+            return procedure(s, name, arguments, dep.project_root)
         except SpecError as exc:
             raise RpcError(-32602, str(exc)) from exc
-        return (
-            f"Run the catalyst command /{name.lstrip('/')}"
-            + (f" with the arguments: {arguments}" if arguments else "")
-            + f", in the project at {dep.project_root}. Use the `catalyst` tool (or the `catalyst` CLI) for "
-            "every step the specification below gives to the CLI.\n\n" + text
-        )
 
     def prompts_get(self, params: dict) -> dict:
         name = str(params.get("name", ""))
