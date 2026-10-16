@@ -119,6 +119,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
 | `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--intent`, `--json`, `--tier`, `--title` |
 | `catalyst rename <id>` | a new title: heading, Name, Filename and file follow; the ID stays | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--title` |
+| `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--to` |
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
 | `catalyst user add <name> <role>` | register a user with a fresh userid and one role | `--as`, `--git-username`, `--intent`, `--json` |
@@ -815,7 +816,7 @@ Each refuses what its slash command refuses, writes, and journals one entry
   deployed module's `definitions/<type>/`; refuses a version that does not
   exist (INV-23).
 
-### Writing verbs: `new`, `status set`, `link`
+### Writing verbs: `new`, `status set`, `link`, `restore`
 
 The mechanical half of creating and changing artifacts, from the entity type
 definitions. Each signs (`--as`, else the only active user), keeps
@@ -839,6 +840,14 @@ back-references, regenerates the indexes and writes one journal entry
   Run again, it changes nothing.
 - `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
   when the field declares a back-reference, cite this artifact back.
+- `catalyst restore <ID> --to <timestamp|#N>`: write the entity's file back
+  as it stood after the last journal entry at or before the timestamp, or
+  after its `N`th change (`#1` is the first; exact when timestamps tie, as
+  `journal show --artifact <ID>` lists them). Its derived fields are then
+  recomputed from their sources. A new journaled change: no entry is
+  rewritten. Refused, saying why: a rule that shares its document with
+  other rules, no version at that time, a version redacted or no longer
+  held, a file already as it stood then.
 
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 

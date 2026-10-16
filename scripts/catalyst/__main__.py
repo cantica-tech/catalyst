@@ -331,7 +331,7 @@ def cmd_repair(args) -> int:
 
 
 def cmd_edit(args) -> int:
-    """Writing verbs (R2 W2): new, rename, status set, link."""
+    """Writing verbs (R2 W2): new, rename, restore, status set, link."""
     from catalyst import edit
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
@@ -369,6 +369,17 @@ def cmd_edit(args) -> int:
                 signer,
                 args.intent or [],
                 command=args.cmd or "catalyst rename",
+                tier=args.tier,
+            )
+        elif args.edit == "restore":
+            res = edit.restore(
+                dep,
+                corpus,
+                args.id,
+                args.to,
+                signer,
+                args.intent or [],
+                command=args.cmd or "catalyst restore",
                 tier=args.tier,
             )
         elif args.edit == "status":
@@ -1989,6 +2000,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="rename")
+
+    p = sub.add_parser("restore", help="write an entity back as it stood at a time: a new journaled change")
+    p.add_argument("id")
+    p.add_argument(
+        "--to",
+        required=True,
+        help="a journal timestamp (ISO; the version after the last entry at or before it), or #N (after its Nth change)",
+    )
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="restore")
 
     p = sub.add_parser("status", help="change an artifact's Status")
     st = p.add_subparsers(dest="status_command", required=True)

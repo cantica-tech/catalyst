@@ -209,6 +209,74 @@ def rename(
     return Result(item_id, path, touched)
 
 
+# --- restore --------------------------------------------------------------
+def restore(
+    dep: Deployment,
+    corpus: Corpus,
+    item_id: str,
+    when: str,
+    signer: dict,
+    intent: list[str],
+    command: str = "catalyst restore",
+    tier: str | None = None,
+) -> Result:
+    """Write an entity's file back as it stood at `when`: the content after
+    the last journal entry at or before that time, or after its Nth change
+    (`#N`, from 1, exact when timestamps tie); its derived fields are then
+    recomputed from their sources. A new journaled change,
+    never a rewrite: every entry stays as it was (L1). A rule kept in a
+    document with other rules is refused (its document holds them too)."""
+    from catalyst import history as entity_history, views
+
+    found = views.resolve(corpus, item_id)
+    if found is None:
+        raise EditError(f"no artifact or rule '{item_id}' in this deployment")
+    if found in corpus.rules and not corpus.rules[found][0].file.name.startswith(found):
+        raise EditError(f"{found} shares its rule document with other rules; restoring it would restore them too")
+    h = entity_history.history(dep, corpus, found)
+    if when.startswith("#"):  # the Nth change of its history: exact even when timestamps tie
+        n = int(when[1:]) if when[1:].isdigit() else 0
+        if not 1 <= n <= len(h["entries"]):
+            raise EditError(f"{found} has {len(h['entries'])} change(s) in its history; {when} is none of them")
+        version = h["entries"][n - 1]
+    else:
+        earlier = [e for e in h["entries"] if (e["timestamp"] or "") <= when]
+        if not earlier:
+            raise EditError(f"no version of {found} at {when}: its first journal entry is later")
+        version = earlier[-1]
+    if version["redacted"]:
+        raise EditError(f"the version of {found} at {when} was redacted; it cannot be restored")
+    if version["after"] is None:
+        raise EditError(f"{found}'s file did not exist at {when} (removed by the entry of {version['timestamp']})")
+    content = version["content_after"]
+    if content is None:
+        raise EditError(f"catalyst no longer holds the version of {found} at {when}")
+    path = dep.root / h["file"]
+    if path.is_file() and path.read_text(encoding="utf-8") == content:
+        raise EditError(f"{found} is already as it stood at {when}")
+    path.write_text(content, encoding="utf-8")
+    # derived fields come from their sources now, never from the old version
+    from catalyst import derived
+
+    for d in derived.drift(dep, load_corpus(dep)):
+        if d.art.id == found:
+            path.write_text(
+                set_or_add_field(path.read_text(encoding="utf-8"), d.field, _ticked(d.expected)), encoding="utf-8"
+            )
+    _finish(
+        dep,
+        command,
+        "update",
+        found,
+        [],
+        intent or [f"Restore {found} to its version of {version['timestamp']}"],
+        [path],
+        str(signer.get("git_username") or signer.get("name")),
+        tier,
+    )
+    return Result(found, path, [path])
+
+
 # --- new ------------------------------------------------------------------
 def new(
     dep: Deployment,
