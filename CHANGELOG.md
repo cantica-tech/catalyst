@@ -6,6 +6,23 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+Four steps an agent did by hand move into the CLI (roadmap R2's exit:
+at least 80% of command steps in code).
+
+- `catalyst rename <ID> --title "<title>"`: a new title; the heading,
+  `Name`, `Filename` and the file name follow, the ID never changes, the
+  indexes are regenerated and the move journaled.
+- `catalyst id next <PREFIX> --count N`: N consecutive IDs, each reserved,
+  for a batch of rows.
+- `catalyst journal restore <timestamp>` without a directory restores into
+  `journal-restore-<timestamp>` in the system's temporary directory,
+  outside the project.
+- `catalyst journal append` refuses a change whose tier needs an artifact
+  (`fix`, `feature`) when it names none: an `--artifact` ID or a
+  `--target`, as `trace` already asks of a commit.
+
 ## 0.70.0 — 2026-10-16
 
 Section 4 is the one command registry: the Taskfile is generated from it (R2). No layout change, no migration: `catalyst sync apply` rewrites the Taskfile.
