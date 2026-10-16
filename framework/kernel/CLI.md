@@ -658,7 +658,8 @@ the deployed version; `--base-kernel` names it otherwise.
   is not installed is refused. Without `--module`, the governing documents
   are recomposed with every installed module. A command file catalyst wrote
   but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
-  the sync before anything is written; a plugin catalog is never touched.
+  the sync before anything is written; a file no release ships is never
+  touched.
   The migrations' judgment steps stay with the agent. A criterion with its
   own runtime (`.venv`) has it brought to the vendored CLI, so the launcher
   and the hooks run the version just deployed.

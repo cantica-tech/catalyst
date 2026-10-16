@@ -58,11 +58,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   history before it is not checked for *unrecorded changes*. `catalyst
   init` sets it to `HEAD`; `""` means the whole history; absent, nothing is
   checked and `catalyst check` warns (`FORMAT.md` §1).
-- **catalyzer.** The plugin manager command `/catalyzer`, parked with the
-  plugins (roadmap R4.7).
 - **Chain, the.** The traceability path every piece of work must have:
-  module artifact → grounding type (a rule) → domain, extended upward
-  through work items when a project-management plugin is active (INV-5).
+  module artifact → grounding type (a rule) → domain (INV-5).
 - **Closed-incomplete.** A `catalyst validate` error: an artifact whose
   status is one of its workflow's closed states still has a field its ETD
   marks `required_when_closed` empty (`CLI.md`,
@@ -126,10 +123,10 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 - **Pin.** Keeping every journaled blob reachable under
   `refs/catalyst/journal`, so `git gc` never prunes the history
   point-in-time restore needs (`catalyst journal pin`, `CLI.md`).
-- **Plugin.** Optional capability in its own repository, loaded only once
-  activated through `/catalyzer`: *background* (watches a deployed
-  project) or *content-contributing* (adds artifact types or commands)
-  (INV-10–INV-13, INV-22).
+- **Plugin.** Retired with the plugin system (ADR-022): modules contribute
+  types and commands; an extension such as `catalyst-git` lives in its own
+  repository and is not loaded by catalyst. INV-10–INV-13 and INV-22 are
+  retired.
 - **Prefix.** Either a rule document's short lowercase ID prefix (`br` in
   `br-AUTH-000003-Ab3xR9pQ`), or an entity type's uppercase ID prefix
   (`ITEM` in `ITEM-000012-Ab3xR9pQ`). Case tells them apart.

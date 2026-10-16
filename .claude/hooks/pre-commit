@@ -3,4 +3,4 @@
 # CI (deployment-rules.yml) is the unbypassable version; --no-verify skips this.
 set -euo pipefail
 python3 scripts/check_deployment.py
-python3 scripts/check_plugin_contracts.py
+python3 scripts/check_command_parity.py

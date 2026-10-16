@@ -4,8 +4,7 @@
 This is the enforcement layer of the anti-drift architecture: the invariants an
 agent is asked to uphold (INV-5..INV-8, INV-16, INV-17, INV-23, INV-24,
 INV-26) are re-checked here deterministically, so they hold every time
-regardless of what any agent or human did. Mirrors the existing
-scripts/check_plugins.py pattern.
+regardless of what any agent or human did.
 
 Module-agnostic: entity folders, index names and definition types come from
 the kernel's own entity types (framework/kernel/entities/) plus the ETDs of

@@ -1,4 +1,0 @@
-[submodule "plugins/repository/catalyst-git"]
-	path = framework/kernel/plugins/repository/catalyst-git
-	url = https://github.com/oliben67/catalyst-git
-	branch = development

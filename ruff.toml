@@ -1,7 +1,7 @@
 # Ruff: the cantica-tech standard (.standards/, synced — never edit there) plus this repository's own settings.
 extend = ".standards/ruff.toml"
 src = ["scripts", "tests"]
-extend-exclude = ["framework/kernel/plugins/repository/*"]   # plugin submodules: their own repositories   # catalyst's own modules: catalyst, project_file, module_loader, the test helpers
+# catalyst's own modules: catalyst, project_file, module_loader, the test helpers
 
 # Ratchet (2026-10-09, standards v0.1.0): violations that predate the standard, per file. Remove an entry
 # when its file is fixed; never add one for new code.
