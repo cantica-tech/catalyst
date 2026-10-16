@@ -46,7 +46,7 @@ it stood. The terms used here are defined in the
 The framework is the **kernel** plus one **process module** per deployment.
 The kernel is process-agnostic: it owns rules and domains, reconciliation
 cases (`RECON-`), workflows (`WORKFLOW-`), users and roles, the
-journal, repoed sync, plugins, and entity definitions as a mechanism. The
+journal, repoed sync, and entity definitions as a mechanism. The
 active module adds its development-artifact types — their templates,
 definitions, commands, meta-rules, invariants and migrations — and is named
 by the `module` field of the project's `<app-name>.catalyst` pointer. Each
@@ -69,9 +69,9 @@ Rules          (prefix)-(DOMAIN)-(NNNNNN)-(userid)      (documented behavior)
 Rules of rules   the meta-rules governing all of the above
 ```
 
-The work-items layer is optional, plugin-provided content, not core — see
-"Extensible via plugins" below. Without one active, the chain starts one
-layer down: dev artifacts trace straight to a rule.
+The work-items layer is optional: a module declares work items as its own
+types when its process needs them. Without them, the chain starts one layer
+down: dev artifacts trace straight to a rule.
 
 The chain's one invariant: **no work happens without a traceable link down to a
 documented rule** — an active-module artifact grounds to the module's
@@ -169,20 +169,14 @@ deployed into other projects: it only ever exists in catalyst's own repo,
 for verifying catalyst's own rules against catalyst's own actual state,
 never as something an ordinary deployment carries around.
 
-## Extensible via plugins
+## Extensible through modules
 
-Plugins add ongoing capability without touching the kernel — each
-lives in its own repository (never this one, with one exception: schemas
-and plugins still maturing live under `plugins/_prototyping/` until they
-graduate out), is gated behind explicit activation (parked for now, roadmap R4.7), and
-operates on the *deployed* project, never on catalyst itself. Two shapes
-exist: **background** plugins that continuously watch a deployed
-project — `catalyst-git`, the first one, surfacing rule breaks as they
-happen — and **content-contributing** plugins that add whole artifact
-types to a deployment on activation. Work-item tracking (`EPIC`/`STORY`/
-`TASK`/`SPIKE`/`SPRINT`) is the first of the latter kind: currently
-schema-only, in `plugins/_prototyping/project-management/agile/`, with
-no concrete, activatable plugin yet.
+New capability comes as a module: its types, templates, commands and
+rules as data, several modules per deployment (`catalyst module install`).
+The plugin system that came before is retired (ADR-022). `catalyst-git`,
+which watches a deployed project and surfaces rule breaks as they happen,
+remains an optional extension in its own repository; catalyst does not
+load it.
 
 ## Getting started
 

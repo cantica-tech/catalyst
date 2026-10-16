@@ -9,11 +9,9 @@ This folder contains the reusable document templates that seed the deployed cata
   referenced from its `module.yaml`; `MODULE-SPECIFICATION.md` §2–§3) and
   they are deployed alongside the kernel's. This folder holds only the
   kernel's own templates, such as [`rule.template.md`](rule.template.md).
-- **Work-item templates are not here anymore.** They moved to
-  `plugins/_prototyping/project-management/agile/templates/` — `work-items/`
-  is plugin-territory, not core (`Rules-of-Rules.md` §8, INV-22); see
-  that directory's own `README.md`. `workflow.template.md` is the one
-  exception — it moved back here, see below.
+- **Work-item templates are not here.** Work items are a module's types
+  when it declares them (ADR-022); the module ships their templates.
+  `workflow.template.md` is a kernel type and stays here, see below.
 - Rule and domain scaffolding templates used when a project is instantiated
   — `domain.template.md` deploys nested under `rules/domains/`, not as a
   top-level sibling (domains exist only to group rules).

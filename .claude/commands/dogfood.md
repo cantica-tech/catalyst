@@ -17,8 +17,7 @@ verifying catalyst's own rules against catalyst's own actual state.
    The literal token `recreate` additionally runs step 3's recreation
    drift check. Anything else — ask for clarification rather than
    guessing a mode.
-2. Run `scripts/check_deployment.py`/`scripts/check_plugins.py`/
-   `scripts/check_plugin_contracts.py`/`scripts/check_command_parity.py`
+2. Run `scripts/check_deployment.py`/`scripts/check_command_parity.py`
    and the pytest suite against catalyst's criterion (`catalyst where`) — the structural half of
    `/check-rules`. Always runs, regardless of `$ARGUMENTS`.
 3. **Only when `recreate` was given** — the recreation drift check

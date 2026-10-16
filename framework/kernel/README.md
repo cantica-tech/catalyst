@@ -28,7 +28,7 @@ and the `catalyst` CLI works from any shell, untested. Terms are defined in
 A four-layer chain, each layer subordinate to the one below it:
 
 ```
-Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer, plugin)
+Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer, a module's types)
                         │
                         ▼
 Dev artifacts     <PREFIX>-NNNNNN / TAG-               (the active module's grounded work and lightweight annotations)
@@ -69,8 +69,7 @@ control — see `Rules-of-Rules.md` §11.
 Every artifact-type directory follows the same shape — a versioned,
 catalogued `templates/` subdirectory and its own `README.md`
 (`INVARIANTS.md` INV-20, `Rules-of-Rules.md` §15) — including `boards/`
-and `workflows/` (optional, per agile flavor) and a `tickets/` slot
-reserved for plugin population rather than a core-defined type.
+and `workflows/` (optional, per agile flavor).
 
 Every rule-linked change also appends one entry to the journal
 (`development/journal/`), an append-only, transaction-log-grade
@@ -112,13 +111,10 @@ own repository — it's never part of what a deployed project carries.
 
 - [`templates/README.md`](templates/README.md) — explains the purpose of the reusable template library and how the templates map to the framework's artifact and workflow layers.
 
-## Agile-methodology agnostic (plugin-territory)
+## Agile-methodology agnostic
 
-`work-items/` isn't core anymore (`Rules-of-Rules.md` §8, INV-22) — it
-only exists once a project-management-type plugin extending the schema
-at `plugins/_prototyping/project-management/agile/` (this repository)
-is activated. That schema defaults to Scrum vocabulary (epic/story/task/
-spike/sprint) because it's the most widely recognized, but nothing below
+Work items are not core: a module declares them as its own types when its
+process needs them (ADR-022). Whatever vocabulary it uses, nothing below
 the work-items layer cares which agile flavor sits on top of it:
 
 - **Scrum**: use `SPRINT-NNN` as written — time-boxed, committed items,

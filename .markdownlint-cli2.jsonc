@@ -8,5 +8,5 @@
     "MD001": false, // 1 heading level jump
     "MD026": false  // 1 heading ending in a full stop (ACCESS-CONTROL.md, cited by name)
   },
-  "ignores": ["**/node_modules/**", "what-is-going-on/**", "framework/kernel/plugins/repository/**"]
+  "ignores": ["**/node_modules/**", "what-is-going-on/**"]
 }

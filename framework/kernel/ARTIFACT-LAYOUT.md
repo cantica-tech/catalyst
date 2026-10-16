@@ -95,9 +95,6 @@ the surrounding deploy-procedure text.
             templates/                   # Document markdown templates
             commands/                    # Module slash commands (.md)
             skills/                      # Agent skills exported by module
-    plugins/                             # unaffected by INV-20 — a plugin owns its own layout
-        <type>/
-            [...]
     development/
         <folder>/                        # active-module entity types whose ETD stores them under development/
             templates/ ...               # same shape as a top-level <folder>/
@@ -114,8 +111,9 @@ Entity Type Definitions (`MODULE-SPECIFICATION.md` §4); every one of them
 follows the same INV-20 shape. A module may also deploy generated,
 non-artifact files of its own (see its `INVARIANTS.module.md`).
 
-`work-items/` is **not** part of this core tree — see "Optional,
-plugin-provided: `work-items/`" below.
+Work items (epics, stories, tasks) are not part of this core tree: a
+module declares them as its own types when its process needs them
+(ADR-022).
 
 ## Exceptions to the pattern
 
@@ -132,47 +130,6 @@ that has one:
 - `rules/Rules-of-Rules.md` — the document that *governs* an artifact
   type, sibling to its `templates/` and instance catalog, not an
   instance itself.
-- `plugins/` — a plugin's own repository owns its internal structure;
-  INV-20 does not reach into it.
-
-## Optional, plugin-provided: `work-items/`
-
-Unlike everything above, `work-items/` is never part of a fresh
-deployment by default (`Rules-of-Rules.md` §8, INV-22) — it only exists
-once a project-management-type plugin extending
-`plugins/_prototyping/project-management/agile/`'s schema is activated.
-When one is, the shape it deploys is the same INV-20 pattern as every
-core type:
-
-```
-    work-items/
-        boards/                          # Kanban/Scrumban flavor only
-            templates/
-                README.md
-                templates-board.md
-                TEMPLATE-BOARD-v1.md
-                ...
-            README.md
-            boards.md
-            [...]
-        epics/
-            templates/ ...
-            README.md
-            epics.md
-            [...]
-        spikes/, sprints/ (Scrum flavor only), stories/, tasks/  # same shape
-        tickets/                         # no templates/ — no core semantics (§8)
-        README.md
-        rules-of-work-items.md           # governs this type, siblings to its templates/
-```
-
-Exactly which of `boards/`/`epics/`/`spikes/`/`sprints/`/`stories/`/
-`tasks/`/`tickets/` actually deploys, and their template
-content, is that plugin's own `working-contract.md` `## Contributes`
-section — this tree is illustrative of the shape, not a guarantee any
-given plugin deploys all of it. No concrete plugin exists yet.
-(`WORKFLOW-`/`workflows/` used to be part of this schema too — it's
-core now, always present, see the top-level tree above.)
 
 ## See also
 
