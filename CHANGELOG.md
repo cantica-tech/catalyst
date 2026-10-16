@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.77.0 — 2026-10-17
+
+An entity's earlier version written back as a new journaled change (`catalyst restore`); the design notes, the roadmap and the decisions log move into `docs/`. No layout change, no migration.
 
 - `catalyst restore <ID> --to <timestamp|#N>` writes an entity's earlier
   version back as a new journaled change, never a rewrite: the version after
