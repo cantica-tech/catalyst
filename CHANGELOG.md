@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- The laws brief that every session loads is tightened, wording only, from
+  785 tokens to 634 (the target is 700): every law keeps its
+  obligation; lists the law's own sentence already implies, and the
+  intro's pointer to the format documents, are gone. The token baseline is
+  rewritten to hold it.
+
 ## 0.75.1 — 2026-10-16
 
 The install documents cut to the judgment `catalyst init` leaves to the agent. No layout change, no migration.
