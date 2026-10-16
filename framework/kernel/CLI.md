@@ -1172,7 +1172,8 @@ criterion the same way, served or not. It listens on 127.0.0.1 only, on a
 port the system picks unless `--port` names one, and prints one JSON line,
 `{"url", "token", "pid"}`; the token is made for the run and never stored.
 The read endpoints and `events` answer as on a server, `GET check` returns
-`catalyst check --json`, and `push`, `have`, `changes` and `blobs` answer
+`catalyst check --json`, `GET head` adds what the deployment runs (`kernel`,
+`modules` with their versions, and `catalyst`, the version serving it), and `push`, `have`, `changes` and `blobs` answer
 405. Its batch is a change counter: it moves when a criterion file changes
 (checked every second), and `events` sends it.
 
