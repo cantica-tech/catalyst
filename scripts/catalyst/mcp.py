@@ -30,7 +30,7 @@ from urllib.parse import unquote, urlparse
 import project_file
 from catalyst import version_string
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
-from catalyst.spec import SpecError, load_section4, spec_text
+from catalyst.spec import SpecError, load_section4, spec_text, summary as _summary
 
 PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 # where a client names the project when it does not start the server in it
@@ -88,13 +88,6 @@ TOOLS = [
         },
     },
 ]
-
-
-def _summary(bullets: list[str]) -> str:
-    """A command's one-line description: its §4 bullet, after the dash."""
-    first = " ".join(line.strip() for line in bullets[0].splitlines()) if bullets else ""
-    text = first.split("—", 1)[1].strip() if "—" in first else first.lstrip("- ")
-    return text if len(text) <= 300 else text[:297].rstrip() + "..."
 
 
 def _path_of(uri: str) -> Path | None:

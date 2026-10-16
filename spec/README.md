@@ -16,6 +16,8 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `graph.schema.json` | `catalyst graph --json` | `GET /v1/graph` |
 | `journal.schema.json` | `catalyst journal show --json` | `GET /v1/journal` |
 | `check.schema.json` | `catalyst check --json` | `GET /v1/check` (local mode) |
+| `commands.schema.json` | `catalyst spec --json` | `GET /v1/commands` |
+| `command-spec.schema.json` | `catalyst spec <command> [<part>] --json` | `GET /v1/spec/<command>[/<part>]` |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`).
