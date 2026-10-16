@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.75.1 — 2026-10-16
+
+The install documents cut to the judgment `catalyst init` leaves to the agent. No layout change, no migration.
 
 - The install documents keep only the judgment `catalyst init` leaves to the
   agent: `INSTANTIATION-GUIDE.md` from 21.6 KB to 5.3 KB, its checklist from
