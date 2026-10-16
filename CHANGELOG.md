@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.74.0 — 2026-10-16
+
+The local head says what the deployment runs (R6.5). No layout change, no migration.
 
 - `GET /v1/head` of `catalyst serve --local` adds what the deployment runs:
   `kernel`, `modules` (each `id` and `version`) and `catalyst`, the version
