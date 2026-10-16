@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.73.0 — 2026-10-16
+
+What an entity page shows: an artifact's sections and next states, a type's transitions, guards and sections (R6.7). No layout change, no migration.
 
 - What an entity page shows (roadmap R6.7): `catalyst view <id> --json` and
   `GET /v1/view/<id>` give an artifact's `sections` (each heading and its
