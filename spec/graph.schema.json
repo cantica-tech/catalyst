@@ -224,7 +224,10 @@
         "fields",
         "states",
         "initial",
-        "closed_states"
+        "closed_states",
+        "transitions",
+        "guards",
+        "sections"
       ],
       "properties": {
         "name": {
@@ -298,6 +301,56 @@
         },
         "closed_states": {
           "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "description": "The moves its workflow allows; none means any state may follow any other.",
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "guards": {
+          "type": "object",
+          "description": "State → the conditions entering it requires (`children_closed`, `nonempty` with a field, `section_written` with a heading).",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "condition",
+                "argument"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "condition": {
+                  "type": "string"
+                },
+                "argument": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "description": "The headings a new artifact of the type carries.",
           "items": {
             "type": "string"
           }

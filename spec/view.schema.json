@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/cantica-tech/catalyst/spec/view.schema.json",
   "title": "catalyst view",
-  "description": "What `catalyst view <id> --json` prints and `GET /v1/view/<id>` returns: one artifact or rule, what it links to (`links`), what links to it (`linked_from`: the entity and its field), and the journal entries labelled with it or targeting it.",
+  "description": "What `catalyst view <id> --json` prints and `GET /v1/view/<id>` returns: one artifact or rule, what it links to (`links`), what links to it (`linked_from`: the entity and its field), the journal entries labelled with it or targeting it, and for an artifact its sections and the states it may move to.",
   "anyOf": [
     {
       "$ref": "#/$defs/artifact"
@@ -21,7 +21,9 @@
         "file",
         "links",
         "linked_from",
-        "journal"
+        "journal",
+        "sections",
+        "next"
       ],
       "description": "An artifact: its ID, its type's prefix, its title, its file in the criterion, then each field of its document by name, as written (the module's fields, never listed here).",
       "properties": {
@@ -109,6 +111,49 @@
                   "string",
                   "null"
                 ],
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "description": "The document's `## ` sections in order: each heading and its text as written.",
+          "items": {
+            "type": "object",
+            "required": [
+              "heading",
+              "text"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "heading": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "next": {
+          "type": "array",
+          "description": "The states the artifact may move to from its own (its type's transitions, or every other state when it declares none), each with what its guards say blocks it now; `catalyst status set` refuses a blocked one without `--force`.",
+          "items": {
+            "type": "object",
+            "required": [
+              "state",
+              "blocked_by"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "type": "string"
+              },
+              "blocked_by": {
+                "type": "array",
                 "items": {
                   "type": "string"
                 }
