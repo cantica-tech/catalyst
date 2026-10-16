@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `GET /v1/head` of `catalyst serve --local` adds what the deployment runs:
+  `kernel`, `modules` (each `id` and `version`) and `catalyst`, the version
+  serving it — so a client sees a deployment behind the catalyst it is read
+  with (roadmap R6.5).
+
 ## 0.73.0 — 2026-10-16
 
 What an entity page shows: an artifact's sections and next states, a type's transitions, guards and sections (R6.7). No layout change, no migration.

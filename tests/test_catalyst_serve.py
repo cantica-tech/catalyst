@@ -411,6 +411,17 @@ def test_local_mode_answers_like_the_cli_and_refuses_writes(local, capsys):
     assert err.value.status == 401
 
 
+def test_local_head_says_what_the_deployment_runs(local):
+    """R6.5: a client sees a deployment behind the catalyst it reads it with."""
+    from catalyst import __version__
+
+    project, _, client = local
+    head = client.call("GET", "/head")
+    assert head["kernel"] == (project / ".criterion" / "version.txt").read_text(encoding="utf-8").strip()
+    assert head["modules"] == [{"id": "example-process", "version": head["modules"][0]["version"]}]
+    assert head["catalyst"] == __version__ and isinstance(head["seq"], int)
+
+
 def test_local_mode_follows_the_criterion_and_says_so(local):
     import time
     import urllib.request
