@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.71.0 — 2026-10-16
+
+Four steps an agent did by hand move into the CLI (R2's exit): `catalyst rename`, `id next --count`, a default `journal restore` directory, and a tier that needs an artifact names one. No layout change, no migration.
 
 Four steps an agent did by hand move into the CLI (roadmap R2's exit:
 at least 80% of command steps in code).
