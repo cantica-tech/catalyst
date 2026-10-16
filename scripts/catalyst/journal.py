@@ -499,6 +499,9 @@ def pin(repo: Path, shas: set[str]) -> int:
 
 
 # --- append --------------------------------------------------------------
+ARTIFACT_ID_RE = re.compile(r"\b[A-Za-z]+(?:-[A-Z]+)?-\d{3,6}\b")  # REQ-000001, br-AUTH-000001, RECON-000002
+
+
 @dataclass
 class AppendRequest:
     command: str
@@ -520,19 +523,27 @@ def head_blob(repo: Path, rel: str) -> str | None:
 
 def append(dep: Deployment, req: AppendRequest) -> dict:
     _validate(req)
-    check_tier(dep, req.tier)
+    check_tier(dep, req.tier, req)
     with journal_lock(dep):
         return _append(dep, req)
 
 
-def check_tier(dep: Deployment, tier: str | None) -> None:
-    """The tier is one the active module declares (rr-META-006)."""
+def check_tier(dep: Deployment, tier: str | None, req: AppendRequest | None = None) -> None:
+    """The tier is one the active module declares (rr-META-006), and a change
+    whose tier needs an artifact names one: its artifact is an ID, or it
+    targets one (what `trace` asks of a commit, asked of the entry too)."""
     from catalyst import tiers
 
     try:
         tiers.check(dep, tier)
     except ValueError as exc:
         raise JournalError(str(exc)) from None
+    needs = next((t for t in tiers.tiers_for(dep) if t.id == tier and t.needs_artifact), None)
+    if needs is not None and req is not None and not (req.targets or ARTIFACT_ID_RE.search(req.artifact)):
+        raise JournalError(
+            f"a {tier} change serves an artifact: give --artifact <ID> or --target <ID> "
+            f"(a change that needs none is --tier {', '.join(t.id for t in tiers.tiers_for(dep) if not t.needs_artifact) or 'chore'})"
+        )
 
 
 def _validate(req: AppendRequest) -> None:

@@ -393,3 +393,30 @@ def test_revisions_and_object_ids_never_reach_git_as_options():
     assert j.revisions(["A..B", "^c"]) == ["A..B", "^c"]
     assert j.object_id("a" * 40) and not j.object_id("--batch") and not j.object_id("A" * 40)
     assert not j.blob_exists(Path(), "-p")
+
+
+def test_restore_defaults_to_a_side_directory_outside_the_project(project, tmp_path, monkeypatch, capsys):
+    import tempfile
+
+    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    dep = load(project)
+    path = ".criterion/items/ITEM-000001-first-item.md"
+    item(project).write_text("version one\n", encoding="utf-8")
+    j.append(dep, req([path], timestamp="2026-05-01T00:00:00Z"))
+    assert main(["journal", "restore", "2026-05-02T00:00:00Z"]) == 0
+    side = tmp_path / "tmp" / "journal-restore-20260502T000000Z"
+    assert str(side) in capsys.readouterr().out
+    assert (side / path).read_text(encoding="utf-8") == "version one\n"
+
+
+def test_a_change_whose_tier_needs_an_artifact_names_one(project):
+    dep = load(project)
+    path = ".criterion/items/ITEM-000001-first-item.md"
+    item(project).write_text("changed\n", encoding="utf-8")
+    with pytest.raises(j.JournalError, match="a fix change serves an artifact"):
+        j.append(dep, req([path], artifact="a cleanup", targets=[], tier="fix"))
+    j.append(dep, req([path], artifact=f"ITEM-000001-{USERID}", targets=[], tier="fix"))  # an artifact ID
+    item(project).write_text("changed again\n", encoding="utf-8")
+    j.append(dep, req([path], artifact="a cleanup", tier="feature"))  # it targets a rule
+    item(project).write_text("changed a third time\n", encoding="utf-8")
+    j.append(dep, req([path], artifact="a cleanup", targets=[], tier="chore"))  # needs none

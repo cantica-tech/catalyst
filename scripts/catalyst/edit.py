@@ -10,6 +10,7 @@ whether a change should happen at all.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import re
 from dataclasses import dataclass, field
@@ -161,6 +162,51 @@ def _finish(
             tier=tier,
         ),
     )
+
+
+# --- rename ---------------------------------------------------------------
+def rename(
+    dep: Deployment,
+    corpus: Corpus,
+    item_id: str,
+    title: str,
+    signer: dict,
+    intent: list[str],
+    command: str = "catalyst rename",
+    tier: str | None = None,
+) -> Result:
+    """A new title for an artifact: its heading, `Name`, `Filename` and file
+    name follow (L7: the ID never changes). References cite the ID, so none
+    is rewritten; the indexes are regenerated and the move journaled."""
+    art = _artifact(corpus, item_id)
+    old = art.file
+    prefix, number = item_id.split("-")[:2]
+    name = slug(title)
+    path = old.parent / f"{prefix}-{number}-{name}.md"
+    if path != old and path.exists():
+        raise EditError(f"{path} already exists")
+    text = old.read_text(encoding="utf-8")
+    text = re.sub(r"^#\s+.*$", f"# `{item_id}` — {title}", text, count=1, flags=re.M)
+    for field_name, value in (("Name", f"`{name}`"), ("Filename", f"`{path.name}`")):
+        with contextlib.suppress(EditError):  # a type without the field
+            text = set_field(text, field_name, value)
+    path.write_text(text, encoding="utf-8")
+    touched = [path]
+    if path != old:
+        old.unlink()
+        touched.append(old)
+    _finish(
+        dep,
+        command,
+        "update",
+        item_id,
+        [],
+        intent or [f"Rename {item_id}: {title}"],
+        touched,
+        str(signer.get("git_username") or signer.get("name")),
+        tier,
+    )
+    return Result(item_id, path, touched)
 
 
 # --- new ------------------------------------------------------------------
