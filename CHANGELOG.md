@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `catalyst restore <ID> --to <timestamp|#N>` writes an entity's earlier
+  version back as a new journaled change, never a rewrite: the version after
+  the last entry at or before a time, or after its `N`th change. Its derived
+  fields are recomputed from their sources. A rule that shares its document,
+  a version redacted or no longer held, and a file already at that version
+  are refused with the reason.
+
 ## 0.76.0 — 2026-10-16
 
 A command dispatched to the project's agent with its output streamed and its cost (R5.5), and a rule's view with the rule itself (R6.14). No layout change, no migration.
