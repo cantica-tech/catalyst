@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.75.2 — 2026-10-16
+
+The laws brief every session loads, tightened under its target, wording only. No layout change, no migration.
 
 - The laws brief that every session loads is tightened, wording only, from
   785 tokens to 634 (the target is 700): every law keeps its
