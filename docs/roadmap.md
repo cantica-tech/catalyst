@@ -213,7 +213,7 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | A served page: `serve --local --static <dir>` | done, 0.64.0 |
 | Runs: `catalyst agent run --json`, started by a UI's host after the person confirms; no `serve` route starts one | done, 0.76.0 (R5.5) |
 | Writes: a UI's host runs catalyst's own verbs after the person confirms (owner decision W1, recorded with the UI); no `serve` route writes | the verbs exist; each needs `--json` output where it lacks one |
-| `catalyst restore <id> --to <timestamp>`: an earlier version written back as a new journaled change | open |
+| `catalyst restore <id> --to <timestamp|#N>`: an earlier version written back as a new journaled change, its derived fields recomputed | done, 0.77.0 (REQ-000049) |
 | `check --json` names the entity of each finding, so a UI can mark drift where it shows the entity | open |
 | Coverage counts (rules with targeting work, linked tests) in `backlog` or `graph` | open |
 | A run log kept by `agent run` (who, command, ok, usage, cost), for run history and a cost meter | open |
