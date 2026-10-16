@@ -243,3 +243,12 @@ def test_the_lock_waits_while_windows_reports_it_delete_pending(tmp_path, monkey
     with ids.id_lock(dep, wait=5):
         pass
     assert len(calls) == 2
+
+
+def test_cli_count_reserves_consecutive_ids(tmp_path, capsys):
+    project = make_project(tmp_path)
+    assert main(["--project", str(project), "id", "next", "SUB", "--count", "3"]) == 0
+    assert capsys.readouterr().out.split() == [f"SUB-00000{n}-{USERID}" for n in (2, 3, 4)]
+    assert main(["--project", str(project), "id", "next", "SUB"]) == 0
+    assert capsys.readouterr().out.strip() == f"SUB-000005-{USERID}"  # the three stay reserved
+    assert main(["--project", str(project), "id", "next", "SUB", "--count", "0"]) == 2

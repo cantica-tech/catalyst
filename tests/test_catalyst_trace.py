@@ -89,7 +89,7 @@ def test_report_counts_actors_tiers_and_traced_commits(project):
         j.AppendRequest(
             command="/create-item",
             action="create",
-            artifact="x",
+            artifact=f"ITEM-000001-{USERID}",
             targets=[],
             intent=["x"],
             files=["src/a.py"],

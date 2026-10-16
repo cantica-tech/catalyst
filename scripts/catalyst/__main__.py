@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -61,7 +62,11 @@ def cmd_id(args) -> int:
     signer = resolve_signer(dep, corpus, args.as_user)
     # reserved under the ID lock: parallel callers never get the same ID
     if args.id_command == "next":
-        print(next_entity_id(dep, corpus, args.prefix, signer, reserve=True))
+        if args.count < 1:
+            print("catalyst: --count must be at least 1", file=sys.stderr)
+            return 2
+        for _ in range(args.count):  # consecutive IDs, each reserved: a batch of rows, never guessed
+            print(next_entity_id(dep, corpus, args.prefix, signer, reserve=True))
     else:
         print(next_rule_id(dep, corpus, args.doc_prefix, args.domain, signer, reserve=True))
     return 0
@@ -179,8 +184,12 @@ def cmd_journal(args) -> int:
             )
         return 1 if failing else 0
     if args.journal_command == "restore":
-        restored, missing = j.restore(dep, args.timestamp, args.out)
-        print(f"restored {len(restored)} file(s) as of {args.timestamp} into {args.out}")
+        import tempfile
+
+        # outside the project by default, never over the working tree
+        out = args.out or Path(tempfile.gettempdir()) / f"journal-restore-{re.sub(r'[^0-9A-Za-z]', '', args.timestamp)}"
+        restored, missing = j.restore(dep, args.timestamp, out)
+        print(f"restored {len(restored)} file(s) as of {args.timestamp} into {out}")
         for path in missing:
             print(f"  missing blob: {path}")
         return 1 if missing else 0
@@ -322,7 +331,7 @@ def cmd_repair(args) -> int:
 
 
 def cmd_edit(args) -> int:
-    """Writing verbs (R2 W2): new, status set, link."""
+    """Writing verbs (R2 W2): new, rename, status set, link."""
     from catalyst import edit
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
@@ -349,6 +358,17 @@ def cmd_edit(args) -> int:
                 signer,
                 args.intent or [],
                 command=args.cmd or "catalyst new",
+                tier=args.tier,
+            )
+        elif args.edit == "rename":
+            res = edit.rename(
+                dep,
+                corpus,
+                args.id,
+                args.title,
+                signer,
+                args.intent or [],
+                command=args.cmd or "catalyst rename",
                 tier=args.tier,
             )
         elif args.edit == "status":
@@ -1794,6 +1814,7 @@ def build_parser() -> argparse.ArgumentParser:
     ids = p.add_subparsers(dest="id_command", required=True)
     q = ids.add_parser("next", help="next <PREFIX>-NNNNNN-<userid> for an entity type")
     q.add_argument("prefix", help="entity type prefix, e.g. RECON or a module's type")
+    q.add_argument("--count", type=int, default=1, help="that many consecutive IDs, one per line")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.set_defaults(func=cmd_id)
     q = ids.add_parser("next-rule", help="next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID")
@@ -1835,7 +1856,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("restore", help="materialise journaled files as of a timestamp")
     q.add_argument("timestamp", help="ISO 8601 UTC, e.g. 2026-09-27T18:00:00Z")
-    q.add_argument("out", type=Path, help="side directory (must be empty or absent)")
+    q.add_argument(
+        "out",
+        type=Path,
+        nargs="?",
+        help="side directory, empty or absent (default: journal-restore-<timestamp> in TMPDIR)",
+    )
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("show", help="read-only: journal entries, filtered, in time order")
     q.add_argument("--since", help="only entries from this date/time on (ISO 8601)")
@@ -1912,6 +1938,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="new")
+
+    p = sub.add_parser("rename", help="a new title: heading, Name, Filename and file follow; the ID stays")
+    p.add_argument("id")
+    p.add_argument("--title", required=True)
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="rename")
 
     p = sub.add_parser("status", help="change an artifact's Status")
     st = p.add_subparsers(dest="status_command", required=True)

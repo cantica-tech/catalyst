@@ -187,3 +187,24 @@ def test_a_slug_never_ends_in_a_bare_number():
     )
     assert edit.slug("Upgrade to Python 3 11") == "upgrade-to-python"
     assert edit.slug("2026") == "item"
+
+
+def test_rename_moves_the_file_and_its_fields_never_the_id(tmp_path, capsys):
+    project = _project(tmp_path)
+    dep, corpus = _state(project)
+    res = edit.new(dep, corpus, "items", "First draft 2", {"Targets": RULE, "Domain": "AUTH"}, _signer(corpus), [])
+    assert res.file.name == f"{res.id.rsplit('-', 1)[0]}-first-draft.md"  # never a bare number at the end
+    assert main(["--project", str(project), "rename", res.id, "--title", "The export drops a row"]) == 0
+    capsys.readouterr()
+    moved = res.file.parent / f"{res.id.rsplit('-', 1)[0]}-the-export-drops-a-row.md"
+    assert not res.file.exists() and moved.is_file()
+    text = moved.read_text(encoding="utf-8")
+    assert text.startswith(f"# `{res.id}` — The export drops a row")
+    assert "| **Name** | `the-export-drops-a-row` |" in text and f"| **Filename** | `{moved.name}` |" in text
+    assert moved.name in (project / ".criterion" / "items" / "items.md").read_text(encoding="utf-8")
+    last = journal_entries(project / ".criterion")[-1]
+    assert last["artifact"] == res.id and last["action"] == "update"
+    assert {f["path"].rsplit("/", 1)[-1] for f in last["files"]} >= {res.file.name, moved.name}
+    dep, corpus = _state(project)
+    assert not [f for f in validate(dep, corpus) if f.level == ERROR]
+    assert main(["--project", str(project), "rename", "ITEM-999999", "--title", "x"]) == 1
