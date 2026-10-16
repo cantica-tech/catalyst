@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.76.0 — 2026-10-16
+
+A command dispatched to the project's agent with its output streamed and its cost (R5.5), and a rule's view with the rule itself (R6.14). No layout change, no migration.
 
 - `catalyst agent run <command> [<arguments>…]` dispatches a command to the
   project's agent, non-interactively, from the project's root, and streams
