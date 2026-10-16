@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.72.0 — 2026-10-16
+
+The plugin system is removed from the kernel (R4.7, ADR-022). No layout change, no migration.
 
 - The plugin system is removed from the kernel (roadmap R4.7, ADR-022):
   `framework/kernel/plugins/` (the catalog, the activation checklist, the
