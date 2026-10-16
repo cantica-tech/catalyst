@@ -178,6 +178,19 @@ def spec_text(s: Section4, command: str, part: str | None = None) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+def procedure(s: Section4, name: str, arguments: str, project_root) -> str:
+    """What an agent is given to run a command: the command and its
+    arguments, where, and its spec (`/create item …` reads item's part).
+    The MCP server's prompts and `catalyst agent run` send the same text."""
+    text = spec_text(s, name, (arguments.split() or [None])[0])
+    return (
+        f"Run the catalyst command /{name.lstrip('/')}"
+        + (f" with the arguments: {arguments}" if arguments else "")
+        + f", in the project at {project_root}. Use the `catalyst` tool (or the `catalyst` CLI) for "
+        "every step the specification below gives to the CLI.\n\n" + text
+    )
+
+
 def spec(dep: Deployment, command: str, part: str | None = None) -> str:
     return spec_text(load_section4(dep), command, part)
 

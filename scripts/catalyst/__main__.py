@@ -760,6 +760,39 @@ def cmd_agent(args) -> int:
         return 1
 
 
+def cmd_agent_run(args) -> int:
+    """`agent run <command> [args]` (R5.5): the command's procedure sent to the
+    project's agent from the project's root; its events streamed, then what
+    it cost. Exit 0 when the agent says it succeeded, 1 when not, 2 when it
+    could not start."""
+    import project_file
+    from catalyst import run as runs
+    from catalyst.spec import SpecError, load_section4, procedure
+
+    dep = open_deployment(args)
+    agent = args.agent or project_file.agent_of(project_file.read_dir(dep.project_root))
+    rest = list(args.arguments)
+    if "--json" in rest:  # given after the arguments: still catalyst's own flag
+        rest.remove("--json")
+        args.json = True
+    arguments = " ".join(rest)
+    try:
+        prompt = procedure(load_section4(dep), args.command, arguments, dep.project_root)
+        adapter = runs.adapter_for(agent)
+    except (SpecError, runs.RunError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 2
+
+    def show(event: dict) -> None:
+        if args.json:
+            print(json.dumps(event, ensure_ascii=False), flush=True)
+        elif (line := runs.render(event)) is not None:
+            print(line, flush=True)
+
+    end = runs.run(adapter, agent, args.command, arguments, prompt, dep.project_root, show)
+    return 0 if end["ok"] else 1
+
+
 AGENT_BINARIES = {"claude-code": "claude"}  # an agent id whose CLI binary has another name
 
 
@@ -2148,6 +2181,12 @@ def build_parser() -> argparse.ArgumentParser:
     q = ags.add_parser("status", help="which agents have catalyst")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_agent)
+    q = ags.add_parser("run", help="dispatch a command to the project's agent; stream what it does and what it cost")
+    q.add_argument("command", help="a command of CODE-OF-CONDUCT.md §4, e.g. check-rules")
+    q.add_argument("arguments", nargs=argparse.REMAINDER, help="its arguments, as typed after the slash command")
+    q.add_argument("--agent", help="this run's agent (default: the one `catalyst open --agent` records)")
+    q.add_argument("--json", action="store_true", help="the events as JSON lines (spec/run-event.schema.json)")
+    q.set_defaults(func=cmd_agent_run)
 
     p = sub.add_parser("mcp", help="serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants")
     p.set_defaults(func=cmd_mcp)

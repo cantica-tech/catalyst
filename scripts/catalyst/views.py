@@ -231,9 +231,16 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
     elif corpus.rule_id(item_id):
         item_id = corpus.rule_id(item_id) or item_id
         rule = corpus.rules[item_id][0]
+        text = _rule_text(rule)
+        rules_index = dep.root / "rules" / "rules.md"
+        index = rules_index.read_text(encoding="utf-8").splitlines() if rules_index.is_file() else []
         out = {
             "id": item_id,
             "type": "rule",
+            "title": _rule_title(rule, text, index),
+            "status": _rule_status(text),
+            "domain": _rule_domain(item_id),
+            "text": text,
             "file": _rel(dep, rule.file),
             "line": rule.line,
             "retired": rule.retired,

@@ -18,6 +18,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `check.schema.json` | `catalyst check --json` | `GET /v1/check` (local mode) |
 | `commands.schema.json` | `catalyst spec --json` | `GET /v1/commands` |
 | `command-spec.schema.json` | `catalyst spec <command> [<part>] --json` | `GET /v1/spec/<command>[/<part>]` |
+| `run-event.schema.json` | `catalyst agent run <command> --json` (one per line) | — (no route starts a run) |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`).
