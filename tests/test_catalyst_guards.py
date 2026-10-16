@@ -79,3 +79,20 @@ def test_check_warns_about_work_already_past_a_guard(guarded, capsys):
     main(["validate"])
     out = capsys.readouterr().out
     assert "guard" in out and "is Done, but" in out
+
+
+def test_view_and_graph_say_what_an_entity_page_shows(guarded):
+    """The entity page reads its type's workflow from `graph` and an
+    artifact's sections and next states from `view` (roadmap R6.7)."""
+    from catalyst.views import graph, view
+
+    project, _ = guarded
+    dep = load(project)
+    corpus = load_corpus(dep)
+    shown = view(dep, corpus, ITEM)
+    assert {"heading": "Notes", "text": "What was noticed."} in shown["sections"]
+    done = next(n for n in shown["next"] if n["state"] == "Done")
+    assert done["blocked_by"] == [f"{SUB} (in `Subs`) is Open, not closed", "`## Notes` is not written"]
+    item_type = graph(dep, corpus)["types"]["ITEM"]
+    assert item_type["guards"]["Done"][-1] == {"condition": "section_written", "argument": "Notes"}
+    assert isinstance(item_type["transitions"], list) and isinstance(item_type["sections"], list)
