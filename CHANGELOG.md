@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.75.0 — 2026-10-16
+
+The commands and their specs as data, for a command palette (R6.8). No layout change, no migration.
 
 - `catalyst spec --json`, `GET /v1/commands` and `GET /v1/spec/<command>[/<part>]`
   give the deployment's commands as data: each command's `usage`, one-line
