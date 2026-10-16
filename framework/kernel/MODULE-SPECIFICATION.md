@@ -14,8 +14,8 @@ kernel: its repository layout, its manifest, its Entity Type Definitions
 
 The catalyst framework is the **kernel** plus its **process modules**. The
 kernel is process-agnostic: it owns rules, domains, reconciliation cases,
-workflows, users and roles, the journal, repoed sync, plugins and
-entity definitions as a mechanism. A module owns a process domain: its
+workflows, users and roles, the journal, repoed sync and entity
+definitions as a mechanism. A module owns a process domain: its
 development-artifact entity types, their templates, definitions, commands,
 meta-rules, invariants and migrations. The kernel never names a specific
 module or any of its entities (`INVARIANTS.md` INV-30); it only speaks of

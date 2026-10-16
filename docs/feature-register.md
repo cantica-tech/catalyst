@@ -1,7 +1,8 @@
 # Feature register (R1.3 inventory lock)
 
-**Status: draft — verdicts proposed, awaiting owner review.** Only rows marked *owner, 2026-10-08* carry an owner
-decision; every other verdict is a proposal. All open questions are answered (see the end).
+**Status: accepted (owner, 2026-10-16).** The owner reviewed the proposed verdicts and applied all of them; with the
+rows marked *owner, 2026-10-08*, every verdict is now an owner decision. All open questions are answered (see the
+end). The plugin rows' condition changed the same day: R4.7 removes the plugin system now (see *Decided*).
 **Date:** 2026-10-08. **Refreshed 2026-10-15**: each row gains *State*, the state of the roadmap items it cites
 according to the audit in `what-is-going-on/06-roadmap-streamline.md` — *shipped* (every item done), *settled*
 (done, decided or superseded), or the items still open. The state is that of the roadmap items, not a fresh check of
@@ -355,3 +356,10 @@ None. The 2026-10-08 answers are below.
 - **Module install (K-17, PL-04):** roadmap item R4.9, plan `docs/plans/r4-9-module-install.md`; several modules per deployment, `install` adds one beside the others.
 - **Unmentioned rows (K-66, K-71, PR-09, PR-51, PR-62, SE-22, SE-33, SE-34):** Keep confirmed.
 - **B3 / B4 (`10`):** accepted: plugins parked until R4.7, meta-tags become a `tags:` field.
+
+## Decided (owner, 2026-10-16)
+
+- **R1.3:** every proposed verdict accepted; R1 is closed.
+- **R4.7:** the plugin system goes now, not "until a second real plugin exists": the plugin tree, the catalog and
+  their commands are removed from the kernel; `catalyst-git` stays as an optional extension. The *Park* verdicts
+  of K-55, K-56, PR-68, PR-69, PR-70, CMD-12, PL-02, PL-03, PL-09 and PL-10 are carried out by that removal.

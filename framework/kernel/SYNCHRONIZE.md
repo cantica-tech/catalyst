@@ -87,26 +87,11 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
     own steps rather than applying them silently. Do not re-run an entry on
     a project whose pre-sync `version.txt` already reflected a version past
     that entry's "From" version.
-11. Never deactivate an already-active plugin as a side effect of applying a
-    new kernel version. A plugin stays active across the sync unless its
-    entry in the relevant `plugins/<type>/catalog.md` explicitly excludes
-    the target kernel version via the `Compatibility` field — a bare `*`,
-    or an absent field, is never grounds for deactivation. Only deactivate a
-    plugin when that field names a version or range that excludes the
-    target version, and report which plugin was deactivated and why.
-12. Never treat a deployed project's `plugins/<type>/catalog.md` or any
-    installed plugin directory under `plugins/<type>/<name>/` as framework
-    template content to overwrite wholesale. Once a project has registered
-    or activated any plugin, that catalog and those directories are
-    project-owned state, not framework state: synchronization may only
-    merge into a `catalog.md` — adding rows for newly available plugins
-    not yet present there, and refreshing the pinned `Release`/`Tag`/
-    `Compatibility` columns of a row that already exists — and must never
-    delete an existing row, blank the file, or delete or replace an
-    installed plugin's directory contents as a side effect of the sync.
-    If a plugin's row or directory would otherwise be missing, that is a
-    `/catalyzer activate`/`download` action for the user to take
-    afterward; `/sync-framework` must never perform or silently correct it.
+11. Never delete or overwrite a file the deployment keeps that no kernel or
+    module release ships (a plugin catalog from before the plugin system
+    was retired, ADR-022, say): it is project-owned state.
+12. Never write into the project beyond `catalyst.toml`; a release's
+    content reaches the criterion only.
 13. At the end of the synchronization run, perform a four-eyes verification
    pass: one sub-agent verifies the deployment against the checklist in
    [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md), and a second
@@ -127,13 +112,9 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
 2. Ask for exactly one confirmation before beginning the synchronization.
 3. Compare the deployed framework files with the latest framework state.
 4. Copy any changed templates, rules, guidance, or structure needed by the
-   deployed project, including plugin content pulled directly from each
-   plugin's own repository when plugin updates are required. No plugin may be
-   sourced from this repository; every plugin must have its own repository.
-   A deployed project's own `plugins/<type>/catalog.md` and installed plugin
-   directories are project-owned state, not framework template content —
-   merge into them (see item 12 of the slash-command behavior above), never
-   overwrite or delete them wholesale.
+   deployed project. A file the deployment keeps that no release ships is
+   project-owned state (item 11 of the slash-command behavior above): never
+   overwritten or deleted.
 5. Ensure the deployed project contains a custom root-level `README.md` that
    describes the deployed framework's structure and the project's artifact
    layout. Also ensure it contains `ACCESS-CONTROL.md`, copied verbatim
@@ -187,7 +168,7 @@ migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
    - `IAM/roles/roles.json` (from `templates/roles.template.json` on
      first deploy; entries added/changed by `/role add|modify` —
      never overwritten by synchronization once it exists, same
-     project-owned-state treatment as an installed plugin directory) and
+     project-owned-state treatment as item 11 above) and
      `IAM/users/users.json` (from `templates/users.template.json` on
      first deploy; entries added/updated by
      `/user add|remove|modify|assign-role` — see `INVARIANTS.md`

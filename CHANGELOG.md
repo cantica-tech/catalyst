@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- The plugin system is removed from the kernel (roadmap R4.7, ADR-022):
+  `framework/kernel/plugins/` (the catalog, the activation checklist, the
+  working-contract template, the work-item prototypes), the `catalyst-git`
+  submodule, the plugin check scripts and their CI workflow. The plugin
+  invariants (INV-10 to INV-13, INV-22) and meta-rules (§8, §17) are
+  retired in place, their numbers never reused. New capability comes as a
+  module; work items are a module's types. `catalyst-git` remains an
+  optional extension in its own repository. No CLI verb read any of it: no
+  layout change, no migration. A deployment that copied a plugin catalog
+  keeps it as a file nothing reads.
+
 ## 0.71.0 — 2026-10-16
 
 Four steps an agent did by hand move into the CLI (R2's exit): `catalyst rename`, `id next --count`, a default `journal restore` directory, and a tier that needs an artifact names one. No layout change, no migration.

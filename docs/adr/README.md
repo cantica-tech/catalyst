@@ -22,6 +22,7 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 | [ADR-019](ADR-019-module-namespace.md) | A module's own meta-rule and invariant namespace (R4.3, M4) | ✅ Accepted | kernel, SE module |
 | [ADR-020](ADR-020-fewer-commands.md) | Fewer slash commands, the old names kept as aliases (R2) | ✅ Accepted | kernel, SE module |
 | [ADR-021](ADR-021-one-create-command.md) | One `/create <type>`, a command with parts; meta-tags dropped (R2) | ✅ Accepted | kernel, SE module |
+| [ADR-022](ADR-022-remove-the-plugin-system.md) | Remove the plugin system from the kernel (R4.7) | ✅ Accepted | kernel |
 
 ### Module & Process
 

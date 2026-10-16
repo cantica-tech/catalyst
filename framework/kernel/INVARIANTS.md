@@ -68,14 +68,14 @@ to the active module keeps a one-line placeholder here
 | INV-6 criterion outside the project | L5 | `where`, `open`, `check` |
 | INV-7 descriptive naming | L6 | `check` (structure) |
 | INV-8 no orphan rules | L2 | `check` (structure) |
-| INV-10–13 plugins (parked) | L9 | `check_plugins.py`, `check_plugin_contracts.py` |
+| INV-10–13 plugins (retired, ADR-022) | — | — |
 | INV-16 one active user, advisory roles | L7, L4 | `check`, `user remove` |
 | INV-17 journal | L1 | journal, `journal verify`, `unrecorded`, end-of-turn hook |
 | INV-18 shared deployments | L3, L4 | `share`, the criterion's CI gate, `check` integrity |
 | INV-19 project lifecycle (retired) | L3, L5 | `open`, `move`, `share join` |
 | INV-20 uniform artifact-type layout | L6 | `check` (structure) |
 | INV-21 reconciliation | L4 | `catalyst reconcile` (the role gate) |
-| INV-22 content-contributing plugins (parked) | L9 | — |
+| INV-22 content-contributing plugins (retired, ADR-022) | — | — |
 | INV-23 frozen definitions | L6 | `sync` never overwrites, `definition migrate` |
 | INV-24 workflow entity | — (a format) | `check` (structure) |
 | INV-25 act without asking | — (how to work: `Rules-of-Rules.md`) | — |
@@ -135,11 +135,9 @@ to the active module keeps a one-line placeholder here
   its ETDs specifies `grounding` as `required` (linking directly to the
   grounding type), `inherited` (inheriting its parent's link), or `none`.
   Every document, domain, and rule has a stable, permanent, never-reused
-  ID. Extended upward through `epic → story → task →` when an agile
-  project-management plugin is active (INV-22) — `work-items/` doesn't
-  exist otherwise, so the chain can't reach through it; without one
-  active, the module's grounded artifacts chain directly to their
-  grounding → domain. The module's own chain specifics live in its
+  ID. The module's grounded artifacts chain to their grounding → domain;
+  a module that declares work items (epics, stories, tasks) chains them
+  through its own types. The module's own chain specifics live in its
   `INVARIANTS.module.md` (`MODULE-SPECIFICATION.md` §6.4). At commit
   granularity: every product commit cites an artifact or rule ID that
   resolves in the deployment, or its subject starts `chore:`; merges are
@@ -208,10 +206,9 @@ to the active module keeps a one-line placeholder here
   a state its file's journal chain reaches after the commit's parent state
   (decided by content hashes, never by clocks) was made outside catalyst: it is detected, and adopted
   into the journal or reverted, never silently left (`/adopt`).
-  Complements — does not duplicate — the `catalyst-git` plugin's
-  continuous compliance auditing of a *deployed project*; this journal is
-  core, applies to catalyst's own deployment too, and records history
-  rather than flagging violations.
+  It is core, applies to catalyst's own deployment too, and records
+  history rather than flagging violations (continuous auditing, such as
+  the optional `catalyst-git` extension's, is not the kernel's).
 - **INV-18 — Shared deployments on git.** A deployment is shared
   (`repoed: true`) once `catalyst share create <url>` publishes its
   criterion to a criterion repository; `catalyst.toml` records the remote,
@@ -257,7 +254,7 @@ to the active module keeps a one-line placeholder here
   `TEMPLATE-ROLES-vN.json` version the registry's seed shape, since each
   registry is one JSON file (`{"users": [...]}`, `{"roles": [...]}`)
   rather than one-file-per-instance.
-  `work-items/` is not part of this core set — see INV-22.
+  Work items (epics, stories, tasks) are a module's types when it declares them (ADR-022).
 - **INV-21 — Reconciliation entity for diverging versions.** A
   `RECON-NNNNNN` (`reconciliations/`, top-level, full INV-20 template
   treatment) is the durable record of two entity versions that
@@ -278,24 +275,7 @@ to the active module keeps a one-line placeholder here
   `Rules-of-Rules.md` §16. May optionally name a `Workflow` field (a
   `WORKFLOW-NNNNNN`, INV-24) to guide its resolution — read before
   choosing a verb, when present.
-- **INV-22 — Content-contributing plugins.** *Parked with the plugins (roadmap R4.7).* A plugin's
-  `working-contract.md` may carry an optional `## Contributes` section
-  naming artifact-type folder(s) (full INV-20 treatment) and/or
-  slash-command file(s) it deploys into the target project.
-  `/catalyzer activate` materializes this content — the same mechanism
-  instantiation uses to copy core templates in;
-  `/catalyzer deactivate` removes exactly what was added, never
-  artifact instances the deployment already created with it. Two
-  content-contributing plugins that would deploy the same artifact-type
-  folder must not both be active. `work-items/` (`BOARD-`/`EPIC-`/
-  `SPRINT-`/`STORY-`/`TASK-`/`SPIKE-`/`TICKET-`) is the
-  first type moved to this model — no longer core (INV-20), it only
-  exists once a project-management-type plugin extending the schema at
-  `plugins/_prototyping/project-management/agile/` is activated; none
-  exists yet. The chain invariant (INV-5) is conditional on this: the
-  `epic → story → task →` prefix applies only when such a plugin is
-  active. Plugins under `plugins/_prototyping/` are exempt from INV-11's
-  separate-repository requirement until they graduate out of it.
+- **INV-22 — Content-contributing plugins.** *Retired with the plugin system (ADR-022, roadmap R4.7); the number is never reused.*
 - **INV-23 — Frozen entity definitions.** Every real entity type has a
   short, versioned prose definition (`definitions/README.md`) explaining
   what it is and what it's for, deployed to the criterion's
@@ -347,18 +327,9 @@ to the active module keeps a one-line placeholder here
   `scripts/check_kernel_purity.py`, which derives its denylist from the
   modules in `framework/modules/catalog.md`.
 
-## Plugins
+## Plugins (retired)
 
-- **INV-10 — Activation gate.** *Parked with the plugins (roadmap R4.7).* A plugin is not loaded unless activated via
-  `/catalyzer`, and only if it carries `README.md` + `working-contract.md`.
-- **INV-11 — Plugin provenance.** *Parked with the plugins (roadmap R4.7).* Every plugin has its own repository; no plugin
-  is sourced from the framework repository.
-- **INV-12 — Contract is canonical + stable.** *Parked with the plugins (roadmap R4.7).* Every plugin's
-  `working-contract.md` carries the six metadata fields (Name, Description,
-  UUID, Version, Active, Type). The UUID is generated once and never changes.
-  `Version` matches the plugin's own `version.txt` and its catalog pin. The
-  framework reads `Active` at startup to decide what loads.
-- **INV-13 — Operate on the deployment, not on catalyst.** *Parked with the plugins (roadmap R4.7).* A plugin's runtime
-  target (monitoring, auditing, mutation) is the *deployed project's* repository,
-  resolved at activation time — never the catalyst framework's own repository and
-  never the plugin's own installation directory under `plugins/<type>/<name>/`.
+- **INV-10 — Activation gate.** *Retired with the plugin system (ADR-022, roadmap R4.7); the number is never reused.*
+- **INV-11 — Plugin provenance.** *Retired with the plugin system (ADR-022, roadmap R4.7); the number is never reused.*
+- **INV-12 — Contract is canonical + stable.** *Retired with the plugin system (ADR-022, roadmap R4.7); the number is never reused.*
+- **INV-13 — Operate on the deployment, not on catalyst.** *Retired with the plugin system (ADR-022, roadmap R4.7); the number is never reused.*

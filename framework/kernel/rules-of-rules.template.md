@@ -97,9 +97,10 @@ relates to its neighbours. A code is permanent. A sub-domain
 (`<PARENT>.<SUB>`, one level deep) splits a domain that has grown several
 distinct seams; its rules carry the full code (`cor-CORE.INGEST-000001-…`).
 
-## 8. `rr-META-008` — parked
+## 8. `rr-META-008` — retired
 
-Agile work items, with the plugins (roadmap R4.7); never reused.
+Agile work items, retired with the plugin system (ADR-022); a module declares
+them as its own types when a process needs them. Never reused.
 
 ## 11. `rr-META-011` Users and roles are advisory, except reconciliation
 
@@ -168,10 +169,10 @@ in the case's `## Revisions`; applying an accepted version to the entity is
 ordinary, journaled work; a closed case is final (`definitions/
 reconciliation`).
 
-## 17. `rr-META-017` — parked
+## 17. `rr-META-017` — retired
 
-Content-contributing plugins, with the plugins (roadmap R4.7); never
-reused.
+Content-contributing plugins, retired with the plugin system (ADR-022);
+modules contribute content. Never reused.
 
 ## 18. `rr-META-018` — catalyst development only
 

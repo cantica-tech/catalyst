@@ -58,8 +58,8 @@ first user, and, afterwards, its first rules.
      lists the modules checked out next to the project or to catalyst as
      `catalyst-<id>` (production modules: `framework/modules/catalog.md`):
      propose one and ask. For one elsewhere, pass `--module-dir <dir>` (a checkout of the module's
-     repository at the release matching this kernel version). Like plugins,
-     a module is never sourced from this framework repository.
+     repository at the release matching this kernel version). A module is
+     never sourced from this framework repository.
    - **The first user**, registered as Admin (INV-16): `--user` defaults to
      `git config user.name`; ask for the git username (`--git-username`).
    - **The agent** (`--agent <id>`, e.g. `claude-code`), recorded in the
@@ -117,9 +117,8 @@ first user, and, afterwards, its first rules.
 
    It commits nothing in the project repository. From here on,
    `catalyst <args>` means `python3 .criterion/bin/catalyst.pyz <args>`.
-   `work-items/` is **not** built — it only comes into being if a
-   project-management-type plugin is activated later (`Rules-of-Rules.md`
-   §8, INV-22; `ARTIFACT-LAYOUT.md`).
+   Work items (epics, stories, tasks) are built only if the module
+   declares them as its types (ADR-022).
 
    The resulting working copy (the module's folders vary by module):
 
@@ -169,9 +168,8 @@ first user, and, afterwards, its first rules.
    artifact to its grounding type (a kernel rule) to a domain stays intact
    (INV-5), not the folder names. The module's meta-rules
    (`rules-of-rules.module.md`, composed above) say what each of its types
-   is for; the kernel never names them (INV-30). `plugins/<type>/<name>/`
-   appears when a plugin is activated; `.ledger/` holds the agent's install
-   ledger (`BOOTSTRAP.md` §3).
+   is for; the kernel never names them (INV-30). `.ledger/` holds the agent's
+   install ledger (`BOOTSTRAP.md` §3).
 5. **Wire the agent and the project's tasks.** Once per machine, run
    `catalyst agent install <agent>` (`CLI.md`): it writes only the agent's
    user-level config — the `catalyst mcp` server, whose prompts are the
@@ -197,8 +195,6 @@ first user, and, afterwards, its first rules.
    (`--pattern-only` while the deployment is local-only, since CI has no
    working copy; `CLI.md` has the GitHub Actions snippet). Commits made
    before either existed are not checked.
-   When plugins are needed, pull their content directly from each plugin's
-   own repository; no plugin may be sourced from this framework repository.
 6. **Populate what the module requires.** If a document the module's
    meta-rules or invariants require at instantiation (for example a
    generated summary) still carries template `{{PLACEHOLDER}}` text, run
@@ -245,24 +241,11 @@ first user, and, afterwards, its first rules.
 
 ## 2. Choosing your agile flavor
 
-`work-items/` is plugin-only (§1 step 4, `Rules-of-Rules.md` §8) — this
-choice only matters if and when a project-management-type plugin is
-activated. Nothing below the work-items layer changes regardless.
-Above it, once such a plugin is active:
-
-- Using Scrum → keep everything as templated (`sprints/` included, skip
-  `boards/`).
-- Using Kanban → skip `sprints/`; use `boards/` (`BOARD-NNNNNN`) instead —
-  a WIP-limited `Status` value set on stories/tasks, referencing the
-  board in place of sprint membership (the schema's own
-  `rules-of-work-items.template.md` §6).
-- Using something else entirely → the framework's hard requirement is
-  only §1 of `CODE-OF-CONDUCT.md` (no development without a
-  targeted rule) — everything above that is replaceable with whatever
-  process vocabulary your team actually uses, as long as it still
-  bottoms out in the active module's development artifacts. Without any
-  project-management plugin active, this is the default — the chain
-  simply starts at the active module's artifacts (INV-5).
+Work items are a module's types (ADR-022): a module that declares epics,
+stories, tasks, sprints or boards brings its own process vocabulary.
+Without one, the chain starts at the active module's artifacts (INV-5).
+The framework's hard requirement is only §1 of `CODE-OF-CONDUCT.md` (no
+development without a targeted rule).
 
 ## 3. Greenfield path — no existing code or practices
 
