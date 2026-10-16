@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "timestamp": "2026-10-16T16:24:46+00:00",
+  "timestamp": "2026-10-16T17:58:04+00:00",
   "measurements": [
     {
       "name": "framework/kernel/INVARIANTS.md",
-      "bytes": 3141,
-      "tokens": 785,
+      "bytes": 2537,
+      "tokens": 634,
       "category": "grounding"
     },
     {
@@ -124,8 +124,8 @@
     },
     {
       "name": "framework/kernel/INVARIANTS.md",
-      "bytes": 3141,
-      "tokens": 785,
+      "bytes": 2537,
+      "tokens": 634,
       "category": "install"
     },
     {
