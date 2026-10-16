@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.75.1 — 2026-10-16
+
+The install documents cut to the judgment `catalyst init` leaves to the agent. No layout change, no migration.
+
+- The install documents keep only the judgment `catalyst init` leaves to the
+  agent: `INSTANTIATION-GUIDE.md` from 21.6 KB to 5.3 KB, its checklist from
+  6.1 KB to 2.0 KB, `BOOTSTRAP.md` from 7.9 KB to 3.7 KB. The install path
+  measures about 3.5k tokens, from about 9.7k (target 3k). What `init`
+  writes is listed in `CLI.md` (`catalyst init`); the tree stays in
+  `ARTIFACT-LAYOUT.md`. BOOTSTRAP no longer sends the agent through
+  `INVARIANTS.md` in full and the kernel `README.md`: the laws are loaded at
+  session start and `catalyst why` explains the rest. The token baseline is
+  rewritten to hold the cut.
+
 ## 0.75.0 — 2026-10-16
 
 The commands and their specs as data, for a command palette (R6.8). No layout change, no migration.

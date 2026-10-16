@@ -2,7 +2,7 @@
 
 A reference document, deployed verbatim to `.criterion/ACCESS-CONTROL.md`
 on first instantiation and refreshed on `/sync-framework` whenever this
-kernel version changes it (`INSTANTIATION-GUIDE.md` §1 step 8,
+kernel version changes it (`catalyst init` in `CLI.md`,
 `SYNCHRONIZE.md` item 5) — same treatment as `CODE-OF-CONDUCT.md`/
 `Rules-of-Rules.md`. It explains mechanics that already live in
 `INVARIANTS.md`, `rules-of-rules.template.md`, and `IAM/roles/roles.json`;
