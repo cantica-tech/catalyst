@@ -547,7 +547,20 @@ class LocalReader(Reads):
         return self.refresh()
 
     def head(self) -> dict:
-        return {"seq": self.batch(), "files": len(self._stamp or ())}
+        """The batch and file count, then what this deployment runs: its
+        kernel and module versions and the catalyst serving it (R6.5: a client
+        sees a deployment behind the catalyst it is read with)."""
+        from catalyst import __version__
+
+        dep = self.loaded()[1]
+        version = dep.root / "version.txt"
+        return {
+            "seq": self.batch(),
+            "files": len(self._stamp or ()),
+            "kernel": version.read_text(encoding="utf-8").strip() if version.is_file() else None,
+            "modules": [{"id": m.id, "version": m.version} for m in dep.installed()],
+            "catalyst": __version__,
+        }
 
     def loaded(self) -> tuple:
         batch = self.refresh()
