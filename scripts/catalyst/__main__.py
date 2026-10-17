@@ -345,9 +345,7 @@ def cmd_approve(args) -> int:
     try:
         signer = resolve_signer(dep, corpus, args.as_user)
         entry = gates.approve(dep, corpus, args.id, args.gate, signer, args.intent or [], args.tier)
-        left = next(
-            g for g in gates.report(dep, load_corpus(dep), entry["artifact"])["gates"] if g["gate"] == args.gate
-        )
+        left = gates.left_after(dep, load_corpus(dep), entry)
     except (IdError, JournalError, gates.GateError, ViewError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -748,6 +746,7 @@ def cmd_reconcile(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     try:
+        content = _read_from(args.from_file) if args.from_file else None
         res = edit.reconcile(
             dep,
             corpus,
@@ -756,12 +755,47 @@ def cmd_reconcile(args) -> int:
             resolve_signer(dep, corpus, args.as_user),
             args.text or "",
             args.intent or [],
+            content,
         )
-    except edit.EditError as exc:
+    except (edit.EditError, OSError, IdError, JournalError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     status = (load_corpus(dep).artifacts[res.id][0].get("Status") or "").strip()
     print(f"{res.id}: {args.verb} -> {status}")
+    return 0
+
+
+def _read_from(path: str) -> str:
+    """A proposal's content: a file, or standard input for `-`."""
+    return sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+
+
+def cmd_propose(args) -> int:
+    """`catalyst propose <ID> --from <file>` (design 26): a change offered for
+    review, as a reconciliation case carrying the proposed content."""
+    from catalyst import proposals
+    from catalyst.corpus import load_corpus
+    from catalyst.edit import EditError
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    try:
+        signer = resolve_signer(dep, corpus, args.as_user)
+        res = proposals.propose(
+            dep, corpus, args.id, _read_from(args.from_file), signer, args.title, args.intent or [], args.tier
+        )
+        found = proposals.info(dep, load_corpus(dep), load_corpus(dep).artifacts[res.id][0])
+    except (proposals.ProposalError, EditError, IdError, JournalError, OSError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(found, indent=2))
+    else:
+        print(
+            f"{res.id}: proposes a change to {found['entity']} ({found['path']}), journaled; decided with "
+            f"`catalyst reconcile {res.id} accept|accept-with-edits|reject|propose|close`"
+        )
     return 0
 
 
@@ -2428,9 +2462,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("case", help="the RECON- case ID")
     p.add_argument("verb", choices=["accept", "accept-with-edits", "reject", "propose", "close"])
     p.add_argument("--text", help="propose: the proposed resolution (a new Revisions row)")
+    p.add_argument(
+        "--from",
+        dest="from_file",
+        help="a proposal: the content it now proposes (propose) or accepts (accept-with-edits); - reads stdin",
+    )
     p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.set_defaults(func=cmd_reconcile)
+
+    p = sub.add_parser("propose", help="propose a change to an entity or rule document, decided by someone else")
+    p.add_argument("id", help="the entity, or a rule (its document is what is proposed)")
+    p.add_argument("--from", dest="from_file", required=True, help="the proposed content of its file; - reads stdin")
+    p.add_argument("--title", help="the case's title (default: Proposed change to <ID>)")
+    p.add_argument("--as", dest="as_user", help="who proposes (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_propose)
 
     p = sub.add_parser("why", help="explain a law (L1…), an invariant (INV-n), a meta-rule or an ID")
     p.add_argument("item", help="L3, INV-17, rr-META-012, a rule or artifact ID")

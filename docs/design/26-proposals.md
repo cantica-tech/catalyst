@@ -106,6 +106,23 @@ gate already approved.
    approvals made after it lands.
 6. **What a proposal covers at 1.0**: one entity's file or one rule document (recommended), or several files at once.
 
+## 7a. As built (kernel 0.81.0, REQ-000053)
+
+Three departures from §2, each simpler than the text above:
+
+- **No `Kind` field.** The reconciliation template already had `Proposer`, `Baseline` and `Proposed`; a proposal is a
+  case with `Trigger: proposal`, a new value of an existing field. The template gains the value as a new version (a
+  judgment step of migration 0.81.0); nothing else in the format changes.
+- **The proposed content is `reconciliations/<RECON-id>.proposed`**, one file beside the case, not
+  `reconciliations/<RECON-id>/proposed/<path>`: the structure check reads every `.md` under a type's folder, and a
+  proposed artifact kept as `.md` there would be read as a second file with the same ID.
+- **`propose new <type>` is not built.** A new rule is proposed as a change to its rule document; a new artifact is
+  created directly, since there is no earlier version for review to protect. The journal entry of a proposal is a
+  `create` (of the case) by `catalyst propose`, not a new `propose` action.
+
+A revision (`reconcile <case> propose --from <file>`) re-bases the proposal on the entity as it is then, so a moved base
+is settled by revising, as §3 says.
+
 ## 8. Steps once confirmed
 
 | Step | Content |

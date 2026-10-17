@@ -1,13 +1,14 @@
 """`catalyst inbox` (roadmap R5.7): what waits for a person, each item with
 its evidence and the commands that settle it.
 
-Five sources, each of which already has a verb that settles it:
+Six sources, each of which already has a verb that settles it:
 
 - commits made outside catalyst whose changes the journal does not record
   (`catalyst journal adopt`, or a revert);
 - changed or new project files not journaled yet (`catalyst journal
   append`, or the change discarded);
-- reconciliation cases that are not closed (`catalyst reconcile`);
+- reconciliation cases that are not closed (`catalyst reconcile`), a
+  proposal apart from a dispute (design 26);
 - analyses in their deciding phase (`catalyst analysis decide`);
 - gated changes waiting for their approvals, a gated rule's text or an
   entity one move away from a gated state (`catalyst approve`; design 25).
@@ -19,11 +20,11 @@ and the analyses only.
 
 from __future__ import annotations
 
-from catalyst import analysis, gates, unrecorded
+from catalyst import analysis, gates, proposals, unrecorded
 from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
-KINDS = ("unrecorded-commit", "unrecorded-change", "reconciliation", "analysis", "approval")
+KINDS = ("unrecorded-commit", "unrecorded-change", "reconciliation", "analysis", "approval", "proposal")
 RECONCILIATION = "RECON"
 DECISIONS = ("accept", "accept-with-edits", "reject", "propose")
 
@@ -54,6 +55,17 @@ def inbox(dep: Deployment, corpus: Corpus) -> dict:
         if status in closed or status == "Closed":
             continue
         evidence = {"status": status, "entity": (art.get("Entity") or "").strip().strip("`") or None}
+        if proposals.is_proposal(art):
+            p = proposals.info(dep, corpus, art)
+            evidence.update({k: p[k] for k in ("path", "base", "proposed", "author")})
+            settle = [
+                f"catalyst reconcile {art.id} accept",
+                f"catalyst reconcile {art.id} accept-with-edits --from <file>",
+                f"catalyst reconcile {art.id} reject",
+                f"catalyst reconcile {art.id} propose --from <file>",
+            ]
+            items.append(_item(KINDS[5], art.id, art.title, evidence, settle))
+            continue
         settle = [f"catalyst reconcile {art.id} {d}" for d in DECISIONS]
         items.append(_item(KINDS[2], art.id, art.title, evidence, settle))
     for art in corpus.by_prefix.get(analysis.PREFIX, []):
@@ -83,6 +95,7 @@ def render(found: dict) -> str:
         KINDS[2]: "reconciliation cases",
         KINDS[3]: "analyses to decide",
         KINDS[4]: "approvals waiting",
+        KINDS[5]: "proposals to decide",
     }
     lines = []
     for kind in KINDS:
