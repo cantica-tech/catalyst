@@ -160,6 +160,61 @@
               }
             }
           }
+        },
+        "proposal": {
+          "type": "object",
+          "description": "A proposal case (design 26): its entity, the entity's file, the base and proposed blobs, the proposed version's author, and both contents, for a diff.",
+          "required": [
+            "entity",
+            "path",
+            "base",
+            "proposed",
+            "author",
+            "content_base",
+            "content_proposed"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "entity": {
+              "type": "string"
+            },
+            "path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "base": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "proposed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "author": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "content_base": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "content_proposed": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         }
       },
       "additionalProperties": {

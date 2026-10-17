@@ -145,6 +145,7 @@ def _finish(
     files: list[Path],
     actor: str,
     tier: str | None,
+    extra: dict | None = None,
 ) -> None:
     """Common ending: indexes, then one journal entry for every touched file."""
     changes = indexes.regenerate(dep, load_corpus(dep))
@@ -160,8 +161,20 @@ def _finish(
             files=[str(p) for p in paths],
             actor=actor,
             tier=tier,
+            extra=extra,
         ),
     )
+
+
+def recompute_derived(dep: Deployment, item_id: str, path: Path) -> None:
+    """An entity's derived fields from their sources now, never from the content written."""
+    from catalyst import derived
+
+    for d in derived.drift(dep, load_corpus(dep)):
+        if d.art.id == item_id:
+            path.write_text(
+                set_or_add_field(path.read_text(encoding="utf-8"), d.field, _ticked(d.expected)), encoding="utf-8"
+            )
 
 
 # --- rename ---------------------------------------------------------------
@@ -273,14 +286,7 @@ def restore(
     if path.is_file() and path.read_text(encoding="utf-8") == content:
         raise EditError(f"{found} is already as it stood at {when}")
     path.write_text(content, encoding="utf-8")
-    # derived fields come from their sources now, never from the old version
-    from catalyst import derived
-
-    for d in derived.drift(dep, load_corpus(dep)):
-        if d.art.id == found:
-            path.write_text(
-                set_or_add_field(path.read_text(encoding="utf-8"), d.field, _ticked(d.expected)), encoding="utf-8"
-            )
+    recompute_derived(dep, found, path)  # derived fields come from their sources now, never from the old version
     _finish(
         dep,
         command,
@@ -542,7 +548,7 @@ def reconciliation_level(dep: Deployment, signer: dict) -> tuple[str, str]:
     return best
 
 
-def _append_revision(text: str, author: str, note: str) -> str:
+def _append_revision(text: str, author: str, note: str, blob: str | None = None) -> str:
     """A new row at the end of the `## Revisions` table."""
     lines = text.split("\n")
     start = next((i for i, line in enumerate(lines) if line.strip() == "## Revisions"), None)
@@ -555,7 +561,8 @@ def _append_revision(text: str, author: str, note: str) -> str:
     numbers = [int(m.group(1)) for i in rows if (m := re.match(r"^\|\s*(\d+)\s*\|", lines[i]))]
     stamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     cell = note.replace("|", "\\|").replace("\n", " ")
-    lines.insert(rows[-1] + 1, f"| {max(numbers, default=0) + 1} | {author} | {stamp} | — | {cell} |")
+    hashed = f"`{blob}`" if blob else "—"
+    lines.insert(rows[-1] + 1, f"| {max(numbers, default=0) + 1} | {author} | {stamp} | {hashed} | {cell} |")
     return "\n".join(lines)
 
 
@@ -567,12 +574,18 @@ def reconcile(
     signer: dict,
     text: str = "",
     intent: list[str] | None = None,
+    content: str | None = None,
 ) -> Result:
     """`/reconcile <case> <verb>` (Rules-of-Rules.md rr-META-016, INV-21): the
     one role check catalyst enforces. `full` may use every verb, `propose`
-    only `propose`, `none` nothing. Records the decision; applying an accepted
-    version to the disputed entity stays the human's (or the agent's, on the
-    human's word) ordinary, journaled work."""
+    only `propose`, `none` nothing. On a dispute it records the decision;
+    applying an accepted version stays the human's (or the agent's, on the
+    human's word) ordinary, journaled work. On a proposal (design 26)
+    `accept` writes the proposed content to the entity (`accept-with-edits`
+    writes `content`), `propose` with `content` revises it, and its author
+    may `close` it while it is open (withdrawn)."""
+    from catalyst import proposals
+
     if verb not in RECON_VERBS:
         raise EditError(f"'{verb}' is not a reconcile verb ({', '.join(RECON_VERBS)})")
     art = _artifact(corpus, case_id)
@@ -580,34 +593,66 @@ def reconcile(
         raise EditError(f"{case_id} is not a reconciliation case")
     who = str(signer.get("name") or signer.get("git_username"))
     level, role = reconciliation_level(dep, signer)
-    if level == "none":
+    proposal = proposals.is_proposal(art)
+    withdrawing = (
+        proposal
+        and verb == "close"
+        and proposals.is_open(art)
+        and _same_user(signer, (art.get("Signed-off-by") or "").strip())
+    )
+    if level == "none" and not withdrawing:
         raise EditError(
             f"{who} has no reconciliation rights (no role grants `propose` or `full`): ask a `full` or "
             "`propose` user to act"
         )
-    if verb != "propose" and level != "full":
+    if verb != "propose" and level != "full" and not withdrawing:
         raise EditError(f"`{verb}` needs a `full` reconciliation role; {who} ({role}) may only `propose`")
     status = (art.get("Status") or "").strip()
     if status == "Closed":
         raise EditError(f"{case_id} is Closed: a closed case is final")
     resolved = status.startswith("Resolved-")
     body = art.file.read_text(encoding="utf-8")
-    if verb == "propose":
-        if resolved:
-            raise EditError(f"{case_id} is already {status}: close it, or open a new case")
-        if not text.strip():
-            raise EditError("`propose` needs the proposal's text (--text)")
-        body, new = _append_revision(body, who, text.strip()), "Under Review"
-    elif verb == "close":
-        if not resolved:
-            raise EditError(f"{case_id} is {status or 'not resolved'}: resolve it (accept/reject) before closing")
-        new = "Closed"
-    else:
-        if resolved:
-            raise EditError(f"{case_id} is already {status}")
-        new = RESOLVING[verb]
-        today = datetime.date.today().isoformat()
-        body = set_or_add_field(set_or_add_field(body, "Resolved", today), "Resolver", f"{who} ({role})")
+    files, targets, extra = [art.file], [], None
+    if content is not None and not (proposal and verb in ("propose", "accept-with-edits")):
+        raise EditError("--from is for a proposal's `propose` or `accept-with-edits`")
+    try:
+        if verb == "propose":
+            if resolved:
+                raise EditError(f"{case_id} is already {status}: close it, or open a new case")
+            if content is not None:
+                blob, proposed, base = proposals.revise(dep, corpus, art, content)
+                body = set_or_add_field(body, "Proposed", f"`{blob}` — `{proposed.relative_to(dep.root).as_posix()}`")
+                entity_file = proposals.info(dep, corpus, art)["path"]
+                body = set_or_add_field(body, "Baseline", f"`{base}` — `{entity_file}` when this revision was made")
+                note = text.strip() or "Revised proposal"
+                body, files = _append_revision(body, who, note, blob), [art.file, proposed]
+            elif not text.strip():
+                raise EditError(
+                    "`propose` needs the proposal's text (--text)" + (" or content (--from)" if proposal else "")
+                )
+            else:
+                body = _append_revision(body, who, text.strip())
+            new = "Under Review"
+        elif verb == "close":
+            if not resolved and not withdrawing:
+                raise EditError(f"{case_id} is {status or 'not resolved'}: resolve it (accept/reject) before closing")
+            new = "Closed"
+        else:
+            if resolved:
+                raise EditError(f"{case_id} is already {status}")
+            if proposal and verb in ("accept", "accept-with-edits"):
+                if verb == "accept-with-edits" and content is None:
+                    raise EditError("`accept-with-edits` on a proposal needs the content it accepts (--from)")
+                target, extra = proposals.apply(dep, corpus, art, signer, content)
+                files, targets = [art.file, target], [_clean_ref(art.get("Entity"))]
+                if content is not None:
+                    blob = journal.git(dep.root, "hash-object", "--", target.relative_to(dep.root).as_posix())
+                    body = _append_revision(body, who, "Accepted with edits", blob)
+            new = RESOLVING[verb]
+            today = datetime.date.today().isoformat()
+            body = set_or_add_field(set_or_add_field(body, "Resolved", today), "Resolver", f"{who} ({role})")
+    except proposals.ProposalError as exc:
+        raise EditError(str(exc)) from None
     body = set_field(body, "Status", new)
     art.file.write_text(body, encoding="utf-8")
     _finish(
@@ -615,11 +660,22 @@ def reconcile(
         "/reconcile",
         "status-change" if new != status else "update",
         case_id,
-        [],
+        targets,
         list(intent or [])
         or [f"{case_id}: {verb} ({status or '?'} -> {new})" + (f" — {text.strip()}" if text else "")],
-        [art.file],
+        files,
         str(signer.get("git_username") or signer.get("name")),
         None,
+        extra,
     )
-    return Result(case_id, art.file, [art.file])
+    return Result(case_id, art.file, files)
+
+
+def _clean_ref(value: str | None) -> str:
+    return (value or "").strip().strip("`").strip()
+
+
+def _same_user(signer: dict, name: str) -> bool:
+    from catalyst.gates import _same
+
+    return _same(signer, name)

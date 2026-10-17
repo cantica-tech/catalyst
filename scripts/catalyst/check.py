@@ -129,6 +129,9 @@ def run(dep: Deployment) -> Report:
     from catalyst import gates
 
     report.errors += [f"gates: {p}" for p in gates.problems(dep, corpus)]
+    from catalyst import proposals
+
+    report.errors += [f"proposal: {p}" for p in proposals.problems(dep, corpus)]
     for w in gates.unapproved_rules(dep, corpus):
         report.errors.append(
             f"gates unapproved: {w['id']}: its current text lacks {w['missing']} of {w['approvals']} approval(s) "

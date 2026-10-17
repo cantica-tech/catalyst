@@ -171,7 +171,11 @@ signer's `reconciliation` level from `IAM/roles/roles.json`: `full`
 decides, `propose` only proposes, `none` neither. Each round is a new row
 in the case's `## Revisions`; applying an accepted version to the entity is
 ordinary, journaled work; a closed case is final (`definitions/
-reconciliation`).
+reconciliation`). A change offered for review before it lands is a case
+too, a proposal (`catalyst propose <ID> --from <file>`): it keeps the
+proposed content beside the case, and `accept` writes it to the entity,
+refused when the entity has changed since and for the proposal's own
+author, who may withdraw it while it is open (`CLI.md`).
 
 ## 17. `rr-META-017` — retired
 

@@ -5,7 +5,10 @@
 > criteria (`Rules-of-Rules.md` §16). Opened when `/criterion push`
 > stops on a conflict and the agent proposes a resolution (never applying
 > it), for a rights-mismatch (`Rules-of-Rules.md` §11), for a contested
-> change committed outside catalyst (`/adopt`), or manually.
+> change committed outside catalyst (`/adopt`), manually, or by
+> `catalyst propose` for a change offered for review before it lands
+> (`Trigger: proposal`: `Proposed` names the content kept beside the case
+> as `<RECON-id>.proposed`, and `accept` writes it to the entity).
 
 | Field | Value |
 |---|---|
@@ -13,11 +16,11 @@
 | **Name** | short descriptive summary summarizing the reconciliation's purpose — follows Rules of Rules naming conventions |
 | **Entity** | type + ID/path of the artifact actually being reconciled |
 | **Workflow** | `WORKFLOW-NNNNNN` guiding this case's resolution, if any — optional, leave blank unless a documented procedure for this recurring kind of conflict exists (`Rules-of-Rules.md` §19) |
-| **Trigger** | `rights-mismatch` / `merge-conflict` / `unrecorded-change` / `manual` |
+| **Trigger** | `rights-mismatch` / `merge-conflict` / `unrecorded-change` / `manual` / `proposal` |
 | **Status** | `Open` / `Under Review` / `Resolved-Accepted` / `Resolved-Accepted-with-Edits` / `Resolved-Rejected` / `Closed` |
 | **Proposer** | name (role) — see `IAM/users/users.json` |
-| **Baseline** | content hash + short description of `criterion`'s version at open time |
-| **Proposed** | content hash + short description of the proposer's version |
+| **Baseline** | content hash + short description of `criterion`'s version at open time (a proposal: the entity's file when proposed, its base) |
+| **Proposed** | content hash + short description of the proposer's version (a proposal: its `<RECON-id>.proposed` file) |
 | **Opened** | YYYY-MM-DD |
 | **Resolved** | YYYY-MM-DD (blank until `Status` leaves `Open`/`Under Review`) |
 | **Resolver** | name (role) — blank until resolved |
@@ -46,6 +49,10 @@ Final decision and rationale, filled in once `Status` moves to a
 the shared branch as-is; `Resolved-Accepted-with-Edits` merges the last
 revision's content instead; `Resolved-Rejected` leaves the shared
 branch's version unchanged and the proposer drops or reworks their change.
+On a proposal, `accept` writes the proposed content to the entity itself
+(refused when its file is no longer the base, and for the proposed
+version's author); `accept-with-edits` writes the content the acceptor
+gives.
 
 ## Related
 

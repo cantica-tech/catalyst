@@ -514,6 +514,8 @@ class AppendRequest:
     allow_unchanged: bool = False
     timestamp: str = field(default_factory=now)
     tier: str | None = None
+    # fields a verb adds to its entry (`proposed_by`, `proposal`: a proposal accepted, design 26)
+    extra: dict | None = None
 
 
 def head_blob(repo: Path, rel: str) -> str | None:
@@ -602,6 +604,8 @@ def _append(dep: Deployment, req: AppendRequest) -> dict:
     }
     if req.tier:
         entry["tier"] = req.tier
+    for key, value in (req.extra or {}).items():
+        entry.setdefault(key, value)
     for repo, shas in to_pin.items():  # pin first: a failed pin leaves no entry behind
         pin(repo, shas)
     write(dep, entry)
