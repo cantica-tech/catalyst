@@ -205,3 +205,24 @@ def test_an_unknown_command_or_agent_exits_2(project, capsys):
     assert "/nope is not in CODE-OF-CONDUCT.md" in capsys.readouterr().err
     assert main(["agent", "run", "--agent", "codex", "alpha"]) == 2
     assert "no run adapter for agent 'codex'" in capsys.readouterr().err
+
+
+def test_each_run_is_logged_for_this_user_and_listed_with_its_cost(project, tmp_path, monkeypatch, capsys):
+    """REQ-000050: the run log in catalyst's home, never in the criterion or the project."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("CATALYST_HOME", str(home))
+    assert _run(monkeypatch, capsys, Replay(tmp_path, CLEAN), "alpha", "x")[0] == 0
+    assert _run(monkeypatch, capsys, Replay(tmp_path, STREAM), "alpha", "y")[0] == 1
+    logged = list(home.glob("projects/*/runs.jsonl"))
+    assert len(logged) == 1 and not list(project.rglob("runs.jsonl"))
+    capsys.readouterr()
+    assert main(["agent", "runs", "--json"]) == 0
+    items = json.loads(capsys.readouterr().out)
+    assert [(r["command"], r["arguments"], r["ok"]) for r in items] == [("alpha", "x", True), ("alpha", "y", False)]
+    assert items[0]["usage"] == {"input": 12, "output": 34, "cache_read": 5000, "cache_write": 600}
+    assert items[1]["denied"] == ["Write"]
+    assert schema_check.problems(items, schema_check.load("runs")) == []
+    assert main(["agent", "runs"]) == 0
+    assert "2 run(s), $0.0246 in all" in capsys.readouterr().out
+    assert main(["agent", "runs", "--limit", "1", "--json"]) == 0
+    assert len(json.loads(capsys.readouterr().out)) == 1

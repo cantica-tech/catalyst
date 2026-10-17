@@ -248,7 +248,9 @@ def cmd_check(args) -> int:
     report = run(dep)
     failing = report.failing(args.strict)
     if args.json:
-        json.dump({"ok": not failing, "errors": report.errors, "warnings": report.warnings}, sys.stdout, indent=2)
+        from catalyst.check import as_json
+
+        json.dump(as_json(report, dep, failing), sys.stdout, indent=2)
         print()
     else:
         if report.errors or report.warnings:
@@ -801,7 +803,40 @@ def cmd_agent_run(args) -> int:
             print(line, flush=True)
 
     end = runs.run(adapter, agent, args.command, arguments, prompt, dep.project_root, show)
+    runs.record(dep.project_root, git_actor(dep.project_root), agent, args.command, arguments, end)
     return 0 if end["ok"] else 1
+
+
+def git_actor(project: Path) -> str:
+    """Who runs: the project's `git config user.name`, else the system user."""
+    import getpass
+
+    name = proc.git(str(project), "config", "user.name").stdout.strip()
+    return name or getpass.getuser()
+
+
+def cmd_agent_runs(args) -> int:
+    """`agent runs [--limit N] [--json]`: this user's logged runs for the
+    project, with what each cost (`agent run` writes them)."""
+    from catalyst import run as runs
+
+    dep = open_deployment(args)
+    items = runs.runs(dep.project_root, args.limit)
+    if args.json:
+        print(json.dumps(items, indent=2, ensure_ascii=False))
+        return 0
+    total = 0.0
+    for r in items:
+        cost = r.get("cost_usd")
+        total += cost if isinstance(cost, (int, float)) else 0.0
+        u = r.get("usage") or {}
+        print(
+            f"{r.get('timestamp')}  {'ok    ' if r.get('ok') else 'FAILED'}  /{r.get('command')} {r.get('arguments') or ''}".rstrip()
+            + f"  ({u.get('input', 0)} in, {u.get('output', 0)} out"
+            + (f", ${cost:.4f})" if isinstance(cost, (int, float)) else ")")
+        )
+    print(f"catalyst: {len(items)} run(s), ${total:.4f} in all")
+    return 0
 
 
 AGENT_BINARIES = {"claude-code": "claude"}  # an agent id whose CLI binary has another name
@@ -2212,6 +2247,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--agent", help="this run's agent (default: the one `catalyst open --agent` records)")
     q.add_argument("--json", action="store_true", help="the events as JSON lines (spec/run-event.schema.json)")
     q.set_defaults(func=cmd_agent_run)
+    q = ags.add_parser("runs", help="this user's logged runs for the project, with what each cost")
+    q.add_argument("--limit", type=int, help="only the last N")
+    q.add_argument("--json", action="store_true", help="the log's lines (spec/runs.schema.json)")
+    q.set_defaults(func=cmd_agent_runs)
 
     p = sub.add_parser("mcp", help="serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants")
     p.set_defaults(func=cmd_mcp)
