@@ -513,7 +513,6 @@ its CLI not on `PATH`. Only Claude Code has an adapter
 (`claude -p … --output-format stream-json`). No route of `catalyst serve`
 starts a run (roadmap R5.5; whether the UI launches agents is open).
 
-
 ### `catalyst agent runs [--limit <n>] [--json]`
 
 This user's logged runs for the project, oldest first: each `agent run`
