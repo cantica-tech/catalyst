@@ -6,7 +6,9 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.78.0 — 2026-10-17
+
+What a UI's read side needs from the engine: check findings with their entity, rule coverage, and this user's run log. No layout change, no migration.
 
 - `check --json` (and `GET /v1/check`) gains `findings`: each error and
   warning with its level, its text and the entity it is about, so a client
