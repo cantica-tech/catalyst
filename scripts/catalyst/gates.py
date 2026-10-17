@@ -60,10 +60,10 @@ def _raw(dep: Deployment) -> list | None:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise GateError(f"{GATES}: not JSON ({exc})") from None
+        raise GateError(f"{GATES.as_posix()}: not JSON ({exc})") from None
     gates = data.get("gates") if isinstance(data, dict) else None
     if not isinstance(gates, list):
-        raise GateError(f'{GATES}: a "gates" list is expected')
+        raise GateError(f'{GATES.as_posix()}: a "gates" list is expected')
     return gates
 
 
@@ -85,7 +85,7 @@ def problems(dep: Deployment, corpus: Corpus) -> list[str]:
         return []
     out, seen, roles = [], set(), _roles(dep)
     for i, g in enumerate(raw):
-        where = f"{GATES} gate {i + 1}"
+        where = f"{GATES.as_posix()} gate {i + 1}"
         if not isinstance(g, dict):
             out.append(f"{where}: not an object")
             continue
@@ -96,12 +96,12 @@ def problems(dep: Deployment, corpus: Corpus) -> list[str]:
             out.append(f"{where}: `id` {gid} is declared twice")
         else:
             seen.add(gid)
-            where = f"{GATES} gate {gid}"
+            where = f"{GATES.as_posix()} gate {gid}"
         n = g.get("approvals")
         if not isinstance(n, int) or isinstance(n, bool) or n < 1:
             out.append(f"{where}: `approvals` is a whole number, at least 1")
         if g.get("role") not in roles:
-            out.append(f"{where}: `role` {g.get('role')!r} is not a role of {ROLES}")
+            out.append(f"{where}: `role` {g.get('role')!r} is not a role of {ROLES.as_posix()}")
         covers = g.get("covers")
         if not isinstance(covers, dict) or len(covers) != (2 if "type" in (covers or {}) else 1):
             out.append(f'{where}: `covers` is {{"rules": {{"domain": …}}}} or {{"type": …, "to": …}}')
@@ -241,7 +241,7 @@ def approve(
         raise GateError(f"no artifact or rule '{item_id}' in this deployment")
     gate = next((g for g in load(dep, corpus) if g.id == gate_id), None)
     if gate is None:
-        raise GateError(f"no gate '{gate_id}' in {GATES}")
+        raise GateError(f"no gate '{gate_id}' in {GATES.as_posix()}")
     if gate not in covering(dep, corpus, found):
         raise GateError(f"gate {gate_id} does not cover {found} ({gate.describe()})")
     if not signer.get("active", True):
@@ -308,7 +308,7 @@ def entering(dep: Deployment, corpus: Corpus, prefix: str, state: str) -> list[G
         gates = load(dep, corpus)
     except GateError as exc:
         if (dep.root / GATES).is_file():
-            raise GateError(f"{exc} — fix {GATES} before moving an entity") from None
+            raise GateError(f"{exc} — fix {GATES.as_posix()} before moving an entity") from None
         raise
     return [g for g in gates if g.covers_move(prefix, state)]
 
