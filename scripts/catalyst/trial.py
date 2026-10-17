@@ -19,6 +19,7 @@ import io
 import os
 import shlex
 import shutil
+import stat
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -85,9 +86,15 @@ def make(dep: Deployment, keep: bool = False) -> Scratch:
     return Scratch(root, keep)
 
 
+def _writable_then_retry(func, path, _exc) -> None:
+    """Git keeps its objects read-only, which Windows will not delete: make one writable and remove it again."""
+    os.chmod(path, stat.S_IWRITE)  # noqa: PTH101
+    func(path)
+
+
 def remove(scratch: Scratch) -> None:
-    if not scratch.keep:
-        shutil.rmtree(scratch.root, ignore_errors=True)
+    if not scratch.keep and scratch.root.exists():
+        shutil.rmtree(scratch.root, onerror=_writable_then_retry)  # onerror: Python 3.11 has no onexc
 
 
 def _findings(dep: Deployment) -> list[dict]:
