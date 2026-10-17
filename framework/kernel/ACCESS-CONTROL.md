@@ -11,7 +11,7 @@ previously laid out the full read/write picture per role, or answered
 "when can the agent write without asking, and signed as whom", and what
 actually controls a shared deployment.
 
-## 1. Read is universal. Write is advisory, with two genuinely enforced exceptions.
+## 1. Read is universal. Write is advisory, with three genuinely enforced exceptions.
 
 Catalyst has **no read restriction of any kind, for any role.** Nothing in
 `INVARIANTS.md`, `Rules-of-Rules.md`, or any command spec gates a read by
@@ -24,7 +24,7 @@ advisory notes on writes it can at least attribute after the fact via
 
 **Write is role-scoped, but almost entirely advisory** (INV-25): acting
 outside your role's typical actions never blocks the write — it proceeds,
-noted rather than gated. Two things are hard exceptions, enforced regardless
+noted rather than gated. Three things are hard exceptions, enforced regardless
 of role or identity:
 
 - **INV-16** — a write that would leave zero active users in
@@ -32,10 +32,17 @@ of role or identity:
   case).
 - **INV-21 / `rr-META-016`** — resolving a `RECON-` reconciliation case is
   gated by the actor's `reconciliation` field (`full`/`propose`/`none`) in
-  `IAM/roles/roles.json`. This is the *one* place role genuinely determines
-  whether a write is allowed at all, not just whether it's noted.
+  `IAM/roles/roles.json`. Role genuinely determines whether this write is
+  allowed at all, not just whether it's noted.
+- **Approval gates** (`rr-META-011`, opt-in) — when a deployment declares
+  them in `IAM/gates.json`, `catalyst status set` refuses to move an entity
+  into a gated state, and `catalyst check` errors on a gated rule's text,
+  until the current version has the gate's approvals (`catalyst approve`)
+  from users holding its role, never its author; `--force` does not pass a
+  gate. Without the file there is no gate.
 
-Both are enforced by the agent, which trusts the self-declared signer. In a
+All three are enforced by the CLI and the agent, which trust the
+self-declared signer. In a
 shared deployment (`rr-META-013`), the gates that do not depend on the
 agent's good faith are the hosting service's: who may merge into the
 shared branch, pull-request review, and the required `catalyst` check,
@@ -137,8 +144,8 @@ active users the CLI refuses to guess (`--as` required), and neither
 
 - Read: unrestricted, always, for everyone.
 - Write: advisory by default (INV-25) — proceeds and notes, never asks or
-  blocks — except reconciliation resolution (INV-21) and the INV-16
-  active-user floor, which the agent enforces.
+  blocks — except reconciliation resolution (INV-21), the approval gates a
+  deployment declares (`IAM/gates.json`) and the INV-16 active-user floor.
 - Shared deployments: branch protection, pull-request review and the
   required `catalyst` check are the controls that do not rely on the agent.
 - Signing identity: session-resolved once, reused thereafter; asked when

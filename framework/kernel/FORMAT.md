@@ -387,7 +387,8 @@ one user is active (INV-16), every userid is well-formed and unique
 ```
 
 `reconciliation` is `full`, `propose` or `none` (INV-21). Structure: the
-file exists. Role checks are advisory (`Rules-of-Rules.md` §11).
+file exists. Role checks are advisory, except reconciliation and the
+approval gates of `IAM/gates.json` (`Rules-of-Rules.md` §11).
 
 ## 7. The journal
 

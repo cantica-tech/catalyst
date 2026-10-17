@@ -1,20 +1,24 @@
-"""Approval gates, opt-in (decision G, design 25, REQ-000051 A1 and A2):
-`IAM/gates.json` read and checked, `catalyst approve` journaling an
-approval of one version, `catalyst approvals` counting them."""
+"""Approval gates, opt-in (decision G, design 25): `IAM/gates.json` read and
+checked, `catalyst approve` journaling an approval of one version,
+`catalyst approvals` counting them (REQ-000051, A1 and A2); `status set`,
+`new` and `restore` refused into a gated state and `check` erroring on a
+gated rule's unapproved text (REQ-000052, A3); the inbox's `approval` kind
+and the served approvals (REQ-000052, A4)."""
 
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 import pytest
 
 import schema_check
-from catalyst import check, gates
+from catalyst import check, gates, inbox, serve
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
-from catalyst_fixtures import journal_entries, write
+from catalyst_fixtures import USERID, journal_entries, write
 from test_catalyst_history import RULE, lived  # noqa: F401 (the fixture)
 
 SPEC = Path(__file__).resolve().parents[1]
@@ -114,7 +118,7 @@ def test_an_approval_is_of_a_version_and_never_the_authors(lived, capsys):  # no
     assert main(["approvals", item]) == 0
     assert "1/1 from Reviewer (cy); passed" in capsys.readouterr().out
     errors = check.run(load(project)).errors  # the fixture is no full deployment: its structure errors aside,
-    assert [e for e in errors if e.startswith(("journal", "gates"))] == []  # approvals keep the journal sound
+    assert [e for e in errors if e.startswith(("journal", "gates:"))] == []  # approvals keep the journal sound
 
 
 def test_a_rule_gate_counts_two_reviewers(lived, capsys):  # noqa: F811
@@ -128,3 +132,95 @@ def test_a_rule_gate_counts_two_reviewers(lived, capsys):  # noqa: F811
     assert (got["counted"], got["missing"]) == (["bob", "cy"], 0)
     with pytest.raises(gates.GateError):
         gates.approve(dep, load_corpus(dep), "ITEM-999999", "item-done", load_corpus(dep).user("bob"), [])
+
+
+def test_a_gated_state_waits_for_its_approvals(lived, capsys):  # noqa: F811
+    project, _, _ = lived
+    _iam(project)
+    fields = ["--field", f"Targets={RULE}", "--field", "Domain=AUTH"]
+    assert main(["new", "ITEM", "--title", "Third", "--as", "ada", *fields]) == 0
+    item = capsys.readouterr().out.split()[0]
+    for force in ([], ["--force"]):  # --force passes a guard, never a gate
+        assert main(["status", "set", item, "Done", "--as", "ada", *force]) == 1
+        said = capsys.readouterr().err
+        assert "gate item-done lacks 1 of 1 approval(s) from Reviewer" in said and "--force does not pass" in said
+    assert main(["new", "ITEM", "--title", "Born done", "--as", "ada", *fields, "--field", "Status=Done"]) == 1
+    assert "through gate item-done" in capsys.readouterr().err
+    assert main(["approve", item, "--gate", "item-done", "--as", "bob"]) == 0
+    assert main(["status", "set", item, "Done", "--as", "ada", "--intent", "approved"]) == 0
+    capsys.readouterr()
+    assert "| **Status** | Done |" in next((project / ".criterion" / "items").glob(item[:11] + "*")).read_text()
+
+
+def test_a_malformed_gate_file_refuses_the_moves(lived, capsys):  # noqa: F811
+    project, item, _ = lived
+    _iam(
+        project, {"gates": [{"id": "x", "covers": {"type": "ITEM", "to": "Nope"}, "approvals": 1, "role": "Reviewer"}]}
+    )
+    assert main(["status", "set", item, "Open", "--as", "ada"]) == 1
+    assert "fix IAM/gates.json" in capsys.readouterr().err
+
+
+def test_restore_does_not_bring_back_a_gated_state(lived, capsys):  # noqa: F811
+    project, item, _ = lived  # Done before any gate was declared
+    _iam(project)
+    assert main(["status", "set", item, "Open", "--as", "ada", "--intent", "reopened"]) == 0  # Open is not gated
+    capsys.readouterr()
+    assert main(["restore", item, "--to", "#3", "--as", "ada"]) == 1
+    assert "moves it to Done, a gated state" in capsys.readouterr().err
+    assert main(["approve", item, "--gate", "item-done", "--as", "bob"]) == 0
+    assert main(["restore", item, "--to", "#3", "--as", "ada"]) == 0  # approved: the way back is open: no gate entered
+
+
+def test_check_errors_on_a_gated_rule_until_approved(lived, capsys):  # noqa: F811
+    project, _, _ = lived
+    _iam(project)
+
+    def unapproved():
+        return [e for e in check.run(load(project)).errors if e.startswith("gates unapproved")]
+
+    assert len(unapproved()) == 1 and RULE in unapproved()[0] and "lacks 2 of 2" in unapproved()[0]
+    assert main(["approve", RULE, "--gate", "auth-rules", "--as", "bob"]) == 0
+    assert "lacks 1 of 2" in unapproved()[0]
+    assert main(["approve", RULE, "--gate", "auth-rules", "--as", "cy"]) == 0
+    capsys.readouterr()
+    assert unapproved() == []
+    _iam(project, None)
+    (project / ".criterion" / gates.GATES).unlink()
+    assert unapproved() == []  # no file, no gate
+
+
+def test_the_inbox_lists_what_waits_for_an_approval(lived, capsys):  # noqa: F811
+    project, done, _ = lived
+    _iam(project)
+    dep = load(project)
+    found = inbox.inbox(dep, load_corpus(dep))
+    assert schema_check.problems(found, schema_check.load("inbox")) == []
+    waiting = {i["id"]: i for i in found["items"] if i["kind"] == "approval"}
+    first = f"ITEM-000001-{USERID}"  # Open: one move from Done; `done` is in it already
+    assert set(waiting) == {RULE, first} and found["counts"]["approval"] == 2
+    assert waiting[first]["settle"] == [f"catalyst approve {first} --gate item-done"]
+    assert (waiting[RULE]["evidence"]["missing"], waiting[RULE]["evidence"]["role"]) == (2, "Reviewer")
+    assert main(["approve", first, "--gate", "item-done", "--as", "bob"]) == 0
+    assert main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert "approvals waiting: 1" in out and RULE in out and first not in out.split("approvals waiting")[1]
+    assert done not in out
+
+
+def test_the_server_answers_approvals_like_the_verb(lived, capsys):  # noqa: F811
+    project, item, _ = lived
+    _iam(project)
+    httpd, token = serve.make_local(project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert main(["approvals", item, "--json"]) == 0
+        assert client.call("GET", f"/approvals/{item}") == json.loads(capsys.readouterr().out)
+        assert [i["kind"] for i in client.call("GET", "/inbox")["items"]].count("approval") == 2
+        with pytest.raises(serve.ServeError) as err:
+            client.call("GET", "/approvals/NOPE-000001")
+        assert err.value.status == 404
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

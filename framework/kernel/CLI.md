@@ -888,6 +888,22 @@ naming an unknown role, domain, type or state, as an error.
   (`spec/approvals.schema.json`). Once the text changes, earlier approvals
   no longer count.
 
+Gates are enforced (`Rules-of-Rules.md` §11):
+
+- `catalyst status set` into a gated state is refused until the gate's
+  approvals for the entity's current version are recorded; the refusal
+  names how many are missing and from which role. `--force` passes the
+  module's guards, never a gate: a gate that must be passed is removed in
+  `IAM/gates.json`, a journaled change. `catalyst new` refuses an initial
+  status a gate covers, and `catalyst restore` a version whose Status
+  enters a gated state without its approvals. A malformed `IAM/gates.json`
+  refuses every move until it is fixed.
+- `catalyst check` reports one error (`gates unapproved`) per rule of a
+  gated domain whose current text lacks its approvals; a retired rule is
+  left out.
+- `catalyst inbox` lists what waits (kind `approval`), and
+  `GET approvals/<id>` answers `catalyst approvals <id> --json`.
+
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
@@ -945,14 +961,17 @@ generate its types from.
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
 - `catalyst inbox`: what waits for a person, each item with its `evidence`
-  and `settle`, the commands that settle it. Four kinds: a commit made
+  and `settle`, the commands that settle it. Five kinds: a commit made
   outside catalyst whose changes the journal does not record
   (`unrecorded-commit`: adopt it or revert it); a changed or new project
   file not journaled yet (`unrecorded-change`); a reconciliation case that
   is not closed (`reconciliation`: the decisions `catalyst reconcile`
-  takes); an analysis in its deciding phase (`analysis`). It lists and
+  takes); an analysis in its deciding phase (`analysis`); a gated change
+  waiting for its approvals (`approval`: a gated rule whose text lacks
+  them, or an open entity one move away from a gated state that lacks them
+  for its current version; `catalyst approve` settles it). It lists and
   settles nothing, and exits `0` whether or not anything waits. A bare
-  working copy has no project history and lists the last two kinds only.
+  working copy has no project history and lists the last three kinds only.
   The payload is described by `spec/inbox.schema.json`.
 
 ### `catalyst unrecorded [<range>] [--json]`
@@ -1264,9 +1283,10 @@ own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 `GET commands` and `GET spec/<command>[/<part>]` (`catalyst spec --json`;
 a criterion without a `CODE-OF-CONDUCT.md` lists no command), and
 `GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
-server the content comes from the blobs it holds), and `GET inbox`
+server the content comes from the blobs it holds), `GET approvals/<id>`
+(`catalyst approvals <id> --json`), and `GET inbox`
 (`catalyst inbox`; a server has no project history, so its inbox holds the
-reconciliation cases and the analyses only). Each
+reconciliation cases, the analyses and the approvals only). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an
 unknown type or ID is a 404 with the CLI's message. `GET events` is a
 server-sent event stream: the current batch on connect, then each new batch

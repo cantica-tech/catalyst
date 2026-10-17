@@ -163,11 +163,15 @@ def _same(user: dict, actor: str | None) -> bool:
     return bool(a) and a in {str(user.get(k, "")).strip().lower() for k in ("name", "git_username", "userid")}
 
 
-def author(dep: Deployment, path: str, blob: str) -> str | None:
+def _ledger(dep: Deployment) -> list[dict]:
+    return [entry for _, entry, _ in journal.read(dep) if entry]
+
+
+def author(dep: Deployment, path: str, blob: str, entries: list[dict] | None = None) -> str | None:
     """Who wrote this version: the actor of the last entry whose content after it is."""
     who = None
-    for _, entry, _ in journal.read(dep):
-        if not entry or entry.get("action") == APPROVE:
+    for entry in _ledger(dep) if entries is None else entries:
+        if entry.get("action") == APPROVE:
             continue
         for f in entry.get("files") or []:
             if isinstance(f, dict) and f.get("path") == path and f.get("after") == blob:
@@ -175,13 +179,12 @@ def author(dep: Deployment, path: str, blob: str) -> str | None:
     return who
 
 
-def recorded(dep: Deployment, item_id: str, gate_id: str, blob: str) -> list[str]:
+def recorded(dep: Deployment, item_id: str, gate_id: str, blob: str, entries: list[dict] | None = None) -> list[str]:
     """The actors of the approvals of this gate for this version, in order, each once."""
     out: list[str] = []
-    for _, entry, _ in journal.read(dep):
+    for entry in _ledger(dep) if entries is None else entries:
         if (
-            entry
-            and entry.get("action") == APPROVE
+            entry.get("action") == APPROVE
             and entry.get("artifact") == item_id
             and entry.get("gate") == gate_id
             and (entry.get("approved") or {}).get("blob") == blob
@@ -191,12 +194,20 @@ def recorded(dep: Deployment, item_id: str, gate_id: str, blob: str) -> list[str
     return out
 
 
-def counted(dep: Deployment, corpus: Corpus, gate: Gate, item_id: str) -> tuple[list[str], int]:
+def counted(
+    dep: Deployment,
+    corpus: Corpus,
+    gate: Gate,
+    item_id: str,
+    entries: list[dict] | None = None,
+    current: tuple[str, str] | None = None,
+) -> tuple[list[str], int]:
     """(the approvals that count for the entity's current version, how many are missing)."""
-    path, blob = version(dep, corpus, item_id)
-    wrote = author(dep, path, blob)
+    entries = _ledger(dep) if entries is None else entries
+    path, blob = current or version(dep, corpus, item_id)
+    wrote = author(dep, path, blob, entries)
     counts = []
-    for actor in recorded(dep, item_id, gate.id, blob):
+    for actor in recorded(dep, item_id, gate.id, blob, entries):
         user = corpus.user(actor)
         if user and user.get("active", True) and gate.role in (user.get("roles") or []) and not _same(user, wrote):
             counts.append(actor)
@@ -287,3 +298,98 @@ def report(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
             }
         )
     return {"id": found, "version": blob, "gates": out}
+
+
+# --- enforcing them (design 25 A3, A4) ------------------------------------------
+def entering(dep: Deployment, corpus: Corpus, prefix: str, state: str) -> list[Gate]:
+    """The gates an entity of this type passes to enter this state. A malformed
+    `IAM/gates.json` refuses every move it could cover: a gate fails closed."""
+    try:
+        gates = load(dep, corpus)
+    except GateError as exc:
+        if (dep.root / GATES).is_file():
+            raise GateError(f"{exc} — fix {GATES} before moving an entity") from None
+        raise
+    return [g for g in gates if g.covers_move(prefix, state)]
+
+
+def refusal(dep: Deployment, corpus: Corpus, item_id: str, state: str) -> str | None:
+    """Why the entity may not enter `state` yet — the gates whose approvals for
+    its current version are missing, how many and from which role — or None."""
+    prefix = corpus.artifacts[item_id][0].prefix if item_id in corpus.artifacts else None
+    short = []
+    for g in entering(dep, corpus, prefix or "", state):
+        _, missing = counted(dep, corpus, g, item_id)
+        if missing:
+            short.append(f"gate {g.id} lacks {missing} of {g.approvals} approval(s) from {g.role}")
+    if not short:
+        return None
+    return (
+        f"{item_id} cannot become {state}: {'; '.join(short)} for its current version "
+        f"(`catalyst approve {item_id} --gate <gate>`; --force does not pass a gate)"
+    )
+
+
+def _waiting_entry(g: Gate, item_id: str, blob: str, counts: list[str], missing: int) -> dict:
+    return {
+        "id": item_id,
+        "gate": g.id,
+        "role": g.role,
+        "approvals": g.approvals,
+        "covers": {"rules": {"domain": g.domain}} if g.domain else {"type": g.type, "to": g.to},
+        "version": blob,
+        "counted": counts,
+        "missing": missing,
+    }
+
+
+def unapproved_rules(dep: Deployment, corpus: Corpus) -> list[dict]:
+    """Each rule a gate covers whose current text lacks its approvals (`check` errors
+    on each); a malformed or absent `IAM/gates.json` gives none (`check` reports it)."""
+    try:
+        gates = [g for g in load(dep, corpus) if g.domain]
+    except GateError:
+        return []
+    if not gates:
+        return []
+    entries, blobs, out = _ledger(dep), {}, []
+    for rid in sorted(corpus.rules):
+        rule = corpus.rules[rid][0]
+        if rule.retired:
+            continue
+        for g in (g for g in gates if g.covers_rule(rid)):
+            if rule.file not in blobs:
+                blobs[rule.file] = version(dep, corpus, rid)
+            counts, missing = counted(dep, corpus, g, rid, entries, blobs[rule.file])
+            if missing:
+                out.append(_waiting_entry(g, rid, blobs[rule.file][1], counts, missing))
+    return out
+
+
+def waiting(dep: Deployment, corpus: Corpus) -> list[dict]:
+    """What waits for an approval (`catalyst inbox` kind `approval`): every gated
+    rule whose text lacks its approvals, and every open entity one move away from
+    a gated state — a state a transition leads into from its own, or any when its
+    type declares no transitions — that lacks them for its current version."""
+    out = unapproved_rules(dep, corpus)
+    try:
+        gates = [g for g in load(dep, corpus) if g.type]
+    except GateError:
+        return out
+    entries = _ledger(dep) if gates else []
+    for g in gates:
+        etd = dep.etds.get(g.type) if g.type else None
+        if etd is None or g.type is None or g.to is None:
+            continue
+        moves = {(t.from_state, t.to_state) for t in etd.workflow.transitions}
+        for art in corpus.by_prefix.get(g.type, []):
+            state = (art.get("Status") or "").strip().strip("`")
+            if state == g.to or state in etd.workflow.closed_states:
+                continue
+            if moves and (state, g.to) not in moves:
+                continue
+            current = version(dep, corpus, art.id)
+            counts, missing = counted(dep, corpus, g, art.id, entries, current)
+            if missing:
+                out.append(_waiting_entry(g, art.id, current[1], counts, missing))
+    return out
