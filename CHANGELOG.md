@@ -25,6 +25,9 @@ Approval gates, opt-in (decision G, design 25, steps A1 and A2): declared and ch
   the approvals that count for its current version and how many are missing
   (`spec/approvals.schema.json`). Once the text changes, earlier approvals
   no longer count.
+- Fix: `catalyst module install` no longer fails when git's background gc
+  moves objects while the install takes its snapshot; the snapshot never
+  enters `.git` or `.venv`.
 
 ## 0.78.0 — 2026-10-17
 
