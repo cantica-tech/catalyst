@@ -29,7 +29,7 @@ Approval gates enforced (decision G, design 25, steps A3 and A4). A deployment w
   reconciliation and approval gates; `ACCESS-CONTROL.md`, `INVARIANTS.md`
   INV-16 and `FORMAT.md` say the same.
 
-## 0.79.0 — 2026-10-17
+## 0.79.0 — released with 0.80.0
 
 Approval gates, opt-in (decision G, design 25, steps A1 and A2): declared and checked, approvals recorded and counted. Nothing is enforced yet; that comes with A3. No layout change, no migration.
 
