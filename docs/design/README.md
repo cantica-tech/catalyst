@@ -23,3 +23,5 @@ and the code disagree, the code, `framework/kernel/` and `CHANGELOG.md` are righ
 | [21](21-module-install-design.md) | Installing modules |
 | [22](22-engine-for-ui-views.md) | What the engine owes a UI's views: impact, history, inbox, a served page |
 | [25](25-approval-gates.md) | Approval gates, opt-in: declared in IAM, approvals of a version, enforced by `status set` and `check` (decided 2026-10-17) |
+| [26](26-proposals.md) | Proposals: a change offered for review before it lands, as a reconciliation that carries its content (decided 2026-10-17) |
+| [27](27-impact-simulation.md) | Impact simulation: `catalyst try`, one change made on a scratch copy, the findings it adds and clears (decided 2026-10-17) |

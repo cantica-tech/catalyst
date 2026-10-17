@@ -217,6 +217,22 @@ def _next_states(dep: Deployment, corpus: Corpus, art: Artifact) -> list[dict]:
     return [{"state": s, "blocked_by": failures(dep, corpus, art, s)} for s in dict.fromkeys(states)]
 
 
+def _proposal(dep: Deployment, corpus: Corpus, art) -> dict:
+    """A proposal's entity, base and proposed blobs, with both contents, so a
+    client shows the diff without a blob route (design 26)."""
+    from catalyst import history, proposals
+
+    p = proposals.info(dep, corpus, art)
+    fetch = history.git_blob(dep)
+    base = fetch(p["base"]) if p["base"] else None
+    proposed = dep.root / p["file"]
+    return {
+        **{k: p[k] for k in ("entity", "path", "base", "proposed", "author")},
+        "content_base": base.decode("utf-8", "replace") if base is not None else None,
+        "content_proposed": proposed.read_text(encoding="utf-8") if proposed.is_file() else None,
+    }
+
+
 def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
     item_id = resolve(corpus, item_id) or item_id
     arts = corpus.artifacts.get(item_id)
@@ -228,6 +244,10 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
         }
         out["sections"] = _sections(art.file.read_text(encoding="utf-8"))
         out["next"] = _next_states(dep, corpus, art)
+        from catalyst import proposals
+
+        if proposals.is_proposal(art):
+            out["proposal"] = _proposal(dep, corpus, art)
     elif corpus.rule_id(item_id):
         item_id = corpus.rule_id(item_id) or item_id
         rule = corpus.rules[item_id][0]

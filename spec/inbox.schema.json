@@ -23,7 +23,8 @@
         "unrecorded-change",
         "reconciliation",
         "analysis",
-        "approval"
+        "approval",
+        "proposal"
       ],
       "properties": {
         "unrecorded-commit": {
@@ -43,6 +44,10 @@
           "minimum": 0
         },
         "approval": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "proposal": {
           "type": "integer",
           "minimum": 0
         }
@@ -68,7 +73,8 @@
             "unrecorded-change",
             "reconciliation",
             "analysis",
-            "approval"
+            "approval",
+            "proposal"
           ]
         },
         "id": {
@@ -80,13 +86,16 @@
         },
         "evidence": {
           "type": "object",
-          "description": "What the item rests on. A commit: `commit`, `author`, `files` (each `path`, `before`, `after`). A change: `path`. A case: `status`, `entity`. An analysis: `status`, `scope`. An approval: `gate`, `role`, `approvals` (how many the gate asks), `counted` (who approved the current version, each counting), `missing`, `version` (the blob of the entity's file).",
+          "description": "What the item rests on. A commit: `commit`, `author`, `files` (each `path`, `before`, `after`). A change: `path`. A case: `status`, `entity`. An analysis: `status`, `scope`. An approval: `gate`, `role`, `approvals` (how many the gate asks), `counted` (who approved the current version, each counting), `missing`, `version` (the blob of the entity's file). A proposal: `status`, `entity`, `path` (the entity's file), `base` (its blob when proposed), `proposed` (the proposed content's blob), `author` (who wrote the proposed version).",
           "properties": {
             "commit": {
               "type": "string"
             },
             "author": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "files": {
               "type": "array",
@@ -117,7 +126,10 @@
               }
             },
             "path": {
-              "type": "string"
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "status": {
               "type": "string"
@@ -156,6 +168,18 @@
             },
             "version": {
               "type": "string"
+            },
+            "base": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "proposed": {
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         },

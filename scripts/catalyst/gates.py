@@ -168,14 +168,15 @@ def _ledger(dep: Deployment) -> list[dict]:
 
 
 def author(dep: Deployment, path: str, blob: str, entries: list[dict] | None = None) -> str | None:
-    """Who wrote this version: the actor of the last entry whose content after it is."""
+    """Who wrote this version: the actor of the last entry whose content after it is
+    — or, for an accepted proposal, the proposed version's author (`proposed_by`)."""
     who = None
     for entry in _ledger(dep) if entries is None else entries:
         if entry.get("action") == APPROVE:
             continue
         for f in entry.get("files") or []:
             if isinstance(f, dict) and f.get("path") == path and f.get("after") == blob:
-                who = entry.get("actor")
+                who = entry.get("proposed_by") or entry.get("actor")
     return who
 
 
@@ -201,11 +202,13 @@ def counted(
     item_id: str,
     entries: list[dict] | None = None,
     current: tuple[str, str] | None = None,
+    wrote: str | None = None,
 ) -> tuple[list[str], int]:
-    """(the approvals that count for the entity's current version, how many are missing)."""
+    """(the approvals that count for the entity's current version — or the
+    `current` (path, blob) given, by its author `wrote` — how many are missing)."""
     entries = _ledger(dep) if entries is None else entries
     path, blob = current or version(dep, corpus, item_id)
-    wrote = author(dep, path, blob, entries)
+    wrote = wrote if current and wrote is not None else author(dep, path, blob, entries)
     counts = []
     for actor in recorded(dep, item_id, gate.id, blob, entries):
         user = corpus.user(actor)
@@ -233,12 +236,23 @@ def approve(
     tier: str | None = None,
 ) -> dict:
     """Record one approval of the entity's current version under a gate:
-    one `approve` entry, its gate and version named; nothing else changes."""
-    from catalyst import views
+    one `approve` entry, its gate and version named; nothing else changes.
+    Named by an open proposal's case (design 26), it approves the proposed
+    version of the case's entity, which counts once the proposal lands."""
+    from catalyst import proposals, views
 
     found = views.resolve(corpus, item_id)
     if found is None:
         raise GateError(f"no artifact or rule '{item_id}' in this deployment")
+    case, p = None, {}
+    if found in corpus.artifacts and proposals.is_proposal(corpus.artifacts[found][0]):
+        case = corpus.artifacts[found][0]
+        if not proposals.is_open(case):
+            raise GateError(f"{found} is decided: approve its entity's version instead")
+        p = proposals.info(dep, corpus, case)
+        if p["path"] is None or not p["proposed"]:
+            raise GateError(f"{found} names no entity or no proposed version (`catalyst check`)")
+        found = p["entity"]
     gate = next((g for g in load(dep, corpus) if g.id == gate_id), None)
     if gate is None:
         raise GateError(f"no gate '{gate_id}' in {GATES.as_posix()}")
@@ -248,8 +262,12 @@ def approve(
         raise GateError(f"{signer.get('name')} is not an active user")
     if gate.role not in (signer.get("roles") or []):
         raise GateError(f"{signer.get('name')} does not hold the role {gate.role} that gate {gate_id} asks for")
-    path, blob = version(dep, corpus, found)
-    if _same(signer, author(dep, path, blob)):
+    if case is not None:
+        path, blob, wrote = journal.WC + p["path"], p["proposed"], p["author"]
+    else:
+        path, blob = version(dep, corpus, found)
+        wrote = author(dep, path, blob)
+    if _same(signer, wrote):
         raise GateError(
             f"{signer.get('name')} wrote this version of {found}: an author never approves their own change"
         )
@@ -269,11 +287,28 @@ def approve(
         "approved": {"path": path, "blob": blob},
         "writer": f"catalyst/{journal.__version__}",
     }
+    if case is not None:
+        entry["proposal"] = case.id
     if tier:
         entry["tier"] = tier
     with journal.journal_lock(dep):
         journal.write(dep, entry)
     return entry
+
+
+def left_after(dep: Deployment, corpus: Corpus, entry: dict) -> dict:
+    """After an approval: its gate's count for the version it approved — the
+    entity's current one, or a proposal's proposed one (`missing`)."""
+    gate = next(g for g in load(dep, corpus) if g.id == entry["gate"])
+    if entry.get("proposal"):
+        from catalyst import proposals
+
+        p = proposals.info(dep, corpus, corpus.artifacts[entry["proposal"]][0])
+        current = (entry["approved"]["path"], entry["approved"]["blob"])
+        counts, missing = counted(dep, corpus, gate, entry["artifact"], current=current, wrote=p["author"] or "")
+    else:
+        counts, missing = counted(dep, corpus, gate, entry["artifact"])
+    return {"gate": gate.id, "counted": counts, "missing": missing}
 
 
 def report(dep: Deployment, corpus: Corpus, item_id: str) -> dict:

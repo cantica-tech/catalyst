@@ -163,7 +163,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst analysis close <id>` | close once every finding is decided and accepted ones exist | `--as` |
 | `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
 | `catalyst analysis status <id>` | an analysis's phase and what it still needs | — |
-| `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--intent`, `--text` |
+| `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--from`, `--intent`, `--text` |
+| `catalyst propose <id>` | propose a change to an entity or rule document, decided by someone else | `--as`, `--from`, `--intent`, `--json`, `--tier`, `--title` |
 | `catalyst why <item>` | explain a law (L1…), an invariant (INV-n), a meta-rule or an ID | — |
 | `catalyst open` | make the project ready on this machine (join, runtime) and say where it stands | `--agent`, `--fetch`, `--json` |
 | `catalyst share info` | the driver, where the shared copy is, what it can do | `--json` |
@@ -904,6 +905,35 @@ Gates are enforced (`Rules-of-Rules.md` §11):
 - `catalyst inbox` lists what waits (kind `approval`), and
   `GET approvals/<id>` answers `catalyst approvals <id> --json`.
 
+### Proposals: `propose`
+
+A change offered for review before it lands (decision P, design 26): a
+reconciliation case with `Trigger: proposal`.
+
+- `catalyst propose <ID> --from <file> [--title <t>] [--as <user>]
+  [--intent <why>] [--json]`: opens the case, naming the entity, its file's
+  blob now (`Baseline`, the base) and the proposed content, kept beside the
+  case as `reconciliations/<RECON-id>.proposed` (`Proposed`, its blob); one
+  journal entry, the entity's file untouched. A rule is proposed as its
+  rule document, whole. `-` reads the content from standard input. Needs a
+  `propose` or `full` reconciliation role.
+- `catalyst reconcile <case> accept` writes the proposed content to the
+  entity (its derived fields recomputed), journaled by the acceptor with
+  `proposal` and `proposed_by` (the proposed version's author); refused
+  when the entity's file is no longer the base, for that author (law L4),
+  and, for a move into a gated state, until the gate's approvals of the
+  proposed version are recorded. `accept-with-edits --from <file>` writes
+  the acceptor's content instead. `propose --from <file>` revises the
+  proposal against the entity as it is now (a new base). Its author may
+  `close` it while it is open (withdrawn); `reject` writes nothing.
+- `catalyst approve <case> --gate <gate>` approves the proposed version of
+  the case's entity; once it lands those approvals count for the entity,
+  and the proposal's author, not the acceptor, is the version's author.
+- `catalyst check` reports an open proposal whose entity is gone, whose
+  base names no blob, or whose proposed file is missing or changed outside
+  catalyst. `catalyst view <case>` gives `proposal`: the entity, its file,
+  both blobs, the author and both contents.
+
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
@@ -961,7 +991,7 @@ generate its types from.
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
 - `catalyst inbox`: what waits for a person, each item with its `evidence`
-  and `settle`, the commands that settle it. Five kinds: a commit made
+  and `settle`, the commands that settle it. Six kinds: a commit made
   outside catalyst whose changes the journal does not record
   (`unrecorded-commit`: adopt it or revert it); a changed or new project
   file not journaled yet (`unrecorded-change`); a reconciliation case that
@@ -969,9 +999,12 @@ generate its types from.
   takes); an analysis in its deciding phase (`analysis`); a gated change
   waiting for its approvals (`approval`: a gated rule whose text lacks
   them, or an open entity one move away from a gated state that lacks them
-  for its current version; `catalyst approve` settles it). It lists and
+  for its current version; `catalyst approve` settles it); a proposal
+  being decided (`proposal`: its entity, file, base, proposed blob and
+  author; the `reconcile` decisions settle it), listed apart from the
+  disputes. It lists and
   settles nothing, and exits `0` whether or not anything waits. A bare
-  working copy has no project history and lists the last three kinds only.
+  working copy has no project history and lists the last four kinds only.
   The payload is described by `spec/inbox.schema.json`.
 
 ### `catalyst unrecorded [<range>] [--json]`

@@ -6,6 +6,26 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.81.0 — 2026-10-17
+
+Proposals (decision P, design 26): a change offered for review before it lands. Migration
+`0.81.0/proposals.md`: the reconciliation template gains the `proposal` trigger (a new template version, a judgment
+step); nothing is converted.
+
+- `catalyst propose <ID> --from <file>` opens a reconciliation case with `Trigger: proposal`: its entity, the
+  entity's file as it is (`Baseline`, the base) and the proposed content, kept beside the case as
+  `reconciliations/<RECON-id>.proposed`. The entity is untouched. A rule is proposed as its rule document.
+- `catalyst reconcile <case> accept` on a proposal writes the proposed content to the entity, journaled by the
+  acceptor with `proposal` and `proposed_by`. It is refused when the entity has changed since (revise it with
+  `reconcile <case> propose --from <file>`, which re-bases it), for the proposed version's own author, and for a
+  move into a gated state until the proposed version has the gate's approvals. `accept-with-edits --from <file>`
+  writes the acceptor's content; the author may `close` an open proposal.
+- `catalyst approve <case> --gate <gate>` approves the proposed version; once it lands those approvals count, with
+  the proposer as the version's author, so a gated rule can land already approved.
+- `catalyst inbox` has a sixth kind, `proposal`, listed apart from the disputes; `catalyst view <case>` gives the
+  proposal with both contents; `catalyst check` reports an open proposal whose proposed file is missing or changed
+  outside catalyst. `Rules-of-Rules.md` §16 says what a proposal is.
+
 ## 0.80.0 — 2026-10-17
 
 Approval gates enforced (decision G, design 25, steps A3 and A4). A deployment without `IAM/gates.json` sees no change. No layout change, no migration.
