@@ -164,6 +164,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
 | `catalyst analysis status <id>` | an analysis's phase and what it still needs | — |
 | `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--from`, `--intent`, `--text` |
+| `catalyst try <change>` | make one change on a scratch copy of the criterion and say what it would do (nothing is kept) | `--as`, `--json`, `--keep`, `--proposal` |
 | `catalyst propose <id>` | propose a change to an entity or rule document, decided by someone else | `--as`, `--from`, `--intent`, `--json`, `--tier`, `--title` |
 | `catalyst why <item>` | explain a law (L1…), an invariant (INV-n), a meta-rule or an ID | — |
 | `catalyst open` | make the project ready on this machine (join, runtime) and say where it stands | `--agent`, `--fetch`, `--json` |
@@ -933,6 +934,28 @@ reconciliation case with `Trigger: proposal`.
   base names no blob, or whose proposed file is missing or changed outside
   catalyst. `catalyst view <case>` gives `proposal`: the entity, its file,
   both blobs, the author and both contents.
+
+### Trying a change: `try`
+
+`catalyst try [--json] [--keep] <verb> <its arguments…>` (decision T,
+design 27) makes one change on a scratch copy of the criterion and says
+what it would do; nothing in the criterion or the project changes, and the
+journal holds nothing of it. The verb is one of catalyst's writing verbs
+(`status`, `new`, `link`, `rename`, `restore`, `approve`, `reconcile`,
+`propose`), run with its real refusals: a refused change is the answer
+(exit `1`, its message said). `catalyst try --proposal <case> --as <user>`
+tries accepting a proposal.
+
+The copy is a `git clone --shared` of the criterion under
+`$CATALYST_HOME/scratch/` (its objects read in place, its refs its own),
+with the criterion's files as they are now copied over it, uncommitted
+changes and new files included; it is removed after, or kept with
+`--keep`. The report (`spec/try.schema.json`) gives the files the change
+writes with their blobs before and after, the `check` findings it adds and
+clears (compared as text, with their entity), the `impact` of the entity
+it touched, and what it would leave waiting for an approval. The project
+side of `check` is not tried; nothing is shared. Making the change for
+real is running the same verb without `try`.
 
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 

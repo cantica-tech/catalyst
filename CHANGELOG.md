@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.82.0 — 2026-10-17
+
+Impact simulation (decision T, design 27): try a change before making it. No layout change, no migration.
+
+- `catalyst try [--json] [--keep] <verb> <its arguments…>` makes one of catalyst's writing verbs (`status`, `new`,
+  `link`, `rename`, `restore`, `approve`, `reconcile`, `propose`) on a scratch copy of the criterion — a
+  `git clone --shared` under `$CATALYST_HOME/scratch/` with the criterion's current files over it — and reports
+  what it would do: the files it writes, the `check` findings it adds and clears, the `impact` of the entity it
+  touches and the approvals it would leave waiting. A refused change is the answer, said as the verb says it.
+  Nothing in the criterion or the project changes; the copy is removed (kept with `--keep`).
+- `catalyst try --proposal <case> --as <user>` tries accepting a proposal (0.81.0).
+- The report is described by `spec/try.schema.json`.
+
 ## 0.81.0 — 2026-10-17
 
 Proposals (decision P, design 26): a change offered for review before it lands. Migration
