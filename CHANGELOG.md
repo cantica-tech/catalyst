@@ -6,6 +6,29 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.80.0 — 2026-10-17
+
+Approval gates enforced (decision G, design 25, steps A3 and A4). A deployment without `IAM/gates.json` sees no change. No layout change, no migration.
+
+- `catalyst status set` refuses to move an entity into a gated state until
+  the gate's approvals for its current version are recorded, naming how
+  many are missing and from which role. `--force` passes the module's
+  guards, never a gate: a gate that must be passed is removed in
+  `IAM/gates.json`, a journaled change. `catalyst new` refuses an initial
+  status a gate covers, and `catalyst restore` a version that enters a
+  gated state without its approvals. A malformed `IAM/gates.json` refuses
+  every move until it is fixed.
+- `catalyst check` reports one error (`gates unapproved`) per rule of a
+  gated domain whose current text lacks its approvals.
+- `catalyst inbox` has a fifth kind, `approval`: each gated rule whose text
+  lacks its approvals, and each open entity one move away from a gated
+  state that lacks them, settled by `catalyst approve`
+  (`spec/inbox.schema.json`). `catalyst serve` answers
+  `GET approvals/<id>` like `catalyst approvals <id> --json`.
+- `Rules-of-Rules.md` §11 (`rr-META-011`): roles are advisory except
+  reconciliation and approval gates; `ACCESS-CONTROL.md`, `INVARIANTS.md`
+  INV-16 and `FORMAT.md` say the same.
+
 ## 0.79.0 — 2026-10-17
 
 Approval gates, opt-in (decision G, design 25, steps A1 and A2): declared and checked, approvals recorded and counted. Nothing is enforced yet; that comes with A3. No layout change, no migration.
