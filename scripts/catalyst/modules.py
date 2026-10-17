@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -363,12 +364,17 @@ def verify(root: Path, only: str | None = None) -> list[Finding]:
 
 # --- install --------------------------------------------------------------------
 def _snapshot(root: Path) -> dict[Path, bytes]:
+    """Each file's digest, `.git` and `.venv` never entered: git's background
+    gc moves loose objects while a walk would list them."""
     skip = {".git", ".venv"}
-    return {
-        f: hashlib.sha256(f.read_bytes()).digest()
-        for f in root.rglob("*")
-        if f.is_file() and not skip & set(f.relative_to(root).parts)
-    }
+    found = {}
+    for here, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in skip]
+        for name in files:
+            f = Path(here) / name
+            if f.is_file():
+                found[f] = hashlib.sha256(f.read_bytes()).digest()
+    return found
 
 
 BULLET_RE = re.compile(r"^- `/.*?(?: —|\n(?! ))", re.M | re.S)

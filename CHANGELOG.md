@@ -6,6 +6,52 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.80.0 — 2026-10-17
+
+Approval gates enforced (decision G, design 25, steps A3 and A4). A deployment without `IAM/gates.json` sees no change. No layout change, no migration.
+
+- `catalyst status set` refuses to move an entity into a gated state until
+  the gate's approvals for its current version are recorded, naming how
+  many are missing and from which role. `--force` passes the module's
+  guards, never a gate: a gate that must be passed is removed in
+  `IAM/gates.json`, a journaled change. `catalyst new` refuses an initial
+  status a gate covers, and `catalyst restore` a version that enters a
+  gated state without its approvals. A malformed `IAM/gates.json` refuses
+  every move until it is fixed.
+- `catalyst check` reports one error (`gates unapproved`) per rule of a
+  gated domain whose current text lacks its approvals.
+- `catalyst inbox` has a fifth kind, `approval`: each gated rule whose text
+  lacks its approvals, and each open entity one move away from a gated
+  state that lacks them, settled by `catalyst approve`
+  (`spec/inbox.schema.json`). `catalyst serve` answers
+  `GET approvals/<id>` like `catalyst approvals <id> --json`.
+- `Rules-of-Rules.md` §11 (`rr-META-011`): roles are advisory except
+  reconciliation and approval gates; `ACCESS-CONTROL.md`, `INVARIANTS.md`
+  INV-16 and `FORMAT.md` say the same.
+
+## 0.79.0 — released with 0.80.0
+
+Approval gates, opt-in (decision G, design 25, steps A1 and A2): declared and checked, approvals recorded and counted. Nothing is enforced yet; that comes with A3. No layout change, no migration.
+
+- `IAM/gates.json` declares a deployment's approval gates; without it there
+  is no gate. A gate covers the rules of one domain or an entity type
+  entering one state, and asks for a number of approvals from one role.
+  `catalyst check` reports a malformed gate, or one naming an unknown role,
+  domain, type or state, as an error
+  (`framework/kernel/schemas/gates.schema.json`).
+- `catalyst approve <ID> --gate <gate> [--as] [--intent]` journals one
+  approval (action `approve`, no file changed) of the entity's current
+  version: its file's blob. It is refused for a gate that does not cover the
+  entity, a signer who is not active or lacks the role, the author of that
+  version, or a second approval of the same version by the same person.
+- `catalyst approvals <ID> [--json]` lists each gate covering the entity,
+  the approvals that count for its current version and how many are missing
+  (`spec/approvals.schema.json`). Once the text changes, earlier approvals
+  no longer count.
+- Fix: `catalyst module install` no longer fails when git's background gc
+  moves objects while the install takes its snapshot; the snapshot never
+  enters `.git` or `.venv`.
+
 ## 0.78.0 — 2026-10-17
 
 What a UI's read side needs from the engine: check findings with their entity, rule coverage, and this user's run log. No layout change, no migration.
