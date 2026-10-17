@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -230,3 +231,22 @@ def test_a_ref_is_what_follows_the_last_at(spec, source, ref):
     assert modules.split_ref(spec) == (source, ref)
     assert modules.clean_url("https://user:pw@example.test/acme/mod.git") == "https://example.test/acme/mod.git"
     assert modules.is_url("git@example.test:acme/mod.git") and not modules.is_url("/srv/mod.git")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="permissions")
+def test_the_install_snapshot_never_enters_git(tmp_path):
+    """git's background gc moves loose objects while a walk would list them
+    (a CI flake on `module install`): `.git` and `.venv` are not entered."""
+    from catalyst.modules import _snapshot
+
+    (tmp_path / "a.md").write_text("a\n")
+    for hidden in (".git", ".venv"):
+        locked = tmp_path / hidden / "objects" / "a3"
+        locked.mkdir(parents=True)
+        (locked / "x").write_text("x\n")
+        locked.chmod(0)
+    try:
+        assert _snapshot(tmp_path) == {tmp_path / "a.md": hashlib.sha256(b"a\n").digest()}
+    finally:
+        for hidden in (".git", ".venv"):
+            (tmp_path / hidden / "objects" / "a3").chmod(0o755)

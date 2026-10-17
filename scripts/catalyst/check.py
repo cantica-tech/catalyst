@@ -126,6 +126,14 @@ def run(dep: Deployment) -> Report:
     corpus = load_corpus(dep)
     for f in validate(dep, corpus):
         (report.errors if f.level == ERROR else report.warnings).append(f"chain {f.code}: {f.where}: {f.message}")
+    from catalyst import gates
+
+    report.errors += [f"gates: {p}" for p in gates.problems(dep, corpus)]
+    for w in gates.unapproved_rules(dep, corpus):
+        report.errors.append(
+            f"gates unapproved: {w['id']}: its current text lacks {w['missing']} of {w['approvals']} approval(s) "
+            f"from {w['role']} under gate {w['gate']} (`catalyst approve {w['id']} --gate {w['gate']}`)"
+        )
     from catalyst import unrecorded
 
     manual = unrecorded.since_baseline(dep) if not dep.standalone and unrecorded.baseline(dep) is not None else []

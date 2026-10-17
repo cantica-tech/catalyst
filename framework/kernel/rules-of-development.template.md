@@ -20,7 +20,8 @@ each tier needs: `Rules-of-Rules.md` §6 and the active module's part.
 
 The signer is a registered user, declared with `--as` and confirmed when more
 than one could sign — never guessed (`Rules-of-Rules.md` §11). Roles are
-advisory, except for reconciliation (§16 there). The registry files:
+advisory, except for reconciliation (§16 there) and the approval gates a
+deployment declares (`IAM/gates.json`, §11 there). The registry files:
 `FORMAT.md` §6.
 
 ## 3. Standard document types

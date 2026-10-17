@@ -170,7 +170,9 @@ to the active module keeps a one-line placeholder here
   active-module artifact, rule-linked artifact, and work item carries a
   `Signed-off-by` field. Role checks against `roles.json` are advisory — a
   mismatch proceeds anyway, noted rather than paused for (INV-25), never
-  a hard block, since catalyst cannot verify who is actually typing.
+  a hard block, since catalyst cannot verify who is actually typing —
+  except reconciliation (INV-21) and the approval gates a deployment
+  declares in `IAM/gates.json` (`Rules-of-Rules.md` §11).
   `/user remove` never deletes a user's entry; it sets `"active": false`,
   and refuses if doing so would leave zero active users — this specific
   case isn't advisory, since it would break this invariant's own hard
