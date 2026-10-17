@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cantica-tech/catalyst/framework/kernel/schemas/gates.schema.json",
+  "title": "catalyst approval gates",
+  "description": "A deployment's `IAM/gates.json` (decision G, design 25): each gate covers the rules of one domain or an entity type entering one state, and asks for a number of approvals from one role. No file, no gate. `catalyst check` reports what this schema cannot: an unknown role, domain, type or state.",
+  "type": "object",
+  "required": ["gates"],
+  "additionalProperties": false,
+  "properties": {
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "covers", "approvals", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+          "covers": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": ["rules"],
+                "additionalProperties": false,
+                "properties": {
+                  "rules": {
+                    "type": "object",
+                    "required": ["domain"],
+                    "additionalProperties": false,
+                    "properties": { "domain": { "type": "string" } }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["type", "to"],
+                "additionalProperties": false,
+                "properties": { "type": { "type": "string" }, "to": { "type": "string" } }
+              }
+            ]
+          },
+          "approvals": { "type": "integer", "minimum": 1 },
+          "role": { "type": "string" }
+        }
+      }
+    }
+  }
+}

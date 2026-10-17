@@ -217,7 +217,7 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | `check --json` names the entity of each finding, so a UI can mark drift where it shows the entity | open |
 | Coverage counts (rules with targeting work, linked tests) in `backlog` or `graph` | open |
 | A run log kept by `agent run` (who, command, ok, usage, cost), for run history and a cost meter | open |
-| Approval gates, opt-in (decision G): a gate model, approvals journaled, enforced by `status set`, rule edits and `check` | open |
+| Approval gates, opt-in (decision G): a gate model, approvals journaled, enforced by `status set`, rule edits and `check` | done, 0.79.0 and 0.80.0 (design `25`, REQ-000051, REQ-000052): `IAM/gates.json`, `approve`, `approvals`; `status set`, `new` and `restore` refuse a gated state, `check` errors on a gated rule's unapproved text, `inbox` kind `approval`, `GET approvals/<id>` |
 | A proposal path for rules and changes; a rule typing field (must, should, may) | open |
 | `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | open |
 

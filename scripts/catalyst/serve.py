@@ -184,7 +184,7 @@ class Reads:
 
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
-        backlog, journal, graph, inbox, history, impact, and the commands
+        backlog, journal, graph, inbox, history, impact, approvals, and the commands
         and their specs (`catalyst spec --json`)."""
         from catalyst import views
         from catalyst.journal import JournalError
@@ -217,6 +217,13 @@ class Reads:
 
                 depth = one("depth")
                 data = impact.impact(dep, corpus, item, one("direction") or "both", int(depth) if depth else None)
+            elif what == "approvals":
+                from catalyst import gates
+
+                try:
+                    data = gates.report(dep, corpus, item)
+                except gates.GateError as e:
+                    raise ServeError(404, str(e)) from None
             elif what == "backlog":
                 data = views.backlog(dep, corpus)
             elif what == "commands":
@@ -757,7 +764,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
                 path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands")
-                or path.startswith(("/view/", "/impact/", "/history/", "/spec/"))
+                or path.startswith(("/view/", "/impact/", "/history/", "/approvals/", "/spec/"))
             ):
                 what, _, item = path.strip("/").partition("/")
                 seq, data = self.app.read(what, urllib.parse.parse_qs(url.query), urllib.parse.unquote(item))

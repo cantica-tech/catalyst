@@ -251,6 +251,24 @@ def restore(
     content = version["content_after"]
     if content is None:
         raise EditError(f"catalyst no longer holds the version of {found} at {when}")
+    if found in corpus.artifacts:
+        from catalyst import gates
+
+        art = corpus.artifacts[found][0]
+        then = ""
+        for line in content.splitlines():
+            m = FIELD_ROW_RE.match(line)
+            if m and norm_field(m.group(1)) == norm_field("Status"):
+                cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
+                then = (cells[1] if len(cells) > 1 else "").strip("`")
+                break
+        now = (art.get("Status") or "").strip().strip("`")
+        try:
+            refused = gates.refusal(dep, corpus, found, then) if then and then != now else None
+        except gates.GateError as exc:
+            raise EditError(str(exc)) from None
+        if refused:
+            raise EditError(f"restoring {found} moves it to {then}, a gated state: {refused}")
     path = dep.root / h["file"]
     if path.is_file() and path.read_text(encoding="utf-8") == content:
         raise EditError(f"{found} is already as it stood at {when}")
@@ -309,6 +327,18 @@ def new(
     status = field_def(etd, "Status") if any(norm_field(f.name) == norm_field("Status") for f in etd.fields) else None
     if status is not None and status.name not in given:
         given[status.name] = etd.workflow.initial
+    if status is not None:
+        from catalyst import gates
+
+        try:
+            entered = gates.entering(dep, corpus, etd.id_prefix, str(given[status.name]))
+        except gates.GateError as exc:
+            raise EditError(str(exc)) from None
+        if entered:  # a version nobody approved yet: create it, approve it, then `status set`
+            raise EditError(
+                f"{etd.name} enters {given[status.name]} through gate {entered[0].id}: create it in another "
+                "state, have it approved, then `catalyst status set`"
+            )
     missing = [
         f.name
         for f in etd.fields
@@ -404,6 +434,14 @@ def set_status(
     if allowed and (old, status) not in allowed and not force:
         nexts = sorted(t for f, t in allowed if f == old)
         raise EditError(f"{etd.name} cannot go from {old} to {status} (from {old}: {', '.join(nexts) or 'nothing'})")
+    from catalyst import gates
+
+    try:
+        refused = gates.refusal(dep, corpus, item_id, status)  # before the guards: --force never passes a gate
+    except gates.GateError as exc:
+        raise EditError(str(exc)) from None
+    if refused:
+        raise EditError(refused)
     from catalyst.guards import failures
 
     blocked = failures(dep, corpus, art, status)

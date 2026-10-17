@@ -332,6 +332,66 @@ def cmd_repair(args) -> int:
     return 0
 
 
+def cmd_approve(args) -> int:
+    """`catalyst approve <ID> --gate <gate>` (decision G, design 25 A2): one
+    approval of the entity's current version, journaled."""
+    from catalyst import gates
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+    from catalyst.views import ViewError
+
+    dep = open_deployment(args)
+    corpus = load_corpus(dep)
+    try:
+        signer = resolve_signer(dep, corpus, args.as_user)
+        entry = gates.approve(dep, corpus, args.id, args.gate, signer, args.intent or [], args.tier)
+        left = next(
+            g for g in gates.report(dep, load_corpus(dep), entry["artifact"])["gates"] if g["gate"] == args.gate
+        )
+    except (IdError, JournalError, gates.GateError, ViewError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({**entry, "missing": left["missing"]}, indent=2))
+    else:
+        print(
+            f"{entry['artifact']} approved under gate {args.gate} by {entry['actor']}, journaled; "
+            + (f"{left['missing']} approval(s) still missing" if left["missing"] else "the gate is passed")
+        )
+    return 0
+
+
+def cmd_approvals(args) -> int:
+    """`catalyst approvals <ID>`: each gate covering the entity, what counts and what is missing."""
+    from catalyst import gates
+    from catalyst.corpus import load_corpus
+    from catalyst.views import ViewError
+
+    dep = open_deployment(args)
+    try:
+        data = gates.report(dep, load_corpus(dep), args.id)
+    except (gates.GateError, ViewError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(data, indent=2))
+        return 0
+    if not data["gates"]:
+        print(f"{data['id']}: no gate covers it")
+    for g in data["gates"]:
+        what = (
+            f"rules of {g['covers']['rules']['domain']}"
+            if "rules" in g["covers"]
+            else (f"{g['covers']['type']} entering {g['covers']['to']}")
+        )
+        said = ", ".join(g["counted"]) or "none"
+        print(
+            f"{data['id']} gate {g['gate']} ({what}): {len(g['counted'])}/{g['approvals']} from {g['role']} "
+            f"({said})" + (f"; {g['missing']} missing" if g["missing"] else "; passed")
+        )
+    return 0
+
+
 def cmd_edit(args) -> int:
     """Writing verbs (R2 W2): new, rename, restore, status set, link."""
     from catalyst import edit
@@ -2035,6 +2095,20 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="rename")
+
+    p = sub.add_parser("approve", help="approve an entity's current version under a gate (IAM/gates.json), journaled")
+    p.add_argument("id")
+    p.add_argument("--gate", required=True, help="the gate's id in IAM/gates.json")
+    p.add_argument("--as", dest="as_user", help="who approves (name or git_username): never the version's author")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_approve)
+
+    p = sub.add_parser("approvals", help="the gates covering an entity: approvals counted and missing")
+    p.add_argument("id")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_approvals)
 
     p = sub.add_parser("restore", help="write an entity back as it stood at a time: a new journaled change")
     p.add_argument("id")

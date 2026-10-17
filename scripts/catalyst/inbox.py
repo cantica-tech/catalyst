@@ -1,14 +1,16 @@
 """`catalyst inbox` (roadmap R5.7): what waits for a person, each item with
 its evidence and the commands that settle it.
 
-Four sources, each of which already has a verb that settles it:
+Five sources, each of which already has a verb that settles it:
 
 - commits made outside catalyst whose changes the journal does not record
   (`catalyst journal adopt`, or a revert);
 - changed or new project files not journaled yet (`catalyst journal
   append`, or the change discarded);
 - reconciliation cases that are not closed (`catalyst reconcile`);
-- analyses in their deciding phase (`catalyst analysis decide`).
+- analyses in their deciding phase (`catalyst analysis decide`);
+- gated changes waiting for their approvals, a gated rule's text or an
+  entity one move away from a gated state (`catalyst approve`; design 25).
 
 The inbox lists; it settles nothing and proposes no decision. A bare working
 copy or a served criterion has no project history, so it lists the cases
@@ -17,11 +19,11 @@ and the analyses only.
 
 from __future__ import annotations
 
-from catalyst import analysis, unrecorded
+from catalyst import analysis, gates, unrecorded
 from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
-KINDS = ("unrecorded-commit", "unrecorded-change", "reconciliation", "analysis")
+KINDS = ("unrecorded-commit", "unrecorded-change", "reconciliation", "analysis", "approval")
 RECONCILIATION = "RECON"
 DECISIONS = ("accept", "accept-with-edits", "reject", "propose")
 
@@ -59,6 +61,15 @@ def inbox(dep: Deployment, corpus: Corpus) -> dict:
             continue
         evidence = {"status": "Deciding", "scope": (art.get("Scope") or "").strip() or None}
         items.append(_item(KINDS[3], art.id, art.title, evidence, [f"catalyst analysis decide {art.id} …"]))
+    for w in gates.waiting(dep, corpus):
+        what = (
+            f"the rules of {w['covers']['rules']['domain']}"
+            if "rules" in w["covers"]
+            else f"entering {w['covers']['to']}"
+        )
+        title = f"{w['missing']} of {w['approvals']} approval(s) from {w['role']} missing ({what})"
+        evidence = {k: w[k] for k in ("gate", "role", "approvals", "counted", "missing", "version")}
+        items.append(_item(KINDS[4], w["id"], title, evidence, [f"catalyst approve {w['id']} --gate {w['gate']}"]))
     counts = {kind: sum(1 for i in items if i["kind"] == kind) for kind in KINDS}
     return {"items": items, "counts": counts}
 
@@ -71,6 +82,7 @@ def render(found: dict) -> str:
         KINDS[1]: "changes not journaled",
         KINDS[2]: "reconciliation cases",
         KINDS[3]: "analyses to decide",
+        KINDS[4]: "approvals waiting",
     }
     lines = []
     for kind in KINDS:
@@ -79,7 +91,7 @@ def render(found: dict) -> str:
             continue
         lines.append(f"{titles[kind]}: {len(mine)}")
         for i in mine:
-            about = i["evidence"].get("entity") or i["evidence"].get("author") or ""
+            about = i["evidence"].get("entity") or i["evidence"].get("author") or i["evidence"].get("gate") or ""
             lines.append(f"  {i['id']}  {i['title']}" + (f"  ({about})" if about else ""))
             lines.append(f"      {'  |  '.join(i['settle'])}")
     total = len(found["items"])
