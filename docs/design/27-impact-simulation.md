@@ -99,6 +99,16 @@ the real verb runs, with its real refusals, on a real copy. Not a way to apply a
 5. **What can be tried at 1.0**: catalyst's writing verbs and a proposal's acceptance (recommended), or also an
    arbitrary file edit (`--file <path>=<content>`), which a proposal (`26`) already covers.
 
+## 7a. As built (kernel 0.82.0, REQ-000054)
+
+- **A shared clone, not a worktree** (choice 2's alternative). A worktree shares the criterion's refs, so the journal
+  entries a try writes would move the criterion's own `refs/catalyst/journal` pin; a `git clone --shared` reads the
+  criterion's objects in place and keeps its refs to itself. The criterion's current files are copied over it as §2
+  says, and files deleted but not yet committed are deleted in the copy. Measured on catalyst's own criterion: a try
+  of a rename takes about two seconds, and the criterion's files and its journal pin are unchanged after.
+- **`--proposal` takes `--as`**, who accepts it; T3 is built with T1 and T2, proposals having shipped in 0.81.0.
+- The verb runs in-process on the copy (`--working-copy`), so a try needs no second catalyst.
+
 ## 8. Steps once confirmed
 
 | Step | Content |

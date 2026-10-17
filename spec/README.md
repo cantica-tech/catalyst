@@ -21,6 +21,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `run-event.schema.json` | `catalyst agent run <command> --json` (one per line) | — (no route starts a run) |
 | `runs.schema.json` | `catalyst agent runs --json` | `GET /v1/runs` (local mode) |
 | `approvals.schema.json` | `catalyst approvals <id> --json` | `GET /v1/approvals/<id>` |
+| `try.schema.json` | `catalyst try <verb …> --json` | — (the host runs it, design 27) |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`), with the schema of a deployment's approval
