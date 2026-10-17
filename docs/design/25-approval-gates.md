@@ -1,7 +1,7 @@
 # 25 — Approval gates, opt-in (design for the owner, 2026-10-17)
 
-> **Status: draft.** Owner decision G (2026-10-16, [decisions](../decisions.md)): approval gates are a 1.0 feature,
-> opt-in — no gate unless a deployment declares one. This note proposes how, and lists the choices to confirm (§6).
+> **Status: decided (owner, 2026-10-17), all five choices as recommended (§6).** Owner decision G (2026-10-16,
+> [decisions](../decisions.md)): approval gates are a 1.0 feature, opt-in — no gate unless a deployment declares one.
 
 ## 1. Today
 

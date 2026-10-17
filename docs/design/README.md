@@ -22,4 +22,4 @@ and the code disagree, the code, `framework/kernel/` and `CHANGELOG.md` are righ
 | [20](20-module-v3-design.md) | Module format 3 |
 | [21](21-module-install-design.md) | Installing modules |
 | [22](22-engine-for-ui-views.md) | What the engine owes a UI's views: impact, history, inbox, a served page |
-| [25](25-approval-gates.md) | Approval gates, opt-in: declared in IAM, approvals of a version, enforced by `status set` and `check` (draft) |
+| [25](25-approval-gates.md) | Approval gates, opt-in: declared in IAM, approvals of a version, enforced by `status set` and `check` (decided 2026-10-17) |
