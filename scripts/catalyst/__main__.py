@@ -799,6 +799,24 @@ def cmd_propose(args) -> int:
     return 0
 
 
+def cmd_try(args) -> int:
+    """`catalyst try <verb …>` (design 27): the change made on a scratch copy,
+    and what it would do; nothing in the criterion changes."""
+    from catalyst import trial
+
+    dep = open_deployment(args)
+    change = list(args.change)
+    if args.proposal:
+        change = ["reconcile", args.proposal, "accept", *(["--as", args.as_user] if args.as_user else []), *change]
+    try:
+        report = trial.attempt(dep, change, keep=args.keep)
+    except trial.TryError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    print(json.dumps(report, indent=2) if args.json else trial.render(report), end="" if not args.json else "\n")
+    return 0 if report["ok"] else 1
+
+
 def cmd_why(args) -> int:
     """`why <law|INV-n|meta-rule|ID>` (R4.1): a law with the invariants it
     absorbs, an invariant with its law and what enforces it, a meta-rule's
@@ -2470,6 +2488,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.set_defaults(func=cmd_reconcile)
+
+    p = sub.add_parser(
+        "try", help="make one change on a scratch copy of the criterion and say what it would do (nothing is kept)"
+    )
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--keep", action="store_true", help="keep the scratch copy, to look inside")
+    p.add_argument("--proposal", help="try accepting this proposal (`reconcile <case> accept`)")
+    p.add_argument("--as", dest="as_user", help="with --proposal: who accepts it (name or git_username)")
+    p.add_argument(
+        "change", nargs=argparse.REMAINDER, help="the verb and its arguments, e.g. status set REQ-000004 Done"
+    )
+    p.set_defaults(func=cmd_try)
 
     p = sub.add_parser("propose", help="propose a change to an entity or rule document, decided by someone else")
     p.add_argument("id", help="the entity, or a rule (its document is what is proposed)")

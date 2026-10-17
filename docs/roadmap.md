@@ -219,7 +219,7 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | A run log kept by `agent run` (who, command, ok, usage, cost), for run history and a cost meter | open |
 | Approval gates, opt-in (decision G): a gate model, approvals journaled, enforced by `status set`, rule edits and `check` | done, 0.79.0 and 0.80.0 (design `25`, REQ-000051, REQ-000052): `IAM/gates.json`, `approve`, `approvals`; `status set`, `new` and `restore` refuse a gated state, `check` errors on a gated rule's unapproved text, `inbox` kind `approval`, `GET approvals/<id>` |
 | Proposals (decision P): a change offered for review before it lands, decided with the reconciliation verbs | done, 0.81.0 (design `26`, REQ-000053): `catalyst propose`, `accept` writes it, gates count the proposed version, `inbox` kind `proposal` |
-| Impact simulation (decision T): `catalyst try <verb …>` on a scratch copy | open (design `27`, decided 2026-10-17) |
+| Impact simulation (decision T): `catalyst try <verb …>` on a scratch copy | done, 0.82.0 (design `27`, REQ-000054): the real verb on a shared clone of the criterion, the findings added and cleared, the files, the impact and the approvals left waiting; `--proposal` |
 | A proposal path for rules and changes; a rule typing field (must, should, may) | open |
 | `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | open |
 
