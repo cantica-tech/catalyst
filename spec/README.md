@@ -20,6 +20,8 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `command-spec.schema.json` | `catalyst spec <command> [<part>] --json` | `GET /v1/spec/<command>[/<part>]` |
 | `run-event.schema.json` | `catalyst agent run <command> --json` (one per line) | — (no route starts a run) |
 | `runs.schema.json` | `catalyst agent runs --json` | `GET /v1/runs` (local mode) |
+| `approvals.schema.json` | `catalyst approvals <id> --json` | — (A4 adds it to the server) |
 
 The schemas of a module's own files are with the kernel
-(`framework/kernel/schemas/`).
+(`framework/kernel/schemas/`), with the schema of a deployment's approval
+gates (`gates.schema.json`, for `IAM/gates.json`).

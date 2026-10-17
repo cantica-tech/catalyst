@@ -119,6 +119,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
 | `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--intent`, `--json`, `--tier`, `--title` |
 | `catalyst rename <id>` | a new title: heading, Name, Filename and file follow; the ID stays | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--title` |
+| `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--gate`, `--intent`, `--json`, `--tier` |
+| `catalyst approvals <id>` | the gates covering an entity: approvals counted and missing | `--json` |
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--to` |
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
@@ -864,6 +866,27 @@ back-references, regenerates the indexes and writes one journal entry
   rewritten. Refused, saying why: a rule that shares its document with
   other rules, no version at that time, a version redacted or no longer
   held, a file already as it stood then.
+
+### Approval gates: `approve`, `approvals`
+
+Opt-in (decision G): a deployment declares its gates in `IAM/gates.json`
+(`framework/kernel/schemas/gates.schema.json`); without the file there is
+no gate. A gate covers the rules of one domain, or an entity type entering
+one state, and asks for a number of approvals from one role of
+`IAM/roles/roles.json`. `catalyst check` reports a malformed gate, or one
+naming an unknown role, domain, type or state, as an error.
+
+- `catalyst approve <ID> --gate <gate> [--as <user>] [--intent <why>]`:
+  one journal entry (action `approve`, no file changed) naming the gate and
+  the version approved: the blob of the entity's file as it is now. Refused,
+  saying why: a gate that does not cover the entity, a signer who is not
+  active or does not hold the gate's role, the author of that version (the
+  actor of the entry that wrote it: an author never approves their own
+  change), or a second approval of the same version by the same person.
+- `catalyst approvals <ID> [--json]`: each gate covering the entity, the
+  approvals that count for its current version and how many are missing
+  (`spec/approvals.schema.json`). Once the text changes, earlier approvals
+  no longer count.
 
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
