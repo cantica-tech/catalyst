@@ -7,7 +7,8 @@
   "required": [
     "open",
     "missing_links",
-    "rules_without_open_work"
+    "rules_without_open_work",
+    "coverage"
   ],
   "additionalProperties": false,
   "properties": {
@@ -48,6 +49,25 @@
       "type": "array",
       "items": {
         "type": "string"
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "The project's active rules (the handbook's meta-rules left out), and those at least one artifact (open or closed) cites in a reference field (catalyst >= 0.78.0).",
+      "required": [
+        "rules",
+        "cited"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cited": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

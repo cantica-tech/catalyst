@@ -186,6 +186,57 @@ def run(
     return end
 
 
+# --- the run log -------------------------------------------------------------
+def log_path(project: Path) -> Path | None:
+    """This user's run log for a project: in catalyst's home beside their
+    agent choice, never in the criterion or the project (it is telemetry,
+    not governed content). None outside a catalyst project."""
+    import project_file
+
+    name = project_file.project_name(project_file.read_dir(project))
+    return project_file.home() / "projects" / name / "runs.jsonl" if name else None
+
+
+def record(project: Path, actor: str, agent: str, command: str, arguments: str, end: Event) -> None:
+    """One line per run: when, who, which agent and command, how it ended
+    and what it cost. A log that cannot be written never fails the run."""
+    import datetime
+
+    path = log_path(project)
+    if path is None:
+        return
+    line = {
+        "timestamp": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "actor": actor,
+        "agent": agent,
+        "command": command.lstrip("/"),
+        "arguments": arguments,
+        **{k: end.get(k) for k in ("ok", "turns", "usage", "cost_usd", "duration_ms", "denied")},
+    }
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
+def runs(project: Path, limit: int | None = None) -> list[dict]:
+    """The logged runs, oldest first (the last `limit` when given); a damaged line is skipped."""
+    path = log_path(project)
+    if path is None or not path.is_file():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(item, dict):
+            out.append(item)
+    return out[-limit:] if limit else out
+
+
 def render(event: Event) -> str | None:
     """One event as a line for a person; None for what is not worth a line."""
     kind = event["event"]

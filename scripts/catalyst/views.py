@@ -275,9 +275,10 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
 
 # --- backlog --------------------------------------------------------------
 def backlog(dep: Deployment, corpus: Corpus) -> dict:
-    """Open work by type and status, open items missing a required link, and
-    rules no open item targets. "Open" is any status outside the ETD's
-    closed states."""
+    """Open work by type and status, open items missing a required link,
+    rules no open item targets, and rule coverage (active rules, and those
+    any artifact cites). "Open" is any status outside the ETD's closed
+    states."""
     open_by_type: dict[str, dict[str, list[str]]] = {}
     missing: list[dict] = []
     targeted: set[str] = set()
@@ -295,7 +296,20 @@ def backlog(dep: Deployment, corpus: Corpus) -> dict:
             if etd.grounding_field:
                 targeted |= set(ref_values(art.get(etd.grounding_field) or ""))
     idle = sorted(rid for rid, defs in corpus.rules.items() if not defs[0].retired and rid not in targeted)
-    return {"open": open_by_type, "missing_links": missing, "rules_without_open_work": idle}
+    # coverage: the project's active rules (the handbook's meta-rules govern catalyst, not the project),
+    # and those at least one artifact (open or closed) cites in a reference field
+    active = {rid for rid, defs in corpus.rules.items() if not defs[0].retired and defs[0].file.name != HANDBOOK}
+    cited: set[str] = set()
+    for prefix in dep.etds:
+        names = _ref_fields(dep, prefix)
+        for art in corpus.by_prefix.get(prefix, []):
+            for name in names:
+                cited |= set(ref_values(art.get(name) or ""))
+    coverage = {"rules": len(active), "cited": len(active & cited)}
+    return {"open": open_by_type, "missing_links": missing, "rules_without_open_work": idle, "coverage": coverage}
+
+
+HANDBOOK = "Rules-of-Rules.md"  # the composed meta-rules: catalyst's own, not a project's
 
 
 # --- graph ----------------------------------------------------------------

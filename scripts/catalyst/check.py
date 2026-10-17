@@ -42,6 +42,47 @@ class Report:
         return "\n".join(lines)
 
 
+# An entity ID inside a finding's text: an artifact's (`REQ-000004`) or a rule's (`br-AUTH-000001`), signed or not.
+ENTITY_IN_TEXT = re.compile(r"\b[A-Za-z][A-Za-z0-9]*-(?:[A-Z][A-Z0-9.]*-)?\d{3,6}(?:-[A-Za-z0-9]{8})?\b")
+FILE_IN_TEXT = re.compile(r"[\w./-]+\.md\b")
+
+
+def as_json(report: Report, dep: Deployment, failing: bool) -> dict:
+    """What `check --json` prints and `GET /v1/check` returns: `ok`, the
+    `errors` and `warnings` as lines, and the same as `findings`, each with
+    the entity it is about — the one whose file it names, else the first
+    known entity ID in it — so a UI can mark drift where it shows the entity."""
+    from catalyst import views
+
+    corpus = load_corpus(dep)
+    by_file: dict[str, str] = {}
+    for defs in corpus.artifacts.values():
+        for art in defs:
+            by_file[art.file.relative_to(dep.root).as_posix()] = art.id
+    for rid, defs in corpus.rules.items():
+        if defs[0].file.name.startswith(rid):  # a one-file rule; a shared document names several
+            by_file[defs[0].file.relative_to(dep.root).as_posix()] = rid
+
+    def entity(text: str) -> str | None:
+        for m in FILE_IN_TEXT.finditer(text):
+            path = m.group(0)
+            found = next((i for f, i in by_file.items() if path == f or path.endswith("/" + f)), None)
+            if found:
+                return found
+        for m in ENTITY_IN_TEXT.finditer(text):
+            try:
+                found = views.resolve(corpus, m.group(0))
+            except views.ViewError:  # a short ID two artifacts share: not this one's to guess
+                continue
+            if found:
+                return found
+        return None
+
+    findings = [{"level": "error", "text": e, "entity": entity(e)} for e in report.errors]
+    findings += [{"level": "warning", "text": w, "entity": entity(w)} for w in report.warnings]
+    return {"ok": not failing, "errors": report.errors, "warnings": report.warnings, "findings": findings}
+
+
 def run(dep: Deployment) -> Report:
     report = Report()
     if not dep.standalone:
