@@ -6,6 +6,26 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.79.0 — 2026-10-17
+
+Approval gates, opt-in (decision G, design 25, steps A1 and A2): declared and checked, approvals recorded and counted. Nothing is enforced yet; that comes with A3. No layout change, no migration.
+
+- `IAM/gates.json` declares a deployment's approval gates; without it there
+  is no gate. A gate covers the rules of one domain or an entity type
+  entering one state, and asks for a number of approvals from one role.
+  `catalyst check` reports a malformed gate, or one naming an unknown role,
+  domain, type or state, as an error
+  (`framework/kernel/schemas/gates.schema.json`).
+- `catalyst approve <ID> --gate <gate> [--as] [--intent]` journals one
+  approval (action `approve`, no file changed) of the entity's current
+  version: its file's blob. It is refused for a gate that does not cover the
+  entity, a signer who is not active or lacks the role, the author of that
+  version, or a second approval of the same version by the same person.
+- `catalyst approvals <ID> [--json]` lists each gate covering the entity,
+  the approvals that count for its current version and how many are missing
+  (`spec/approvals.schema.json`). Once the text changes, earlier approvals
+  no longer count.
+
 ## 0.78.0 — 2026-10-17
 
 What a UI's read side needs from the engine: check findings with their entity, rule coverage, and this user's run log. No layout change, no migration.
