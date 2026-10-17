@@ -1,6 +1,6 @@
-# 27 — Impact simulation: try a change on a scratch copy, see what it breaks (draft for the owner, 2026-10-17)
+# 27 — Impact simulation: try a change on a scratch copy, see what it breaks (design for the owner, 2026-10-17)
 
-> **Status: draft, for the owner's decision (§7).** Asked for by the Studio's roadmap (R6.47 in the UI repository's
+> **Status: decided (owner, 2026-10-17), all five choices as recommended (§7); built after [`26`](26-proposals.md).** Asked for by the Studio's roadmap (R6.47 in the UI repository's
 > `24`): "try a change on a scratch copy, see what breaks, then apply". Uses `check`, `impact` (R5.6) and, for
 > proposals, [`26`](26-proposals.md).
 

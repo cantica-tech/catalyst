@@ -1,6 +1,7 @@
-# 26 — Proposals: a change offered for review before it lands (draft for the owner, 2026-10-17)
+# 26 — Proposals: a change offered for review before it lands (design for the owner, 2026-10-17)
 
-> **Status: draft, for the owner's decision (§7).** Asked for by the Studio's roadmap (R6.44 in the UI repository's
+> **Status: decided (owner, 2026-10-17), all six choices as recommended (§7); proposals are built first, then
+> [`27`](27-impact-simulation.md).** Asked for by the Studio's roadmap (R6.44 in the UI repository's
 > `24`): "propose a rule or a change; reviewers see it in the inbox with its diff". Builds on reconciliation (INV-21)
 > and the approval gates of [`25`](25-approval-gates.md).
 
