@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- `check --json` (and `GET /v1/check`) gains `findings`: each error and
+  warning with its level, its text and the entity it is about, so a client
+  can show drift where it shows that entity. `errors` and `warnings` keep
+  their shape.
+- `backlog --json` gains `coverage`: the project's active rules (the
+  handbook's meta-rules left out) and how many an artifact cites.
+- `catalyst agent run` keeps a run log for this user, in catalyst's home and
+  never in the criterion; `catalyst agent runs [--limit] [--json]` lists it
+  with the total cost, and `serve --local` gives it at `GET /v1/runs`
+  (`spec/runs.schema.json`).
+
 ## 0.77.0 — 2026-10-17
 
 An entity's earlier version written back as a new journaled change (`catalyst restore`); the design notes, the roadmap and the decisions log move into `docs/`. No layout change, no migration.

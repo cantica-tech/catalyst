@@ -432,6 +432,28 @@ def test_local_mode_gives_the_commands_and_their_specs(local, capsys):
     assert err.value.status == 404 and "not in CODE-OF-CONDUCT.md" in str(err.value)
 
 
+def test_local_mode_gives_findings_coverage_and_this_users_runs(local, tmp_path, monkeypatch):
+    """REQ-000050: what a UI's read side needs, in local mode only for the runs."""
+    project, _, client = local
+    item = f"ITEM-000001-{USERID}"
+    path = next((project / ".criterion").rglob(f"{item.rsplit('-', 1)[0]}-*.md"))
+    path.write_text(
+        path.read_text(encoding="utf-8").replace(f"br-AUTH-000001-{USERID}", "br-AUTH-999999"), encoding="utf-8"
+    )
+    checked = client.call("GET", "/check")
+    assert checked["findings"] and all({"level", "text", "entity"} <= set(f) for f in checked["findings"])
+    assert any(f["entity"] == item for f in checked["findings"])  # the finding names the item's file
+    assert set(client.call("GET", "/backlog")["coverage"]) == {"rules", "cited"}
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    assert client.call("GET", "/runs") == {"runs": []}
+
+
+def test_a_shared_server_keeps_nobodys_runs(server):
+    with pytest.raises(serve.ServeError) as err:
+        _get(server, "/runs")
+    assert err.value.status == 404
+
+
 def test_local_head_says_what_the_deployment_runs(local):
     """R6.5: a client sees a deployment behind the catalyst it reads it with."""
     from catalyst import __version__

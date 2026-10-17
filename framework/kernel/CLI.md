@@ -144,6 +144,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst agent uninstall <agent>` | remove catalyst's entries from it | — |
 | `catalyst agent status` | which agents have catalyst | `--json` |
 | `catalyst agent run <command> <arguments>` | dispatch a command to the project's agent; stream what it does and what it cost | `--agent`, `--json` |
+| `catalyst agent runs` | this user's logged runs for the project, with what each cost | `--json`, `--limit` |
 | `catalyst mcp` | serve catalyst to an agent over MCP (stdio): its commands, CLI, invariants | — |
 | `catalyst task <name> <task_args>` | run a criterion task (Taskfile.common.yml) from the project's root | — |
 | `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
@@ -314,7 +315,11 @@ catalyst (`unrecorded`), index freshness
 integrity (`criterion integrity`: nothing either side recorded is lost;
 kept per HEAD, so the end-of-turn check stays cheap). Journal warnings on entries written before the
 CLI are summarised in one line (`journal verify --legacy` lists them).
-Exits `1` on any error, or on any warning under `--strict`.
+Exits `1` on any error, or on any warning under `--strict`. With `--json`:
+`ok`, the `errors` and `warnings` as lines, and the same as `findings`, each
+with its `level`, `text` and the `entity` it is about — the one whose file
+it names, else the first known entity ID in it, else null — so a client can
+mark drift where it shows that entity (`spec/check.schema.json`).
 
 **Format check.** The pointer's `format` field declares the on-disk format
 the deployment is written in (`FORMAT.md`). A pointer with no `format` is
@@ -507,6 +512,18 @@ the run cannot start: an unknown command, an agent without an adapter, or
 its CLI not on `PATH`. Only Claude Code has an adapter
 (`claude -p … --output-format stream-json`). No route of `catalyst serve`
 starts a run (roadmap R5.5; whether the UI launches agents is open).
+
+
+### `catalyst agent runs [--limit <n>] [--json]`
+
+This user's logged runs for the project, oldest first: each `agent run`
+appends one line to `$CATALYST_HOME/projects/<name>/runs.jsonl` — when, who
+(the project's `git config user.name`), the agent, the command and its
+arguments, `ok`, turns, token `usage`, `cost_usd`, `duration_ms` and the
+`denied` tools. The log is the user's own, beside their agent choice: never
+in the criterion or the project, never shared, and a log that cannot be
+written never fails a run. Without `--json`, one line per run and the total
+cost (`spec/runs.schema.json`).
 
 ### What a deployment governs
 
@@ -870,8 +887,10 @@ generate its types from.
   gives its `title`, `status`, `domain` and `text` (its own section, read
   as `graph` reads it).
 - `catalyst backlog`: open items per type and status ("open" is any status
-  outside the ETD's closed states), open items missing a required link, and
-  rules no open item targets.
+  outside the ETD's closed states), open items missing a required link,
+  rules no open item targets, and `coverage`: the project's active rules
+  (the handbook's meta-rules left out) and how many of them an artifact,
+  open or closed, cites in a reference field.
 - `catalyst journal show [--since <date>] [--artifact <id>] [--actor <name>]
   [--rule <id>]`: journal entries in time order, filtered.
 - `catalyst journal show --artifact <id> --content`: the history of one
@@ -1247,8 +1266,10 @@ port the system picks unless `--port` names one, and prints one JSON line,
 `{"url", "token", "pid"}`; the token is made for the run and never stored.
 The read endpoints and `events` answer as on a server, `GET check` returns
 `catalyst check --json`, `GET head` adds what the deployment runs (`kernel`,
-`modules` with their versions, and `catalyst`, the version serving it), and `push`, `have`, `changes` and `blobs` answer
-405. Its batch is a change counter: it moves when a criterion file changes
+`modules` with their versions, and `catalyst`, the version serving it),
+`GET runs` returns this user's run log for the project (`{runs: [...]}`;
+local mode only — a shared server keeps nobody's runs), and `push`, `have`,
+`changes` and `blobs` answer 405. Its batch is a change counter: it moves when a criterion file changes
 (checked every second), and `events` sends it.
 
 `--static <dir>` (with `--local` only) also serves a directory's files,

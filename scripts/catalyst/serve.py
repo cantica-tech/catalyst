@@ -591,7 +591,7 @@ class LocalReader(Reads):
 
     def check(self) -> dict:
         """What `catalyst check --json` prints, once per change."""
-        from catalyst.check import run
+        from catalyst.check import as_json, run
 
         batch, dep, _ = self.loaded()
         with self._loading:
@@ -599,7 +599,7 @@ class LocalReader(Reads):
                 report = run(dep)
                 self._checked = (
                     batch,
-                    {"ok": not report.failing(False), "errors": report.errors, "warnings": report.warnings},
+                    as_json(report, dep, report.failing(False)),
                 )
             return self._checked[1]
 
@@ -739,6 +739,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 path in ("/changes", "/have", "/push") or path.startswith("/blobs/")
             ):
                 raise ServeError(405, "this is a local, read-only view of one criterion")
+            if method == "GET" and path == "/runs" and getattr(self.app, "read_only", False):
+                from catalyst import run as runs  # local mode only: a shared server keeps nobody's runs
+
+                return self._send(200, {"runs": runs.runs(self.app.project)})
             if method == "GET" and path == "/head":
                 return self._send(200, self.app.head())
             if method == "GET" and path == "/changes":
