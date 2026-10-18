@@ -17,6 +17,7 @@ from dataclasses import asdict, dataclass
 
 from catalyst.corpus import STRENGTHS, Artifact, Corpus, is_empty, norm_field, ref_values
 from catalyst.deployment import Deployment
+from check_deployment import ONE_FILE_RULE_RE, RULE_HEADING_RE
 from module_loader import ETD, FieldDefinition
 
 ERROR, WARNING = "error", "warning"
@@ -81,6 +82,29 @@ class Validator:
                     "rule-unindexed",
                     f"{self.rel(d.file)}:{d.line}",
                     f"rule `{rule_id}` is not listed in rules/rules.md (INV-8)",
+                )
+
+        self.check_rule_files()
+
+    def check_rule_files(self) -> None:
+        """A file named as a rule (`<ID>-<slug>.md`, FORMAT.md §5.2) is that rule;
+        one that also holds a rule heading would be read as a rule document, its
+        own rule lost: refused, since which it is would be a guess (ADR-000047)."""
+        rules_dir = self.dep.root / "rules"
+        if not rules_dir.is_dir():
+            return
+        for f in sorted(rules_dir.rglob("*.md")):
+            parts = f.relative_to(rules_dir).parts
+            if "templates" in parts or "domains" in parts or not ONE_FILE_RULE_RE.match(f.stem):
+                continue
+            lines = f.read_text(encoding="utf-8", errors="ignore").splitlines()
+            if any(RULE_HEADING_RE.match(line) for line in lines):
+                self.add(
+                    ERROR,
+                    "rule-file-heading",
+                    self.rel(f),
+                    "a file named as a rule holds a rule heading: keep the rule in its own file without headings, "
+                    "or move it into a rule document (FORMAT.md §5.2)",
                 )
 
     # --- artifacts -----------------------------------------------------

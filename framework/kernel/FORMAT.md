@@ -339,7 +339,9 @@ A heading-defined rule:
   placeholder for a module-owned meta-rule, not a definition.
 - Validate: a rule ID defined twice is `duplicate-id`; a rule not listed
   in `rules/rules.md` is `rule-unindexed`; a strength other than the three
-  is `rule-strength` (errors). `rr-META-` rules in
+  is `rule-strength`; a file named as a rule that also holds a rule heading
+  is `rule-file-heading`, since it would be read as a rule document and its
+  own rule lost (errors). `rr-META-` rules in
   `Rules-of-Rules.md` govern themselves and are never listed there.
 
 ### 5.3 `rules/rules.md`
