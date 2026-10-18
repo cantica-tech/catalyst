@@ -186,6 +186,11 @@ class Reads:
     def modules(self, path: str, query: dict[str, list[str]]) -> object:
         raise ServeError(501, "modules are this machine's: `catalyst serve --local`, or `catalyst module`")
 
+    def share(self, query: dict[str, list[str]]) -> object:
+        raise ServeError(
+            501, "the share status is this machine's: `catalyst serve --local`, or `catalyst share status`"
+        )
+
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
         backlog, journal, graph, inbox, history, impact, approvals, analyses, definitions, and the commands
@@ -636,6 +641,20 @@ class LocalReader(Reads):
             raise ServeError(404, str(e)) from None
         raise ServeError(404, f"no such endpoint: GET {path}")
 
+    def share(self, query: dict[str, list[str]]) -> object:
+        """Local mode only: what `catalyst share status --json` prints;
+        `?fetch=1` asks the shared copy first (R6.25)."""
+        from catalyst import store
+
+        _, dep, _ = self.loaded()
+        from catalyst.modules import clean_url
+
+        fetch = (query.get("fetch") or ["0"])[0] in ("1", "true")
+        st = store.share_for(dep).status(fetch=fetch).as_dict()
+        if st.get("location"):
+            st["location"] = clean_url(st["location"])  # never a token embedded in a remote URL
+        return st
+
     def check(self) -> dict:
         """What `catalyst check --json` prints, once per change."""
         from catalyst.check import as_json, run
@@ -824,6 +843,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 and getattr(self.app, "read_only", False)
             ):
                 return self._send(200, self.app.modules(path, urllib.parse.parse_qs(url.query)))
+            if method == "GET" and path == "/share" and getattr(self.app, "read_only", False):
+                return self._send(200, self.app.share(urllib.parse.parse_qs(url.query)))
             if method == "GET" and path == "/runs" and getattr(self.app, "read_only", False):
                 from catalyst import run as runs  # local mode only: a shared server keeps nobody's runs
 
