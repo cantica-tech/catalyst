@@ -16,6 +16,7 @@ The audit pack and a README badge. No layout change, no migration.
 - `catalyst serve --local`: `GET /v1/audit`.
 - `catalyst badge [--metric check|chain] [--out <file>]`: a README badge, an SVG of `check`'s result or of the rules
   something rests on, for CI to publish.
+- Fixed: `catalyst serve` could hang at startup while DNS did not answer: it no longer looks its own address up.
 
 ## 0.86.0 — 2026-10-18
 

@@ -513,3 +513,25 @@ def test_serve_local_prints_where_and_how_to_reach_it(tmp_path, monkeypatch):
     finally:
         proc.terminate()
         proc.wait(timeout=10)
+
+
+def test_the_server_binds_without_asking_dns_its_own_name(tmp_path, monkeypatch):
+    """BUG-000018: binding made a reverse DNS lookup (`socket.getfqdn`) and hung
+    while no name server answered; serving never asks DNS now."""
+    import socket
+    import threading
+
+    def no_dns(*_a, **_kw):
+        raise AssertionError("serve asked DNS for its own name")
+
+    monkeypatch.setattr(socket, "getfqdn", no_dns)
+    project = make_project(tmp_path, git=True)
+    httpd, token = serve.make_local(project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        assert httpd.server_name == "127.0.0.1" and httpd.server_port == httpd.server_address[1]
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert isinstance(client.call("GET", "/head")["seq"], int)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -58,6 +58,7 @@ import json
 import os
 import re
 import secrets
+import socketserver
 import sqlite3
 import subprocess
 import tempfile
@@ -842,9 +843,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._route("POST")
 
 
+class _Server(http.server.ThreadingHTTPServer):
+    """The standard threading server, binding without the reverse DNS lookup
+    `HTTPServer.server_bind` makes (`socket.getfqdn`): serving never waits on
+    a name server that does not answer."""
+
+    def server_bind(self) -> None:
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name, self.server_port = str(host), int(port)
+
+
 def make_server(db: Path, host: str = "127.0.0.1", port: int = 8765) -> http.server.ThreadingHTTPServer:
     handler = type("BoundHandler", (Handler,), {"app": Server(db)})
-    return http.server.ThreadingHTTPServer((host, port), handler)
+    return _Server((host, port), handler)
 
 
 def make_local(
@@ -859,7 +871,7 @@ def make_local(
     app = LocalReader(project, token, poll)
     app.static = Path(static).resolve() if static is not None else None
     handler = type("LocalHandler", (Handler,), {"app": app})
-    return http.server.ThreadingHTTPServer(("127.0.0.1", port), handler), token
+    return _Server(("127.0.0.1", port), handler), token
 
 
 def start_line(url: str, token: str, pid: int, static: bool) -> dict:
