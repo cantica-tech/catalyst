@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.90.0 — 2026-10-18
+
+The share status served. No layout change, no migration.
+
+- `catalyst serve --local` answers `GET /v1/share` (`?fetch=1` asks the shared copy first): what
+  `catalyst share status --json` prints, its location without credentials (`spec/share-status.schema.json`). A
+  shared server refuses it.
+
 ## 0.89.0 — 2026-10-18
 
 The three first-class agents run commands (decision B2), and changes name their tier. No layout change, no migration.
