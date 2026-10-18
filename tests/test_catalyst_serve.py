@@ -600,6 +600,9 @@ def test_the_deployment_names_its_embedding_origins(tmp_path):
     assert serve.deployment_origins(project) == ("https://wiki.example.com", "http://localhost:3000")
     httpd, _ = serve.make_local(project, 0)
     try:
-        assert httpd.RequestHandlerClass.origins == {"https://wiki.example.com", "http://localhost:3000"}
+        from typing import cast
+
+        handler = cast("type[serve.Handler]", httpd.RequestHandlerClass)
+        assert handler.origins == {"https://wiki.example.com", "http://localhost:3000"}
     finally:
         httpd.server_close()
