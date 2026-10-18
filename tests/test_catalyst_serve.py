@@ -633,3 +633,29 @@ def test_the_definitions_are_listed_and_served(tmp_path, capsys):
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_the_share_status_is_served_locally(tmp_path, capsys):
+    """R6.25: the Studio's share panel reads `share status` from the local server."""
+    import json as _json
+    import threading
+
+    import schema_check
+    from catalyst.__main__ import main
+    from catalyst.init import init
+    from test_catalyst_init import request
+
+    req = request(tmp_path)
+    init(req)
+    assert main(["--project", str(req.project), "share", "status", "--json"]) == 0
+    status = _json.loads(capsys.readouterr().out)
+    assert schema_check.problems(status, schema_check.load("share-status")) == []
+    httpd, token = serve.make_local(req.project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert client.call("GET", "/share") == status
+        assert client.call("GET", "/share?fetch=1")["driver"] == status["driver"]
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
