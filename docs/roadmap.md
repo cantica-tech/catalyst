@@ -220,6 +220,8 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | Approval gates, opt-in (decision G): a gate model, approvals journaled, enforced by `status set`, rule edits and `check` | done, 0.79.0 and 0.80.0 (design `25`, REQ-000051, REQ-000052): `IAM/gates.json`, `approve`, `approvals`; `status set`, `new` and `restore` refuse a gated state, `check` errors on a gated rule's unapproved text, `inbox` kind `approval`, `GET approvals/<id>` |
 | Proposals (decision P): a change offered for review before it lands, decided with the reconciliation verbs | done, 0.81.0 (design `26`, REQ-000053): `catalyst propose`, `accept` writes it, gates count the proposed version, `inbox` kind `proposal` |
 | Impact simulation (decision T): `catalyst try <verb …>` on a scratch copy | done, 0.82.0 (design `27`, REQ-000054): the real verb on a shared clone of the criterion, the findings added and cleared, the files, the impact and the approvals left waiting; `--proposal` |
+| Rule strength (decision S): a rule states `must`, `should` or `may` | done, 0.83.0 (REQ-000056): the `**Strength**` line, `must` when none; `check`'s `rule-strength`; `view`, `list` and `graph` carry it; a breach reported as a violation, warning or note |
+| Decisions as entities (decision E): the process module's `ADR-` type | done, 0.83.0 with module 3.3.0 (REQ-000057): `ADR-` with the rules it shapes and its supersessions; a sync scaffolds a new type's folder; catalyst's 22 decisions in its record (`ADR-000025` to `ADR-000046`) |
 | A proposal path for rules and changes; a rule typing field (must, should, may) | open |
 | `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | open |
 
