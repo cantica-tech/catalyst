@@ -373,6 +373,7 @@ promotes them to errors:
 | Code | Meaning |
 |---|---|
 | `enum-value` | An enum field holds a value outside the ETD's allowed values. |
+| `unknown-user` | A `user` or `user-list` field names someone who is not a registered user. |
 | `guard` | An artifact is in a state whose guards it fails (`MODULE-SPECIFICATION.md` §4.3); it may predate the guard. |
 | `ref-type` | A reference resolves, but to a different type than the ETD expects. |
 | `cardinality` | A single-reference field holds several values. |

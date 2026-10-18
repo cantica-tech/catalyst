@@ -190,6 +190,10 @@ class Validator:
                         where,
                         f"`{fd.name}` is '{raw.strip()}', not one of {', '.join(fd.allowed_values)}",
                     )
+            if fd.kind in ("user", "user-list") and self.corpus.users:
+                names = [n.strip().strip("`") for n in (raw.split(",") if fd.kind == "user-list" else [raw])]
+                for name in (n for n in names if n and self.corpus.user(n) is None):
+                    self.add(WARNING, "unknown-user", where, f"`{fd.name}` names '{name}', not a registered user")
             if fd.kind in ("ref", "ref-list"):
                 values = self.check_ref_field(art, fd, raw)
                 if etd.grounding_field and norm_field(fd.name) == norm_field(etd.grounding_field):

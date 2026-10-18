@@ -370,9 +370,11 @@ def new(
         if fd.name in given:
             v = given[fd.name]
             row_values[fd.name] = _ticked(v) if isinstance(v, list) else str(v)
-        elif fd.kind == "user":
+        # a required user or date field defaults to the signer and today; an
+        # optional one (an assignee, a due date) stays empty until it is given
+        elif fd.kind == "user" and fd.required:
             row_values[fd.name] = signer_name
-        elif fd.kind == "date":
+        elif fd.kind == "date" and fd.required:
             row_values[fd.name] = day
         elif fd.kind in REF_KINDS:
             row_values[fd.name] = NONE_YET

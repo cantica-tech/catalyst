@@ -19,6 +19,9 @@ The audit pack and a README badge. No layout change, no migration.
 - Fixed: `catalyst serve` could hang at startup while DNS did not answer: it no longer looks its own address up.
 - Rule storage (decision B7): a rule is a heading in a rule document or its own file, both checked alike; a file named
   as a rule that also holds a rule heading is `check`'s `rule-file-heading` error.
+- `check` warns when a `user` or `user-list` field names someone who is not a registered user (`unknown-user`).
+- `catalyst new` fills an optional `user` or `date` field only when it is given (a required one still defaults to the
+  signer and today): an item is not assigned to whoever creates it.
 
 ## 0.86.0 — 2026-10-18
 
