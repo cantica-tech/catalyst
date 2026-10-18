@@ -155,7 +155,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--git-username`, `--kernel`, `--user` |
 | `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
 | `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
-| `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--mode`, `--name` |
+| `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--mode`, `--name`, `--passes` |
 | `catalyst analysis record <id> <file>` | store one independent pass's findings (JSON) | `--as`, `--pass`, `--replace` |
 | `catalyst analysis diff <id>` | match the two passes: agreed, conflicting, A-only, B-only | `--as` |
 | `catalyst analysis reconcile <id> <file>` | store the reconciler's list (every finding accounted for) | `--as` |
@@ -1232,9 +1232,11 @@ The four-eyes analysis of existing code (`ANALYSIS-PLAYBOOK.md`,
 one, and journals the record and its reports. Every subcommand fails with
 exit `1` and a reason on stderr when a precondition does not hold.
 
-- **`start [<path>...] [--mode bootstrap|incremental] [--name <name>] [--as <user>]`**
-  — allocates the record (Status `Extracting`) and writes
-  `inventory.json`: every tracked file under the paths (default: the whole
+- **`start [<path>...] [--mode bootstrap|incremental] [--passes 1|2] [--name <name>] [--as <user>]`**
+  — allocates the record (Status `Extracting`, its `Passes`) and writes
+  `inventory.json` (with `passes`: two, four-eyes, unless `--passes 1` or
+  `catalyst.toml`'s `analysis_passes = 1` says one; another value of
+  `analysis_passes` is refused): every tracked file under the paths (default: the whole
   project, never `.criterion`) with its blob hash, and the product's `HEAD`
   as the code state. `incremental` (the default) also lists the rules,
   domains and rule-grounded artifacts already recorded; `bootstrap`
@@ -1244,8 +1246,9 @@ exit `1` and a reason on stderr when a precondition does not hold.
   statement, confidence; a rule's status; in-scope file and line evidence;
   a defect's `breaks`, an existing rule or a rule finding of the same
   pass) and stores it once as `A.json` or `B.json`. Warns when both passes
-  are identical.
-- **`diff <ID>`** — needs both passes: pairs findings (same kind; wording
+  are identical. A single-pass analysis refuses `--pass B`.
+- **`diff <ID>`** — needs both passes (a single-pass analysis: pass A,
+  every finding of which is then `a_only`): pairs findings (same kind; wording
   and shared evidence) and writes `diff.json` — `agreed`, `conflicting`
   (paired, but a different rule status or broken rule), `a_only`,
   `b_only`. Status `Reconciling`.
@@ -1267,7 +1270,7 @@ exit `1` and a reason on stderr when a precondition does not hold.
   findings are decided, and anything keeping the record from its phase.
 
 `catalyst check` applies the same rules to every record: a record in
-`Reconciling` or later without both passes and the diff, in `Deciding` or
+`Reconciling` or later without its passes and the diff, in `Deciding` or
 later without a complete reconciliation, or `Closed` with an undecided
 finding or a missing artifact, is an error.
 

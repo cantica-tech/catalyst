@@ -43,7 +43,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   local-only working copy lives there (INV-6, `BOOTSTRAP.md` §1).
 - **ANALYSIS.** `ANALYSIS-NNNNNN`: the record of one four-eyes analysis of
   existing code (`/run-analysis`, `catalyst analysis`) — its scope, mode
-  (`bootstrap` / `incremental`), the commit analysed, both passes, the
+  (`bootstrap` / `incremental`), the commit analysed, its passes (two, or
+  one when it is single-pass), the
   reconciled findings (domains, rules, defects) and the user's decision on
   each, in `analyses/` (`ANALYSIS-PLAYBOOK.md`, `CLI.md`).
 - **`.catalystignore`.** A committed file in any product directory that

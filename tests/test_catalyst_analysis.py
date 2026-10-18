@@ -263,3 +263,71 @@ def test_the_playbooks_findings_example_is_valid():
     )
     example = json.loads(re.search(r"```json\n(.*?)```", text, re.S).group(1))
     assert an.validate_findings(example["findings"], inventory={"src/session.py"}, rules=set(), domains=set()) == []
+
+
+def _pointer(project, **fields):
+    pointer = project / "app.catalyst"
+    data = json.loads(pointer.read_text(encoding="utf-8"))
+    data.update(fields)
+    pointer.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_a_single_pass_analysis_is_recorded_reconciled_and_decided(project):
+    """Owner decision B5 (REQ-000058): one pass when chosen, recorded as
+    single-pass; every finding verified at reconciliation and decided by a person."""
+    ctx = an.start(load(project), ["src"], "incremental", signer(project), "one pass", passes=1)
+    assert ctx.load("inventory.json")["passes"] == 1
+    assert ctx.art.get("Passes") == "1"
+    assert "single-pass" in ctx.art.file.read_text(encoding="utf-8")
+    with pytest.raises(an.AnalysisError, match="single-pass: only pass A"):
+        an.record(ctx, "B", PASS_B)
+    with pytest.raises(an.AnalysisError, match="the pass is needed first"):
+        an.run_diff(ctx)
+    an.record(ctx, "A", PASS_A)
+    d = an.run_diff(ctx)
+    assert d["agreed"] == [] and sorted(d["a_only"]) == ["A1", "A2", "A3"]
+    ctx = an.context(load(project), ctx.art.id)
+    unverified = {
+        "findings": [
+            {**PASS_A["findings"][2], "id": "F1", "sources": ["A:A3"]},
+        ],
+        "dropped": [{"source": "A:A1", "reason": "covered"}, {"source": "A:A2", "reason": "covered"}],
+    }
+    with pytest.raises(an.AnalysisError, match="F1: found by one pass or contested"):
+        an.reconcile(ctx, unverified)
+    unverified["findings"][0]["verification"] = "read src/login.py: check() is called"
+    an.reconcile(ctx, unverified)
+    ctx = an.context(load(project), ctx.art.id)
+    an.decide(ctx, "F1", "accept", signer(project), artifact=RULE)
+    an.close(an.context(load(project), ctx.art.id))
+    assert an.phase(an.context(load(project), ctx.art.id).art) == "Closed"
+    assert not [e for e in run_check(load(project)).errors if e.startswith("analysis:")]
+
+
+def test_the_deployment_sets_the_default_and_two_stays_the_default(project):
+    assert started(project).load("inventory.json")["passes"] == 2
+    _pointer(project, analysis_passes=1)
+    assert an.start(load(project), ["src"], "incremental", signer(project)).load("inventory.json")["passes"] == 1
+    assert (
+        an.start(load(project), ["src"], "incremental", signer(project), passes=2).load("inventory.json")["passes"] == 2
+    )
+    _pointer(project, analysis_passes=3)
+    with pytest.raises(an.AnalysisError, match="analysis_passes"):
+        an.start(load(project), ["src"], "incremental", signer(project))
+
+
+def test_an_analysis_started_before_passes_were_recorded_has_two(project):
+    ctx = started(project)
+    inv = ctx.load("inventory.json")
+    del inv["passes"]
+    (ctx.dir / "inventory.json").write_text(json.dumps(inv), encoding="utf-8")
+    assert an.passes_of(an.context(load(project), ctx.art.id)) == 2
+
+
+def test_cli_starts_a_single_pass_analysis(project, capsys):
+    from catalyst.__main__ import main
+
+    assert main(["analysis", "start", "src", "--passes", "1", "--as", USER]) == 0
+    assert "single-pass" in capsys.readouterr().out
+    assert main(["analysis", "status", f"ANALYSIS-000001-{USERID}"]) == 0
+    assert "passes:    single-pass" in capsys.readouterr().out
