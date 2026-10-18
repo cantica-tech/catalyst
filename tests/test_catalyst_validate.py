@@ -254,3 +254,20 @@ def test_decorated_closed_status_counts_as_closed(tmp_path):
     edit(item_file(project), f"| **Subs** | `SUB-000001-{USERID}` |", "| **Subs** | *(none)* |")
     edit(item_file(project), "| **Status** | Open |", "| **Status** | **Done** ✅ |")
     assert "closed-incomplete" in codes(project, ERROR)
+
+
+def test_a_user_field_names_a_registered_user(tmp_path):
+    """Decision B9's assignee: a `user` field's value is a registered user, else a warning."""
+    project = make_project(tmp_path)
+    schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
+    text = schema.read_text(encoding="utf-8")
+    schema.write_text(
+        text.replace("\nworkflow:", "  - name: Assignee\n    kind: user\n    required: false\n\nworkflow:", 1),
+        encoding="utf-8",
+    )
+    edit(item_file(project), "| **Status** | Open |", "| **Status** | Open |\n| **Assignee** | ada |")
+    assert "unknown-user" not in codes(project)
+    edit(item_file(project), "| **Assignee** | ada |", "| **Assignee** | Grace Hopper |")
+    assert "unknown-user" in codes(project, WARNING)
+    edit(item_file(project), "| **Assignee** | Grace Hopper |", "| **Assignee** | *(none yet)* |")
+    assert "unknown-user" not in codes(project)

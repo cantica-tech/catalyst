@@ -51,8 +51,9 @@ applies. Until all four hold the rule is not done; its status markers
 A rule is a heading in a rule document under `{{RULES_DIR}}/` —
 `<doc-prefix>-<DOMAIN>-NNNNNN[-parent-id]-<userid>` then its title — or its
 own file, `<ID>-<slug>.md`, that a rule document lists; either way it is
-listed in `{{RULES_DIR}}/rules.md` (`FORMAT.md` §5, INV-8). Keep one shape
-per rule document. Take the number from
+listed in `{{RULES_DIR}}/rules.md` (`FORMAT.md` §5, INV-8). Both shapes are
+read, numbered and checked alike; a rule's own file holds no rule heading.
+Take the number from
 `catalyst id next-rule <doc-prefix> <DOMAIN> --as <signer>`, never by hand.
 Add `[-parent-id]` only for a true sub-case of one existing rule. A rule
 document's file may be renamed to a more descriptive name; an ID never

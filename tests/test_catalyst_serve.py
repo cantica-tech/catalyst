@@ -513,3 +513,96 @@ def test_serve_local_prints_where_and_how_to_reach_it(tmp_path, monkeypatch):
     finally:
         proc.terminate()
         proc.wait(timeout=10)
+
+
+def test_the_server_binds_without_asking_dns_its_own_name(tmp_path, monkeypatch):
+    """BUG-000018: binding made a reverse DNS lookup (`socket.getfqdn`) and hung
+    while no name server answered; serving never asks DNS now."""
+    import socket
+    import threading
+
+    def no_dns(*_a, **_kw):
+        raise AssertionError("serve asked DNS for its own name")
+
+    monkeypatch.setattr(socket, "getfqdn", no_dns)
+    project = make_project(tmp_path, git=True)
+    httpd, token = serve.make_local(project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        assert httpd.server_name == "127.0.0.1" and httpd.server_port == httpd.server_address[1]
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert isinstance(client.call("GET", "/head")["seq"], int)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def _raw(url: str, method: str = "GET", headers: dict | None = None):
+    import urllib.error
+    import urllib.request
+
+    req = urllib.request.Request(url, method=method, headers=headers or {})  # noqa: S310 (the test's localhost server)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:  # noqa: S310 (the test's localhost server)
+            return r.status, dict(r.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers)
+
+
+def test_an_allowed_origin_reads_with_its_token_and_writes_nothing(tmp_path):
+    """Owner decision B8: pages of an allowed origin read through serve, each
+    with its reader's token; nothing is allowed by default, nothing is written."""
+    import threading
+
+    import pytest
+
+    project = make_project(tmp_path, git=True)
+    with pytest.raises(serve.ServeError):
+        serve.make_local(project, 0, origins=("https://wiki.example.com/path",))
+    httpd, token = serve.make_local(project, 0, poll=0.1, origins=("https://wiki.example.com",))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{httpd.server_address[1]}/v1"
+    auth = {"Authorization": f"Bearer {token}"}
+    try:
+        status, h = _raw(f"{base}/head", headers={**auth, "Origin": "https://wiki.example.com"})
+        assert status == 200 and h.get("Access-Control-Allow-Origin") == "https://wiki.example.com"
+        status, h = _raw(f"{base}/head", headers={**auth, "Origin": "https://evil.example"})
+        assert status == 200 and "Access-Control-Allow-Origin" not in h  # the browser keeps it from that page
+        status, _ = _raw(f"{base}/head", headers={"Origin": "https://wiki.example.com"})
+        assert status == 401  # the reader's token is still needed
+        status, h = _raw(
+            f"{base}/head",
+            "OPTIONS",
+            {"Origin": "https://wiki.example.com", "Access-Control-Request-Method": "GET"},
+        )
+        assert status == 204 and h.get("Access-Control-Allow-Methods") == "GET"
+        status, _ = _raw(
+            f"{base}/push",
+            "OPTIONS",
+            {"Origin": "https://wiki.example.com", "Access-Control-Request-Method": "POST"},
+        )
+        assert status == 403
+        status, _ = _raw(f"{base}/push", "POST", {**auth, "Origin": "https://wiki.example.com"})
+        assert status == 403
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_the_deployment_names_its_embedding_origins(tmp_path):
+    import json as _json
+
+    project = make_project(tmp_path, git=True)
+    pointer = project / "app.catalyst"
+    data = _json.loads(pointer.read_text(encoding="utf-8"))
+    data["embed_origins"] = "https://wiki.example.com, http://localhost:3000"
+    pointer.write_text(_json.dumps(data), encoding="utf-8")
+    assert serve.deployment_origins(project) == ("https://wiki.example.com", "http://localhost:3000")
+    httpd, _ = serve.make_local(project, 0)
+    try:
+        from typing import cast
+
+        handler = cast("type[serve.Handler]", httpd.RequestHandlerClass)
+        assert handler.origins == {"https://wiki.example.com", "http://localhost:3000"}
+    finally:
+        httpd.server_close()

@@ -102,3 +102,17 @@ def test_a_rule_in_its_own_file_passes_the_structure_check(tmp_path):
     assert check_required_headings(root) == []
     write(root / "rules" / "core" / "notes.md", "# Notes\n\nno headings\n")
     assert len(check_required_headings(root)) == 2
+
+
+def test_a_rule_file_that_holds_a_rule_heading_is_refused(tmp_path):
+    """REQ-000063 (ADR-000047): a file named as a rule is that rule; one that also
+    holds a rule heading would be read as a document, its own rule lost."""
+    project = make_project(tmp_path)
+    rule, _ = _per_file_rules(project)
+    path = project / ".criterion" / "rules" / "core" / f"{rule}-log-pipeline.md"
+    dep = load(project)
+    assert not [f for f in validate(dep, load_corpus(dep)) if f.code == "rule-file-heading"]
+    path.write_text(path.read_text(encoding="utf-8") + f"\n### `{rule}` Logs flow\n", encoding="utf-8")
+    dep = load(project)
+    found = [f for f in validate(dep, load_corpus(dep)) if f.code == "rule-file-heading"]
+    assert len(found) == 1 and found[0].level == "error" and f"{rule}-log-pipeline.md" in found[0].where
