@@ -38,7 +38,7 @@ exactly that.
 |---|---|---|
 | R0.1–R0.4, R0.6–R0.8, R0.10–R0.20 | done | `11` (released 0.46.0) |
 | R0.5 session-scoped Stop hook | done | 0.66.0 (REQ-000035): a baseline at session start, the Stop hook blocks on new failures only; `agent install` must be run again |
-| R0.9 one model for rule storage | partly | ADR-001 accepted; per-file rules recognised since 0.52.1; whether `validate` enforces one model: not audited |
+| R0.9 one model for rule storage | partly (audited 2026-10-18) | ADR-001 (one shape) still contradicts `FORMAT.md` §5.2 and rr-META-003 (two shapes, "one shape per rule document" unchecked); `validate` enforces no single model; numbering is safe across shapes. `check` rejected one-file rules: fixed in 0.85.0 (BUG-000016). Open: the owner's decision, supersede ADR-001 to allow both shapes (recommended) or enforce one |
 | R0.21 Python floor, Windows | done | CI runs Ubuntu, macOS and Windows on 3.11 and 3.13 |
 | R1.1, R1.2, R1.4, R1.5, R1.6 | done | `12`; `tests/test_token_budgets.py`, `docs/golden-corpus`, `docs/adr` (19 ADRs) |
 | R1.3 feature register | done | accepted by the owner 2026-10-16 (all proposed verdicts); refreshed against kernel 0.71.0 and module 3.2.0 (163 shipped, 11 settled, 29 no item, 35 open) |
@@ -61,12 +61,12 @@ exactly that.
 | R4.5 generated agent adapters | superseded | by R3.1c: nothing is written per project |
 | R4.6 unverifiable hard rules | partly | plugin invariants parked; the role check is still advisory (INV-16) |
 | R4.7 park the plugin system | done (removed) | kernel 0.72.0, 2026-10-16 (ADR-022, REQ-000043): the plugin tree, the `catalyst-git` submodule, the plugin checks and their workflow removed; the plugin invariants and meta-rules retired in place; `catalyst-git` an optional extension |
-| R4.8 journal hygiene | not audited | |
+| R4.8 journal hygiene | partly (audited 2026-10-18) | direct-correction entries stopped (64, all pre-CLI; changes outside catalyst go through `/adopt`, 0 unrecorded); `adopt` recorded the git author's name, not the user's `git_username`, and skipped the needs-artifact check: fixed in 0.85.0 (BUG-000017; 83 past entries stay as written). Open: `--command` not checked against §4 (66 non-canonical); 27% of entries untiered; short placeholder intents and repeated `/status` entries |
 | R4.10 configurable four-eyes analysis | done, 0.84.0 (owner decision B5; REQ-000058) | two passes stay the default; `catalyst.toml` `analysis_passes = 1` makes one the deployment's default, `catalyst analysis start --passes 1\|2` chooses for one analysis; a single-pass analysis is recorded as such (`Passes`), refuses pass B, and every finding it keeps says how it was verified and is decided by a person |
 | R4.9 module install | done but N4 | `catalyst module install\|list\|verify\|upgrade`, several modules per deployment (0.58.0–0.60.0); signatures (N4) wait for R7 |
 | R5.1 JSON Schemas in `spec/` | done for the read side | 0.65.0 (2026-10-14): nine schemas, every read payload and `check`; `validate`, `journal verify` and `report` left out |
 | R5.2 `catalyst serve` | done differently | HTTP with events (0.53.0, 0.54.0), not JSON-RPC over stdio |
-| R5.3 parity suite, TS parser deleted | partly | the UI reads through `serve --local` since 0.54.0; deletion of its parser not audited |
+| R5.3 parity suite, TS parser deleted | done (core; audited 2026-10-18) | parity green on 2026-10-10 (design `19` §12); the UI's parser, validator and parity suite deleted on 2026-10-11; it reads only through `serve --local` >= 0.54.0. Small single-file reads remain on its side (IAM JSON, entity definitions, §4 commands, description text): follow-ups, the IAM and definition ones needing a route here |
 | R5.4 MCP for agents | done differently | `catalyst mcp` (stdio), not `serve --mcp` |
 | R5.5 agent dispatch with streamed output | done (Claude Code adapter) | 0.76.0 (2026-10-16, REQ-000048): `catalyst agent run <command> [--json]`, events with turns, token usage, cost and denied tools (`spec/run-event.schema.json`); catalyst widens no permission and a denied run is not ok; no `serve` route starts a run (a UI's host starts it, owner decision C2). Copilot and Gemini CLI adapters open (B2) |
 | R5.6–R5.9 | done | 0.61.0–0.64.0 (2026-10-13/14): `impact`, an entity's history, `inbox`, `serve --static`, with schemas in `spec/` for the first three |
