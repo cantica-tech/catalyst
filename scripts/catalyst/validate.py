@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 
-from catalyst.corpus import Artifact, Corpus, is_empty, norm_field, ref_values
+from catalyst.corpus import STRENGTHS, Artifact, Corpus, is_empty, norm_field, ref_values
 from catalyst.deployment import Deployment
 from module_loader import ETD, FieldDefinition
 
@@ -66,6 +66,13 @@ class Validator:
                     f"rule `{rule_id}` is defined {len(defs)} times ({places})",
                 )
             d = defs[0]
+            if d.stated is not None and d.strength not in STRENGTHS:
+                self.add(
+                    ERROR,
+                    "rule-strength",
+                    f"{self.rel(d.file)}:{d.line}",
+                    f"rule `{rule_id}` states strength `{d.stated}`: one of {', '.join(STRENGTHS)} (FORMAT.md §5.2)",
+                )
             if d.file.name == "Rules-of-Rules.md" and rule_id.startswith("rr-"):
                 continue  # meta-rules (the kernel's and a module's namespace) are self-governing, never in rules.md
             if self.corpus.indexed_rules and rule_id not in self.corpus.indexed_rules:

@@ -10,6 +10,7 @@ rule-type directory, for example `{{RULES_DIR}}/{{RULE_TYPE_DIR}}/{{RULE_SLUG}}.
 - **Type**: `{{RULE_TYPE}}`
 - **Domain**: `{{DOMAIN_CODE}}`
 - **Status**: ✅ working
+- **Strength**: `{{RULE_STRENGTH}}` — `must`, `should` or `may`; `must` when left out (`FORMAT.md` §5.2)
 - **Targets**: `{{TARGET_RULE_IDS}}`
 
 ## Rule

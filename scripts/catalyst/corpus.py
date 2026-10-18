@@ -45,6 +45,10 @@ def meta_key(value: str) -> tuple[str, int] | None:
 RULE_ID_RE = re.compile(rf"^([a-z]+-{DOMAIN_CODE}-\d{{3,6}}(?:-(?=[A-Za-z0-9]{{0,7}}[A-Z])[A-Za-z0-9]{{8}})?)(?=-|$)")
 TABLE_ID_RE = re.compile(r"^\|\s*`?([A-Z]+-[0-9]{6}(?:-[A-Za-z0-9]{8})?)`?\s*\|")
 PLACEHOLDER_MARK = "owned by the active module"
+# A rule's strength (FORMAT.md §5.2, decision S): a `**Strength**` line of its
+# text, `must` when it states none.
+STRENGTHS = ("must", "should", "may")
+STRENGTH_RE = re.compile(r"^\s*(?:[-*]\s+)?\*\*Strength:?\*\*:?\s*`?([^`\s]*)`?", re.IGNORECASE)
 EMPTY_VALUES = {"", "-", "—", "n/a", "none"}
 
 
@@ -78,6 +82,11 @@ class Rule:
     line: int
     retired: bool = False
     inherited: bool = False  # from the project's workspace criterion (R3.1b), read-only
+    stated: str | None = None  # its `**Strength**` line's value, as written
+
+    @property
+    def strength(self) -> str:
+        return (self.stated or "must").lower()
 
 
 @dataclass
@@ -162,6 +171,7 @@ def _rules(root: Path) -> tuple[dict[str, list[Rule]], set[str]]:
             # one file per rule, named `<id>-<slug>.md` (FORMAT.md §5.1)
             rule = Rule(own.group(1), f, 1)
             rule.retired = any("🗑" in line and "status" in line.lower() for line in lines)
+            rule.stated = next((m.group(1) for line in lines if (m := STRENGTH_RE.match(line))), None)
             found.setdefault(rule.id, []).append(rule)
             continue
         current: Rule | None = None
@@ -179,6 +189,8 @@ def _rules(root: Path) -> tuple[dict[str, list[Rule]], set[str]]:
                 current = None
             elif current is not None and "🗑" in line and "status" in line.lower():
                 current.retired = True
+            elif current is not None and current.stated is None and (sm := STRENGTH_RE.match(line)):
+                current.stated = sm.group(1)
     return found, indexed
 
 

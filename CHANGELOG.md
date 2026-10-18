@@ -6,6 +6,21 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.83.0 — 2026-10-18
+
+Rule strength (decision S): a rule says how hard it binds. Migration: `framework/kernel/migrations/0.83.0/rule-strength.md`.
+
+- A rule states `must`, `should` or `may` on a `**Strength**` line of its text (`FORMAT.md` §5.2); one that states
+  none is `must`, so no existing rule changes.
+- `catalyst check` reports any other value as `rule-strength` (an error).
+- `catalyst view`, `list rule` and `graph` give each rule its `strength` (`spec/view.schema.json`,
+  `spec/list.schema.json`, `spec/graph.schema.json`).
+- A breach is reported by the rule's strength: a violation for `must`, a warning for `should`, a note for `may`
+  (`Rules-of-Rules.md` §5, `/check-rules`, `ANALYSIS-PLAYBOOK.md` step 5).
+- The rule template gains the `**Strength**` line.
+- `catalyst sync apply` scaffolds the folder of a type a module adds — its templates, their catalog and its index,
+  as `init` does — so `catalyst new` works on it at once; until now a new type arrived with its definition only.
+
 ## 0.82.0 — 2026-10-17
 
 Impact simulation (decision T, design 27): try a change before making it. No layout change, no migration.

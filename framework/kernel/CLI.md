@@ -359,6 +359,7 @@ Findings come in two levels.
 | `signer` | `Signed-off-by` is missing or names an unregistered user (INV-16). |
 | `id-shape` | An ID is not `<PREFIX>-NNNNNN-<registered userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
 | `rule-unindexed` | A rule is not listed in `rules/rules.md` (INV-8). |
+| `rule-strength` | A rule states a strength other than `must`, `should` or `may` (`FORMAT.md` §5.2). |
 | `index-orphan` | An index row registers an ID that has no file. |
 
 **Warnings** are shape mismatches in otherwise sound data; `--strict`

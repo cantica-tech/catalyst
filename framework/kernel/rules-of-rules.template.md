@@ -72,6 +72,12 @@ Every rule document lives under `{{RULES_DIR}}/`, every rule appears in
 `TEMPLATE-RULE-vN.md` in `{{RULES_DIR}}/templates/`. `catalyst check`
 reports anything orphaned: fix the document, never the check.
 
+A rule states its strength on a `**Strength**` line: `must`, `should` or
+`may`; one that states none is `must`. The strength says how a breach is
+reported, never whether it is: a `must` breach is a violation, a `should`
+breach a warning, a `may` breach a note. Weakening a rule's strength is a
+change to the rule, journaled like any other.
+
 ## 6. `rr-META-006` Work has its own IDs, and a tier
 
 Every artifact the active module defines gets
