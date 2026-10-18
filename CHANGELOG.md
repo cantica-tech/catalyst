@@ -6,6 +6,17 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.84.0 — 2026-10-18
+
+Configurable four-eyes analysis (decision B5). Migration: `framework/kernel/migrations/0.84.0/single-pass-analysis.md`.
+
+- `catalyst analysis start --passes 1|2` chooses the number of independent passes of one analysis, and
+  `catalyst.toml`'s optional `analysis_passes` the deployment's default; without either, two, as before.
+- A single-pass analysis is recorded as such (`Passes`, `inventory.json`'s `passes`), refuses pass B, and every
+  finding it keeps says how it was verified against the code; the user still decides each one.
+- An analysis started before 0.84.0 is read as two-pass. `/run-analysis` takes `--passes 1|2`; the analysis template
+  gains `Passes`.
+
 ## 0.83.0 — 2026-10-18
 
 Rule strength (decision S): a rule says how hard it binds. Migration: `framework/kernel/migrations/0.83.0/rule-strength.md`.

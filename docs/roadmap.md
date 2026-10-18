@@ -62,7 +62,7 @@ exactly that.
 | R4.6 unverifiable hard rules | partly | plugin invariants parked; the role check is still advisory (INV-16) |
 | R4.7 park the plugin system | done (removed) | kernel 0.72.0, 2026-10-16 (ADR-022, REQ-000043): the plugin tree, the `catalyst-git` submodule, the plugin checks and their workflow removed; the plugin invariants and meta-rules retired in place; `catalyst-git` an optional extension |
 | R4.8 journal hygiene | not audited | |
-| R4.10 configurable four-eyes analysis | **open** (owner decision B5, 2026-10-16) | four-eyes stays the default; a deployment default and a per-analysis choice of one or two passes (`catalyst analysis start --passes`); a single pass still ends with a person's decision, and is recorded as single-pass |
+| R4.10 configurable four-eyes analysis | done, 0.84.0 (owner decision B5; REQ-000058) | two passes stay the default; `catalyst.toml` `analysis_passes = 1` makes one the deployment's default, `catalyst analysis start --passes 1\|2` chooses for one analysis; a single-pass analysis is recorded as such (`Passes`), refuses pass B, and every finding it keeps says how it was verified and is decided by a person |
 | R4.9 module install | done but N4 | `catalyst module install\|list\|verify\|upgrade`, several modules per deployment (0.58.0–0.60.0); signatures (N4) wait for R7 |
 | R5.1 JSON Schemas in `spec/` | done for the read side | 0.65.0 (2026-10-14): nine schemas, every read payload and `check`; `validate`, `journal verify` and `report` left out |
 | R5.2 `catalyst serve` | done differently | HTTP with events (0.53.0, 0.54.0), not JSON-RPC over stdio |

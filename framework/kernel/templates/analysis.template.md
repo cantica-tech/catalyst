@@ -7,6 +7,7 @@
 | **Filename** | `ANALYSIS-NNNNNN-<userid>-<name>.md` |
 | **Status** | exactly one of `Extracting` / `Reconciling` / `Deciding` / `Closed` / `Abandoned` — set by the `catalyst analysis` commands as each phase completes; `Closed` and `Abandoned` are its closed states |
 | **Mode** | `bootstrap` (a project with no rules yet) or `incremental` (rules exist: find what they miss, and where the code breaks them) |
+| **Passes** | `2` (four-eyes, the default) or `1` (single-pass: chosen with `--passes 1` or the deployment's `analysis_passes`) |
 | **Scope** | the paths analysed, space-separated, relative to the project root |
 | **Code state** | the product commit analysed (`HEAD` at `start`); every finding's evidence refers to it |
 | **Opened** | YYYY-MM-DD |
@@ -17,7 +18,8 @@
 
 Two independent, blind extraction passes over the same scope and code
 state (`ANALYSIS-PLAYBOOK.md`), recorded with `catalyst analysis record
---pass A|B`: `reports/<ID>/A.json`, `reports/<ID>/B.json`.
+--pass A|B`: `reports/<ID>/A.json`, `reports/<ID>/B.json`. A single-pass
+analysis records pass A only.
 
 ## Reconciliation
 

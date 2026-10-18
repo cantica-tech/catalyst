@@ -104,10 +104,10 @@ A product commit made for the change cites the artifact or rule it serves
 - `/status` — update an artifact or work item's `Status` field, then
   regenerate indexes and journal the change. Refuses a `RECON-` case:
   its `Status` changes only through `/reconcile` (role-gated).
-- `/run-analysis [<path>...] [--bootstrap|--incremental]` — analyse
+- `/run-analysis [<path>...] [--bootstrap|--incremental] [--passes 1|2]` — analyse
   existing code to infer domains, rules and the defects where the code
-  breaks a rule, with a four-eyes process: two independent blind passes,
-  a reconciliation that accounts for every finding of both, and the
+  breaks a rule, with a four-eyes process: two independent blind passes
+  (or one, if chosen), a reconciliation that accounts for every finding, and the
   user's decision on each finding (`ANALYSIS-PLAYBOOK.md`, an `ANALYSIS-`
   record, `catalyst analysis`). `--bootstrap` for a project with no rules
   yet; `--incremental` (the default) finds what existing rules miss.
@@ -268,10 +268,11 @@ every reference mechanically); and return a concise summary of likely
 impact, affected areas, and any blocking concerns. If the file cannot be
 resolved, report that it was not found and do not invent a result.
 
-When the user enters `/run-analysis [<path>...] [--bootstrap|--incremental]`,
+When the user enters `/run-analysis [<path>...] [--bootstrap|--incremental] [--passes 1|2]`,
 follow the criterion's `ANALYSIS-PLAYBOOK.md` (the deployed playbook) phase by
 phase: `catalyst analysis start <path>... --mode <mode> --as <signer>`
-(the whole project when no path is given), two independent passes with the
+(the whole project when no path is given; `--passes 1` only if the user
+asks), its passes (two independent ones, or A alone) with the
 playbook's pass prompt recorded with `catalyst analysis record --pass A|B`,
 `catalyst analysis diff`, a reconciliation recorded with `catalyst analysis
 reconcile`, then each reconciled finding presented to the user — accept,

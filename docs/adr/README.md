@@ -8,7 +8,8 @@ Since 2026-10-18 (decision E) a decision is an entity of the process module, an 
 (`decisions/`), with the rules it shapes; record a new one with `/create adr`, not here. Each file below is recorded
 there as written, its number moved up by 24, since the journal still names the files by theirs: `ADR-0NN` here is
 `ADR-0000(NN+24)` there (`ADR-001` is `ADR-000025`, `ADR-022` is `ADR-000046`). These files stay as the public copy
-and are not edited; a change of mind is a new decision in the record that supersedes the old one.
+and are not edited, and the index below follows the record's statuses (the twelve still pending were decided by
+the owner on 2026-10-18); a change of mind is a new decision in the record that supersedes the old one.
 
 ## Format
 
@@ -22,9 +23,9 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 |---|-------|--------|-------|
 | [ADR-001](ADR-001-one-file-per-rule-document.md) | One file per rule document, not per rule ID | ✅ Accepted | kernel |
 | [ADR-002](ADR-002-session-scoped-stop-hook.md) | Session-scoped stop hook (block only session edits) | ✅ Accepted | kernel |
-| [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ⏳ Pending | kernel |
-| [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ⏳ Pending | kernel |
-| [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ⏳ Pending | kernel |
+| [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ✅ Accepted (owner, 2026-10-18) | kernel |
+| [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ✅ Accepted (owner, 2026-10-18) | kernel |
+| [ADR-005](ADR-005-artifacts-linked-via-etd-pointers.md) | Artifacts linked to rules via etd: ID pointers | ❌ Rejected (owner, 2026-10-18) | kernel |
 | [ADR-017](ADR-017-prose-feature-freeze.md) | Prose feature freeze until the R2 verbs exist (R1.6) | ✅ Accepted | kernel |
 | [ADR-018](ADR-018-handbook-and-command-catalogue.md) | The handbook, the command catalogue, and the commands they drop (R4.2) | ✅ Accepted | kernel, SE module |
 | [ADR-019](ADR-019-module-namespace.md) | A module's own meta-rule and invariant namespace (R4.3, M4) | ✅ Accepted | kernel, SE module |
@@ -36,32 +37,32 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-006](ADR-006-se-module-canonical-through-r2.md) | SE module as canonical process plugin (through R2) | ⏳ Pending | SE module |
-| [ADR-007](ADR-007-artifact-tiers-severity.md) | Artifact tiers (Support, Guidance, Enforcement) for severity | ⏳ Pending | SE module |
+| [ADR-006](ADR-006-se-module-canonical-through-r2.md) | SE module as canonical process plugin (through R2) | ✅ Accepted (owner, 2026-10-18) | SE module |
+| [ADR-007](ADR-007-artifact-tiers-severity.md) | Artifact tiers (Support, Guidance, Enforcement) for severity | ❌ Rejected (owner, 2026-10-18) | SE module |
 | [ADR-008](ADR-008-workflow-narrative-thread.md) | Workflow links as narrative thread (not state machines) | ❌ Rejected: workflows are declared state machines | SE module |
 
 ### Store & Migration
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ⏳ Pending | kernel |
+| [ADR-009](ADR-009-legacy-deployments-vs-locator.md) | Existing deployments remain LEGACY; new deployments use locator | ❌ Rejected (owner, 2026-10-18) | kernel |
 | [ADR-010](ADR-010-catalyst-toml-locator.md) | `catalyst.toml` locates the criterion in `$HOME/.catalyst` (no working copy in the project; Python floor 3.11) | ✅ Accepted | kernel |
-| [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ⏳ Pending | kernel |
+| [ADR-011](ADR-011-store-abstraction-in-repo-driver.md) | Store abstraction in repo driver (vs. inline) | ❌ Rejected (owner, 2026-10-18) | kernel |
 
 ### Naming & Versioning
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-012](ADR-012-catalyst-framework-kernel-naming.md) | Naming: catalyst framework (repo), kernel (framework/kernel), modules (SE, plugins) | ⏳ Pending | infra |
-| [ADR-013](ADR-013-version-ceiling-r1-start.md) | Version ceiling: R1 starts at 0.46.0; 1.0.0 after R7 complete | ⏳ Pending | infra |
-| [ADR-014](ADR-014-release-1-0-aligns-r7.md) | Release 1.0.0 aligns with R7 completion (production-ready) | ⏳ Pending | infra |
+| [ADR-012](ADR-012-catalyst-framework-kernel-naming.md) | Naming: catalyst framework (repo), kernel (framework/kernel), modules (SE, plugins) | ✅ Accepted (owner, 2026-10-18) | infra |
+| [ADR-013](ADR-013-version-ceiling-r1-start.md) | Version ceiling: R1 starts at 0.46.0; 1.0.0 after R7 complete | ✅ Accepted (owner, 2026-10-18) | infra |
+| [ADR-014](ADR-014-release-1-0-aligns-r7.md) | Release 1.0.0 aligns with R7 completion (production-ready) | ✅ Accepted (owner, 2026-10-18) | infra |
 
 ### User Interfaces (R5–R6)
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-015](ADR-015-three-uis-cli-spa-desktop.md) | Three official UIs: CLI (kernel, now), SPA (R6), Desktop (R6) | ⏳ Pending | infra |
-| [ADR-016](ADR-016-vscode-thin-client.md) | VS Code thin client (R6) uses server protocol (R3.9) | ⏳ Pending | infra |
+| [ADR-015](ADR-015-three-uis-cli-spa-desktop.md) | Three official UIs: CLI (kernel, now), SPA (R6), Desktop (R6) | ✅ Accepted (owner, 2026-10-18) | infra |
+| [ADR-016](ADR-016-vscode-thin-client.md) | VS Code thin client (R6) uses server protocol (R3.9) | ✅ Accepted (owner, 2026-10-18) | infra |
 
 ## Status Legend
 

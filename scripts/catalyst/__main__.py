@@ -1350,12 +1350,22 @@ def cmd_analysis(args) -> int:
 
     if sub == "start":
         who = signer()
-        ctx = an.start(dep, args.scope, args.mode, who, args.name)
-        journaled(ctx, "create", f"{args.mode} analysis of {' '.join(ctx.load('inventory.json')['scope'])}", who)
+        ctx = an.start(dep, args.scope, args.mode, who, args.name, args.passes)
         inv = ctx.load("inventory.json")
+        single = inv["passes"] == 1
+        journaled(
+            ctx,
+            "create",
+            f"{args.mode} analysis of {' '.join(inv['scope'])}" + (", single-pass" if single else ""),
+            who,
+        )
         print(
             f"{ctx.art.id}: {len(inv['files'])} file(s) at {inv['code_state'][:10]}; "
-            f"record two independent passes with `catalyst analysis record {ctx.art.id} --pass A|B <file>`"
+            + (
+                f"single-pass: record the pass with `catalyst analysis record {ctx.art.id} --pass A <file>`"
+                if single
+                else f"record two independent passes with `catalyst analysis record {ctx.art.id} --pass A|B <file>`"
+            )
         )
         return 0
     ctx = an.context(dep, args.id, corpus)
@@ -1363,9 +1373,13 @@ def cmd_analysis(args) -> int:
         d, r = ctx.load("diff.json"), ctx.load("reconciled.json")
         decided = (ctx.load("decisions.json") or {}).get("decisions", {})
         print(f"{ctx.art.id}: {an.phase(ctx.art)} ({ctx.art.get('Mode')}; {ctx.art.get('Scope')})")
-        print(
-            f"passes:    A {'recorded' if ctx.load('A.json') else '—'}, B {'recorded' if ctx.load('B.json') else '—'}"
-        )
+        if an.passes_of(ctx) == 1:
+            print(f"passes:    single-pass; A {'recorded' if ctx.load('A.json') else '—'}")
+        else:
+            print(
+                f"passes:    A {'recorded' if ctx.load('A.json') else '—'}, "
+                f"B {'recorded' if ctx.load('B.json') else '—'}"
+            )
         if d:
             print(
                 f"diff:      {len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, "
@@ -2437,6 +2451,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="bootstrap: no rules yet; incremental: find what the rules miss (default)",
     )
     q.add_argument("--name", help="a short name for the record")
+    q.add_argument(
+        "--passes",
+        type=int,
+        choices=[1, 2],
+        help="independent passes: 2, four-eyes (default), or 1; the deployment's default is catalyst.toml's "
+        "analysis_passes",
+    )
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("record", help="store one independent pass's findings (JSON)")
