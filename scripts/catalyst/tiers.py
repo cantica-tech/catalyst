@@ -25,6 +25,15 @@ def tiers_for(dep) -> list[Tier]:
     return list(found.values()) or list(DEFAULT_TIERS)
 
 
+def inferred(dep, artifact: str) -> str | None:
+    """The tier an artifact's own type opens (R4.8): a change to an artifact
+    whose type exactly one tier names (`artifact: <PREFIX>`) is of that tier,
+    when the change names none. None when no tier, or several, name it."""
+    prefix = artifact.split("-", 1)[0] if re.match(r"^[A-Z][A-Z0-9]*-\d", artifact) else ""
+    named = [t.id for t in tiers_for(dep) if prefix and t.artifact == prefix]
+    return named[0] if len(named) == 1 else None
+
+
 def ids(dep) -> list[str]:
     return [t.id for t in tiers_for(dep)]
 

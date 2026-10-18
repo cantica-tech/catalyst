@@ -895,7 +895,9 @@ The mechanical half of creating and changing artifacts, from the entity type
 definitions. Each signs (`--as`, else the only active user), keeps
 back-references, regenerates the indexes and writes one journal entry
 (`--intent` repeatable, `--command` names the slash command it runs for,
-`--tier`). Each takes `--json` and exits `1`, changing nothing, on a refusal.
+`--tier`; without `--tier`, the tier the artifact's type opens when exactly one
+tier names it, so a requirement's change is a feature's without saying so).
+Each takes `--json` and exits `1`, changing nothing, on a refusal.
 
 - `catalyst new <type> --title <t> [--field NAME=VALUE ...]`: the next ID,
   the type's latest template with its fields filled (ID, name, file name,
