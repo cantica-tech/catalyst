@@ -235,3 +235,43 @@ def test_a_dropped_type_stays_while_the_shared_gate_runs_an_older_kernel(tmp_pat
     assert actions[0][:2] == ("retired-type", "skip") and "once the shared criterion runs 0.69.0" in actions[0][2]
     monkeypatch.setattr(sync, "gate_version", lambda dep: "0.69.0")
     assert [(a.kind, a.change) for a in sync._retired_types(load(project))] == [("retired-type", "remove")]
+
+
+def test_a_type_the_module_adds_gets_its_folder_and_can_be_created(tmp_path):
+    """A sync that brings a new type scaffolds its folder, templates and index
+    as `init` does, so `catalyst new` works at once (REQ-000057)."""
+    project, deployed = _deployment(tmp_path)
+    base = _release(tmp_path, deployed)
+    mod = tmp_path / "example-process-0.3.0"
+    shutil.copytree(tmp_path / "example-process", mod)
+    yaml = (mod / "module.yaml").read_text(encoding="utf-8")
+    yaml = yaml.replace("version: 0.2.0", "version: 0.3.0").replace(
+        "  - id: SUB\n    schema: schemas/sub.yaml\n",
+        "  - id: SUB\n    schema: schemas/sub.yaml\n  - id: NOTE\n    schema: schemas/note.yaml\n",
+    )
+    yaml += "  - entity_type: NOTE\n    template_path: templates/note.template.md\n"
+    (mod / "module.yaml").write_text(yaml, encoding="utf-8")
+    (mod / "version.txt").write_text("0.3.0\n", encoding="utf-8")
+    (mod / "schemas" / "note.yaml").write_text(
+        "id_prefix: NOTE\nname: Note\nplural_name: Notes\nfolder: notes\ngrounding: none\n\nfields:\n"
+        "  - name: ID\n    kind: text\n    required: true\n  - name: Status\n    kind: enum\n    required: true\n"
+        "    allowed_values:\n      - Open\n      - Done\n",
+        encoding="utf-8",
+    )
+    (mod / "templates" / "note.template.md").write_text(
+        "# `NOTE-NNNNNN` — {{title}}\n\n| Field | Value |\n|---|---|\n| **ID** | `NOTE-NNNNNN` |\n"
+        "| **Status** | Open |\n\n## Text\n\nText.\n",
+        encoding="utf-8",
+    )
+    dep = load(project)
+    src = sync.Sources(dep, KERNEL, mod, base, None)
+    p = sync.plan(dep, src, sync.commands_dir(dep, None))
+    assert ("type-folder", ".criterion/notes", "add") in {(a.kind, a.target, a.change) for a in p.actions}
+    _, touched = sync.apply(dep, src, sync.commands_dir(dep, None), "ada", [])
+    src.close()
+    root = project / ".criterion"
+    assert (root / "notes" / "templates" / "TEMPLATE-NOTE-v1.md").is_file()
+    assert (root / "notes" / "notes.md").is_file()
+    assert root / "notes" / "notes.md" in touched
+    assert main(["--project", str(project), "new", "NOTE", "--title", "First note", "--as", "ada"]) == 0
+    assert list((root / "notes").glob("NOTE-000001-*.md"))

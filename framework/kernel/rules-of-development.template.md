@@ -309,7 +309,9 @@ targets and broken links (the chain), journal integrity, and stale or
 missing index rows (`CLI.md` lists every code). Then do what only
 judgment can: look for rules that conflict with one another
 (`Rules-of-Rules.md` §1), domains that overlap or are misassigned, and
-artifacts whose content no longer matches the rule they cite. Report
+artifacts whose content no longer matches the rule they cite, reported
+by the rule's strength (`FORMAT.md` §5.2): a violation of a `must` rule,
+a warning for a `should` rule, a note for a `may` one. Report
 both parts; never hand-edit an index to clear a finding —
 `catalyst index regen` does that.
 

@@ -327,10 +327,17 @@ A heading-defined rule:
 - A rule's body runs to the next heading. It is **retired** when its
   heading contains `🗑`, or a line of its body contains both `🗑` and the
   word "status" (`Rules-of-Rules.md` §4).
+- A rule's **strength** is the value of the first line of its body that
+  reads `**Strength**` (a list item or not, the colon inside or after the
+  bold, the value plain or backticked): `must`, `should` or `may`, in any
+  case. A rule that states none is `must`. A breach of a `must` rule is a
+  violation, of a `should` rule a warning, of a `may` rule a note
+  (`Rules-of-Rules.md` §5).
 - A heading containing "owned by the active module" is the kernel's
   placeholder for a module-owned meta-rule, not a definition.
 - Validate: a rule ID defined twice is `duplicate-id`; a rule not listed
-  in `rules/rules.md` is `rule-unindexed` (errors). `rr-META-` rules in
+  in `rules/rules.md` is `rule-unindexed`; a strength other than the three
+  is `rule-strength` (errors). `rr-META-` rules in
   `Rules-of-Rules.md` govern themselves and are never listed there.
 
 ### 5.3 `rules/rules.md`

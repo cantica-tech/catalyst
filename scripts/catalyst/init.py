@@ -147,6 +147,49 @@ def _type_folder(
     _write(folder / "README.md", readme)
 
 
+def type_rel(etd) -> str:
+    """A type's folder in the criterion, relative to its root."""
+    return f"{etd.location}/{etd.folder}" if etd.location else etd.folder
+
+
+def scaffold_type(root: Path, tree: Path, manifest, etd, stamp: str) -> None:
+    """One module type's folder: its templates (the module's, or the
+    generated one of a v3 type), their catalog and README, its index and its
+    README — at `init`, at `catalyst module install`, and when a sync brings
+    a type the deployment has no folder for yet."""
+    from catalyst import generate
+
+    prefix = etd.id_prefix
+    rel = type_rel(etd)
+    srcs = [tree / t.template_path for t in manifest.templates if t.entity_type == prefix]
+    # with two templates, the index one is named after the folder
+    # (<folder>.template.md); a single template is the item's, unless
+    # the type is generated (v3): then it can only be the index's
+    index_src = next((t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None)
+    item = next((t for t in srcs if t is not index_src), None)
+    index_text = (
+        ""
+        if etd.naming == "free-form"
+        else (
+            index_src.read_text(encoding="utf-8")
+            if index_src and index_src.is_file()
+            else f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n"
+        )
+    )
+    type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
+
+    _type_folder(
+        root,
+        rel,
+        type_name,
+        item,
+        index_text,
+        f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see `CODE-OF-CONDUCT.md` §3/§4.\n",
+        stamp,
+        generate.template(etd) if etd.generated and etd.naming != "free-form" else None,
+    )
+
+
 def _module_dir(req: InitRequest) -> Path:
     if req.module is not None:
         return req.module
@@ -267,40 +310,8 @@ def seed_module(
     shutil.copytree(tree, root / "modules" / manifest.id)
     modules.record(root, manifest.id, source, commit)
     # --- module entity folders --------------------------------------------
-    templates = {t.entity_type: [] for t in manifest.templates}
-    for t in manifest.templates:
-        templates[t.entity_type].append(tree / t.template_path)
-    for prefix, etd in sorted((e.id_prefix, e) for e in manifest.entity_types.values()):
-        rel = f"{etd.location}/{etd.folder}" if etd.location else etd.folder
-        srcs = templates.get(prefix, [])
-        # with two templates, the index one is named after the folder
-        # (<folder>.template.md); a single template is the item's, unless
-        # the type is generated (v3): then it can only be the index's
-        index_src = next(
-            (t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None
-        )
-        item = next((t for t in srcs if t is not index_src), None)
-        index_text = (
-            ""
-            if etd.naming == "free-form"
-            else (
-                index_src.read_text(encoding="utf-8")
-                if index_src and index_src.is_file()
-                else f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n"
-            )
-        )
-        type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
-
-        _type_folder(
-            root,
-            rel,
-            type_name,
-            item,
-            index_text,
-            f"# {etd.plural_name}\n\n`{prefix}-NNNNNN` {etd.plural_name.lower()} — see `CODE-OF-CONDUCT.md` §3/§4.\n",
-            stamp,
-            generate.template(etd) if etd.generated and etd.naming != "free-form" else None,
-        )
+    for etd in sorted(manifest.entity_types.values(), key=lambda e: e.id_prefix):
+        scaffold_type(root, tree, manifest, etd, stamp)
     for rp in manifest.required_paths:
         target = root / rp.path
         if not target.exists():
