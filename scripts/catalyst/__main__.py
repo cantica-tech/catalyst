@@ -1129,6 +1129,22 @@ def cmd_audit(args) -> int:
     return 0
 
 
+def cmd_badge(args) -> int:
+    """`catalyst badge` (R6.28): a README badge as an SVG file or on stdout."""
+    from catalyst import badge
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    label, value, colour = badge.measure(dep, load_corpus(dep), args.metric)
+    image = badge.svg(label, value, colour)
+    if args.out:
+        Path(args.out).write_text(image, encoding="utf-8")
+        print(f"wrote {args.out}: {label} {value}")
+    else:
+        sys.stdout.write(image)
+    return 0
+
+
 def cmd_trace(args) -> int:
     from catalyst import unrecorded
     from catalyst.corpus import load_corpus
@@ -2037,6 +2053,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.add_argument("--html", metavar="FILE", help="write a self-contained page, printable to PDF")
     p.set_defaults(func=cmd_audit)
+
+    p = sub.add_parser("badge", help="a README badge: an SVG of check's result or of the rules in use")
+    p.add_argument("--metric", choices=["check", "chain"], default="check")
+    p.add_argument("--out", metavar="FILE", help="write the SVG there (default: stdout)")
+    p.set_defaults(func=cmd_badge)
 
     p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
     p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")

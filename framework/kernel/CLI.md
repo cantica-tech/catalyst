@@ -100,6 +100,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst hook start` | session-start hook: print the invariants, record the session's baseline | `--format`, `--quiet` |
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
 | `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
+| `catalyst badge` | a README badge: an SVG of check's result or of the rules in use | `--metric`, `--out` |
 | `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
@@ -642,6 +643,16 @@ with `EVENT`, `BASE_SHA`, `HEAD_SHA`, `BEFORE` and `SHA` set from
 `github.sha`. `catalyst` is the criterion's vendored CLI
 (`$CATALYST_HOME/projects/<name>/criterion/bin/catalyst.pyz`) or, without a
 criterion, the zipapp of a catalyst release.
+
+### `catalyst badge [--metric check|chain] [--out <file>]`
+
+A README badge (R6.28): one small SVG, `label | value`, its colour green,
+amber or red and its text saying it all (`aria-label`, `<title>`).
+`check` (the default): `passing`, amber when there are warnings, or the
+number of `catalyst check`'s errors. `chain`: the live rules that something
+rests on, of all of them (green from 80%, amber from 50%). It is a file for a
+CI job to publish beside the code; nothing is served, so no server answers an
+anonymous request for it.
 
 ### `catalyst audit [--json] [--html <file>]`
 

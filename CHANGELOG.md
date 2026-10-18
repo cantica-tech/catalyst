@@ -8,12 +8,14 @@ messages.
 
 ## 0.87.0 — 2026-10-18
 
-The audit pack. No layout change, no migration.
+The audit pack and a README badge. No layout change, no migration.
 
 - `catalyst audit [--json] [--html <file>]`: what the deployment runs, the record's integrity (journal, `check`,
   gated rules lacking approvals), who signed, and each rule with everything that rests on it, transitively; as data
   (`spec/audit.schema.json`), in brief, or as a self-contained page printable to a PDF.
 - `catalyst serve --local`: `GET /v1/audit`.
+- `catalyst badge [--metric check|chain] [--out <file>]`: a README badge, an SVG of `check`'s result or of the rules
+  something rests on, for CI to publish.
 
 ## 0.86.0 — 2026-10-18
 
