@@ -2,6 +2,14 @@
 
 This directory contains the architecture decision records (ADRs) for the catalyst framework. Each ADR documents a significant design decision: its context, the decision made, consequences, and alternatives considered.
 
+## In catalyst's record
+
+Since 2026-10-18 (decision E) a decision is an entity of the process module, an `ADR-` in catalyst's criterion
+(`decisions/`), with the rules it shapes; record a new one with `/create adr`, not here. Each file below is recorded
+there as written, its number moved up by 24, since the journal still names the files by theirs: `ADR-0NN` here is
+`ADR-0000(NN+24)` there (`ADR-001` is `ADR-000025`, `ADR-022` is `ADR-000046`). These files stay as the public copy
+and are not edited; a change of mind is a new decision in the record that supersedes the old one.
+
 ## Format
 
 ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md](TEMPLATE.md) for the standard structure.

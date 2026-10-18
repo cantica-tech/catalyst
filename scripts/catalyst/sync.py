@@ -422,6 +422,18 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         target = f".criterion/definitions/{generate.type_slug(etd)}.md"
         if target not in planned and not (deployed_defs / f"{generate.type_slug(etd)}.md").exists():
             p.actions.append(Action("definition", target, "add", "new entity type, defined in module.yaml (generated)"))
+    for etd in _module_types(src):  # a type the deployment has no folder for: scaffolded as init does
+        from catalyst.init import type_rel
+
+        if dep.folder(etd) is None:
+            p.actions.append(
+                Action(
+                    "type-folder",
+                    f".criterion/{type_rel(etd)}",
+                    "add",
+                    "new entity type: its folder, templates and index",
+                )
+            )
     p.actions += _retired_types(dep)
     if p.from_kernel != p.to_kernel:
         p.actions.append(
@@ -535,14 +547,21 @@ def _rel(dep: Deployment, path: Path) -> str:
 
 
 # --- applying -------------------------------------------------------------
-def _generated_types(src: Sources) -> list:
-    """The types a v3 module declares in its module.yaml (module v3, M3)."""
+def _manifest(src: Sources):
     from module_loader import load_module
 
-    if src.module is None:
-        return []
-    manifest = load_module(module_dir=src.module)
-    return [e for e in manifest.entity_types.values() if e.generated] if manifest else []
+    return load_module(module_dir=src.module) if src.module is not None else None
+
+
+def _module_types(src: Sources) -> list:
+    """Every type the target module declares."""
+    manifest = _manifest(src)
+    return sorted(manifest.entity_types.values(), key=lambda e: e.id_prefix) if manifest else []
+
+
+def _generated_types(src: Sources) -> list:
+    """The types a v3 module declares in its module.yaml (module v3, M3)."""
+    return [e for e in _module_types(src) if e.generated]
 
 
 def _latest_definition(folder: Path) -> Path | None:
@@ -637,6 +656,14 @@ def apply(
                     if generate.type_slug(etd) == name:
                         (root / "definitions" / f"{name}.md").write_text(generate.definition(etd), encoding="utf-8")
                         touched.append(root / "definitions" / f"{name}.md")
+        elif a.kind == "type-folder" and src.module is not None:
+            from catalyst import init as init_mod
+
+            manifest = _manifest(src)
+            etd = next(e for e in _module_types(src) if f".criterion/{init_mod.type_rel(e)}" == a.target)
+            init_mod.PARAMS = compose.deployed_params(root, mod.id) if mod else None
+            init_mod.scaffold_type(root, src.module, manifest, etd, datetime.date.today().isoformat())
+            touched += sorted(f for f in (root / init_mod.type_rel(etd)).rglob("*") if f.is_file())
         elif a.kind == "retired-type" and a.change == "remove":
             name = next(n for n, (folder, *_) in RETIRED_TYPES.items() if a.target == f".criterion/{folder}")
             where, definition = root / RETIRED_TYPES[name][0], root / "definitions" / f"{name}.md"
