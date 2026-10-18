@@ -69,6 +69,10 @@ USERID_RE = re.compile(r"^[A-Za-z0-9]{8}$")
 # A domain code, with at most one sub-domain level: `AUTH`, `CORE.INGEST`.
 DOMAIN_CODE = r"[A-Z][A-Z0-9]*(?:\.[A-Z][A-Z0-9]*)?"
 RULE_HEADING_RE = re.compile(rf"^#{{2,3}}\s+(?:\d+\.\s+)?`([a-z]+-{DOMAIN_CODE}-(\d+)((?:-[a-zA-Z0-9]+)*))`")
+# `<ID>-<slug>`: a rule in its own file (FORMAT.md §5.2), its ID ending in a userid
+ONE_FILE_RULE_RE = re.compile(
+    rf"^[a-z]+-{DOMAIN_CODE}-\d{{3,6}}(?:-[A-Za-z0-9]+)*-(?=[A-Za-z0-9]{{0,7}}[A-Z])[A-Za-z0-9]{{8}}-"
+)
 JOURNAL_REQUIRED_FIELDS = (
     "timestamp",
     "actor",
@@ -330,6 +334,8 @@ def check_required_headings(root: Path) -> list[str]:
         ):
             continue
         text = f.read_text(encoding="utf-8", errors="ignore")
+        if ONE_FILE_RULE_RE.match(f.stem) and not any(RULE_HEADING_RE.match(line) for line in text.splitlines()):
+            continue  # a rule in its own file (FORMAT.md §5.2) is the rule, not a rule document
         if "## Contents" not in text:
             errors.append(f"INV-8 heading: {f.relative_to(root)} missing '## Contents'")
         if "Linked Artifacts" not in text:

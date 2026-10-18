@@ -295,7 +295,8 @@ differs from what `index regen` would write.
 Every `.md` file under `rules/`, at any depth, is read for rule headings,
 except `rules.md`, templates, templates catalogs, and anything under
 `rules/domains/` or a `templates/` folder. `Rules-of-Rules.md` is read for
-its `rr-META-` rules; every other such file is a **rule document**: it
+its `rr-META-` rules, and a rule in its own file (§5.2) is that rule; every
+other such file is a **rule document**: it
 must contain a `## Contents` heading and a
 `## Linked Artifacts — Quick Index` heading, and its file name (or stem)
 must appear in `rules/rules.md` (structure, INV-8).
