@@ -21,7 +21,12 @@ Each agent's output is normalized by its adapter to the same events
   settings denied a tool is not `ok`: it did not do its work, whatever the
   agent says.
 
-Only Claude Code has an adapter; another agent is said, not guessed at.
+Claude Code's adapter reads its stream-json. GitHub Copilot's and Gemini
+CLI's (owner decision B2) run them in their non-interactive mode, `-p`,
+and pass on what they print as text, the run `ok` when the agent exits 0;
+they report no tool calls, usage or cost (`measured: false`), since
+nothing here reads more of their output than they document as stable. An
+agent with no adapter is said, not guessed at.
 No HTTP route starts a run: whether the UI launches agents is an open
 owner decision (C2).
 """
@@ -117,10 +122,49 @@ class ClaudeCode:
             }
 
 
-ADAPTERS: dict[str, Callable[[], ClaudeCode]] = {"claude-code": ClaudeCode}
+@dataclass
+class PlainText:
+    """An agent run in its non-interactive mode (`<binary> -p <prompt>`), what
+    it prints passed on as text; it says nothing of tools, usage or cost."""
+
+    binary: str
+    _last: list[str] = field(default_factory=list)
+
+    def argv(self, prompt: str) -> list[str]:
+        return [self.binary, "-p", prompt]
+
+    def events(self, line: str) -> Iterator[Event]:
+        text = line.rstrip("\n")
+        if text.strip():
+            self._last = [*self._last[-40:], text]
+            yield {"event": "text", "text": text}
+
+    def finish(self, code: int, stderr: str) -> Event:
+        """The run's end, from the agent's exit: `ok` on 0; nothing measured."""
+        result = "\n".join(self._last[-20:]) if code == 0 else (stderr.strip() or f"the agent exited {code}")
+        return {
+            "event": "end",
+            "ok": code == 0,
+            "turns": 0,
+            "usage": {"input": 0, "output": 0, "cache_read": 0, "cache_write": 0},
+            "cost_usd": None,
+            "duration_ms": None,
+            "denied": [],
+            "result": result[:2000],
+            "measured": False,
+        }
 
 
-def adapter_for(agent: str, which: Callable[[str], str | None] = shutil.which) -> ClaudeCode:
+Adapter = ClaudeCode | PlainText
+
+ADAPTERS: dict[str, Callable[[], Adapter]] = {
+    "claude-code": ClaudeCode,
+    "copilot": lambda: PlainText("copilot"),
+    "gemini": lambda: PlainText("gemini"),
+}
+
+
+def adapter_for(agent: str, which: Callable[[str], str | None] = shutil.which) -> Adapter:
     """The adapter for `agent`, its CLI found on PATH; a RunError says why not."""
     make = ADAPTERS.get(agent)
     if make is None:
@@ -134,14 +178,14 @@ def adapter_for(agent: str, which: Callable[[str], str | None] = shutil.which) -
     return adapter
 
 
-def stream(adapter: ClaudeCode, lines: Iterable[str]) -> Iterator[Event]:
+def stream(adapter: Adapter, lines: Iterable[str]) -> Iterator[Event]:
     """The events of a run's output lines, in order."""
     for line in lines:
         yield from adapter.events(line)
 
 
 def run(
-    adapter: ClaudeCode,
+    adapter: Adapter,
     agent: str,
     command: str,
     arguments: str,
@@ -171,6 +215,9 @@ def run(
             on_event(event)
         stderr = proc.stderr.read() if proc.stderr else ""
         code = proc.wait()
+    if end is None and isinstance(adapter, PlainText):
+        end = adapter.finish(code, stderr)
+        on_event(end)
     if end is None:
         end = {
             "event": "end",

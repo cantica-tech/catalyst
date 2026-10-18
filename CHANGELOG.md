@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.89.0 — 2026-10-18
+
+The three first-class agents run commands (decision B2). No layout change, no migration.
+
+- `catalyst agent run` runs GitHub Copilot (`copilot -p`) and Gemini CLI (`gemini -p`) beside Claude Code: what they
+  print is passed on as text, the run `ok` when the agent exits 0. They report no tool calls, usage or cost; their
+  `end` event says `measured: false` (`spec/run-event.schema.json`).
+
 ## 0.88.0 — 2026-10-18
 
 Journal hygiene (R4.8) and the definitions served. No layout change, no migration.
