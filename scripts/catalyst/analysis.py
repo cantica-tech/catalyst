@@ -35,6 +35,7 @@ KINDS = ("domain", "rule", "defect")
 STATUSES = ("holds", "partial", "missing")  # a rule: implemented / buggy or incomplete / not implemented
 CONFIDENCE = ("high", "medium", "low")
 MODES = ("bootstrap", "incremental")
+PASSES = (1, 2)  # two independent, blind passes by default; one when the deployment or the analysis says so
 PHASES = ("Extracting", "Reconciling", "Deciding", "Closed", "Abandoned")
 AGREED = "both passes"  # the verification of an agreed finding
 
@@ -284,15 +285,53 @@ def context(dep: Deployment, analysis_id: str, corpus: Corpus | None = None) -> 
     return Context(dep, corpus, art, reports(dep, art.id))
 
 
+def default_passes(dep: Deployment) -> int:
+    """The deployment's default number of passes: `analysis_passes` in
+    `catalyst.toml`, else two (owner decision B5)."""
+    raw = dep.pointer.get("analysis_passes")
+    if raw in (None, ""):
+        return 2
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = 0
+    if n not in PASSES:
+        raise AnalysisError(f"catalyst.toml `analysis_passes` is {raw!r}: 1 or 2")
+    return n
+
+
+def passes_of(ctx: Context) -> int:
+    """How many passes this analysis was started with (two before 0.84.0)."""
+    return int((ctx.load("inventory.json") or {}).get("passes") or 2)
+
+
+def _passes_text(art_id: str, passes: int) -> str:
+    if passes == 1:
+        return (
+            "One pass (single-pass, chosen when it was started), recorded with\n"
+            f"`catalyst analysis record {art_id} --pass A`; every finding is verified\n"
+            "against the code at reconciliation and decided by a person."
+        )
+    return (
+        "Two independent, blind passes (`ANALYSIS-PLAYBOOK.md`), recorded with\n"
+        f"`catalyst analysis record {art_id} --pass A|B`."
+    )
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:48] or "analysis"
 
 
-def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str | None = None) -> Context:
+def start(
+    dep: Deployment, scope: list[str], mode: str, signer: dict, name: str | None = None, passes: int | None = None
+) -> Context:
     from catalyst.ids import next_entity_id
 
     if mode not in MODES:
         raise AnalysisError(f"mode must be one of {', '.join(MODES)}")
+    passes = default_passes(dep) if passes is None else passes
+    if passes not in PASSES:
+        raise AnalysisError("--passes is 1 or 2")
     if dep.standalone:
         raise AnalysisError("an analysis reads the product's code — run it from the project")
     project = dep.project_root
@@ -324,6 +363,7 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
 | **Filename** | `{md.name}` |
 | **Status** | Extracting |
 | **Mode** | {mode} |
+| **Passes** | {passes} |
 | **Scope** | {" ".join(scope)} |
 | **Code state** | {head} |
 | **Opened** | {today} |
@@ -332,12 +372,11 @@ def start(dep: Deployment, scope: list[str], mode: str, signer: dict, name: str 
 
 ## Passes
 
-Two independent, blind passes (`ANALYSIS-PLAYBOOK.md`), recorded with
-`catalyst analysis record {art_id} --pass A|B`.
+{_passes_text(art_id, passes)}
 
 ## Reconciliation
 
-*(after both passes)*
+*(after {"the pass" if passes == 1 else "both passes"})*
 
 ## Decisions
 
@@ -363,7 +402,15 @@ Two independent, blind passes (`ANALYSIS-PLAYBOOK.md`), recorded with
         }
     _write(
         reports(dep, art_id) / "inventory.json",
-        {"analysis": art_id, "mode": mode, "scope": scope, "code_state": head, "files": files, "existing": existing},
+        {
+            "analysis": art_id,
+            "mode": mode,
+            "passes": passes,
+            "scope": scope,
+            "code_state": head,
+            "files": files,
+            "existing": existing,
+        },
     )
     return context(dep, art_id)
 
@@ -375,6 +422,8 @@ def record(ctx: Context, which: str, data: dict, replace: bool = False) -> list[
     which = which.upper()
     if which not in ("A", "B"):
         raise AnalysisError("--pass is A or B")
+    if which == "B" and passes_of(ctx) == 1:
+        raise AnalysisError(f"{ctx.art.id} is single-pass: only pass A is recorded")
     target = ctx.dir / f"{which}.json"
     if target.exists() and not replace:
         raise AnalysisError(f"pass {which} is already recorded")
@@ -408,11 +457,22 @@ def _canon(findings) -> str:
     return json.dumps(sorted(json.dumps(strip(f), sort_keys=True) for f in findings or []))
 
 
+def _passes(ctx: Context) -> tuple:
+    """Passes A and B; a single-pass analysis's B is empty, so every finding
+    is A's alone and must say how it was verified."""
+    a = ctx.load("A.json")
+    if passes_of(ctx) == 1:
+        return a, {"pass": "B", "findings": []}
+    return a, ctx.load("B.json")
+
+
 def run_diff(ctx: Context) -> dict:
     if phase(ctx.art) not in ("Extracting", "Reconciling"):
         raise AnalysisError(f"{ctx.art.id} is {phase(ctx.art)}")
-    a, b = ctx.load("A.json"), ctx.load("B.json")
+    a, b = _passes(ctx)
     if a is None or b is None:
+        if passes_of(ctx) == 1:
+            raise AnalysisError("the pass is needed first (`catalyst analysis record --pass A`)")
         raise AnalysisError("both passes are needed first (`catalyst analysis record --pass A|B`)")
     d = diff(a["findings"], b["findings"])
     _write(ctx.dir / "diff.json", d)
@@ -423,7 +483,7 @@ def run_diff(ctx: Context) -> dict:
 def reconcile(ctx: Context, data: dict) -> None:
     if phase(ctx.art) != "Reconciling":
         raise AnalysisError(f"{ctx.art.id} is {phase(ctx.art)}: reconcile after `catalyst analysis diff`")
-    a, b, d = ctx.load("A.json"), ctx.load("B.json"), ctx.load("diff.json")
+    (a, b), d = _passes(ctx), ctx.load("diff.json")
     if not isinstance(data, dict):
         raise AnalysisError("the reconciled file is an object with `findings` and `dropped`")
     problems = validate_findings(
@@ -491,8 +551,10 @@ def problems(ctx: Context, status: str | None = None) -> list[str]:
     out = []
     if not (ctx.dir / "inventory.json").is_file():
         out.append("no inventory.json (`catalyst analysis start` writes it)")
-    a, b, d = ctx.load("A.json"), ctx.load("B.json"), ctx.load("diff.json")
+    (a, b), d = _passes(ctx), ctx.load("diff.json")
     if a is None or b is None:
+        if passes_of(ctx) == 1:
+            return out + ["the pass is not recorded (A.json)"]
         return out + ["both passes are not recorded (A.json, B.json)"]
     if d is None:
         return out + ["no diff.json (`catalyst analysis diff`)"]

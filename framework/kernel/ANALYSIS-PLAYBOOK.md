@@ -24,6 +24,15 @@ path, or reports a rule the code does not have — far better than one pass
 plus a self-review, because the second agent carries none of the first
 one's framing.
 
+Four-eyes is the default. A deployment may make one pass its default
+(`analysis_passes = 1` in `catalyst.toml`), and one analysis may choose
+either when it is started (`catalyst analysis start --passes 1|2`). A
+**single-pass** analysis is recorded as such (its record's `Passes` is
+`1`): it records pass A only, every finding it keeps says how it was
+verified against the code, and the user still decides each one. It is
+cheaper and catches less: choose it for a narrow scope, never because two
+passes disagreed.
+
 ```text
 pass A (independent) ──┐
                         ├──▶ diff ──▶ reconciliation ──▶ the user decides each finding
