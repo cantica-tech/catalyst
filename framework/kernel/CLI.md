@@ -139,6 +139,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst impact <id>` | what an entity rests on and what rests on it, transitively (read-only) | `--depth`, `--down`, `--json`, `--up` |
 | `catalyst module list` | each installed module: id, version, source, commit, hash (no network) | `--json` |
 | `catalyst module install <source>` | install a module into a deployment that has none (seeded as init does) | `--as`, `--intent`, `--json`, `--kernel` |
+| `catalyst module available <id>` | the releases at the module's recorded repository (the network) | `--json` |
 | `catalyst module upgrade <id> <source>` | move the installed module to another release, through `sync plan\|apply` | `--as`, `--base-kernel`, `--intent`, `--json`, `--kernel`, `--plan` |
 | `catalyst module verify <id>` | recompute each module's hash and compare it with the record (exit 1 on a difference) | `--json` |
 | `catalyst where` | the project's criterion: the home store, or a legacy working copy | `--json` |
@@ -819,6 +820,19 @@ when the source is a git checkout, and the sha256 of the deployed tree
   recorded, which is not an error: its next `sync apply` records it (the
   source stays empty when that sync names no `--module`).
 
+### `catalyst module available <id> [--json]`
+
+The releases of an installed module: the version tags (`1.2.3` or `v1.2.3`)
+at the repository its record names, read with `git ls-remote` (the
+network), newest first, each marked `installed` or `newer`
+(`spec/module-releases.schema.json`). A module installed from a directory
+or a zip has no repository to list, and an unreachable one is refused,
+exit `1`. `catalyst serve --local` answers `GET /v1/modules` (`module list
+--json`), `GET /v1/modules/<id>/available` (this) and `GET
+/v1/modules/<id>/plan?to=<tag>` (`module upgrade <id> <its repository>@<tag>
+--plan --json`, for a tag this lists, never another source); a shared server
+has none of them.
+
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 
 Each refuses what its slash command refuses, writes, and journals one entry
@@ -1376,7 +1390,8 @@ port the system picks unless `--port` names one, and prints one JSON line,
 `{"url", "token", "pid"}`; the token is made for the run and never stored.
 The read endpoints and `events` answer as on a server, `GET check` returns
 `catalyst check --json`, `GET head` adds what the deployment runs (`kernel`,
-`modules` with their versions, and `catalyst`, the version serving it),
+`modules` with their versions, and `catalyst`, the version serving it) and
+its `project` name (catalyst >= 0.86.0),
 `GET runs` returns this user's run log for the project (`{runs: [...]}`;
 local mode only — a shared server keeps nobody's runs), and `push`, `have`,
 `changes` and `blobs` answer 405. Its batch is a change counter: it moves when a criterion file changes

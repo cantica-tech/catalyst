@@ -362,6 +362,86 @@ def verify(root: Path, only: str | None = None) -> list[Finding]:
     return findings
 
 
+# --- releases -------------------------------------------------------------------
+VERSION_TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+
+
+def _version_key(v: str) -> tuple[int, ...]:
+    m = VERSION_TAG_RE.match(v or "")
+    return tuple(int(x) for x in m.groups()) if m else (-1,)
+
+
+def available(root: Path, module_id: str) -> dict:
+    """The releases of an installed module: the version tags at its recorded
+    git source (`git ls-remote`, the network), newest first, each saying
+    whether it is newer than the installed version. A module whose record
+    names no repository has none to list."""
+    entry = next((e for e in read_record(root) if e["id"] == module_id), None)
+    if entry is None:
+        if module_id in installed_ids(root):
+            raise ModuleError(f"module '{module_id}' is not recorded yet: the next `catalyst sync apply` records it")
+        raise ModuleError(f"no module '{module_id}' in this criterion")
+    source, installed = entry.get("source") or "", entry.get("version") or ""
+    if not is_url(source) or source.startswith("-"):
+        raise ModuleError(
+            f"module '{module_id}' was installed from {source or 'nowhere recorded'}: no repository to list"
+        )
+    try:
+        out = subprocess.run(
+            ["git", "ls-remote", "--tags", "--refs", source],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ModuleError(f"cannot reach {clean_url(source)}: {exc}") from None
+    if out.returncode != 0:
+        raise ModuleError(f"cannot reach {clean_url(source)}: {out.stderr.strip() or 'git ls-remote failed'}")
+    tags = []
+    for line in out.stdout.splitlines():
+        _, _, ref = line.partition("\t")
+        tag = ref.removeprefix("refs/tags/")
+        if VERSION_TAG_RE.match(tag):
+            tags.append(tag)
+    releases = [
+        {
+            "version": t.lstrip("v"),
+            "tag": t,
+            "newer": _version_key(t) > _version_key(installed),
+            "installed": _version_key(t) == _version_key(installed),
+        }
+        for t in sorted(set(tags), key=_version_key, reverse=True)
+    ]
+    return {"id": module_id, "installed": installed, "source": clean_url(source), "releases": releases}
+
+
+def upgrade_plan(dep, module_id: str, tag: str) -> dict:
+    """What `catalyst module upgrade <id> <source>@<tag> --plan --json` would
+    list, for one of the releases `available` gives (never another source:
+    a served plan fetches only from the module's recorded repository)."""
+    import tempfile
+
+    from catalyst import sync
+    from module_loader import REPO_ROOT
+
+    releases = available(dep.root, module_id)
+    if tag not in {r["tag"] for r in releases["releases"]}:
+        raise ModuleError(f"{tag!r} is not a release of {module_id} (`catalyst module available {module_id}`)")
+    source = next(e.get("source") for e in read_record(dep.root) if e["id"] == module_id)
+    kernel = REPO_ROOT / "framework" / "kernel"
+    with tempfile.TemporaryDirectory(prefix="catalyst-fetch-") as tmp:
+        module = fetch(f"{source}@{tag}", Path(tmp))[0]
+        src = sync.Sources(dep, kernel, module, kernel, None)
+        try:
+            return {"id": module_id, "to": tag, **sync.plan(dep, src, sync.commands_dir(dep, None)).as_dict()}
+        except sync.SyncError as exc:
+            raise ModuleError(str(exc)) from None
+        finally:
+            src.close()
+
+
 # --- install --------------------------------------------------------------------
 def _snapshot(root: Path) -> dict[Path, bytes]:
     """Each file's digest, `.git` and `.venv` never entered: git's background

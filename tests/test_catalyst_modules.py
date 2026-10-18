@@ -154,3 +154,98 @@ def test_a_module_in_a_larger_repository_is_recorded_with_its_folder(tmp_path):
     assert modules.source_of(module)[0] == "git@example.test:acme/mono.git#modules/example-process"
     assert modules.source_of(tmp_path / "x.zip") == ("x.zip", None)
     assert modules.source_of(None) == (None, None)
+
+
+def _recorded_at(project, url: str) -> None:
+    path = project / ".criterion" / modules.RECORD
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["modules"][0]["source"] = url
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def _ls_remote(monkeypatch, tags: list[str], code: int = 0) -> list[list[str]]:
+    calls: list[list[str]] = []
+    real = subprocess.run
+
+    def fake(cmd, *a, **kw):
+        if cmd[:2] == ["git", "ls-remote"]:
+            calls.append(cmd)
+            out = "".join(f"{i:040x}\trefs/tags/{t}\n" for i, t in enumerate(tags))
+            return subprocess.CompletedProcess(cmd, code, out, "" if code == 0 else "denied")
+        return real(cmd, *a, **kw)
+
+    monkeypatch.setattr(modules.subprocess, "run", fake)
+    return calls
+
+
+def test_module_available_lists_the_release_tags_newest_first(tmp_path, monkeypatch, capsys):
+    """REQ-000060: the releases at the recorded repository, which are newer."""
+    project, _ = _deployment(tmp_path)
+    _recorded_at(project, "https://user:secret@example.test/acme/example-process.git")
+    calls = _ls_remote(monkeypatch, ["0.1.0", "v0.3.0", "0.2.0", "nightly", "0.10.0"])
+    found = modules.available(project / ".criterion", "example-process")
+    assert calls[0][-1] == "https://user:secret@example.test/acme/example-process.git"
+    assert found["source"] == "https://example.test/acme/example-process.git"  # credentials never shown
+    assert [r["tag"] for r in found["releases"]] == ["0.10.0", "v0.3.0", "0.2.0", "0.1.0"]
+    import schema_check
+
+    assert schema_check.problems(found, schema_check.load("module-releases")) == []
+    by = {r["version"]: r for r in found["releases"]}
+    assert by["0.2.0"]["installed"] and by["0.3.0"]["newer"] and not by["0.1.0"]["newer"]
+    assert main(["--project", str(project), "module", "available", "example-process", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == found
+
+
+def test_module_available_refuses_without_a_repository_or_a_reachable_one(tmp_path, monkeypatch):
+    import pytest
+
+    project, _ = _deployment(tmp_path)
+    root = project / ".criterion"
+    with pytest.raises(modules.ModuleError, match="no repository to list"):
+        modules.available(root, "example-process")  # installed from a directory
+    with pytest.raises(modules.ModuleError, match="no module 'other'"):
+        modules.available(root, "other")
+    _recorded_at(project, "https://example.test/acme/example-process.git")
+    _ls_remote(monkeypatch, [], code=128)
+    with pytest.raises(modules.ModuleError, match="cannot reach"):
+        modules.available(root, "example-process")
+    with pytest.raises(modules.ModuleError, match="not a release"):
+        _ls_remote(monkeypatch, ["0.2.0"])
+        modules.upgrade_plan(load(project), "example-process", "9.9.9")
+
+
+def test_the_local_server_answers_the_modules_routes(tmp_path, monkeypatch):
+    import threading
+
+    import pytest
+
+    from catalyst import serve
+
+    project, _ = _deployment(tmp_path)
+    _recorded_at(project, "https://example.test/acme/example-process.git")
+    _ls_remote(monkeypatch, ["0.2.0", "0.3.0"])
+    monkeypatch.setattr(modules, "upgrade_plan", lambda dep, mid, tag: {"id": mid, "to": tag, "actions": []})
+    httpd, token = serve.make_local(project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        (row,) = client.call("GET", "/modules")["modules"]
+        assert row["id"] == "example-process"
+        assert [r["tag"] for r in client.call("GET", "/modules/example-process/available")["releases"]] == [
+            "0.3.0",
+            "0.2.0",
+        ]
+        assert client.call("GET", "/modules/example-process/plan?to=0.3.0") == {
+            "id": "example-process",
+            "to": "0.3.0",
+            "actions": [],
+        }
+        with pytest.raises(serve.ServeError) as err:
+            client.call("GET", "/modules/example-process/plan")
+        assert err.value.status == 400
+        with pytest.raises(serve.ServeError) as err:
+            client.call("GET", "/modules/other/available")
+        assert err.value.status == 404
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
