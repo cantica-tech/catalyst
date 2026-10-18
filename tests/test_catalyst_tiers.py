@@ -84,3 +84,26 @@ def test_trace_accepts_only_the_no_artifact_tiers_prefix(tmp_path):
     assert check_message("clerical(R1): tidy", None, prefixes) is None
     reason = check_message("chore: tidy", None, prefixes)
     assert reason is not None and "`clerical:`" in reason
+
+
+def test_a_change_names_the_tier_its_artifact_type_opens(tmp_path):
+    """R4.8: a verb run without --tier records the tier its artifact's type opens, when one tier alone names it."""
+    project = make_project(tmp_path)
+    mod = project / ".criterion" / "modules" / "example-process" / "module.yaml"
+    write(mod, mod.read_text(encoding="utf-8") + MODULE_TIERS.replace("  - id: position\n    artifact: ITEM\n", ""))
+    dep = load(project)
+    assert tiers.inferred(dep, ITEM) == "conforming"
+    assert tiers.inferred(dep, f"SUB-000001-{USERID}") is None  # no tier names subs
+    assert tiers.inferred(dep, "a description, not an ID") is None
+    _with_tiers(project)  # two tiers name items: which one would be a guess
+    assert tiers.inferred(load(project), ITEM) is None
+
+
+def test_status_set_without_a_tier_records_the_inferred_one(tmp_path):
+    from catalyst_fixtures import journal_entries
+
+    project = make_project(tmp_path, git=True)
+    mod = project / ".criterion" / "modules" / "example-process" / "module.yaml"
+    write(mod, mod.read_text(encoding="utf-8") + MODULE_TIERS.replace("  - id: position\n    artifact: ITEM\n", ""))
+    assert main(["--project", str(project), "status", "set", ITEM, "Done", "--intent", "done"]) == 0
+    assert journal_entries(project / ".criterion")[-1]["tier"] == "conforming"
