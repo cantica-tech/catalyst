@@ -1152,6 +1152,18 @@ def cmd_badge(args) -> int:
     return 0
 
 
+def cmd_definition_list(args) -> int:
+    from catalyst import views
+
+    rows = views.definitions(open_deployment(args))
+    if args.json:
+        print(json.dumps({"definitions": rows}, indent=2))
+        return 0
+    for r in rows:
+        print(f"{r['slug']} v{r['version'] or '?'}  {r['description'][:100]}")
+    return 0
+
+
 def cmd_trace(args) -> int:
     from catalyst import unrecorded
     from catalyst.corpus import load_corpus
@@ -2370,6 +2382,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("definition", help="deployed entity definitions")
     ds = p.add_subparsers(dest="definition_command", required=True)
+    q = ds.add_parser("list", help="each deployed definition: its slug, version and description")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_definition_list)
     q = ds.add_parser("migrate", help="move definitions/<type>.md to a version that exists (INV-23)")
     q.add_argument("entity", help="the entity type's definitions folder name, e.g. role")
     q.add_argument("version", type=int)

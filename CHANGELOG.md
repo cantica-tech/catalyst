@@ -8,10 +8,12 @@ messages.
 
 ## 0.88.0 — 2026-10-18
 
-Journal hygiene (R4.8). No layout change, no migration.
+Journal hygiene (R4.8) and the definitions served. No layout change, no migration.
 
 - `catalyst journal append` warns when `--command` is none of the deployment's commands (`CODE-OF-CONDUCT.md` §4
   and its aliases), a `catalyst <verb>` or a tier's name; the entry is still written.
+- `catalyst definition list [--json]` and `GET /v1/definitions`: each deployed definition's slug, version and
+  description (`spec/definitions.schema.json`), for a client to show what a type is without reading the criterion.
 
 ## 0.87.0 — 2026-10-18
 
