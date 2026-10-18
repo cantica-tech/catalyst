@@ -619,6 +619,22 @@ def cmd_module(args) -> int:
             print(f"installed module {done['id']} {done['version']}{where} ({done['files']} file(s), journaled)")
             print("Next: a DEPLOYMENT.md history line, then `catalyst check`.")
         return 0
+    if args.module_command == "available":
+        try:
+            found = modules.available(dep.root, args.id)
+        except modules.ModuleError as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps(found, indent=2))
+            return 0
+        print(f"{found['id']} {found['installed']} from {found['source']}")
+        for r in found["releases"]:
+            mark = "  installed" if r["installed"] else ("  newer" if r["newer"] else "")
+            print(f"    {r['tag']}{mark}")
+        if not found["releases"]:
+            print("    no release tag")
+        return 0
     if args.module_command == "upgrade":
         installed = [m.id for m in dep.installed()]
         if args.id not in installed:
@@ -2360,6 +2376,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--kernel", type=Path, help="framework/kernel of the release this deployment is at")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_module)
+    q = mods.add_parser("available", help="the releases at the module's recorded repository (the network)")
+    q.add_argument("id", help="the installed module")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_module)
     q = mods.add_parser("upgrade", help="move the installed module to another release, through `sync plan|apply`")

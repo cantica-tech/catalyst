@@ -139,6 +139,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst impact <id>` | what an entity rests on and what rests on it, transitively (read-only) | `--depth`, `--down`, `--json`, `--up` |
 | `catalyst module list` | each installed module: id, version, source, commit, hash (no network) | `--json` |
 | `catalyst module install <source>` | install a module into a deployment that has none (seeded as init does) | `--as`, `--intent`, `--json`, `--kernel` |
+| `catalyst module available <id>` | the releases at the module's recorded repository (the network) | `--json` |
 | `catalyst module upgrade <id> <source>` | move the installed module to another release, through `sync plan\|apply` | `--as`, `--base-kernel`, `--intent`, `--json`, `--kernel`, `--plan` |
 | `catalyst module verify <id>` | recompute each module's hash and compare it with the record (exit 1 on a difference) | `--json` |
 | `catalyst where` | the project's criterion: the home store, or a legacy working copy | `--json` |
@@ -818,6 +819,19 @@ when the source is a git checkout, and the sha256 of the deployed tree
 - A deployment installed before the record existed is listed as not
   recorded, which is not an error: its next `sync apply` records it (the
   source stays empty when that sync names no `--module`).
+
+### `catalyst module available <id> [--json]`
+
+The releases of an installed module: the version tags (`1.2.3` or `v1.2.3`)
+at the repository its record names, read with `git ls-remote` (the
+network), newest first, each marked `installed` or `newer`
+(`spec/module-releases.schema.json`). A module installed from a directory
+or a zip has no repository to list, and an unreachable one is refused,
+exit `1`. `catalyst serve --local` answers `GET /v1/modules` (`module list
+--json`), `GET /v1/modules/<id>/available` (this) and `GET
+/v1/modules/<id>/plan?to=<tag>` (`module upgrade <id> <its repository>@<tag>
+--plan --json`, for a tag this lists, never another source); a shared server
+has none of them.
 
 ### Administration: `user`, `role`, `freeze`, `unfreeze`, `definition migrate`
 

@@ -182,6 +182,9 @@ class Reads:
     def check(self) -> dict:
         raise ServeError(501, "check runs where the criterion's git history is: `catalyst serve --local`, or the CLI")
 
+    def modules(self, path: str, query: dict[str, list[str]]) -> object:
+        raise ServeError(501, "modules are this machine's: `catalyst serve --local`, or `catalyst module`")
+
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
         backlog, journal, graph, inbox, history, impact, approvals, analyses, and the commands
@@ -606,6 +609,29 @@ class LocalReader(Reads):
                 self._loaded = (batch, *self._load())
             return self._loaded
 
+    def modules(self, path: str, query: dict[str, list[str]]) -> object:
+        """Local mode only (the network and git are this machine's): the
+        installed modules (`module list --json`), one module's releases
+        (`/modules/<id>/available`) and the plan of upgrading it to one of
+        them (`/modules/<id>/plan?to=<tag>`)."""
+        from catalyst import modules
+
+        _, dep, _ = self.loaded()
+        parts = [urllib.parse.unquote(p) for p in path.strip("/").split("/")]
+        try:
+            if len(parts) == 1:
+                return {"modules": [f.as_dict() for f in modules.verify(dep.root)]}
+            if len(parts) == 3 and parts[2] == "available":
+                return modules.available(dep.root, parts[1])
+            if len(parts) == 3 and parts[2] == "plan":
+                to = (query.get("to") or [""])[0]
+                if not to:
+                    raise ServeError(400, "plan needs ?to=<a release tag>")
+                return modules.upgrade_plan(dep, parts[1], to)
+        except modules.ModuleError as e:
+            raise ServeError(404, str(e)) from None
+        raise ServeError(404, f"no such endpoint: GET {path}")
+
     def check(self) -> dict:
         """What `catalyst check --json` prints, once per change."""
         from catalyst.check import as_json, run
@@ -756,6 +782,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 path in ("/changes", "/have", "/push") or path.startswith("/blobs/")
             ):
                 raise ServeError(405, "this is a local, read-only view of one criterion")
+            if (
+                method == "GET"
+                and (path == "/modules" or path.startswith("/modules/"))
+                and getattr(self.app, "read_only", False)
+            ):
+                return self._send(200, self.app.modules(path, urllib.parse.parse_qs(url.query)))
             if method == "GET" and path == "/runs" and getattr(self.app, "read_only", False):
                 from catalyst import run as runs  # local mode only: a shared server keeps nobody's runs
 
