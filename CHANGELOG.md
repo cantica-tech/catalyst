@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.88.0 — 2026-10-18
+
+Journal hygiene (R4.8). No layout change, no migration.
+
+- `catalyst journal append` warns when `--command` is none of the deployment's commands (`CODE-OF-CONDUCT.md` §4
+  and its aliases), a `catalyst <verb>` or a tier's name; the entry is still written.
+
 ## 0.87.0 — 2026-10-18
 
 The audit pack and a README badge. No layout change, no migration.

@@ -1151,6 +1151,9 @@ criterion's journal lock, with the real UTC time,
 the signer as `actor`, and each file's `before`/`after` git blob hashes
 (`Rules-of-Rules.md` §12). Write the files first, then append.
 
+- `--command` names the command the change was made for: one of the
+  deployed `CODE-OF-CONDUCT.md` §4 or its aliases, a `catalyst <verb>`, or a
+  tier's name. Another is written as given, with a warning on stderr.
 - `--action` is one of `create`, `update`, `close`, `retire`,
   `status-change`, `sync`; anything else is rejected.
 - `--intent` (repeatable, at least one) is the goal of the change, not a

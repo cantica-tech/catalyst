@@ -116,6 +116,13 @@ def cmd_journal(args) -> int:
         from catalyst.ids import resolve_signer
 
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        if not j.command_known(dep, args.cmd):
+            # R4.8: a warning while 0.x, the entry still written
+            print(
+                f"catalyst: warning: {args.cmd!r} is not a command of this deployment (CODE-OF-CONDUCT.md §4, its "
+                "aliases, `catalyst <verb>` or a tier): name the command the change was made for",
+                file=sys.stderr,
+            )
         entry = j.append(
             dep,
             j.AppendRequest(
