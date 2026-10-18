@@ -6,6 +6,25 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.87.0 — 2026-10-18
+
+The audit pack and a README badge. No layout change, no migration.
+
+- `catalyst audit [--json] [--html <file>]`: what the deployment runs, the record's integrity (journal, `check`,
+  gated rules lacking approvals), who signed, and each rule with everything that rests on it, transitively; as data
+  (`spec/audit.schema.json`), in brief, or as a self-contained page printable to a PDF.
+- `catalyst serve --local`: `GET /v1/audit`.
+- `catalyst badge [--metric check|chain] [--out <file>]`: a README badge, an SVG of `check`'s result or of the rules
+  something rests on, for CI to publish.
+- Fixed: `catalyst serve` could hang at startup while DNS did not answer: it no longer looks its own address up.
+- Rule storage (decision B7): a rule is a heading in a rule document or its own file, both checked alike; a file named
+  as a rule that also holds a rule heading is `check`'s `rule-file-heading` error.
+- `check` warns when a `user` or `user-list` field names someone who is not a registered user (`unknown-user`).
+- `catalyst new` fills an optional `user` or `date` field only when it is given (a required one still defaults to the
+  signer and today): an item is not assigned to whoever creates it.
+- `catalyst serve --allow-origin <origin>` and `catalyst.toml`'s `embed_origins` (decision B8): pages of those origins
+  read through `serve`, each with its reader's token; they write nothing, and no origin is allowed unless named.
+
 ## 0.86.0 — 2026-10-18
 
 Modules as data, for a Studio to administer them. No layout change, no migration.

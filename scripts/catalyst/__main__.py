@@ -1110,6 +1110,41 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_audit(args) -> int:
+    """`catalyst audit` (R6.27): the audit pack, as data, text or a page."""
+    from catalyst import audit
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    pack = audit.build(dep, load_corpus(dep))
+    if args.html:
+        Path(args.html).write_text(audit.render_html(pack), encoding="utf-8")
+        print(f"wrote the audit pack to {args.html} ({len(pack['rules'])} rule(s)); print it for a PDF")
+        return 0
+    if args.json:
+        json.dump(pack, sys.stdout, indent=2)
+        print()
+    else:
+        sys.stdout.write(audit.render(pack))
+    return 0
+
+
+def cmd_badge(args) -> int:
+    """`catalyst badge` (R6.28): a README badge as an SVG file or on stdout."""
+    from catalyst import badge
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    label, value, colour = badge.measure(dep, load_corpus(dep), args.metric)
+    image = badge.svg(label, value, colour)
+    if args.out:
+        Path(args.out).write_text(image, encoding="utf-8")
+        print(f"wrote {args.out}: {label} {value}")
+    else:
+        sys.stdout.write(image)
+    return 0
+
+
 def cmd_trace(args) -> int:
     from catalyst import unrecorded
     from catalyst.corpus import load_corpus
@@ -1691,7 +1726,9 @@ def cmd_serve(args) -> int:
             raise SystemExit("catalyst: serve --local listens on 127.0.0.1 only")
         project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
         try:
-            server, token = serve.make_local(project, args.port or 0, static=args.static)
+            server, token = serve.make_local(
+                project, args.port or 0, static=args.static, origins=tuple(args.allow_origin or ())
+            )
         except serve.ServeError as exc:
             raise SystemExit(f"catalyst: {exc}") from None
         url = f"http://127.0.0.1:{server.server_address[1]}"
@@ -1704,7 +1741,10 @@ def cmd_serve(args) -> int:
         finally:
             server.server_close()
         return 0
-    server = serve.make_server(db, args.host, args.port or 8765)
+    try:
+        server = serve.make_server(db, args.host, args.port or 8765, tuple(args.allow_origin or ()))
+    except serve.ServeError as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
     print(f"catalyst serve: {db} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
     try:
         server.serve_forever()
@@ -2013,6 +2053,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--since", help="only history from this date/time on (ISO 8601)")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("audit", help="the audit pack: each rule's chain and the record's integrity")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--html", metavar="FILE", help="write a self-contained page, printable to PDF")
+    p.set_defaults(func=cmd_audit)
+
+    p = sub.add_parser("badge", help="a README badge: an SVG of check's result or of the rules in use")
+    p.add_argument("--metric", choices=["check", "chain"], default="check")
+    p.add_argument("--out", metavar="FILE", help="write the SVG there (default: stdout)")
+    p.set_defaults(func=cmd_badge)
 
     p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
     p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")
@@ -2626,6 +2676,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="serve this project's own criterion read-only, on 127.0.0.1, for a client on this machine",
     )
     p.add_argument("--project", help="--local: the project (default: the current directory)")
+    p.add_argument(
+        "--allow-origin",
+        action="append",
+        metavar="ORIGIN",
+        help="let pages of this origin read (`https://host[:port]`, repeatable; --local adds catalyst.toml's "
+        "embed_origins); each read still needs its reader's token, and nothing is written",
+    )
     p.add_argument(
         "--static",
         type=Path,

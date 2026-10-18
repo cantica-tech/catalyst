@@ -38,7 +38,7 @@ exactly that.
 |---|---|---|
 | R0.1–R0.4, R0.6–R0.8, R0.10–R0.20 | done | `11` (released 0.46.0) |
 | R0.5 session-scoped Stop hook | done | 0.66.0 (REQ-000035): a baseline at session start, the Stop hook blocks on new failures only; `agent install` must be run again |
-| R0.9 one model for rule storage | partly (audited 2026-10-18) | ADR-001 (one shape) still contradicts `FORMAT.md` §5.2 and rr-META-003 (two shapes, "one shape per rule document" unchecked); `validate` enforces no single model; numbering is safe across shapes. `check` rejected one-file rules: fixed in 0.85.0 (BUG-000016). Open: the owner's decision, supersede ADR-001 to allow both shapes (recommended) or enforce one |
+| R0.9 one model for rule storage | done (0.87.0; owner decision B7) | two shapes, both read, numbered and checked alike: a heading in a rule document or its own file listed by one; ADR-000047 supersedes ADR-001 (ADR-000025); `check` accepts a one-file rule (BUG-000016, 0.85.0) and refuses one that also holds a rule heading (`rule-file-heading`) |
 | R0.21 Python floor, Windows | done | CI runs Ubuntu, macOS and Windows on 3.11 and 3.13 |
 | R1.1, R1.2, R1.4, R1.5, R1.6 | done | `12`; `tests/test_token_budgets.py`, `docs/golden-corpus`, `docs/adr` (19 ADRs) |
 | R1.3 feature register | done | accepted by the owner 2026-10-16 (all proposed verdicts); refreshed against kernel 0.71.0 and module 3.2.0 (163 shipped, 11 settled, 29 no item, 35 open) |

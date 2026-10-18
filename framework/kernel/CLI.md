@@ -99,6 +99,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst hook install` | install the commit-msg hook in the project's git repository | — |
 | `catalyst hook start` | session-start hook: print the invariants, record the session's baseline | `--format`, `--quiet` |
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
+| `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
+| `catalyst badge` | a README badge: an SVG of check's result or of the rules in use | `--metric`, `--out` |
 | `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
@@ -362,6 +364,7 @@ Findings come in two levels.
 | `id-shape` | An ID is not `<PREFIX>-NNNNNN-<registered userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
 | `rule-unindexed` | A rule is not listed in `rules/rules.md` (INV-8). |
 | `rule-strength` | A rule states a strength other than `must`, `should` or `may` (`FORMAT.md` §5.2). |
+| `rule-file-heading` | A file named as a rule (`<ID>-<slug>.md`) also holds a rule heading (`FORMAT.md` §5.2). |
 | `index-orphan` | An index row registers an ID that has no file. |
 
 **Warnings** are shape mismatches in otherwise sound data; `--strict`
@@ -370,6 +373,7 @@ promotes them to errors:
 | Code | Meaning |
 |---|---|
 | `enum-value` | An enum field holds a value outside the ETD's allowed values. |
+| `unknown-user` | A `user` or `user-list` field names someone who is not a registered user. |
 | `guard` | An artifact is in a state whose guards it fails (`MODULE-SPECIFICATION.md` §4.3); it may predate the guard. |
 | `ref-type` | A reference resolves, but to a different type than the ETD expects. |
 | `cardinality` | A single-reference field holds several values. |
@@ -641,6 +645,35 @@ with `EVENT`, `BASE_SHA`, `HEAD_SHA`, `BEFORE` and `SHA` set from
 `github.sha`. `catalyst` is the criterion's vendored CLI
 (`$CATALYST_HOME/projects/<name>/criterion/bin/catalyst.pyz`) or, without a
 criterion, the zipapp of a catalyst release.
+
+### `catalyst badge [--metric check|chain] [--out <file>]`
+
+A README badge (R6.28): one small SVG, `label | value`, its colour green,
+amber or red and its text saying it all (`aria-label`, `<title>`).
+`check` (the default): `passing`, amber when there are warnings, or the
+number of `catalyst check`'s errors. `chain`: the rules in force that
+something rests on, of all of them, meta-rules and retired rules left out
+(green from 80%, amber from 50%). It is a file for a
+CI job to publish beside the code; nothing is served, so no server answers an
+anonymous request for it.
+
+### `catalyst audit [--json] [--html <file>]`
+
+The audit pack (R6.27): what the deployment runs (its project, kernel and
+modules, the catalyst that made the pack, the criterion's commit), the
+record's integrity (`journal verify`'s errors and warnings, `check`'s with
+its first errors, and the gated rules whose current text lacks its
+approvals), who signed how many entities, and each rule with its status,
+strength and domain and everything that rests on it, transitively, nearest
+first, each with the field that brought it in (`impact`'s chain downstream,
+so no type is named). A rule nothing rests on is said; a meta-rule (in
+`Rules-of-Rules.md`) is marked as one and counted with neither, since no
+work rests on it. `--json` prints it
+(`spec/audit.schema.json`); `--html <file>` writes a self-contained page,
+no script and no remote file, printable to a PDF. `catalyst serve --local`
+answers `GET /v1/audit`; a shared server has no such read, the integrity
+checks needing the criterion's git. Nothing is written but the file asked
+for.
 
 ### `catalyst report [--since <date>] [--json]`
 
@@ -1382,6 +1415,12 @@ only its signers are not checked.
 - `serve token list`, `serve token revoke <n>`.
 
 Tokens are managed on the server's host, by whoever runs the server.
+
+Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
+adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
+requests get `Access-Control-Allow-Origin` and the preflight for a GET is
+answered; each read still needs its reader's token, any other method from such
+a page is a 403, and no origin is allowed unless named.
 
 `catalyst serve --local [--project <dir>] [--port <n>] [--static <dir>]` serves a project's
 own criterion read-only, for a client on this machine that reads every
