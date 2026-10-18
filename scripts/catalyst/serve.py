@@ -184,7 +184,7 @@ class Reads:
 
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
-        backlog, journal, graph, inbox, history, impact, approvals, and the commands
+        backlog, journal, graph, inbox, history, impact, approvals, analyses, and the commands
         and their specs (`catalyst spec --json`)."""
         from catalyst import views
         from catalyst.journal import JournalError
@@ -223,6 +223,16 @@ class Reads:
                 try:
                     data = gates.report(dep, corpus, item)
                 except gates.GateError as e:
+                    raise ServeError(404, str(e)) from None
+            elif what == "analyses":
+                from catalyst import analysis
+
+                try:
+                    if item:
+                        data = analysis.report(analysis.context(dep, item, corpus))
+                    else:
+                        data = {"analyses": analysis.summaries(dep, corpus)}
+                except analysis.AnalysisError as e:
                     raise ServeError(404, str(e)) from None
             elif what == "backlog":
                 data = views.backlog(dep, corpus)
@@ -763,8 +773,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
-                path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands")
-                or path.startswith(("/view/", "/impact/", "/history/", "/approvals/", "/spec/"))
+                path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands", "/analyses")
+                or path.startswith(("/view/", "/impact/", "/history/", "/approvals/", "/spec/", "/analyses/"))
             ):
                 what, _, item = path.strip("/").partition("/")
                 seq, data = self.app.read(what, urllib.parse.parse_qs(url.query), urllib.parse.unquote(item))

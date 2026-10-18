@@ -155,7 +155,8 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     assert main(["journal", "adopt", sha[:10], "--intent", "hand-written greeting", "--tier", "chore"]) == 0
     assert "adopted" in capsys.readouterr().out
     entry = [e for _, e, _ in j.read(load(proj)) if e and e.get("origin")][-1]
-    assert entry["origin"] == "manual" and entry["commit"] == sha and entry["actor"] == "Ada Lovelace"
+    # the registered user's git_username, as every other entry has it (BUG-000017)
+    assert entry["origin"] == "manual" and entry["commit"] == sha and entry["actor"] == "ada"
     assert entry["files"][0]["path"] == "src/app.py" and entry["files"][0]["before"] is None
     assert entry["tier"] == "chore" and entry["command"] == "/adopt"
     dep = load(proj)
@@ -163,6 +164,18 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     assert [i for i in j.verify(dep) if i.level == "error"] == []
     assert main(["journal", "adopt", sha[:10], "--intent", "again"]) == 0
     assert "nothing to adopt" in capsys.readouterr().out
+
+
+def test_adopt_keeps_an_unregistered_author_and_asks_a_fix_for_its_artifact(proj):
+    """BUG-000017: an author who is no registered user is recorded as git
+    gives them; a fix or feature adopted names its artifact, as on append."""
+    write(proj / "src" / "other.py", "y = 2\n")
+    git(proj, "add", "src/other.py")
+    git(proj, "-c", "user.name=Grace Hopper", "-c", "user.email=g@h", "commit", "-qm", "outside edit")
+    with pytest.raises(j.JournalError, match="serves an artifact"):
+        u.adopt(load(proj), ["HEAD"], ["outside edit"], tier="fix")
+    entries = u.adopt(load(proj), ["HEAD"], ["outside edit"], tier="fix", targets=[f"ITEM-000001-{USERID}"])
+    assert entries[0]["actor"] == "Grace Hopper"
 
 
 def test_adopt_a_range_in_order_keeps_the_chain(proj):

@@ -268,14 +268,26 @@ def adopt(
     already went through the commit's result. Returns the entries written."""
     if not intent or not all(i.strip() for i in intent):
         raise journal.JournalError("at least one non-empty --intent is required: why the change was made")
-    journal.check_tier(dep, tier)
+    journal.check_tier(dep, tier, targets=targets or [], artifact=artifact or "")
     if dep.standalone:
         raise journal.JournalError("a standalone working copy has no product history to adopt")
     with journal.journal_lock(dep):
         return _adopt(dep, revs, intent, tier, targets or [], artifact, actor)
 
 
+def _actor(corpus, author: str) -> str:
+    """The journal's actor for a commit's author: the registered user's
+    `git_username` when the author is one (by name, git username or userid),
+    else the author as git gives it (FORMAT.md: the actor is the signer's
+    `git_username`)."""
+    user = corpus.user(author) if author else None
+    return str(user.get("git_username") or user.get("name")) if user else author
+
+
 def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
+    from catalyst.corpus import load_corpus
+
+    corpus = load_corpus(dep)
     journaled = recorded(dep)
     written = []
     single = not any(".." in r for r in revs)  # named commits, not ranges: just those
@@ -295,7 +307,7 @@ def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
             journaled.add(path, before, after)
         entry = {
             "timestamp": journal.now(),
-            "actor": actor or c.author,
+            "actor": actor or _actor(corpus, c.author),
             "command": "/adopt",
             "action": "update",
             "artifact": artifact or f"commit {c.short}",

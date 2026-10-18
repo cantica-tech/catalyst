@@ -1368,7 +1368,23 @@ def cmd_analysis(args) -> int:
             )
         )
         return 0
+    if sub == "list":
+        rows = an.summaries(dep, corpus)
+        if args.json:
+            print(json.dumps({"analyses": rows}, indent=2))
+            return 0
+        for r in rows:
+            print(
+                f"{r['id']}  {r['phase']:<11} {r['passes']} pass{'es' if r['passes'] == 2 else ''}  "
+                f"{r['decided']}/{r['findings']} decided  {r['title']}"
+            )
+        if not rows:
+            print("no analysis yet (`catalyst analysis start`)")
+        return 0
     ctx = an.context(dep, args.id, corpus)
+    if sub == "status" and args.json:
+        print(json.dumps(an.report(ctx), indent=2))
+        return 0
     if sub == "status":
         d, r = ctx.load("diff.json"), ctx.load("reconciled.json")
         decided = (ctx.load("decisions.json") or {}).get("decisions", {})
@@ -2495,6 +2511,10 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
     q.add_argument("id")
+    q.add_argument("--json", action="store_true", help="the full report: passes, diff, findings and decisions")
+    q.set_defaults(func=cmd_analysis)
+    q = an_sub.add_parser("list", help="every analysis in brief, newest first")
+    q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_analysis)
 
     p = sub.add_parser("reconcile", help="decide a reconciliation case (role-gated: full, propose, none)")
