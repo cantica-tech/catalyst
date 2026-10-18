@@ -15,6 +15,7 @@ Modules as data, for a Studio to administer them. No layout change, no migration
 - `catalyst serve --local`: `GET /v1/modules` (`module list --json`), `GET /v1/modules/<id>/available`, and
   `GET /v1/modules/<id>/plan?to=<tag>`, the plan of upgrading to one of those releases (`module upgrade --plan
   --json`; never another source). A shared server has none of them.
+- `GET /v1/head` (local mode) also gives the project's name, `project`.
 
 ## 0.85.0 — 2026-10-18
 

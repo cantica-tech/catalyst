@@ -597,6 +597,7 @@ class LocalReader(Reads):
         return {
             "seq": self.batch(),
             "files": len(self._stamp or ()),
+            "project": dep.pointer.get("project_name") if not dep.standalone else None,
             "kernel": version.read_text(encoding="utf-8").strip() if version.is_file() else None,
             "modules": [{"id": m.id, "version": m.version} for m in dep.installed()],
             "catalyst": __version__,

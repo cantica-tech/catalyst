@@ -1390,7 +1390,8 @@ port the system picks unless `--port` names one, and prints one JSON line,
 `{"url", "token", "pid"}`; the token is made for the run and never stored.
 The read endpoints and `events` answer as on a server, `GET check` returns
 `catalyst check --json`, `GET head` adds what the deployment runs (`kernel`,
-`modules` with their versions, and `catalyst`, the version serving it),
+`modules` with their versions, and `catalyst`, the version serving it) and
+its `project` name (catalyst >= 0.86.0),
 `GET runs` returns this user's run log for the project (`{runs: [...]}`;
 local mode only — a shared server keeps nobody's runs), and `push`, `have`,
 `changes` and `blobs` answer 405. Its batch is a change counter: it moves when a criterion file changes

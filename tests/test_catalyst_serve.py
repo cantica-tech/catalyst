@@ -463,6 +463,7 @@ def test_local_head_says_what_the_deployment_runs(local):
     assert head["kernel"] == (project / ".criterion" / "version.txt").read_text(encoding="utf-8").strip()
     assert head["modules"] == [{"id": "example-process", "version": head["modules"][0]["version"]}]
     assert head["catalyst"] == __version__ and isinstance(head["seq"], int)
+    assert head["project"] == "app"  # the project's name, for a client to keep things per project
 
 
 def test_local_mode_follows_the_criterion_and_says_so(local):
