@@ -530,10 +530,17 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
         return _append(dep, req)
 
 
-def check_tier(dep: Deployment, tier: str | None, req: AppendRequest | None = None) -> None:
+def check_tier(
+    dep: Deployment,
+    tier: str | None,
+    req: AppendRequest | None = None,
+    targets: list[str] | None = None,
+    artifact: str | None = None,
+) -> None:
     """The tier is one the active module declares (rr-META-006), and a change
     whose tier needs an artifact names one: its artifact is an ID, or it
-    targets one (what `trace` asks of a commit, asked of the entry too)."""
+    targets one (what `trace` asks of a commit, asked of the entry too) —
+    from `req`, or from `targets` and `artifact` (`journal adopt`)."""
     from catalyst import tiers
 
     try:
@@ -541,7 +548,10 @@ def check_tier(dep: Deployment, tier: str | None, req: AppendRequest | None = No
     except ValueError as exc:
         raise JournalError(str(exc)) from None
     needs = next((t for t in tiers.tiers_for(dep) if t.id == tier and t.needs_artifact), None)
-    if needs is not None and req is not None and not (req.targets or ARTIFACT_ID_RE.search(req.artifact)):
+    if req is not None:
+        targets, artifact = req.targets, req.artifact
+    named = req is not None or targets is not None or artifact is not None
+    if needs is not None and named and not (targets or ARTIFACT_ID_RE.search(artifact or "")):
         raise JournalError(
             f"a {tier} change serves an artifact: give --artifact <ID> or --target <ID> "
             f"(a change that needs none is --tier {', '.join(t.id for t in tiers.tiers_for(dep) if not t.needs_artifact) or 'chore'})"

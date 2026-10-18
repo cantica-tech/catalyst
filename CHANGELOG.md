@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.85.0 — 2026-10-18
+
+An analysis as data, for a workspace to read and triage, and two fixes. No layout change, no migration.
+
+- `catalyst analysis status <id> --json`: the full report of one analysis — its summary (phase, mode, passes, scope,
+  code state, findings decided, accepted and rejected), what each pass recorded, the diff's counts, each reconciled
+  finding with its decision, and what keeps it from its phase (`spec/analysis.schema.json`).
+- `catalyst analysis list [--json]`: every analysis in brief, newest first (`spec/analyses.schema.json`).
+- `catalyst serve`: `GET /v1/analyses` and `GET /v1/analyses/<id>`, as the verbs print them.
+- Fixed: `catalyst check` rejected a rule kept in its own file (`FORMAT.md` §5.2), asking it for a rule document's
+  `## Contents` and `## Linked Artifacts` headings.
+- Fixed: `catalyst journal adopt` recorded the git author's name as the actor instead of the registered user's
+  `git_username`, and did not ask an adopted fix or feature to name its artifact. Past entries stay as written.
+
 ## 0.84.0 — 2026-10-18
 
 Configurable four-eyes analysis (decision B5). Migration: `framework/kernel/migrations/0.84.0/single-pass-analysis.md`.

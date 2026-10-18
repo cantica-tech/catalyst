@@ -162,7 +162,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst analysis decide <id> <finding> <verdict>` | record the user's decision on one reconciled finding | `--artifact`, `--as`, `--reason` |
 | `catalyst analysis close <id>` | close once every finding is decided and accepted ones exist | `--as` |
 | `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
-| `catalyst analysis status <id>` | an analysis's phase and what it still needs | — |
+| `catalyst analysis status <id>` | an analysis's phase and what it still needs | `--json` |
+| `catalyst analysis list` | every analysis in brief, newest first | `--json` |
 | `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--from`, `--intent`, `--text` |
 | `catalyst try <change>` | make one change on a scratch copy of the criterion and say what it would do (nothing is kept) | `--as`, `--json`, `--keep`, `--proposal` |
 | `catalyst propose <id>` | propose a change to an entity or rule document, decided by someone else | `--as`, `--from`, `--intent`, `--json`, `--tier`, `--title` |
@@ -1266,8 +1267,14 @@ exit `1` and a reason on stderr when a precondition does not hold.
   finding's artifact is missing; sets Status `Closed` and the date, and
   writes the summary.
 - **`abandon <ID> --reason <text>`** — Status `Abandoned`, with the reason.
-- **`status <ID>`** — the phase, the passes, the diff counts, how many
-  findings are decided, and anything keeping the record from its phase.
+- **`status <ID> [--json]`** — the phase, the passes, the diff counts, how
+  many findings are decided, and anything keeping the record from its
+  phase. `--json`: the full report — what each pass recorded, the diff's
+  counts, each reconciled finding with its decision, the problems
+  (`spec/analysis.schema.json`; `GET /v1/analyses/<ID>`).
+- **`list [--json]`** — every analysis in brief, newest first: phase,
+  passes, findings decided, accepted and rejected
+  (`spec/analyses.schema.json`; `GET /v1/analyses`).
 
 `catalyst check` applies the same rules to every record: a record in
 `Reconciling` or later without its passes and the diff, in `Deciding` or
@@ -1344,7 +1351,8 @@ own: `GET list?type=<type>&filter=<field=value>` (`catalyst list --json`),
 a criterion without a `CODE-OF-CONDUCT.md` lists no command), and
 `GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
 server the content comes from the blobs it holds), `GET approvals/<id>`
-(`catalyst approvals <id> --json`), and `GET inbox`
+(`catalyst approvals <id> --json`), `GET analyses` and `GET analyses/<id>`
+(`catalyst analysis list|status --json`), and `GET inbox`
 (`catalyst inbox`; a server has no project history, so its inbox holds the
 reconciliation cases, the analyses and the approvals only). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an

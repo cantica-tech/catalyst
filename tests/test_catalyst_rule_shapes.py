@@ -89,3 +89,16 @@ def test_a_pre_cli_journal_entry_is_never_a_structure_error(tmp_path):
     assert check_journal_exists(root) == []
     write(root / "development" / "journal.jsonl", json.dumps(dict(entry, writer="catalyst/0.52.1")) + "\n")
     assert any("is not a 40-hex git hash" in e for e in check_journal_exists(root))
+
+
+def test_a_rule_in_its_own_file_passes_the_structure_check(tmp_path):
+    """BUG-000016: a one-file rule is the rule, not a rule document, so the
+    structure check does not ask it for `## Contents`; a rule document still must."""
+    from check_deployment import check_required_headings
+
+    project = make_project(tmp_path)
+    _per_file_rules(project)
+    root = project / ".criterion"
+    assert check_required_headings(root) == []
+    write(root / "rules" / "core" / "notes.md", "# Notes\n\nno headings\n")
+    assert len(check_required_headings(root)) == 2
