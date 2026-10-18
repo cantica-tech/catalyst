@@ -606,3 +606,30 @@ def test_the_deployment_names_its_embedding_origins(tmp_path):
         assert handler.origins == {"https://wiki.example.com", "http://localhost:3000"}
     finally:
         httpd.server_close()
+
+
+def test_the_definitions_are_listed_and_served(tmp_path, capsys):
+    """R5.3: a client reads the deployed definitions from catalyst, not the files."""
+    import json as _json
+    import threading
+
+    import schema_check
+    from catalyst.__main__ import main
+    from catalyst.init import init
+    from test_catalyst_init import request
+
+    req = request(tmp_path)
+    init(req)
+    assert main(["--project", str(req.project), "definition", "list", "--json"]) == 0
+    listed = _json.loads(capsys.readouterr().out)
+    assert schema_check.problems(listed, schema_check.load("definitions")) == []
+    by = {d["slug"]: d for d in listed["definitions"]}
+    assert "README" not in by and by["domain"]["version"] and by["domain"]["description"]
+    httpd, token = serve.make_local(req.project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert client.call("GET", "/definitions") == listed
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

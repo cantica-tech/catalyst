@@ -530,6 +530,26 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
         return _append(dep, req)
 
 
+def command_known(dep: Deployment, command: str) -> bool:
+    """Whether an entry's `command` is one this deployment has (R4.8): a
+    command of the deployed §4 or one of its aliases (`/create-<type>`), a
+    `catalyst <verb>`, or a tier's name (`chore`, `fix`: FORMAT.md lets an
+    entry name its tier as its command). A deployment without §4 knows all."""
+    from catalyst import spec, tiers
+
+    name = command.strip()
+    if name.startswith("catalyst "):
+        return True
+    if name in {t.id for t in tiers.tiers_for(dep)}:
+        return True
+    try:
+        s = spec.load_section4(dep)
+    except spec.SpecError:
+        return True
+    bare = name.lstrip("/")
+    return bare in s.bullets or bare in s.aliases
+
+
 def check_tier(
     dep: Deployment,
     tier: str | None,

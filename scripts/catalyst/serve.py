@@ -188,7 +188,7 @@ class Reads:
 
     def read(self, what: str, query: dict[str, list[str]], item: str = "") -> tuple[int, object]:
         """(batch, what `catalyst <what> --json` prints) for list, view,
-        backlog, journal, graph, inbox, history, impact, approvals, analyses, and the commands
+        backlog, journal, graph, inbox, history, impact, approvals, analyses, definitions, and the commands
         and their specs (`catalyst spec --json`)."""
         from catalyst import views
         from catalyst.journal import JournalError
@@ -238,6 +238,8 @@ class Reads:
                         data = {"analyses": analysis.summaries(dep, corpus)}
                 except analysis.AnalysisError as e:
                     raise ServeError(404, str(e)) from None
+            elif what == "definitions":
+                data = {"definitions": views.definitions(dep)}
             elif what == "backlog":
                 data = views.backlog(dep, corpus)
             elif what == "commands":
@@ -839,7 +841,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if method == "GET" and path == "/check":
                 return self._send(200, self.app.check(), batch=self.app.batch())
             if method == "GET" and (
-                path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands", "/analyses")
+                path in ("/list", "/backlog", "/journal", "/graph", "/inbox", "/commands", "/analyses", "/definitions")
                 or path.startswith(("/view/", "/impact/", "/history/", "/approvals/", "/spec/", "/analyses/"))
             ):
                 what, _, item = path.strip("/").partition("/")
