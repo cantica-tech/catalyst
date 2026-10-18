@@ -691,9 +691,24 @@ def _levels(roles: bytes | None) -> dict[str, str]:
 
 
 # --- HTTP ---------------------------------------------------------------------
+ORIGIN_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(?::\d{1,5})?$")
+
+
+def check_origin(origin: str) -> str:
+    """An origin a deployment lets embed its views (owner decision B8):
+    `scheme://host[:port]`, no path, no wildcard."""
+    o = origin.strip().rstrip("/")
+    if not ORIGIN_RE.match(o):
+        raise ServeError(400, f"{origin!r} is not an origin (`https://host[:port]`, no path, no wildcard)")
+    return o
+
+
 class Handler(http.server.BaseHTTPRequestHandler):
     server_version = "catalyst-serve/1"
     app: Server
+    # the origins whose pages may read through this server (B8): none by default
+    origins: frozenset[str] = frozenset()
+    _cors: str | None = None
 
     def log_message(self, format, *args):  # quiet: a server for a few people, not a web log
         pass
@@ -716,8 +731,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("X-Content-Type-Options", "nosniff")  # the type is the one sent, never a guess
         if batch is not None:
             self.send_header("X-Catalyst-Batch", str(batch))
+        if self._cors:
+            self._cors_headers()
         self.end_headers()
         self.wfile.write(raw)
+
+    def _cors_headers(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", str(self._cors))
+        self.send_header("Access-Control-Expose-Headers", "X-Catalyst-Batch")
+        self.send_header("Vary", "Origin")
 
     def _events(self) -> None:
         """Server-sent events: the current batch on connect, then each new
@@ -763,7 +785,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         """With `--static`, the API answers its own page only: a request from
         another origin (a page elsewhere in the browser) is refused."""
         origin = self.headers.get("Origin")
-        if getattr(self.app, "static", None) is None or origin is None:
+        if getattr(self.app, "static", None) is None or origin is None or origin in self.origins:
             return False
         port = getattr(self.server, "server_port", None)
         return origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
@@ -773,6 +795,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             url = urllib.parse.urlparse(self.path)
             if getattr(self.app, "static", None) is not None and method == "GET" and not url.path.startswith(API):
                 return self._static(url.path)
+            origin = self.headers.get("Origin")
+            if origin is not None and origin in self.origins:
+                self._cors = origin  # an allowed page elsewhere: it reads, never writes (B8)
+                if method != "GET":
+                    raise ServeError(403, "an embedding page only reads")
             if self._foreign():
                 raise ServeError(403, "this server answers its own page only (a request from another origin)")
             auth = self.headers.get("Authorization", "")
@@ -839,6 +866,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):  # http.server's name
         self._route("GET")
 
+    def do_OPTIONS(self):
+        """A browser's preflight for an allowed origin's read (B8); anything else is refused."""
+        origin = self.headers.get("Origin")
+        asked = (self.headers.get("Access-Control-Request-Method") or "").upper()
+        if origin is None or origin not in self.origins or asked != "GET":
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self._cors = origin
+        self.send_response(204)
+        self._cors_headers()
+        self.send_header("Access-Control-Allow-Methods", "GET")
+        self.send_header("Access-Control-Allow-Headers", "Authorization")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def do_POST(self):
         self._route("POST")
 
@@ -854,13 +899,27 @@ class _Server(http.server.ThreadingHTTPServer):
         self.server_name, self.server_port = str(host), int(port)
 
 
-def make_server(db: Path, host: str = "127.0.0.1", port: int = 8765) -> http.server.ThreadingHTTPServer:
-    handler = type("BoundHandler", (Handler,), {"app": Server(db)})
+def make_server(
+    db: Path, host: str = "127.0.0.1", port: int = 8765, origins: tuple[str, ...] = ()
+) -> http.server.ThreadingHTTPServer:
+    allowed = frozenset(check_origin(o) for o in origins)
+    handler = type("BoundHandler", (Handler,), {"app": Server(db), "origins": allowed})
     return _Server((host, port), handler)
 
 
+def deployment_origins(project: Path) -> tuple[str, ...]:
+    """`catalyst.toml`'s `embed_origins`: the origins, comma-separated, whose pages may read (B8)."""
+    import project_file
+
+    try:
+        raw = project_file.read_dir(Path(project)).get("embed_origins") or ""
+    except Exception:  # no pointer, or an unreadable one: nothing allowed
+        return ()
+    return tuple(o for o in (x.strip() for x in str(raw).split(",")) if o)
+
+
 def make_local(
-    project: Path, port: int = 0, poll: float = 1.0, static: Path | None = None
+    project: Path, port: int = 0, poll: float = 1.0, static: Path | None = None, origins: tuple[str, ...] = ()
 ) -> tuple[http.server.ThreadingHTTPServer, str]:
     """A read-only server over one project's criterion, on loopback only, and
     its token (fresh per run, never stored). `static`: a directory whose
@@ -870,7 +929,8 @@ def make_local(
     token = "cst_" + secrets.token_urlsafe(32)
     app = LocalReader(project, token, poll)
     app.static = Path(static).resolve() if static is not None else None
-    handler = type("LocalHandler", (Handler,), {"app": app})
+    allowed = frozenset(check_origin(o) for o in (*origins, *deployment_origins(project)))
+    handler = type("LocalHandler", (Handler,), {"app": app, "origins": allowed})
     return _Server(("127.0.0.1", port), handler), token
 
 

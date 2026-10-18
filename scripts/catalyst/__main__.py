@@ -1726,7 +1726,9 @@ def cmd_serve(args) -> int:
             raise SystemExit("catalyst: serve --local listens on 127.0.0.1 only")
         project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
         try:
-            server, token = serve.make_local(project, args.port or 0, static=args.static)
+            server, token = serve.make_local(
+                project, args.port or 0, static=args.static, origins=tuple(args.allow_origin or ())
+            )
         except serve.ServeError as exc:
             raise SystemExit(f"catalyst: {exc}") from None
         url = f"http://127.0.0.1:{server.server_address[1]}"
@@ -1739,7 +1741,10 @@ def cmd_serve(args) -> int:
         finally:
             server.server_close()
         return 0
-    server = serve.make_server(db, args.host, args.port or 8765)
+    try:
+        server = serve.make_server(db, args.host, args.port or 8765, tuple(args.allow_origin or ()))
+    except serve.ServeError as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
     print(f"catalyst serve: {db} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
     try:
         server.serve_forever()
@@ -2671,6 +2676,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="serve this project's own criterion read-only, on 127.0.0.1, for a client on this machine",
     )
     p.add_argument("--project", help="--local: the project (default: the current directory)")
+    p.add_argument(
+        "--allow-origin",
+        action="append",
+        metavar="ORIGIN",
+        help="let pages of this origin read (`https://host[:port]`, repeatable; --local adds catalyst.toml's "
+        "embed_origins); each read still needs its reader's token, and nothing is written",
+    )
     p.add_argument(
         "--static",
         type=Path,

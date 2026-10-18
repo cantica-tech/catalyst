@@ -22,6 +22,8 @@ The audit pack and a README badge. No layout change, no migration.
 - `check` warns when a `user` or `user-list` field names someone who is not a registered user (`unknown-user`).
 - `catalyst new` fills an optional `user` or `date` field only when it is given (a required one still defaults to the
   signer and today): an item is not assigned to whoever creates it.
+- `catalyst serve --allow-origin <origin>` and `catalyst.toml`'s `embed_origins` (decision B8): pages of those origins
+  read through `serve`, each with its reader's token; they write nothing, and no origin is allowed unless named.
 
 ## 0.86.0 — 2026-10-18
 

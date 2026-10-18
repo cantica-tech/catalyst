@@ -1416,6 +1416,12 @@ only its signers are not checked.
 
 Tokens are managed on the server's host, by whoever runs the server.
 
+Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
+adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
+requests get `Access-Control-Allow-Origin` and the preflight for a GET is
+answered; each read still needs its reader's token, any other method from such
+a page is a 403, and no origin is allowed unless named.
+
 `catalyst serve --local [--project <dir>] [--port <n>] [--static <dir>]` serves a project's
 own criterion read-only, for a client on this machine that reads every
 criterion the same way, served or not. It listens on 127.0.0.1 only, on a
