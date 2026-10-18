@@ -147,7 +147,11 @@ def _finish(
     tier: str | None,
     extra: dict | None = None,
 ) -> None:
-    """Common ending: indexes, then one journal entry for every touched file."""
+    """Common ending: indexes, then one journal entry for every touched file,
+    of the tier the change names, else the one its artifact's type opens (R4.8)."""
+    from catalyst import tiers
+
+    tier = tier or tiers.inferred(dep, item_id)
     changes = indexes.regenerate(dep, load_corpus(dep))
     paths = list(dict.fromkeys([*files, *(c.path for c in changes)]))
     journal.append(

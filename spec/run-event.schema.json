@@ -76,7 +76,8 @@
         "cost_usd": { "type": ["number", "null"] },
         "duration_ms": { "type": ["integer", "null"] },
         "denied": { "type": "array", "items": { "type": "string" }, "description": "Tools the user's agent settings refused." },
-        "result": { "type": "string", "description": "The agent's last word; on a failure, why." }
+        "result": { "type": "string", "description": "The agent's last word; on a failure, why." },
+        "measured": { "type": "boolean", "description": "false: the agent reports no usage or cost, so the zeros are unknown, not none (catalyst >= 0.88.0; absent: measured)." }
       }
     }
   ]

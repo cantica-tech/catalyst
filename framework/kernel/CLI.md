@@ -521,8 +521,11 @@ the agent's own settings.
 cost last. Exit `0` when the agent reports success, `1` when it does not
 (or stops without a result, whose reason is the `end` event's), `2` when
 the run cannot start: an unknown command, an agent without an adapter, or
-its CLI not on `PATH`. Only Claude Code has an adapter
-(`claude -p … --output-format stream-json`). No route of `catalyst serve`
+its CLI not on `PATH`. Claude Code's adapter reads its stream-json (`claude
+-p … --output-format stream-json`): every event, usage and cost. GitHub
+Copilot's (`copilot -p …`) and Gemini CLI's (`gemini -p …`, owner decision
+B2) pass on what they print as text, `ok` when the agent exits `0`, and
+report no tool call, usage or cost: their `end` event says `measured: false`. No route of `catalyst serve`
 starts a run (roadmap R5.5; whether the UI launches agents is open).
 
 ### `catalyst agent runs [--limit <n>] [--json]`
@@ -892,7 +895,9 @@ The mechanical half of creating and changing artifacts, from the entity type
 definitions. Each signs (`--as`, else the only active user), keeps
 back-references, regenerates the indexes and writes one journal entry
 (`--intent` repeatable, `--command` names the slash command it runs for,
-`--tier`). Each takes `--json` and exits `1`, changing nothing, on a refusal.
+`--tier`; without `--tier`, the tier the artifact's type opens when exactly one
+tier names it, so a requirement's change is a feature's without saying so).
+Each takes `--json` and exits `1`, changing nothing, on a refusal.
 
 - `catalyst new <type> --title <t> [--field NAME=VALUE ...]`: the next ID,
   the type's latest template with its fields filled (ID, name, file name,

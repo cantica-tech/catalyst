@@ -226,3 +226,32 @@ def test_each_run_is_logged_for_this_user_and_listed_with_its_cost(project, tmp_
     assert "2 run(s), $0.0246 in all" in capsys.readouterr().out
     assert main(["agent", "runs", "--limit", "1", "--json"]) == 0
     assert len(json.loads(capsys.readouterr().out)) == 1
+
+
+class Talker(runs.PlainText):
+    """A plain-text agent, the process a script that prints and exits."""
+
+    def __init__(self, text: str, code: int = 0, stderr: str = ""):
+        super().__init__("talker")
+        self.script = f"import sys; print({text!r}); sys.stderr.write({stderr!r}); sys.exit({code})"
+
+    def argv(self, prompt: str) -> list[str]:
+        assert super().argv(prompt) == ["talker", "-p", prompt]  # how a real one is called
+        return [sys.executable, "-c", self.script]
+
+
+def test_copilot_and_gemini_run_as_plain_text_and_measure_nothing(tmp_path):
+    """Decision B2: both agents run, their output as text; `ok` from the exit; no usage claimed."""
+    assert runs.adapter_for("copilot", which=lambda name: f"/bin/{name}").binary == "/bin/copilot"
+    assert runs.adapter_for("gemini", which=lambda name: f"/bin/{name}").binary == "/bin/gemini"
+    seen: list[dict] = []
+    end = runs.run(Talker("checked: no errors\nall good"), "copilot", "/check-rules", "", "p", tmp_path, seen.append)
+    assert [e["event"] for e in seen] == ["start", "text", "text", "end"]
+    assert end["ok"] is True and end["measured"] is False and end["result"] == "checked: no errors\nall good"
+    schema = schema_check.load("run-event")
+    for event in seen:
+        assert schema_check.problems(event, schema) == [], event
+    failed = runs.run(
+        Talker("", code=3, stderr="quota exceeded"), "gemini", "/check-rules", "", "p", tmp_path, seen.append
+    )
+    assert failed["ok"] is False and failed["result"] == "quota exceeded"
