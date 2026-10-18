@@ -134,6 +134,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst role modify <name>` | replace a role's actions | `--action`, `--as`, `--intent`, `--json` |
 | `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
 | `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
+| `catalyst definition list` | each deployed definition: its slug, version and description | `--json` |
 | `catalyst definition migrate <entity> <version>` | move definitions/<type>.md to a version that exists (INV-23) | `--as`, `--intent`, `--json`, `--kernel` |
 | `catalyst sync plan` | list what a sync would change, and the migrations to run | `--as`, `--base-kernel`, `--cli`, `--commands-dir`, `--intent`, `--json`, `--kernel`, `--module` |
 | `catalyst sync apply` | do the mechanical half of /sync-framework, then journal it | `--as`, `--base-kernel`, `--cli`, `--commands-dir`, `--intent`, `--json`, `--kernel`, `--module` |
@@ -1151,6 +1152,9 @@ criterion's journal lock, with the real UTC time,
 the signer as `actor`, and each file's `before`/`after` git blob hashes
 (`Rules-of-Rules.md` §12). Write the files first, then append.
 
+- `--command` names the command the change was made for: one of the
+  deployed `CODE-OF-CONDUCT.md` §4 or its aliases, a `catalyst <verb>`, or a
+  tier's name. Another is written as given, with a warning on stderr.
 - `--action` is one of `create`, `update`, `close`, `retire`,
   `status-change`, `sync`; anything else is rejected.
 - `--intent` (repeatable, at least one) is the goal of the change, not a
@@ -1399,7 +1403,9 @@ a criterion without a `CODE-OF-CONDUCT.md` lists no command), and
 `GET history/<id>` (`catalyst journal show --artifact <id> --content`; on a
 server the content comes from the blobs it holds), `GET approvals/<id>`
 (`catalyst approvals <id> --json`), `GET analyses` and `GET analyses/<id>`
-(`catalyst analysis list|status --json`), and `GET inbox`
+(`catalyst analysis list|status --json`), `GET definitions` (`catalyst
+definition list --json`, each deployed definition's slug, version and
+description), and `GET inbox`
 (`catalyst inbox`; a server has no project history, so its inbox holds the
 reconciliation cases, the analyses and the approvals only). Each
 answer carries the batch it is for in the `X-Catalyst-Batch` header; an

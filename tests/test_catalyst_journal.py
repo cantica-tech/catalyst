@@ -420,3 +420,23 @@ def test_a_change_whose_tier_needs_an_artifact_names_one(project):
     j.append(dep, req([path], artifact="a cleanup", tier="feature"))  # it targets a rule
     item(project).write_text("changed a third time\n", encoding="utf-8")
     j.append(dep, req([path], artifact="a cleanup", targets=[], tier="chore"))  # needs none
+
+
+def test_an_unknown_command_is_warned_about_and_still_journaled(tmp_path, capsys):
+    """R4.8: `--command` names a command the deployment has; another is a warning, the entry still written."""
+    from catalyst.deployment import load
+    from catalyst.init import init
+    from test_catalyst_init import request
+
+    req = request(tmp_path)
+    init(req)
+    dep = load(req.project)
+    assert j.command_known(dep, "/check-rules") and j.command_known(dep, "check-rules")
+    assert j.command_known(dep, "catalyst status set") and j.command_known(dep, "chore")
+    assert not j.command_known(dep, "/implement")
+    (req.project / "notes.md").write_text("x\n", encoding="utf-8")
+    args = ["--project", str(req.project), "journal", "append", "--command", "/implement", "--action", "update"]
+    notes = str(req.project / "notes.md")
+    args += ["--artifact", "notes", "--intent", "a note", "--file", notes, "--tier", "chore", "--as", "ada"]
+    assert main(args) == 0
+    assert "'/implement' is not a command of this deployment" in capsys.readouterr().err

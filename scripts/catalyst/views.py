@@ -623,3 +623,23 @@ def render_backlog(b: dict) -> str:
     lines.append(f"Rules no open item targets: {len(b['rules_without_open_work'])}")
     lines += [f"  {r}" for r in b["rules_without_open_work"]]
     return "\n".join(lines) + "\n"
+
+
+def definitions(dep: Deployment) -> list[dict]:
+    """The deployed definitions (`definitions/<slug>.md`, INV-23): each one's
+    slug, version and description, for a client to show what a type is
+    without reading the criterion's files (`definition list --json`,
+    `GET /v1/definitions`)."""
+    folder = dep.root / "definitions"
+    out = []
+    for f in sorted(folder.glob("*.md")) if folder.is_dir() else []:
+        if f.name == "README.md":
+            continue
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        version = re.search(r"^\|\s*\*\*Version\*\*\s*\|\s*`?([^|`]+?)`?\s*\|", text, re.M)
+        desc = re.search(r"^## Description\s*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+        description = " ".join((desc.group(1) if desc else "").split())
+        out.append(
+            {"slug": f.stem, "version": version.group(1).strip() if version else None, "description": description}
+        )
+    return out

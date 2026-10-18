@@ -116,6 +116,13 @@ def cmd_journal(args) -> int:
         from catalyst.ids import resolve_signer
 
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        if not j.command_known(dep, args.cmd):
+            # R4.8: a warning while 0.x, the entry still written
+            print(
+                f"catalyst: warning: {args.cmd!r} is not a command of this deployment (CODE-OF-CONDUCT.md §4, its "
+                "aliases, `catalyst <verb>` or a tier): name the command the change was made for",
+                file=sys.stderr,
+            )
         entry = j.append(
             dep,
             j.AppendRequest(
@@ -1142,6 +1149,18 @@ def cmd_badge(args) -> int:
         print(f"wrote {args.out}: {label} {value}")
     else:
         sys.stdout.write(image)
+    return 0
+
+
+def cmd_definition_list(args) -> int:
+    from catalyst import views
+
+    rows = views.definitions(open_deployment(args))
+    if args.json:
+        print(json.dumps({"definitions": rows}, indent=2))
+        return 0
+    for r in rows:
+        print(f"{r['slug']} v{r['version'] or '?'}  {r['description'][:100]}")
     return 0
 
 
@@ -2363,6 +2382,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("definition", help="deployed entity definitions")
     ds = p.add_subparsers(dest="definition_command", required=True)
+    q = ds.add_parser("list", help="each deployed definition: its slug, version and description")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_definition_list)
     q = ds.add_parser("migrate", help="move definitions/<type>.md to a version that exists (INV-23)")
     q.add_argument("entity", help="the entity type's definitions folder name, e.g. role")
     q.add_argument("version", type=int)
