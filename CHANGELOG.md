@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.86.0 — 2026-10-18
+
+Modules as data, for a Studio to administer them. No layout change, no migration.
+
+- `catalyst module available <id> [--json]`: the version tags at the module's recorded repository, newest first,
+  each marked installed or newer (`spec/module-releases.schema.json`; the network).
+- `catalyst serve --local`: `GET /v1/modules` (`module list --json`), `GET /v1/modules/<id>/available`, and
+  `GET /v1/modules/<id>/plan?to=<tag>`, the plan of upgrading to one of those releases (`module upgrade --plan
+  --json`; never another source). A shared server has none of them.
+
 ## 0.85.0 — 2026-10-18
 
 An analysis as data, for a workspace to read and triage, and two fixes. No layout change, no migration.
