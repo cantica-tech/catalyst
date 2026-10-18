@@ -99,6 +99,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst hook install` | install the commit-msg hook in the project's git repository | — |
 | `catalyst hook start` | session-start hook: print the invariants, record the session's baseline | `--format`, `--quiet` |
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
+| `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
 | `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
@@ -641,6 +642,22 @@ with `EVENT`, `BASE_SHA`, `HEAD_SHA`, `BEFORE` and `SHA` set from
 `github.sha`. `catalyst` is the criterion's vendored CLI
 (`$CATALYST_HOME/projects/<name>/criterion/bin/catalyst.pyz`) or, without a
 criterion, the zipapp of a catalyst release.
+
+### `catalyst audit [--json] [--html <file>]`
+
+The audit pack (R6.27): what the deployment runs (its project, kernel and
+modules, the catalyst that made the pack, the criterion's commit), the
+record's integrity (`journal verify`'s errors and warnings, `check`'s with
+its first errors, and the gated rules whose current text lacks its
+approvals), who signed how many entities, and each rule with its status,
+strength and domain and everything that rests on it, transitively, nearest
+first, each with the field that brought it in (`impact`'s chain downstream,
+so no type is named). A rule nothing rests on is said. `--json` prints it
+(`spec/audit.schema.json`); `--html <file>` writes a self-contained page,
+no script and no remote file, printable to a PDF. `catalyst serve --local`
+answers `GET /v1/audit`; a shared server has no such read, the integrity
+checks needing the criterion's git. Nothing is written but the file asked
+for.
 
 ### `catalyst report [--since <date>] [--json]`
 

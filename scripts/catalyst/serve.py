@@ -783,6 +783,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 path in ("/changes", "/have", "/push") or path.startswith("/blobs/")
             ):
                 raise ServeError(405, "this is a local, read-only view of one criterion")
+            if method == "GET" and path == "/audit" and getattr(self.app, "read_only", False):
+                from catalyst import audit  # local mode only: the integrity checks need the criterion's git
+
+                _, dep, corpus = self.app.loaded()
+                return self._send(200, audit.build(dep, corpus))
             if (
                 method == "GET"
                 and (path == "/modules" or path.startswith("/modules/"))

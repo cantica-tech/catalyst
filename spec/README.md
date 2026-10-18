@@ -25,6 +25,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `analyses.schema.json` | `catalyst analysis list --json` | `GET /v1/analyses` |
 | `analysis.schema.json` | `catalyst analysis status <id> --json` | `GET /v1/analyses/<id>` |
 | `module-releases.schema.json` | `catalyst module available <id> --json` | `GET /v1/modules/<id>/available` (local mode) |
+| `audit.schema.json` | `catalyst audit --json` | `GET /v1/audit` (local mode) |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`), with the schema of a deployment's approval

@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.87.0 — 2026-10-18
+
+The audit pack. No layout change, no migration.
+
+- `catalyst audit [--json] [--html <file>]`: what the deployment runs, the record's integrity (journal, `check`,
+  gated rules lacking approvals), who signed, and each rule with everything that rests on it, transitively; as data
+  (`spec/audit.schema.json`), in brief, or as a self-contained page printable to a PDF.
+- `catalyst serve --local`: `GET /v1/audit`.
+
 ## 0.86.0 — 2026-10-18
 
 Modules as data, for a Studio to administer them. No layout change, no migration.

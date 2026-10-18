@@ -1110,6 +1110,25 @@ def cmd_report(args) -> int:
     return 0
 
 
+def cmd_audit(args) -> int:
+    """`catalyst audit` (R6.27): the audit pack, as data, text or a page."""
+    from catalyst import audit
+    from catalyst.corpus import load_corpus
+
+    dep = open_deployment(args)
+    pack = audit.build(dep, load_corpus(dep))
+    if args.html:
+        Path(args.html).write_text(audit.render_html(pack), encoding="utf-8")
+        print(f"wrote the audit pack to {args.html} ({len(pack['rules'])} rule(s)); print it for a PDF")
+        return 0
+    if args.json:
+        json.dump(pack, sys.stdout, indent=2)
+        print()
+    else:
+        sys.stdout.write(audit.render(pack))
+    return 0
+
+
 def cmd_trace(args) -> int:
     from catalyst import unrecorded
     from catalyst.corpus import load_corpus
@@ -2013,6 +2032,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--since", help="only history from this date/time on (ISO 8601)")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_report)
+
+    p = sub.add_parser("audit", help="the audit pack: each rule's chain and the record's integrity")
+    p.add_argument("--json", action="store_true")
+    p.add_argument("--html", metavar="FILE", help="write a self-contained page, printable to PDF")
+    p.set_defaults(func=cmd_audit)
 
     p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
     p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")
