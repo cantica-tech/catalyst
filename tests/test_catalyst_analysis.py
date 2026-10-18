@@ -331,3 +331,47 @@ def test_cli_starts_a_single_pass_analysis(project, capsys):
     assert "single-pass" in capsys.readouterr().out
     assert main(["analysis", "status", f"ANALYSIS-000001-{USERID}"]) == 0
     assert "passes:    single-pass" in capsys.readouterr().out
+
+
+def test_the_report_and_the_list_hold_to_their_schemas_and_are_served(project, capsys):
+    """An analysis as data (REQ-000059): `status --json`, `list --json`, and
+    the same at `/v1/analyses` and `/v1/analyses/<id>`."""
+    import threading
+
+    import schema_check
+    from catalyst import serve
+    from catalyst.__main__ import main
+
+    ctx = reconciled(project)
+    an.reconcile(ctx, RECONCILED)
+    ctx = an.context(load(project), ctx.art.id)
+    an.decide(ctx, "F2", "accept", signer(project), artifact=ITEM)
+    rep = an.report(an.context(load(project), ctx.art.id))
+    assert schema_check.problems(rep, schema_check.load("analysis")) == []
+    assert rep["phase"] == "Deciding" and rep["passes"] == 2 and rep["recorded"] == {"A": True, "B": True}
+    assert rep["diff"] is not None and rep["reconciled"] is True
+    by_id = {f["id"]: f for f in rep["items"]}
+    assert by_id["F2"]["decision"]["verdict"] == "accept" and by_id["F1"]["decision"] is None
+    assert (rep["findings"], rep["decided"], rep["accepted"]) == (len(RECONCILED["findings"]), 1, 1)
+    single = an.start(load(project), ["src"], "incremental", signer(project), passes=1)
+    assert an.report(single)["recorded"] == {"A": False, "B": None}
+
+    assert main(["analysis", "list", "--json"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert schema_check.problems(listed, schema_check.load("analyses")) == []
+    assert [r["id"] for r in listed["analyses"]] == [single.art.id, ctx.art.id]
+    assert main(["analysis", "status", ctx.art.id, "--json"]) == 0
+    status = json.loads(capsys.readouterr().out)
+
+    httpd, token = serve.make_local(project, 0, poll=0.1)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        client = serve.Client(f"http://127.0.0.1:{httpd.server_address[1]}", token)
+        assert client.call("GET", "/analyses") == listed
+        assert client.call("GET", f"/analyses/{ctx.art.id}") == status
+        with pytest.raises(serve.ServeError) as err:
+            client.call("GET", "/analyses/ANALYSIS-000099")
+        assert err.value.status == 404
+    finally:
+        httpd.shutdown()
+        httpd.server_close()

@@ -614,6 +614,63 @@ def abandon(ctx: Context, reason: str) -> None:
     )
 
 
+def summary(ctx: Context) -> dict:
+    """One analysis in brief: what `analysis list --json` gives per record."""
+    inv = ctx.load("inventory.json") or {}
+    recon = ctx.load("reconciled.json") or {}
+    decided = (ctx.load("decisions.json") or {}).get("decisions", {})
+    findings = recon.get("findings") or []
+    return {
+        "id": ctx.art.id,
+        "title": ctx.art.title,
+        "phase": phase(ctx.art),
+        "mode": ctx.art.get("Mode"),
+        "passes": passes_of(ctx),
+        "scope": inv.get("scope") or [],
+        "code_state": inv.get("code_state"),
+        "opened": ctx.art.get("Opened"),
+        "closed": ctx.art.get("Closed") or None,
+        "findings": len(findings),
+        "decided": sum(1 for f in findings if f.get("id") in decided),
+        "accepted": sum(1 for f in findings if (decided.get(f.get("id")) or {}).get("verdict") == "accept"),
+        "rejected": sum(1 for f in findings if (decided.get(f.get("id")) or {}).get("verdict") == "reject"),
+    }
+
+
+def report(ctx: Context) -> dict:
+    """One analysis in full, for a workspace to read and triage: its summary,
+    what each pass recorded, the diff, each reconciled finding with its
+    decision, and what keeps it from its phase (`analysis status --json`)."""
+    a, _ = _passes(ctx)
+    d = ctx.load("diff.json")
+    recon = ctx.load("reconciled.json") or {}
+    decided = (ctx.load("decisions.json") or {}).get("decisions", {})
+    findings = []
+    for f in recon.get("findings") or []:
+        dec = decided.get(f.get("id"))
+        findings.append({**f, "decision": dec})
+    return {
+        **summary(ctx),
+        "recorded": {
+            "A": a is not None,
+            "B": None if passes_of(ctx) == 1 else ctx.load("B.json") is not None,
+        },
+        "diff": None if d is None else {k: len(d.get(k) or []) for k in ("agreed", "conflicting", "a_only", "b_only")},
+        "reconciled": ctx.load("reconciled.json") is not None,
+        "dropped": recon.get("dropped") or [],
+        "items": findings,
+        "problems": problems(ctx),
+    }
+
+
+def summaries(dep: Deployment, corpus: Corpus) -> list[dict]:
+    """Every analysis in brief, newest first (`analysis list --json`)."""
+    out = []
+    for art in corpus.by_prefix.get(PREFIX, []):
+        out.append(summary(Context(dep, corpus, art, reports(dep, art.id))))
+    return sorted(out, key=lambda s: s["id"], reverse=True)
+
+
 def files_of(ctx: Context) -> list[Path]:
     """The record and its reports, for the journal."""
     return [ctx.art.file] + sorted(p for p in ctx.dir.glob("*.json"))
