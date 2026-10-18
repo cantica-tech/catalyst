@@ -28,6 +28,7 @@ def test_the_pack_holds_each_rule_with_what_rests_on_it(tmp_path):
     assert chain[sub]["depth"] == 2  # a sub rests on the item, which rests on the rule
     assert pack["signers"] == [{"name": USER, "signed": 2}]
     assert pack["project"] == "app" and pack["integrity"]["unapproved_rules"] == []
+    assert rule["meta"] is False
 
 
 def test_the_page_is_self_contained_and_says_what_holds(tmp_path, capsys):
@@ -56,7 +57,21 @@ def test_a_rule_nothing_rests_on_is_said(tmp_path):
     pack = audit.build(dep, load_corpus(dep))
     assert [r["chain"] for r in pack["rules"] if r["id"] == other] == [[]]
     assert "Nothing rests on it." in audit.render_html(pack)
-    assert "1 with nothing resting on them" in audit.render(pack)
+    assert "2 in force (besides meta-rules and retired ones), 1 with nothing resting on them" in audit.render(pack)
+
+
+def test_a_meta_rule_is_marked_and_not_counted(tmp_path):
+    from catalyst.init import init
+    from test_catalyst_init import request
+
+    req = request(tmp_path)
+    init(req)
+    dep = load(req.project)
+    pack = audit.build(dep, load_corpus(dep))
+    metas = [r for r in pack["rules"] if r["meta"]]
+    assert metas and all(r["id"].startswith("rr-") for r in metas)
+    assert audit.live(pack) == [r for r in pack["rules"] if not r["meta"] and not r["retired"]]
+    assert "A meta-rule: it governs the rules" in audit.render_html(pack)
 
 
 def test_the_local_server_answers_the_pack(tmp_path):

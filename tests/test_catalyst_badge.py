@@ -31,6 +31,14 @@ def test_the_chain_badge_counts_the_live_rules_something_rests_on(tmp_path):
     project = make_project(tmp_path)
     dep = load(project)
     assert badge.measure(dep, load_corpus(dep), "chain") == ("rules in use", "1/1", badge.GOOD)
+    from catalyst.init import init
+    from test_catalyst_init import request
+
+    (tmp_path / "fresh").mkdir()
+    req = request(tmp_path / "fresh")
+    init(req)  # its only rules are the handbook's meta-rules: none is counted
+    fresh = load(req.project)
+    assert badge.measure(fresh, load_corpus(fresh), "chain")[1] == "0/0"
     with pytest.raises(ValueError):
         badge.measure(dep, load_corpus(dep), "stars")
 

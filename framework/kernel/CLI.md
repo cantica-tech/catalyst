@@ -649,8 +649,9 @@ criterion, the zipapp of a catalyst release.
 A README badge (R6.28): one small SVG, `label | value`, its colour green,
 amber or red and its text saying it all (`aria-label`, `<title>`).
 `check` (the default): `passing`, amber when there are warnings, or the
-number of `catalyst check`'s errors. `chain`: the live rules that something
-rests on, of all of them (green from 80%, amber from 50%). It is a file for a
+number of `catalyst check`'s errors. `chain`: the rules in force that
+something rests on, of all of them, meta-rules and retired rules left out
+(green from 80%, amber from 50%). It is a file for a
 CI job to publish beside the code; nothing is served, so no server answers an
 anonymous request for it.
 
@@ -663,7 +664,9 @@ its first errors, and the gated rules whose current text lacks its
 approvals), who signed how many entities, and each rule with its status,
 strength and domain and everything that rests on it, transitively, nearest
 first, each with the field that brought it in (`impact`'s chain downstream,
-so no type is named). A rule nothing rests on is said. `--json` prints it
+so no type is named). A rule nothing rests on is said; a meta-rule (in
+`Rules-of-Rules.md`) is marked as one and counted with neither, since no
+work rests on it. `--json` prints it
 (`spec/audit.schema.json`); `--html <file>` writes a self-contained page,
 no script and no remote file, printable to a PDF. `catalyst serve --local`
 answers `GET /v1/audit`; a shared server has no such read, the integrity

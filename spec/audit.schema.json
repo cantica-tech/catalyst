@@ -155,6 +155,7 @@
           "strength",
           "domain",
           "retired",
+          "meta",
           "chain"
         ],
         "additionalProperties": false,
@@ -182,6 +183,10 @@
           },
           "retired": {
             "type": "boolean"
+          },
+          "meta": {
+            "type": "boolean",
+            "description": "A meta-rule (in `Rules-of-Rules.md`): it governs the rules, and no work rests on it."
           },
           "chain": {
             "type": "array",

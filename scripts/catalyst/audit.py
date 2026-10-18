@@ -70,6 +70,8 @@ def build(dep: Deployment, corpus: Corpus) -> dict:
                 "strength": r.get("strength", "must"),
                 "domain": r.get("domain"),
                 "retired": bool(r.get("retired")),
+                # a meta-rule governs the rule system itself: work does not rest on it
+                "meta": str(r.get("file") or "").endswith(META_DOC),
                 "chain": [
                     {
                         "id": c["id"],
@@ -95,6 +97,14 @@ def build(dep: Deployment, corpus: Corpus) -> dict:
         "signers": [{"name": n, "signed": c} for n, c in sorted(signers.items(), key=lambda x: (-x[1], x[0]))],
         "rules": rules,
     }
+
+
+META_DOC = "Rules-of-Rules.md"
+
+
+def live(pack: dict) -> list[dict]:
+    """The rules work can rest on: neither retired nor meta-rules."""
+    return [r for r in pack["rules"] if not r["retired"] and not r["meta"]]
 
 
 _CSS = """
@@ -146,7 +156,7 @@ def render_html(pack: dict) -> str:
     out += [f"<tr><td>{e(s['name'])}</td><td>{s['signed']}</td></tr>" for s in pack["signers"]]
     out += ["</tbody></table>", "<h2>Rules and what rests on them</h2>"]
     for r in pack["rules"]:
-        flag = " (retired)" if r["retired"] else ""
+        flag = " (retired)" if r["retired"] else " (meta-rule)" if r["meta"] else ""
         out.append('<section class="rule">')
         out.append(f"<h3><code>{e(r['id'])}</code> {e(r['title'])}{flag}</h3>")
         out.append(
@@ -154,7 +164,9 @@ def render_html(pack: dict) -> str:
             + (f" · domain {e(r['domain'])}" if r.get("domain") else "")
             + "</p>"
         )
-        if not r["chain"]:
+        if not r["chain"] and r["meta"]:
+            out.append('<p class="muted">A meta-rule: it governs the rules, and no work rests on it.</p>')
+        elif not r["chain"]:
             out.append('<p class="bad">Nothing rests on it.</p>')
         else:
             out.append("<table><thead><tr><th>Entity</th><th>Type</th><th>Status</th><th>By</th></tr></thead><tbody>")
@@ -175,12 +187,12 @@ def render_html(pack: dict) -> str:
 def render(pack: dict) -> str:
     """The pack in brief, for the terminal."""
     integ = pack["integrity"]
-    alone = [r["id"] for r in pack["rules"] if not r["chain"] and not r["retired"]]
+    alone = [r["id"] for r in live(pack) if not r["chain"]]
     lines = [
         f"audit pack of {pack.get('project') or 'the criterion'} (kernel {pack.get('kernel')})",
         f"  journal: {integ['journal']['entries']} entries, {integ['journal']['errors']} error(s)",
         f"  check:   {integ['check']['errors']} error(s), {integ['check']['warnings']} warning(s)",
         f"  gates:   {len(integ['unapproved_rules'])} gated rule(s) lacking approvals",
-        f"  rules:   {len(pack['rules'])}, {len(alone)} with nothing resting on them",
+        f"  rules:   {len(live(pack))} in force (besides meta-rules and retired ones), {len(alone)} with nothing resting on them",
     ]
     return "\n".join(lines) + "\n"

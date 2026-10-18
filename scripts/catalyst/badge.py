@@ -54,7 +54,12 @@ def measure(dep: Deployment, corpus: Corpus, metric: str) -> tuple[str, str, str
     g = views.graph(dep, corpus)
     nodes = impact._nodes(g)
     rested = {target for _, _, target in impact.links(dep, g, nodes)}
-    live = [r["id"] for r in g["rules"] if not r.get("retired")]
+    # meta-rules govern the rule system: no work rests on them
+    live = [
+        r["id"]
+        for r in g["rules"]
+        if not r.get("retired") and not str(r.get("file") or "").endswith("Rules-of-Rules.md")
+    ]
     held = sum(1 for r in live if r in rested)
     share = held / len(live) if live else 1.0
     colour = GOOD if share >= 0.8 else WARN if share >= 0.5 else BAD
