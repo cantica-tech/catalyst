@@ -96,6 +96,10 @@
         },
         "retired": {
           "type": "boolean"
+        },
+        "strength": {
+          "type": "string",
+          "description": "Its strength, from its `**Strength**` line; `must` when it states none (catalyst >= 0.83.0). An unknown value is `check`'s `rule-strength` error and is passed on as written, lowercased."
         }
       }
     },

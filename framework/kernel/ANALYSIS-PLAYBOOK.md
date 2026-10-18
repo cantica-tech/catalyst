@@ -76,7 +76,9 @@ reports `analyses/reports/<ID>/`.
    final finding that is not a plain agreement says how it was verified.
 5. **Decide.** Present the reconciled findings to the user — domains
    first, then rules, then defects, each with its statement, evidence and
-   verification. For each one, the user accepts, edits then accepts, or
+   verification; a defect also with the strength of the rule it breaks
+   (`catalyst view <rule> --json`), presented as a violation, a warning
+   (`should`) or a note (`may`). For each one, the user accepts, edits then accepts, or
    rejects; never decide for them. On acceptance, write the artifact:
    - a **domain**: `rules/domains/<prefix>-<CODE>-<short-description>.md`
      per `Rules-of-Rules.md` §7, registered in `domains.md`;

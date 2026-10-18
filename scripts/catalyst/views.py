@@ -118,6 +118,7 @@ def list_items(
                 "file": _rel(dep, defs[0].file),
                 "line": defs[0].line,
                 "retired": defs[0].retired,
+                "strength": defs[0].strength,
             }
             for rid, defs in sorted(corpus.rules.items())
         ]
@@ -264,6 +265,7 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
             "file": _rel(dep, rule.file),
             "line": rule.line,
             "retired": rule.retired,
+            "strength": rule.strength,
             "links": {},
         }
     else:
@@ -546,6 +548,7 @@ def graph(dep: Deployment, corpus: Corpus) -> dict:
                 "file": _rel(dep, defs[0].file),
                 "line": defs[0].line,
                 "retired": defs[0].retired,
+                "strength": defs[0].strength,
                 "domain": _rule_domain(rid),
                 "mentions": _mentions(text, resolve, rid),
             }
