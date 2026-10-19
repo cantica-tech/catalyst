@@ -57,7 +57,7 @@ exactly that.
 | R3.8 Python consolidation | done, but `catalyst dev` | 0.65.2 (HK-000001): one git runner, no PyYAML, `stop_hook.py` gone; repo-only checks under `catalyst dev` and the plugin scripts left out |
 | R3.9 server | done | S1–S3 and the local read side released in 0.53.0 and 0.54.0 |
 | R4.1, R4.2, R4.3 | done | 0.52.0, 0.57.0; R4.3's 15 KB target retired (owner decision D6, 2026-10-19): the module's `module.yaml` is read by the kernel, not by agents |
-| R4.4 generated docs | partly | 0.66.1 (HK-000002): the command index and the kernel's types generated into `CLI.md` and `FORMAT.md`, with a check; the prose is still hand-written (a content decision) |
+| R4.4 generated docs | under way (owner decision D7, 2026-10-19) | 0.66.1 (HK-000002): the command index and the kernel's types; 0.97.0: every command's arguments and options with their help (the parser gives each its help), and a check that the prose names only options the CLI has; phases 2–5 (output schemas, file keys, migrations, what enforces each invariant) in `docs/plans/r4-4-generated-reference.md` |
 | R4.5 generated agent adapters | superseded | by R3.1c: nothing is written per project |
 | R4.6 unverifiable hard rules | done for roles (0.93.0, owner decision D5) | a writing verb refuses a signer whose roles do not grant its command (`role_check = "warn"` to warn); the plugin invariants stay parked with the plugin system |
 | R4.7 park the plugin system | done (removed) | kernel 0.72.0, 2026-10-16 (ADR-022, REQ-000043): the plugin tree, the `catalyst-git` submodule, the plugin checks and their workflow removed; the plugin invariants and meta-rules retired in place; `catalyst-git` an optional extension |
