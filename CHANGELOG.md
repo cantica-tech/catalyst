@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.96.0 — 2026-10-19
+
+A status line after each command. No layout change, no migration.
+
+- On an interactive terminal, a command ends with one line on stderr: `catalyst · <project> · checked 14:08 · 0
+  error(s), 3 warning(s)`, the last `catalyst check`'s result as `check` now records it in the criterion's git
+  directory. It never runs a check, never reaches a pipe, never appears with `--json` or after `check`, `hook`,
+  `mcp`, `serve`, `init`, `agent` or `spec`; `CATALYST_FOOTER=0` turns it off (REQ-000076).
+
 ## 0.95.0 — 2026-10-19
 
 The last payloads described, and format 1.0 readable. No layout change, no migration.
