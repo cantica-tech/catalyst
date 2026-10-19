@@ -15,6 +15,8 @@ The deprecation window for 0.x deployments (R3.4, R7). No layout change, no migr
 - Once a project declares a release format (`1.0`), every writing verb refuses on such a deployment: read-only, as
   decided for one minor version after 1.0. Under `1.0-rc` nothing changes but the warning.
 - The kernel's CI installs a second published module and drives it end to end (R7, HK-000005).
+- Fixed: `catalyst new` left an optional field's template hint in place, which `check` warned about; it is written
+  empty (BUG-000022).
 
 ## 0.93.0 — 2026-10-19
 
