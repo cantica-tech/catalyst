@@ -63,8 +63,8 @@ Every artifact the framework creates — active-module artifact or work item
 `IAM/users/users.json` (managed by `/user add|remove|modify|
 assign-role|list`) and `IAM/roles/roles.json` (the role → typical-action
 mapping, `/role add|modify`). A deployment must always have at least
-one active user; beyond that, role checks are advisory, not access
-control — see `Rules-of-Rules.md` §11.
+one active user, and a writing verb refuses a signer whose roles do not
+grant its command — see `Rules-of-Rules.md` §11.
 
 Every artifact-type directory follows the same shape — a versioned,
 catalogued `templates/` subdirectory and its own `README.md`

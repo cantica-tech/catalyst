@@ -1,0 +1,79 @@
+"""Who may make which change (owner decision D5, R4.6; INV-16, rr-META-011).
+
+A writing verb names the command its change is for. The signer may make it
+when one of their roles grants that command: a role's `actions` entry that
+starts with `/` grants the command it names (`/status on tasks` grants
+`status`; an alias such as `/user-add` grants that alias; a command grants
+all its aliases), and `*` grants everything, as does the kernel's `Admin`
+role (so an upgrade never locks its administrators out). Descriptive actions grant
+nothing. A command the deployment's §4 does not have, and a tier named as
+the command, are not checked. `catalyst.toml` `role_check = "warn"` turns a
+refusal into a warning.
+"""
+
+from __future__ import annotations
+
+from catalyst.deployment import Deployment
+
+EVERYTHING = "*"
+ADMIN = "Admin"
+
+
+def required(dep: Deployment, command: str, also: tuple[str, ...] = ()) -> list[str] | None:
+    """The command names any of which grants `command` (with `also`'s
+    aliases when the deployment has them), or None when it is not one of the
+    deployment's commands."""
+    from catalyst import spec
+
+    bare = command.strip().lstrip("/").split(" ")[0] if command.strip() else ""
+    try:
+        s = spec.load_section4(dep)
+    except spec.SpecError:
+        return None
+    names: list[str] = []
+    for name in (bare, *also):
+        if name in s.aliases:
+            names += [name, s.aliases[name]]
+        elif name in s.bullets:
+            names.append(name)
+    return list(dict.fromkeys(names)) or None
+
+
+def grants(dep: Deployment, signer: dict) -> set[str]:
+    """The commands the signer's roles grant (`*` for all)."""
+    from catalyst.corpus import roles
+
+    held = {str(r) for r in signer.get("roles") or []}
+    out: set[str] = {EVERYTHING} if ADMIN in held else set()
+    for role in roles(dep):
+        if str(role.get("name")) not in held:
+            continue
+        for action in role.get("actions") or []:
+            text = str(action).strip()
+            if text == EVERYTHING:
+                out.add(EVERYTHING)
+            elif text.startswith("/") and len(text) > 1:
+                out.add(text[1:].split(" ")[0])
+    return out
+
+
+def mode(dep: Deployment) -> str:
+    """`enforce` (the default) or `warn`, from `catalyst.toml` `role_check`."""
+    value = str((dep.pointer or {}).get("role_check") or "enforce").strip().lower()
+    return "warn" if value == "warn" else "enforce"
+
+
+def refusal(dep: Deployment, signer: dict, command: str, also: tuple[str, ...] = ()) -> str | None:
+    """Why the signer may not make a change for `command`, or None."""
+    needed = required(dep, command, also)
+    if needed is None:
+        return None
+    held = grants(dep, signer)
+    if EVERYTHING in held or held & set(needed):
+        return None
+    roles = ", ".join(str(r) for r in signer.get("roles") or []) or "no role"
+    return (
+        f"{signer.get('name')} ({roles}) may not run /{needed[0]}: none of their roles grants it. "
+        f"Grant it with `catalyst role modify <role> --action /{needed[-1]}`, or assign a role that has it "
+        "(`catalyst user assign-role`); D5, rr-META-011"
+    )

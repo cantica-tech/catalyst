@@ -92,7 +92,7 @@ def cmd_journal(args) -> int:
         from catalyst.ids import resolve_signer
 
         try:
-            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user, "journal")
             chore = args.tier or next((t.id for t in tiers.tiers_for(dep) if not t.needs_artifact), None)
             entry = j.redact(
                 dep, args.blobs, args.intent or [], str(signer.get("git_username") or signer.get("name")), chore
@@ -115,7 +115,7 @@ def cmd_journal(args) -> int:
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
 
-        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user, args.cmd)
         _warn_thin(args.intent or [])
         if not j.command_known(dep, args.cmd):
             # R4.8: a warning while 0.x, the entry still written
@@ -410,6 +410,20 @@ def _warn_thin(intent: list[str]) -> None:
         )
 
 
+def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
+    """The command a writing verb's change is for, and the aliases that also grant it (D5)."""
+    if args.edit == "new":
+        from catalyst.edit import EditError, etd_named
+
+        try:
+            etd = etd_named(dep, args.type)
+        except EditError:
+            return "create", ()
+        names = {etd.id_prefix.lower(), etd.name.lower().replace(" ", "-")}
+        return "create", tuple(sorted(f"create-{n}" for n in names))
+    return {"status": "status", "restore": "journal-restore"}.get(args.edit, "create"), ()
+
+
 def cmd_edit(args) -> int:
     """Writing verbs (R2 W2): new, rename, restore, status set, link."""
     from catalyst import edit
@@ -422,7 +436,7 @@ def cmd_edit(args) -> int:
     try:
         if getattr(args, "tier", None) is not None:
             journal_check_tier(dep, args.tier)  # before anything is written (rr-META-006)
-        signer = resolve_signer(dep, corpus, args.as_user)
+        signer = resolve_signer(dep, corpus, args.as_user, *_edit_command(dep, args))
         if args.edit == "new":
             values = {}
             for spec in args.field or []:
@@ -510,7 +524,14 @@ def cmd_admin(args) -> int:
     dep = open_deployment(args)
     intent = args.intent or []
     try:
-        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        command = {
+            "user": f"user-{getattr(args, 'user_command', '')}",
+            "role": f"role-{getattr(args, 'role_command', '')}",
+            "freeze": "freeze",
+            "unfreeze": "freeze",
+            "definition": "migrate-definition",
+        }.get(args.admin, "")
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user, command)
         if args.admin == "user":
             sub_cmd = args.user_command
             if sub_cmd == "add":
@@ -582,7 +603,7 @@ def _sync_run(args, dep, src, plan_only: bool) -> int:
             p = sync.plan(dep, src, commands)
             print(json.dumps(p.as_dict(), indent=2) if args.json else sync.render(p), end="" if not args.json else "\n")
             return 0
-        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user, "sync-framework")
         p, touched = sync.apply(
             dep, src, commands, str(signer.get("git_username") or signer.get("name")), args.intent or []
         )
@@ -627,7 +648,7 @@ def cmd_module(args) -> int:
         from catalyst.ids import resolve_signer
 
         try:
-            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user, "sync-framework")
             done = modules.install(
                 dep, args.kernel, args.source, str(signer.get("git_username") or signer.get("name")), args.intent or []
             )
@@ -1410,7 +1431,7 @@ def cmd_analysis(args) -> int:
     sub = args.analysis_command
 
     def signer():
-        return resolve_signer(dep, corpus, getattr(args, "as_user", None))
+        return resolve_signer(dep, corpus, getattr(args, "as_user", None), "run-analysis")
 
     def journaled(ctx, action: str, intent: str, who: dict) -> None:
         journal.append(
@@ -1595,7 +1616,7 @@ def cmd_criterion(args) -> int:
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
 
-        signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user, "share")
         pv = cr.preview(dep)
         if pv.empty:
             print(pv.describe())
@@ -1663,7 +1684,7 @@ def cmd_share(args) -> int:
             from catalyst.corpus import load_corpus
             from catalyst.ids import resolve_signer
 
-            notes = serve.create(dep, args.url, resolve_signer(dep, load_corpus(dep), args.as_user))
+            notes = serve.create(dep, args.url, resolve_signer(dep, load_corpus(dep), args.as_user, "share"))
         else:
             notes = store.create(dep, args.url, args.branch, protect=args.protect)
         for note in notes:
@@ -1699,7 +1720,7 @@ def cmd_share(args) -> int:
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
 
-    signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+    signer = resolve_signer(dep, load_corpus(dep), args.as_user, "share")
     pv = share.preview()
     if pv.empty:
         print(pv.describe())
