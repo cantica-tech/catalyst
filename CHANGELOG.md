@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.94.0 — 2026-10-19
+
+The deprecation window for 0.x deployments (R3.4, R7). No layout change, no migration.
+
+- `catalyst check` warns about a deployment still on a legacy `<name>.catalyst` pointer, or with its criterion outside
+  catalyst's home, and names `catalyst move --to-home`.
+- Once a project declares a release format (`1.0`), every writing verb refuses on such a deployment: read-only, as
+  decided for one minor version after 1.0. Under `1.0-rc` nothing changes but the warning.
+- The kernel's CI installs a second published module and drives it end to end (R7, HK-000005).
+
 ## 0.93.0 — 2026-10-19
 
 Roles grant commands (owner decision D5, R4.6). No layout change; a migration with judgment steps
