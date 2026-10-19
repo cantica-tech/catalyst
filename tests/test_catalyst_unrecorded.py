@@ -383,3 +383,22 @@ def test_a_project_in_a_subdirectory_of_its_repository(tmp_path, monkeypatch):
     write(project / "src" / "a.py", "b\n")
     commit_at(mono, T + 2, "chore: by hand")
     assert [[p for p, _, _ in c.changes] for c in u.since_baseline(load(project))] == [["src/a.py"]]
+
+
+def test_a_legacy_deployment_is_warned_about_and_read_only_at_a_release_format(tmp_path, capsys):
+    """R3.4's deprecation window: a 0.x pointer or an in-project criterion is
+    warned about; once the project declares a release format, writes refuse."""
+    from catalyst.__main__ import main
+    from catalyst.check import run as run_checks
+    from catalyst_fixtures import USERID, make_project
+
+    proj = make_project(tmp_path, git=True)
+    warnings = run_checks(load(proj)).warnings
+    assert any(w.startswith("legacy: this project uses the legacy pointer app.catalyst") for w in warnings)
+    item = f"ITEM-000001-{USERID}"
+    set_pointer(proj, format="1.0-rc")
+    assert main(["--project", str(proj), "status", "set", item, "Done", "--as", "ada"]) == 0  # still written
+    set_pointer(proj, format="1.0")
+    capsys.readouterr()
+    assert main(["--project", str(proj), "status", "set", item, "Open", "--as", "ada"]) == 1
+    assert "read-only: this project uses the legacy pointer" in capsys.readouterr().err

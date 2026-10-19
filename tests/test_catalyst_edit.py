@@ -220,3 +220,31 @@ def test_a_reference_may_cite_an_entity_stored_as_a_table_row(tmp_path):
     edit._check_refs(dep, corpus, roadmap, [f"RM-000001-{USERID}"])
     with pytest.raises(edit.EditError, match="does not exist"):
         edit._check_refs(dep, corpus, roadmap, [f"RM-000002-{USERID}"])
+
+
+def test_an_optional_field_not_given_is_empty_not_the_templates_hint(tmp_path):
+    """BUG-000022: `new` left an optional field's template hint in place, which `check` then warned about."""
+    project = _project(tmp_path)
+    schema = project / ".criterion" / "modules" / "example-process" / "schemas" / "item.yaml"
+    schema.write_text(
+        schema.read_text(encoding="utf-8").replace(
+            "  - name: Subs\n",
+            "  - name: Priority\n    kind: enum\n    required: false\n    allowed_values:\n      - High\n"
+            "      - Low\n  - name: Subs\n",
+        ),
+        encoding="utf-8",
+    )
+    template = project / ".criterion" / "items" / "templates" / "TEMPLATE-ITEM-v2.md"
+    template.write_text(
+        template.read_text(encoding="utf-8").replace(
+            "| **Status** |", "| **Priority** | High / Low — how urgent |\n| **Status** |", 1
+        ),
+        encoding="utf-8",
+    )
+    dep, corpus = _state(project)
+    res = edit.new(
+        dep, corpus, "ITEM", "Next", {"Targets": f"br-AUTH-000001-{USERID}", "Domain": "AUTH"}, _signer(corpus), []
+    )
+    text = res.file.read_text(encoding="utf-8")
+    assert "| **Priority** | *(none yet)* |" in text and "how urgent" not in text
+    assert not [f for f in validate(load(project), load_corpus(load(project))) if f.code == "enum-value"]

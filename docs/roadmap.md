@@ -51,7 +51,7 @@ exactly that.
 | R3.1, R3.1a, R3.2, R3.3, R3.5, R3.6 | done | `where`, `runtime`, `share`, journal shards, `open` |
 | R3.1b workspace criterion | done (audited 2026-10-19) | `workspace init\|status` and tests; the audit found roles not inherited and a proposal on an inherited rule crashing, both fixed in 0.92.0 (BUG-000021); rules, domains and users were inherited as documented |
 | R3.1c agent adapters at user level | done | `catalyst mcp`; `agent install` for claude-code, copilot, vscode, cursor, codex, gemini |
-| R3.4 legacy deployments | decided | `move --to-home` exists; `catalyst migrate` was not built (optional) |
+| R3.4 legacy deployments | decided; window built | `move --to-home` exists; `catalyst migrate` was not built (optional); 0.94.0 warns about a legacy deployment and makes it read-only at format 1.0 (REQ-000073) |
 | R3.7 pinned CLI hash | done | `bin/catalyst.pyz.sha256`, verified by the gate |
 | R3.7 redaction tombstones | done | A5 decided 2026-10-14; 0.67.0 (REQ-000036): `catalyst journal redact`; purging git history stays the owner's |
 | R3.8 Python consolidation | done, but `catalyst dev` | 0.65.2 (HK-000001): one git runner, no PyYAML, `stop_hook.py` gone; repo-only checks under `catalyst dev` and the plugin scripts left out |
@@ -227,12 +227,12 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 
 ## R7 — Prove and release 1.0 (M)
 
-* Second module as CI fixture and a real pilot: **risk management** (owner decision B1, 2026-10-17: software engineering first, with a foray into risk management; not a 1.0 product promise).
+* Second module as CI fixture and a real pilot: **risk management** (owner decision B1, 2026-10-17: software engineering first, with a foray into risk management; not a 1.0 product promise); **a CI fixture since 2026-10-19** (HK-000005: `tests/test_second_module.py`, the published module at its release tag, driven end to end on every change).
 * Human beta trial (RM-026/028/029 in the existing roadmap were waiting on this) using `beta/` material rewritten for the new flow — **the owner is the first beta tester** (D3, 2026-10-17), so it can start.
 * First-class agents at 1.0: **Claude Code, GitHub Copilot and Gemini CLI** (B2, 2026-10-17): `catalyst agent install` wires all three; `catalyst agent run` needs Copilot and Gemini CLI adapters (R5.5 follow-up).
 * Format changes keep coming as many small releases, each with its migration (B6, 2026-10-17).
-* Signed releases from an org-owned feed; deprecation window for 0.x pointers (read-only support for one minor).
-* Manual-change detection: warn at 1.0-rc, error at 1.0 (existing plan, kept).
+* Signed releases from an org-owned feed; deprecation window for 0.x pointers (read-only support for one minor): **the window is built (0.94.0, REQ-000073)** — `check` warns about a legacy pointer or in-project criterion now, and writes refuse once the project declares format 1.0.
+* Manual-change detection: warn at 1.0-rc, error at 1.0 (existing plan, kept): **built since 0.42.0** (`unrecorded.level`, tested); it flips when a deployment declares format 1.0, which `check` does not accept yet: declaring 1.0 is the owner's, at the 1.0 release.
 * A UI at 1.0 is its own repository's plan; the engine's side of R6 is what 1.0 owes it.
 
 ## Cross-cutting tracks
