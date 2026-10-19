@@ -399,8 +399,10 @@ one user is active (INV-16), every userid is well-formed and unique
 ```
 
 `reconciliation` is `full`, `propose` or `none` (INV-21). Structure: the
-file exists. Role checks are advisory, except reconciliation and the
-approval gates of `IAM/gates.json` (`Rules-of-Rules.md` §11).
+file exists. A role's `actions` entries that start with `/` grant those
+commands, `*` grants all, and so does the `Admin` role; a writing verb
+refuses a signer whose roles grant none for its change (`Rules-of-Rules.md`
+§11), unless `catalyst.toml` sets `role_check = "warn"`.
 
 ## 7. The journal
 

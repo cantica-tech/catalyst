@@ -11,21 +11,22 @@ previously laid out the full read/write picture per role, or answered
 "when can the agent write without asking, and signed as whom", and what
 actually controls a shared deployment.
 
-## 1. Read is universal. Write is advisory, with three genuinely enforced exceptions.
+## 1. Read is universal. Write is granted by role.
 
 Catalyst has **no read restriction of any kind, for any role.** Nothing in
 `INVARIANTS.md`, `Rules-of-Rules.md`, or any command spec gates a read by
 who's asking — every user, and the agent itself, can read every file in a
 deployment. This isn't an oversight; it follows directly from `rr-META-011`'s
 premise ("catalyst has no way to verify who is actually typing") — a system
-that can't verify identity has no basis for a read *block* either, only for
-advisory notes on writes it can at least attribute after the fact via
-`Signed-off-by`.
+that can't verify identity has no basis for a read *block*. Writes are
+different: each is signed (`Signed-off-by`, the journal), so the signer's
+roles decide which commands it may run.
 
-**Write is role-scoped, but almost entirely advisory** (INV-25): acting
-outside your role's typical actions never blocks the write — it proceeds,
-noted rather than gated. Three things are hard exceptions, enforced regardless
-of role or identity:
+**Write is role-scoped and enforced** (owner decision D5, INV-16): a
+writing verb refuses a signer none of whose roles grants the command its
+change is for — a `/command` among the role's `actions`, `*`, or the
+`Admin` role — and a deactivated signer. `catalyst.toml` `role_check =
+"warn"` makes it a warning. Three more checks apply on top:
 
 - **INV-16** — a write that would leave zero active users in
   `IAM/users/users.json` is refused outright (`/user remove`'s last-user
@@ -50,44 +51,44 @@ which `catalyst criterion protect` turns on (§4).
 
 ## 2. Per-role rights
 
-| Role | Read | Write (advisory — proceeds either way, per INV-25) | Reconciliation (`/reconcile`, enforced) |
+| Role | Read | Write (the `/commands` its `actions` grant; the rest describes) | Reconciliation (`/reconcile`, enforced) |
 |---|---|---|---|
-| Product Owner | everything | create the active module's planning and new-work artifacts, approve/prioritize new work | `propose` |
-| Scrum Master / Delivery Lead | everything | review the active module's open work, `/status` | `propose` |
-| Tech Lead / Architect | everything | approve rule changes and new domains, vet a development artifact's rule target(s) | `full` |
-| Developer | everything | create the active module's development artifacts (implementation-driven), implement them, `/status` on tasks/stories | `propose` |
-| QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/status` on verification items | `propose` |
+| Product Owner | everything | create the active module's planning and new-work artifacts, approve/prioritize new work, `/create`, `/status`, `/adopt`, `/journal` | `propose` |
+| Scrum Master / Delivery Lead | everything | review the active module's open work, `/status`, `/journal` | `propose` |
+| Tech Lead / Architect | everything | approve rule changes and new domains, vet a development artifact's rule target(s), `/create`, `/status`, `/adopt`, `/journal`, `/freeze`, `/migrate-definition`, `/run-analysis` | `full` |
+| Developer | everything | create the active module's development artifacts (implementation-driven), implement the active module's development artifacts, `/create`, `/status`, `/adopt`, `/journal`, `/run-analysis` | `propose` |
+| QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/create`, `/status`, `/adopt`, `/journal` | `propose` |
 | Stakeholder | everything | propose ideas and planning items to the active module | `none` |
-| Release Manager | everything | `/sync-framework`, cutting releases | `full` |
-| Admin | everything | `/user`, `/role`, `/freeze`, `/share create`, `/reconcile` | `full` |
+| Release Manager | everything | `/sync-framework`, `/share`, cutting releases | `full` |
+| Admin | everything | `*` | `full` |
 
-The "Write" column is each role's *typical* scope (`IAM/roles/roles.json`'s
-`actions` field) — a signal for what to expect and note on mismatch, not an
-enforced boundary. Only the "Reconciliation" column is a real gate. The
-active process module names its own commands for these typical actions in
-its documentation; a deployment may list them in `roles.json` via
-`/role modify`.
+The "Write" column is each role's `actions` field in `IAM/roles/roles.json`.
+Its entries that start with `/` are grants: the writing verbs refuse a
+command no role of the signer grants (D5). The descriptive entries grant
+nothing until a deployment adds the `/commands` they mean (`catalyst role
+modify <role> --action /<command>`); the `Admin` role grants everything. The
+active process module names its own commands in its documentation.
 
 Role does not scope what `/share push` carries: every contributor's
 push holds their whole change, and the pull request is where it is
 reviewed.
 
-## 3. What "advisory" actually means, concretely
+## 3. What the check does, concretely
 
-Per `rr-META-011`'s steps (mirrored in `CODE-OF-CONDUCT.md` §2):
+Per `rr-META-011` (mirrored in `CODE-OF-CONDUCT.md` §2):
 
 1. Resolve who's signing — the identity already established this session, or
-   ask if none has been (this one question is information-gathering, not
-   authorization — INV-25 doesn't touch it).
-2. If that name isn't in `IAM/users/users.json`, proceed anyway, noting it.
-3. If their role doesn't cover the action, proceed anyway, noting it.
-4. Fill `Signed-off-by` with the name (carrying any note from 2–3) and write.
+   ask if none has been (`--as`).
+2. A name not in `IAM/users/users.json`, or a deactivated user, is refused.
+3. A command none of their roles grants is refused, with the command that
+   would grant it (`catalyst role modify`, `catalyst user assign-role`).
+   With `role_check = "warn"` in `catalyst.toml` it is a warning and the
+   write proceeds. A tier named as the command (`chore`, `fix`, `feature`)
+   and a command the deployment does not have are not checked.
+4. Fill `Signed-off-by` with the name and write.
 
-No step here ever produces a confirmation prompt or a refusal — that's what
-changed under INV-25. The note itself (not a block) is the accountability
-mechanism: a mismatch is visible in the artifact and in the journal entry
-that records the write, same principle `rr-META-016` gives reconciliation's
-`Resolver` field.
+The agent never answers a refusal by switching signer: who may do what is
+the people's decision (L4).
 
 ## 4. Identity and the shared deployment's real controls
 
@@ -143,9 +144,10 @@ active users the CLI refuses to guess (`--as` required), and neither
 ## 6. Summary
 
 - Read: unrestricted, always, for everyone.
-- Write: advisory by default (INV-25) — proceeds and notes, never asks or
-  blocks — except reconciliation resolution (INV-21), the approval gates a
-  deployment declares (`IAM/gates.json`) and the INV-16 active-user floor.
+- Write: granted by role (D5) — a writing verb refuses a command none of the
+  signer's roles grants — plus reconciliation resolution (INV-21), the
+  approval gates a deployment declares (`IAM/gates.json`) and the INV-16
+  active-user floor.
 - Shared deployments: branch protection, pull-request review and the
   required `catalyst` check are the controls that do not rely on the agent.
 - Signing identity: session-resolved once, reused thereafter; asked when

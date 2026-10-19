@@ -16,6 +16,7 @@ import os
 import re
 import secrets
 import string
+import sys
 from pathlib import Path
 
 from catalyst import journal, lock
@@ -37,19 +38,37 @@ def generate_userid(existing: set[str], rng=secrets.choice) -> str:
             return candidate
 
 
-def resolve_signer(dep: Deployment, corpus: Corpus, as_user: str | None = None) -> dict:
-    """The registered user signing this operation (CODE-OF-CONDUCT.md §2):
-    `--as` when given, else the only active user. Never guessed from git
-    config — with several users and no `--as`, the caller must ask."""
+def resolve_signer(
+    dep: Deployment,
+    corpus: Corpus,
+    as_user: str | None = None,
+    command: str | None = None,
+    also: tuple[str, ...] = (),
+) -> dict:
+    """The registered, active user signing this operation (CODE-OF-CONDUCT.md
+    §2): `--as` when given, else the only active user. Never guessed from git
+    config — with several users and no `--as`, the caller must ask. With
+    `command`, one of the signer's roles must grant it (D5, `permissions`)."""
     if as_user:
         user = corpus.user(as_user)
         if user is None:
             raise IdError(f"'{as_user}' is not a registered user — /user add first")
-        return user
-    active = [u for u in corpus.users if u.get("active", True)]
-    if len(active) == 1:
-        return active[0]
-    raise IdError("cannot tell who is signing — pass --as <name|git_username>")
+        if not user.get("active", True):
+            raise IdError(f"'{as_user}' is deactivated and signs nothing (INV-16)")
+    else:
+        active = [u for u in corpus.users if u.get("active", True)]
+        if len(active) != 1:
+            raise IdError("cannot tell who is signing — pass --as <name|git_username>")
+        user = active[0]
+    if command:
+        from catalyst import permissions
+
+        why = permissions.refusal(dep, user, command, also)
+        if why and permissions.mode(dep) == "warn":
+            print(f'catalyst: warning: {why} (role_check = "warn")', file=sys.stderr)
+        elif why:
+            raise IdError(why)
+    return user
 
 
 def _signer_userid(user: dict) -> str:

@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.93.0 — 2026-10-19
+
+Roles grant commands (owner decision D5, R4.6). No layout change; a migration with judgment steps
+(`framework/kernel/migrations/0.93.0/roles-grant-commands.md`).
+
+- A writing verb refuses a signer none of whose roles grants the command its change is for: a role's `actions`
+  entries that start with `/` are grants, `*` grants everything, and so does the `Admin` role. A tier named as the
+  command and a command the deployment does not have are not checked. The refusal names the command that would grant
+  it.
+- `--as` refuses a deactivated user.
+- `catalyst.toml` `role_check = "warn"` turns a refusal into a warning.
+- The kernel's roles template gives each role the commands its description means. INV-16, `rr-META-011`,
+  `ACCESS-CONTROL.md`, `FORMAT.md` and the README say roles are enforced.
+
 ## 0.92.0 — 2026-10-19
 
 A workspace member inherits the workspace's roles. No layout change, no migration.
