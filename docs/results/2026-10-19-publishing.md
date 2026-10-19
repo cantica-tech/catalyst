@@ -1,7 +1,8 @@
 # Results — 2026-10-19: publishing kernel 0.88.0–0.90.0 and the UI 0.53.0–0.54.0
 
 The owner said yes to publishing these releases. Everything is in the distribution repository
-(`cantica-tech/cantica-tech`) except the Marketplace upload, which was refused because its token has expired.
+(`oliben67/cantica-tech`, a **private** repository on the owner's account, not the organisation: corrected
+2026-10-19) except the Marketplace upload, which was refused because its token has expired.
 
 | What | Where | Result |
 |---|---|---|
