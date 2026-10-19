@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.91.0 — 2026-10-19
+
+Status changes in one step, intents that say why, and declared transitions enforced. No layout change, no migration.
+
+- `catalyst status set <ID> <state> --through` reaches a state the type's declared transitions reach only through
+  other states: the shortest path, each state's gates and guards checked, nothing written on a refusal, one journal
+  entry naming the path. It does not go with `--force` (R4.8).
+- `journal append` and every writing verb warn when an `--intent` has fewer than three words once IDs are left out
+  ("work starts", "R4.8"); the change is still made (R4.8).
+- Fixed: a type's `workflow.transitions` were never read, so `status set` allowed any move and `graph` showed none
+  (BUG-000019). A module that declares transitions now gets the checks it asks for.
+
 ## 0.90.0 — 2026-10-18
 
 The share status served. No layout change, no migration.
