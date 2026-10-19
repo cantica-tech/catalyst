@@ -139,6 +139,10 @@ def run(dep: Deployment) -> Report:
         )
     from catalyst import unrecorded
 
+    legacy_note = unrecorded.legacy_message(dep)
+    if legacy_note:
+        report.warnings.append(f"legacy: {legacy_note}")
+
     manual = unrecorded.since_baseline(dep) if not dep.standalone and unrecorded.baseline(dep) is not None else []
     # a journaled file whose committed state is an unrecorded change: reported once, below, at the
     # beta's level — not also as an `unjournaled` error

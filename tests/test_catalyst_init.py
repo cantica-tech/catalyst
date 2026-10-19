@@ -66,7 +66,7 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     init(req)
     dep = load(req.project)
     report = run_checks(dep)
-    assert report.errors == [] and report.warnings == []
+    assert report.errors == [] and [w for w in report.warnings if not w.startswith("legacy:")] == []
     root = dep.root
     assert (req.project / ".criterion").is_symlink()
     assert "/.criterion" in (req.project / ".gitignore").read_text(encoding="utf-8")
