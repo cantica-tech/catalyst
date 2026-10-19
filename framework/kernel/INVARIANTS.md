@@ -61,7 +61,7 @@ to the active module keeps a one-line placeholder here
 | INV-7 descriptive naming | L6 | `check` (structure) |
 | INV-8 no orphan rules | L2 | `check` (structure) |
 | INV-10–13 plugins (retired, ADR-022) | — | — |
-| INV-16 one active user, advisory roles | L7, L4 | `check`, `user remove` |
+| INV-16 one active user, enforced roles | L7, L4 | `check`, `user remove`, every writing verb |
 | INV-17 journal | L1 | journal, `journal verify`, `unrecorded`, end-of-turn hook |
 | INV-18 shared deployments | L3, L4 | `share`, the criterion's CI gate, `check` integrity |
 | INV-19 project lifecycle (retired) | L3, L5 | `open`, `move`, `share join` |
@@ -163,20 +163,19 @@ to the active module keeps a one-line placeholder here
   never reused.
 - **INV-15** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
   never reused.
-- **INV-16 — At least one active user; advisory role signing.**
+- **INV-16 — At least one active user; roles grant commands.**
   `IAM/users/users.json` and `IAM/roles/roles.json` always exist, and
   `users.json` must contain **at least one user with `"active": true`** —
   a hard requirement, not optional-if-empty like an artifact index. Every
   active-module artifact, rule-linked artifact, and work item carries a
-  `Signed-off-by` field. Role checks against `roles.json` are advisory — a
-  mismatch proceeds anyway, noted rather than paused for (INV-25), never
-  a hard block, since catalyst cannot verify who is actually typing —
-  except reconciliation (INV-21) and the approval gates a deployment
-  declares in `IAM/gates.json` (`Rules-of-Rules.md` §11).
-  `/user remove` never deletes a user's entry; it sets `"active": false`,
-  and refuses if doing so would leave zero active users — this specific
-  case isn't advisory, since it would break this invariant's own hard
-  requirement (INV-25's fundamental-invariant exception).
+  `Signed-off-by` field. A writing verb refuses a signer none of whose
+  roles grants its command (a `/command` in the role's `actions`, `*`, or
+  the `Admin` role; owner decision D5), and a deactivated signer;
+  `catalyst.toml` `role_check = "warn"` makes it a warning. Reconciliation
+  (INV-21) and the approval gates of `IAM/gates.json` add their own checks
+  (`Rules-of-Rules.md` §11). `/user remove` never deletes a user's entry;
+  it sets `"active": false`, and refuses if doing so would leave zero active
+  users.
 - **INV-17 — Append-only, replayable journal.** The journal always
   exists: one shard per actor, machine and month under
   `development/journal/` (`<actor>@<machine>/<YYYY-MM>.jsonl`), plus, in a
@@ -263,7 +262,7 @@ to the active module keeps a one-line placeholder here
   moving `Status` through `Open`/`Under Review`/`Resolved-*`/`Closed` —
   who can resolve one is genuinely gated by the actor's role
   (`reconciliation: full|propose|none` in `IAM/roles/roles.json`), the
-  one deliberate exception to `rr-META-011`'s advisory-only principle:
+  on top of `rr-META-011`'s command grants:
   `propose` may only move a case to `Under Review`, `none` is refused
   outright, and only `full` can reach a `Resolved-*` status — see
   `Rules-of-Rules.md` §16. May optionally name a `Workflow` field (a

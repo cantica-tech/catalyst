@@ -109,14 +109,16 @@ distinct seams; its rules carry the full code (`cor-CORE.INGEST-000001-…`).
 Agile work items, retired with the plugin system (ADR-022); a module declares
 them as its own types when a process needs them. Never reused.
 
-## 11. `rr-META-011` Users and roles are advisory, except reconciliation and approval gates
+## 11. `rr-META-011` Users sign; their roles grant the commands they may run
 
-Every signature names a registered user, declared (`--as`) and confirmed
-with the user when more than one could sign — never guessed from git
-configuration (L4). Roles describe who usually does what: a role mismatch
-is noted and the work proceeds, since catalyst cannot verify who types —
-except for reconciliation (§16) and the approval gates a deployment
-declares in `IAM/gates.json`: an entity enters a gated state, and a gated
+Every signature names a registered, active user, declared (`--as`) and
+confirmed with the user when more than one could sign — never guessed from
+git configuration (L4). A writing verb refuses a signer none of whose roles
+grants the command its change is for: a role grants each `/command` its
+`actions` name, and everything with `*`, as the `Admin` role does (owner
+decision D5; `role_check = "warn"` in `catalyst.toml` warns instead).
+Reconciliation (§16) and the approval gates a deployment declares in
+`IAM/gates.json` check more: an entity enters a gated state, and a gated
 rule's text passes `check`, only once its current version has the gate's
 approvals from its role, never the author's own; `--force` does not pass a
 gate (`catalyst approve`, `CLI.md`). At least one user stays active; a user

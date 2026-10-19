@@ -2,27 +2,27 @@
   "roles": [
     {
       "name": "Product Owner",
-      "actions": ["create the active module's planning and new-work artifacts", "approve/prioritize new work"],
+      "actions": ["create the active module's planning and new-work artifacts", "approve/prioritize new work", "/create", "/status", "/adopt", "/journal"],
       "reconciliation": "propose"
     },
     {
       "name": "Scrum Master / Delivery Lead",
-      "actions": ["review the active module's open work", "/status"],
+      "actions": ["review the active module's open work", "/status", "/journal"],
       "reconciliation": "propose"
     },
     {
       "name": "Tech Lead / Architect",
-      "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)"],
+      "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)", "/create", "/status", "/adopt", "/journal", "/freeze", "/migrate-definition", "/run-analysis"],
       "reconciliation": "full"
     },
     {
       "name": "Developer",
-      "actions": ["create the active module's development artifacts (implementation-driven)", "implement the active module's development artifacts", "/status on tasks/stories"],
+      "actions": ["create the active module's development artifacts (implementation-driven)", "implement the active module's development artifacts", "/create", "/status", "/adopt", "/journal", "/run-analysis"],
       "reconciliation": "propose"
     },
     {
       "name": "QA / Tester",
-      "actions": ["report defects through the active module's development artifacts", "verify a rule's verification coverage", "/status on verification items"],
+      "actions": ["report defects through the active module's development artifacts", "verify a rule's verification coverage", "/create", "/status", "/adopt", "/journal"],
       "reconciliation": "propose"
     },
     {
@@ -32,12 +32,12 @@
     },
     {
       "name": "Release Manager",
-      "actions": ["/sync-framework", "cutting releases"],
+      "actions": ["/sync-framework", "/share", "cutting releases"],
       "reconciliation": "full"
     },
     {
       "name": "Admin",
-      "actions": ["/user-add", "/user-remove", "/user-modify", "/user-assign-role", "/user-list", "/role-add", "/role-modify", "/freeze", "/share create", "/reconcile"],
+      "actions": ["*"],
       "reconciliation": "full"
     }
   ]
