@@ -45,3 +45,19 @@ def test_a_stale_section_is_named_and_not_written_by_check(tmp_path, monkeypatch
 def test_a_document_without_its_markers_is_refused(tmp_path):
     with pytest.raises(SystemExit, match="no `<!-- generated: cli-index"):
         gen_docs.render("# no markers\n", "cli-index", "body")
+
+
+def test_the_options_reference_gives_each_argument_its_help():
+    """R4.4 phase 1: every command's arguments, generated from the parser."""
+    ref = gen_docs.cli_options()
+    assert "| `catalyst status set` | `<id>` |" in ref
+    assert "`--through`" in ref and "reach a later status through the states between" in ref
+    assert "one of `check`, `chain`" in ref.lower()  # choices, from the parser
+    assert ref.count("(repeatable) (repeatable)") == 0
+
+
+def test_the_prose_may_name_only_options_the_cli_has():
+    assert gen_docs.flag_drift("Run `catalyst check --strict`; `--base-*` names both bases.") == []
+    assert gen_docs.flag_drift("`git commit --no-verify` skips the hook.") == []  # another tool's flag
+    assert gen_docs.flag_drift("Pass `--frobnicate` to `catalyst check`.") == ["--frobnicate"]
+    assert gen_docs.flag_drift("`--nothing-*` stands for options no command has.") == ["--nothing-*"]

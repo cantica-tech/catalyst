@@ -2000,6 +2000,61 @@ def cmd_recompose(args) -> int:
     return 1 if conflicts or (args.check and any(r.changed for r in results)) else 0
 
 
+# Help for arguments their parser left without one (R4.4: the reference is generated from the parser, so the
+# parser says what each argument is). By command, then by argument name for the standard ones.
+_HELP_BY_COMMAND: dict[tuple[str, str], str] = {
+    ("hook stop", "strict"): "block on warnings too, not only on errors",
+    ("hook commit-msg", "message_file"): "the file git passes the hook, holding the commit message",
+    (
+        "badge",
+        "metric",
+    ): "what the badge shows: the deployment's check result, or how many live rules have work resting on them",
+    ("journal append", "allow_unchanged"): "journal a file that has not changed since its last entry",
+    ("new", "title"): "the artifact's title; its file name is made from it",
+    ("rename", "title"): "the new title; the file is renamed to match",
+    ("status set", "status"): "the state to set, one the type declares",
+    ("link", "field_name"): "the reference field to add to, e.g. Targets",
+    ("link", "ids"): "the IDs it cites",
+    ("user add", "role"): "the user's first role",
+    ("user assign-role", "role"): "the role to add",
+    ("user modify", "field"): "the field to change",
+    ("user modify", "value"): "its new value",
+    ("role add", "reconciliation"): "what the role may do with a reconciliation case: decide it, propose, or nothing",
+    ("definition migrate", "version"): "the definition version to migrate the type's artifacts to",
+    ("agent install", "agent"): "the agent to wire, at user level",
+    ("agent uninstall", "agent"): "the agent to unwire",
+    ("workspace init", "git_username"): "the first user's git username (default: their name)",
+    ("analysis record", "which"): "the pass it records, A or B",
+    ("analysis reconcile", "file"): "the reconciler's list of findings, every one accounted for",
+    ("analysis decide", "finding"): "the reconciled finding's ID, e.g. F1",
+    ("analysis decide", "verdict"): "accept the finding, or reject it",
+    ("analysis decide", "reason"): "why",
+    ("analysis abandon", "reason"): "why the analysis is abandoned",
+    ("reconcile", "verb"): "what to do with the case",
+    ("serve token", "action"): "issue a token, list them, or revoke one",
+    ("criterion status", "fetch"): "fetch the shared branch first",
+    ("criterion integrity", "head"): "the merge commit to check",
+}
+_HELP_BY_NAME = {
+    "json": "machine-readable output (JSON on stdout)",
+    "as_user": "signer (name or git_username)",
+    "id": "an entity or rule ID",
+}
+
+
+def _fill_help(parser: argparse.ArgumentParser, path: str = "") -> None:
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, sub in action.choices.items():
+                _fill_help(sub, f"{path} {name}".strip())
+        elif action.help is None and "--help" not in action.option_strings:
+            known = _HELP_BY_COMMAND.get((path, action.dest)) or _HELP_BY_NAME.get(action.dest)
+            if known is None and action.dest == "name":
+                known = "the role's name" if path.startswith("role") else "the user's name"
+            if known:
+                action.help = known
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"catalyst {version_string()}")
@@ -2804,6 +2859,7 @@ def build_parser() -> argparse.ArgumentParser:
     uid = p.add_subparsers(dest="userid_command", required=True)
     q = uid.add_parser("gen", help="draw a new unique userid (INV-26)")
     q.set_defaults(func=cmd_userid)
+    _fill_help(parser)
     return parser
 
 
