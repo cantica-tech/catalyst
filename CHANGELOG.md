@@ -17,6 +17,8 @@ Status changes in one step, intents that say why, and declared transitions enfor
   ("work starts", "R4.8"); the change is still made (R4.8).
 - Fixed: a type's `workflow.transitions` were never read, so `status set` allowed any move and `graph` showed none
   (BUG-000019). A module that declares transitions now gets the checks it asks for.
+- Fixed: `catalyst new` and `catalyst link` refused a reference to an entity stored as a table row, such as a
+  roadmap's `RM-` item cited by a feature (BUG-000020).
 
 ## 0.90.0 — 2026-10-18
 
