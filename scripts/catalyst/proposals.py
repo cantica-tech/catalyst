@@ -118,6 +118,11 @@ def propose(
     target = _target_file(corpus, found)
     if target is None:
         raise ProposalError(f"no file holds {found} in this deployment")
+    if not target.is_relative_to(dep.root):
+        raise ProposalError(
+            f"{found} is inherited from the workspace criterion, read-only here: propose the change there "
+            "(`catalyst --project <its root> propose …`)"
+        )
     if target.read_text(encoding="utf-8") == content:
         raise ProposalError(f"{found} already has this content: nothing to propose")
     label, level = _signer_label(dep, signer)

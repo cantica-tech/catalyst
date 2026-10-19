@@ -15,7 +15,6 @@ Each function returns plain data (lists and dicts, ready for `--json`);
 from __future__ import annotations
 
 import fnmatch
-import json
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -72,11 +71,9 @@ def _artifact_row(dep: Deployment, art: Artifact) -> dict:
 
 
 def _roles(dep: Deployment) -> list[dict]:
-    try:
-        data = json.loads((dep.root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    return [r for r in (data.get("roles", []) if isinstance(data, dict) else []) if isinstance(r, dict)]
+    from catalyst.corpus import roles
+
+    return roles(dep)
 
 
 def _templates(dep: Deployment) -> list[dict]:

@@ -77,3 +77,43 @@ def test_a_member_sees_the_workspace_rules_and_users(tmp_path):
     assert SHARED in corpus.rules and corpus.rules[SHARED][0].inherited
     assert corpus.user("grace") is not None
     assert [f for f in validate(dep, corpus) if f.level == ERROR] == []
+
+
+def test_a_member_inherits_the_workspace_roles_and_cannot_propose_an_inherited_rule(tmp_path):
+    """R3.1b audit (BUG-000021): roles were not inherited; proposing an inherited rule crashed."""
+    from catalyst import proposals
+    from catalyst.corpus import roles
+    from catalyst.edit import reconciliation_level
+    from catalyst.views import list_items
+
+    file, a, _ = _workspace(tmp_path)
+    root, _ = ws.init(file, KERNEL, "Ada Lovelace", "ada")
+    (root / "rules" / "ws-shared-rules.md").write_text(
+        f"# Shared rules\n\n## Contents\n\n### `{SHARED}` Shared logging\n\n**Status:** ✅\n", encoding="utf-8"
+    )
+    roles_file = root / "IAM" / "roles" / "roles.json"
+    data = json.loads(roles_file.read_text(encoding="utf-8"))
+    data["roles"].append({"name": "Platform Reviewer", "actions": ["review"], "reconciliation": "full"})
+    roles_file.write_text(json.dumps(data), encoding="utf-8")
+    users = root / "IAM" / "users" / "users.json"
+    data = json.loads(users.read_text(encoding="utf-8"))
+    data["users"].append(
+        {
+            "name": "Grace Hopper",
+            "git_username": "grace",
+            "roles": ["Platform Reviewer"],
+            "active": True,
+            "userid": "Gr4ceHop",
+        }
+    )
+    users.write_text(json.dumps(data), encoding="utf-8")
+
+    dep = load(a)
+    corpus = load_corpus(dep)
+    names = [r["name"] for r in roles(dep)]
+    assert "Platform Reviewer" in names and len(names) == len(set(names))  # the member's own win on a clash
+    assert "Platform Reviewer" in [r["name"] for r in list_items(dep, corpus, "role", [])]
+    grace = corpus.user("grace")
+    assert grace is not None and reconciliation_level(dep, grace) == ("full", "Platform Reviewer")
+    with pytest.raises(proposals.ProposalError, match="inherited from the workspace criterion"):
+        proposals.propose(dep, corpus, SHARED, "# changed\n", grace)
