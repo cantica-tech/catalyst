@@ -114,6 +114,8 @@ def _check_refs(dep: Deployment, corpus: Corpus, fd: FieldDefinition, ids: list[
     else:
         allowed = set((fd.target_type or "").split("|")) - {""}
         known = {i for i, arts in corpus.artifacts.items() if not allowed or arts[0].prefix in allowed}
+        # an entity stored as a table row (a roadmap's `RM-`) is citable like a file's (BUG-000020)
+        known |= {i for prefix, ids in corpus.row_items.items() if not allowed or prefix in allowed for i in ids}
     missing = [i for i in ids if i not in known and not (fd.target_type == "rule" and corpus.rule_id(i))]
     if missing:
         raise EditError(f"`{fd.name}` cites what does not exist here: {', '.join(missing)}")
