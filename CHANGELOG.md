@@ -6,6 +6,17 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.98.0 — 2026-10-20
+
+The kernel's reference generated from the code, phase 2 (D7, R4.4). No layout change, no migration.
+
+- `CLI.md` gains a "Machine-readable output" section: each `--json` command and the schema in `spec/` describing what
+  it prints, generated from `spec/README.md` and the parser (REQ-000078).
+- New schemas for the writing verbs (`new`, `rename`, `restore`, `status set`, `link`), the user and role verbs,
+  `freeze`/`unfreeze` and `definition migrate`: 36 of the 56 `--json` commands are described.
+- `gen_docs.py --check` fails when a new `--json` command has no schema; the list of those still without one may only
+  shrink.
+
 ## 0.97.0 — 2026-10-19
 
 The kernel's reference generated from the code, phase 1 (owner decision D7, R4.4). No layout change, no migration.
