@@ -19,7 +19,7 @@ the code defines.
 | Phase | Document | Generated from | Check |
 |---|---|---|---|
 | 1 (0.97.0) | `CLI.md`: every command's arguments and options with their help, choices, defaults | the CLI's parser; every argument now has help text | the prose may name only options the CLI has (`flag_drift`) |
-| 2 | `CLI.md`: each machine-readable output, the schema that describes it | `spec/*.schema.json` and `spec/README.md` | every `--json` command has a schema |
+| 2 (0.98.0) | `CLI.md`: each machine-readable output, the schema that describes it | `spec/*.schema.json` and `spec/README.md` | a new `--json` command comes with its schema; the 20 still without one may only shrink |
 | 3 | `FORMAT.md`: `catalyst.toml`'s keys; `MODULE-SPECIFICATION.md`: `module.yaml`'s keys | one registry of project-file keys in the code; `framework/kernel/schemas/*.json` | the prose names only keys that exist |
 | 4 | `SYNCHRONIZE.md`: the migrations, from–to and summary | `framework/kernel/migrations/migrations.md` | the list matches the index |
 | 5 | `INVARIANTS.md`: the law-and-invariant table's "enforced by" | the checks that cite each invariant | each invariant names code that enforces it, or says it is judged |
@@ -34,3 +34,10 @@ kernel documents a sync already recomposes.
 - `scripts/catalyst/__main__.py`: `_fill_help` gives the arguments their parsers left bare (105 of 338) their
   help, so `catalyst <command> --help` says it too.
 - `CLI.md`: an "Options reference" section.
+
+## Phase 2, done in 0.98.0
+
+- Five schemas, for the writing verbs, the user and role verbs, `freeze`/`unfreeze` and `definition migrate`: 36 of
+  the 56 `--json` commands have one, against 22 before.
+- `scripts/gen_docs.py`: `cli_json`, and `json_drift` with `UNDESCRIBED`, the 20 still without a schema.
+- `CLI.md`: a "Machine-readable output" section.
