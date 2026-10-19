@@ -216,6 +216,35 @@ def _users(root: Path) -> list[dict]:
     return [u for u in users if isinstance(u, dict)]
 
 
+def _roles_at(root: Path) -> list[dict]:
+    try:
+        data = json.loads((root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    roles = data.get("roles", []) if isinstance(data, dict) else []
+    return [r for r in roles if isinstance(r, dict)]
+
+
+def _workspace_root(dep: Deployment) -> Path | None:
+    """The workspace criterion a member inherits from (R3.1b), if any."""
+    import project_file
+
+    name = project_file.workspace_of(dep.pointer or {})
+    root = project_file.workspace_criterion(name) if name else None
+    return root if root is not None and root.is_dir() and root != dep.root else None
+
+
+def roles(dep: Deployment) -> list[dict]:
+    """The deployment's roles, and a workspace member's inherited ones whose
+    names it does not use itself (R3.1b): every role check reads these."""
+    own = _roles_at(dep.root)
+    root = _workspace_root(dep)
+    if root is None:
+        return own
+    names = {str(r.get("name")) for r in own}
+    return own + [r for r in _roles_at(root) if str(r.get("name")) not in names]
+
+
 def parse_artifact(path: Path, prefix: str) -> Artifact | None:
     text = path.read_text(encoding="utf-8", errors="ignore")
     fields: dict[str, str] = {}
@@ -266,13 +295,11 @@ def _row_items(folder: Path, prefix: str) -> set[str]:
 
 def _inherit_workspace(dep: Deployment, corpus: Corpus) -> None:
     """A member of a VS Code workspace (`workspace = "<name>"` in its
-    catalyst.toml) also sees the workspace criterion's rules, domains, users
-    and roles, read-only; its own entries win on a clash (R3.1b)."""
-    import project_file
-
-    name = project_file.workspace_of(dep.pointer or {})
-    root = project_file.workspace_criterion(name) if name else None
-    if root is None or not root.is_dir() or root == dep.root:
+    catalyst.toml) also sees the workspace criterion's rules, domains and
+    users, read-only; its own entries win on a clash (R3.1b). Roles are read
+    through `roles`."""
+    root = _workspace_root(dep)
+    if root is None:
         return
     rules, indexed = _rules(root)
     for rid, defs in rules.items():

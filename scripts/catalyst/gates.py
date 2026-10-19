@@ -68,11 +68,9 @@ def _raw(dep: Deployment) -> list | None:
 
 
 def _roles(dep: Deployment) -> set[str]:
-    try:
-        data = json.loads((dep.root / ROLES).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return set()
-    return {str(r.get("name")) for r in data.get("roles", []) if isinstance(r, dict)}
+    from catalyst.corpus import roles
+
+    return {str(r.get("name")) for r in roles(dep)}
 
 
 def problems(dep: Deployment, corpus: Corpus) -> list[str]:
