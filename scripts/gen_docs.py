@@ -79,6 +79,90 @@ def cli_index() -> str:
     return "\n".join(lines)
 
 
+def _leaves(parser: argparse.ArgumentParser, prefix: str = "catalyst") -> list[tuple[str, argparse.ArgumentParser]]:
+    """(command, its parser) for every leaf command, in the parser's order."""
+    out = []
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for name, sub in action.choices.items():
+                nested = _leaves(sub, f"{prefix} {name}")
+                out += nested or [(f"{prefix} {name}", sub)]
+    return out
+
+
+def _argument(a: argparse.Action) -> tuple[str, str]:
+    """(how an argument is written, what it does) for the options reference."""
+    if a.option_strings:
+        names = ", ".join(f"`{o}`" for o in sorted(a.option_strings, key=len))
+        takes = a.metavar or (a.dest.upper() if a.nargs != 0 and not isinstance(a.const, bool) else None)
+        if isinstance(a, (argparse._StoreTrueAction, argparse._StoreFalseAction, argparse._CountAction)):
+            takes = None
+        written = names + (f" `{takes}`" if takes and isinstance(takes, str) else "")
+    else:
+        written = f"`<{a.metavar or a.dest}>`" + (" …" if a.nargs in ("*", "+", argparse.REMAINDER) else "")
+    what = " ".join((a.help or "").split()).replace("|", "\\|")
+    notes = []
+    if a.choices and not isinstance(a.choices, dict):
+        notes.append("one of " + ", ".join(f"`{c}`" for c in a.choices))
+    if isinstance(a, argparse._AppendAction) and "repeatable" not in (a.help or ""):
+        notes.append("repeatable")
+    if a.option_strings and a.default not in (None, False, [], argparse.SUPPRESS) and not isinstance(a.default, bool):
+        notes.append(f"default `{a.default}`")
+    if notes:
+        what = f"{what} ({'; '.join(notes)})" if what else "; ".join(notes).capitalize()
+    return written, what or "—"
+
+
+def cli_options() -> str:
+    """Every command's arguments, from the parser: what `catalyst <command> --help` says, in one place."""
+    lines = [
+        "Every command's arguments and options, generated from the CLI's own parser; `catalyst <command> --help` "
+        "says the same. The sections above describe what each command does and why.",
+        "",
+        "| Command | Argument | What it does |",
+        "|---|---|---|",
+    ]
+    for command, sub in _leaves(_parser()):
+        args = [a for a in sub._actions if a.help != argparse.SUPPRESS and "--help" not in a.option_strings]
+        if not args:
+            lines.append(f"| `{command}` | — | — |")
+        for i, a in enumerate(args):
+            written, what = _argument(a)
+            lines.append(f"| {'`' + command + '`' if i == 0 else ''} | {written} | {what} |")
+    return "\n".join(lines)
+
+
+# Other tools' flags the prose names (git, uv, an agent's CLI): never catalyst's, so not checked against its parser
+EXTERNAL_FLAGS = {"--no-verify", "--shared", "--output-format", "--scope", "--relocatable"}
+
+
+def flag_drift(text: str) -> list[str]:
+    """Each `--flag` the hand-written prose of CLI.md names that no command of the parser has (R4.4): the prose is
+    checked against the code. `--prefix-*` stands for every option it begins."""
+    options: set[str] = set()
+
+    def walk(p: argparse.ArgumentParser) -> None:
+        for a in p._actions:
+            options.update(a.option_strings)
+            if isinstance(a, argparse._SubParsersAction):
+                for sub in a.choices.values():
+                    walk(sub)
+
+    walk(_parser())
+    prose = re.sub(r"<!-- generated: .*?<!-- end generated: [\w-]+ -->", "", text, flags=re.S)
+    found = set(re.findall(r"(?<![\w-])(--[a-z][a-z0-9-]*-\*|--[a-z][a-z0-9-]*[a-z0-9])", prose))
+    drift = []
+    for flag in sorted(found):
+        if flag in EXTERNAL_FLAGS:
+            continue
+        if flag.endswith("*"):
+            if not any(o.startswith(flag[:-1]) for o in options):
+                drift.append(flag)
+        elif flag not in options:
+            drift.append(flag)
+    return drift
+
+
 def kernel_types() -> str:
     from module_loader import load_kernel_entities
 
@@ -99,6 +183,7 @@ def kernel_types() -> str:
 SECTIONS: dict[str, tuple[Path, Callable[[], str]]] = {
     "cli-index": (KERNEL / "CLI.md", cli_index),
     "kernel-types": (KERNEL / "FORMAT.md", kernel_types),
+    "cli-options": (KERNEL / "CLI.md", cli_options),
 }
 
 
@@ -120,6 +205,10 @@ def main(argv: list[str] | None = None) -> int:
             stale.append(f"{path.relative_to(ROOT)} ({name})")
             if not check:
                 path.write_text(fresh, encoding="utf-8")
+    drift = flag_drift((KERNEL / "CLI.md").read_text(encoding="utf-8"))
+    if drift:
+        print("CLI.md names options no command has: " + ", ".join(drift))
+        return 1
     if stale:
         print(("out of date: " if check else "rewrote: ") + ", ".join(stale))
         return 1 if check else 0
