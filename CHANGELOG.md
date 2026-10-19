@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.95.0 — 2026-10-19
+
+The last payloads described, and format 1.0 readable. No layout change, no migration.
+
+- `spec/validate.schema.json`, `spec/journal-verify.schema.json` and `spec/report.schema.json` describe what
+  `validate --json`, `journal verify --json` and `report --json` print (R5.1, REQ-000074): every machine-readable
+  output now has a schema.
+- `check` reads format `1.0` ahead of the release (REQ-000075): a deployment that declares it gets the release's
+  strictness, with unrecorded changes as errors and legacy deployments read-only. `init` still writes `1.0-rc`.
+
 ## 0.94.0 — 2026-10-19
 
 The deprecation window for 0.x deployments (R3.4, R7). No layout change, no migration.
