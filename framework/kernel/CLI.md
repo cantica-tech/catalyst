@@ -42,6 +42,13 @@ a zipapp built from a git checkout appends its build, as
 `<version>+g<12-char sha>`, plus `.dirty` when the sources it packed
 differed from that commit.
 
+On an interactive terminal, a command ends with one status line on stderr:
+`catalyst · <project> · checked 14:08 · 0 error(s), 3 warning(s)`, the last
+`catalyst check`'s result as recorded in the criterion's git directory,
+never a new check. It is never printed to a pipe, with `--json`, or after
+`check`, `hook`, `mcp`, `serve`, `init`, `agent` or `spec`;
+`CATALYST_FOOTER=0` turns it off.
+
 A revision or range argument (`trace`, `unrecorded`, `journal adopt`)
 that starts with `-` is rejected, so it can never reach `git` as an
 option.
