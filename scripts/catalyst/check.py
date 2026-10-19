@@ -5,6 +5,7 @@ pass shaped for an agent's end-of-turn hook."""
 
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import sys
@@ -201,7 +202,56 @@ def run(dep: Deployment) -> Report:
             )
         elif f.state == "missing":
             report.errors.append(f"module: {f.id} is recorded in {modules.RECORD} but modules/{f.id}/ is gone")
+    record_last(dep, report)
     return report
+
+
+def _last_path(dep: Deployment) -> Path:
+    from catalyst import lock
+
+    return lock.state_dir(dep.root) / "last-check.json"
+
+
+def record_last(dep: Deployment, report: Report) -> None:
+    """The last check's result, for the CLI's status line (brand item 9): in
+    the criterion's own git directory, never shared; best effort."""
+    try:
+        path = _last_path(dep)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        at = datetime.datetime.now(datetime.UTC).isoformat(timespec="seconds")
+        path.write_text(
+            json.dumps({"at": at, "errors": len(report.errors), "warnings": len(report.warnings)}), encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+
+def last(dep: Deployment) -> dict | None:
+    """The last check's result recorded here, or None."""
+    try:
+        data = json.loads(_last_path(dep).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and "at" in data else None
+
+
+def status_line(dep: Deployment, now: datetime.datetime | None = None) -> str:
+    """`catalyst · <project> · checked 14:08 · 0 error(s), 3 warning(s)` (`09`
+    §5.4): the last recorded check, never a new one."""
+    name = str(dep.pointer.get("project_name") or dep.pointer.get("name") or dep.project_root.name)
+    result = last(dep)
+    if result is None:
+        return f"catalyst · {name} · not checked yet (catalyst check)"
+    try:
+        at = datetime.datetime.fromisoformat(str(result["at"])).astimezone()
+    except ValueError:
+        return f"catalyst · {name} · not checked yet (catalyst check)"
+    now = (now or datetime.datetime.now(datetime.UTC)).astimezone()
+    when = at.strftime("%H:%M") if at.date() == now.date() else at.strftime("%Y-%m-%d %H:%M")
+    return (
+        f"catalyst · {name} · checked {when} · {int(result.get('errors', 0))} error(s), "
+        f"{int(result.get('warnings', 0))} warning(s)"
+    )
 
 
 def merge_integrity(dep: Deployment) -> list[str]:

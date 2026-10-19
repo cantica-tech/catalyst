@@ -2807,13 +2807,36 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# commands that never end with the status line: long-running, about the status itself, or for machines
+_NO_STATUS_LINE = {"check", "hook", "mcp", "serve", "init", "agent", "spec", "help"}
+
+
+def _status_line(args) -> None:
+    """The last check's result after a command, on an interactive terminal only (brand item 9, `09` §5.4):
+    on stderr, so a pipe never sees it; never for `--json`; `CATALYST_FOOTER=0` turns it off."""
+    if os.environ.get("CATALYST_FOOTER") == "0" or getattr(args, "json", False):
+        return
+    if getattr(args, "command", None) in _NO_STATUS_LINE:
+        return
+    if not (sys.stdout.isatty() and sys.stderr.isatty()):
+        return
+    try:
+        from catalyst.check import status_line
+
+        print(status_line(open_deployment(args)), file=sys.stderr)
+    except Exception:  # the status line never fails a command
+        return
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):  # UTF-8 out, whatever the code page (cp1252), so
         if hasattr(stream, "reconfigure"):  # git and hooks read it back; degrade, never crash
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     args = build_parser().parse_args(argv)
     try:
-        return args.func(args)
+        code = args.func(args)
+        _status_line(args)
+        return code
     except (IdError, JournalError, CriterionError, AnalysisError, ShareError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
