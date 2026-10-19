@@ -132,6 +132,84 @@ def cli_options() -> str:
     return "\n".join(lines)
 
 
+SPEC = ROOT / "spec"
+
+# `--json` commands whose output has no schema yet (R4.4 phase 2): this list may only shrink; a new `--json`
+# command comes with its schema (`json_drift`)
+UNDESCRIBED = {
+    "catalyst unrecorded",
+    "catalyst journal append",
+    "catalyst journal adopt",
+    "catalyst journal redact",
+    "catalyst repair derived",
+    "catalyst approve",
+    "catalyst sync plan",
+    "catalyst sync apply",
+    "catalyst module list",
+    "catalyst module install",
+    "catalyst module upgrade",
+    "catalyst module verify",
+    "catalyst where",
+    "catalyst agent status",
+    "catalyst runtime status",
+    "catalyst workspace status",
+    "catalyst propose",
+    "catalyst open",
+    "catalyst share info",
+    "catalyst share push",
+}
+
+
+def _described() -> dict[str, list[str]]:
+    """Each command `spec/README.md` names, and the schemas that describe its output."""
+    rows = re.findall(
+        r"^\| `([\w.-]+\.schema\.json)` \| (.*?) \| (.*?) \|$", (SPEC / "README.md").read_text(encoding="utf-8"), re.M
+    )
+    out: dict[str, list[str]] = {}
+    for schema, commands, _ in rows:
+        for c in re.findall(r"`(catalyst [^`]+?)`", commands):
+            base = re.sub(r"\s+(--|<|\[).*$", "", c).strip()
+            out.setdefault(base, []).append(schema)
+    return out
+
+
+def _json_commands() -> list[str]:
+    return [c for c, sub in _leaves(_parser()) if any("--json" in a.option_strings for a in sub._actions)]
+
+
+def cli_json() -> str:
+    """Each `--json` command and the schema in `spec/` that describes what it prints (R4.4 phase 2)."""
+    described = _described()
+    lines = [
+        "What each command prints with `--json`, and the JSON Schema in `spec/` that describes it, generated from "
+        "`spec/README.md` and the CLI's parser.",
+        "",
+        "| Command | Schema |",
+        "|---|---|",
+    ]
+    for command in _json_commands():
+        schemas = described.get(command)
+        cell = ", ".join(f"`spec/{s}`" for s in dict.fromkeys(schemas)) if schemas else "*(not described yet)*"
+        lines.append(f"| `{command}` | {cell} |")
+    return "\n".join(lines)
+
+
+def json_drift() -> list[str]:
+    """What breaks the phase 2 ratchet: a `--json` command with no schema that is not in UNDESCRIBED, an
+    UNDESCRIBED entry that has a schema now (take it out), or one that is no `--json` command any more."""
+    described, commands = _described(), set(_json_commands())
+    problems = [
+        f"{c} prints --json with no schema in spec/"
+        for c in sorted(commands)
+        if c not in described and c not in UNDESCRIBED
+    ]
+    problems += [f"{c} has a schema now: take it out of UNDESCRIBED" for c in sorted(UNDESCRIBED) if c in described]
+    problems += [
+        f"{c} is no --json command: take it out of UNDESCRIBED" for c in sorted(UNDESCRIBED) if c not in commands
+    ]
+    return problems
+
+
 # Other tools' flags the prose names (git, uv, an agent's CLI): never catalyst's, so not checked against its parser
 EXTERNAL_FLAGS = {"--no-verify", "--shared", "--output-format", "--scope", "--relocatable"}
 
@@ -184,6 +262,7 @@ SECTIONS: dict[str, tuple[Path, Callable[[], str]]] = {
     "cli-index": (KERNEL / "CLI.md", cli_index),
     "kernel-types": (KERNEL / "FORMAT.md", kernel_types),
     "cli-options": (KERNEL / "CLI.md", cli_options),
+    "cli-json": (KERNEL / "CLI.md", cli_json),
 }
 
 
@@ -208,6 +287,10 @@ def main(argv: list[str] | None = None) -> int:
     drift = flag_drift((KERNEL / "CLI.md").read_text(encoding="utf-8"))
     if drift:
         print("CLI.md names options no command has: " + ", ".join(drift))
+        return 1
+    unschema = json_drift()
+    if unschema:
+        print("machine-readable output: " + "; ".join(unschema))
         return 1
     if stale:
         print(("out of date: " if check else "rewrote: ") + ", ".join(stale))

@@ -1704,6 +1704,73 @@ the previous workflow; the new one applies once it is merged.
 
 The job is named `catalyst`, the status check `protect` requires.
 
+## Machine-readable output
+
+<!-- generated: cli-json (scripts/gen_docs.py; do not edit by hand) -->
+
+What each command prints with `--json`, and the JSON Schema in `spec/` that describes it, generated from `spec/README.md` and the CLI's parser.
+
+| Command | Schema |
+|---|---|
+| `catalyst validate` | `spec/validate.schema.json` |
+| `catalyst check` | `spec/check.schema.json` |
+| `catalyst report` | `spec/report.schema.json` |
+| `catalyst audit` | `spec/audit.schema.json` |
+| `catalyst unrecorded` | *(not described yet)* |
+| `catalyst spec` | `spec/commands.schema.json`, `spec/command-spec.schema.json` |
+| `catalyst journal append` | *(not described yet)* |
+| `catalyst journal adopt` | *(not described yet)* |
+| `catalyst journal verify` | `spec/journal-verify.schema.json` |
+| `catalyst journal show` | `spec/history.schema.json`, `spec/journal.schema.json` |
+| `catalyst journal redact` | *(not described yet)* |
+| `catalyst list` | `spec/list.schema.json` |
+| `catalyst view` | `spec/view.schema.json` |
+| `catalyst backlog` | `spec/backlog.schema.json` |
+| `catalyst repair derived` | *(not described yet)* |
+| `catalyst graph` | `spec/graph.schema.json` |
+| `catalyst new` | `spec/change.schema.json` |
+| `catalyst rename` | `spec/change.schema.json` |
+| `catalyst approve` | *(not described yet)* |
+| `catalyst approvals` | `spec/approvals.schema.json` |
+| `catalyst restore` | `spec/change.schema.json` |
+| `catalyst status set` | `spec/change.schema.json` |
+| `catalyst link` | `spec/change.schema.json` |
+| `catalyst user add` | `spec/user.schema.json` |
+| `catalyst user remove` | `spec/user.schema.json` |
+| `catalyst user modify` | `spec/user.schema.json` |
+| `catalyst user assign-role` | `spec/user.schema.json` |
+| `catalyst role add` | `spec/role.schema.json` |
+| `catalyst role modify` | `spec/role.schema.json` |
+| `catalyst freeze` | `spec/freeze.schema.json` |
+| `catalyst unfreeze` | `spec/freeze.schema.json` |
+| `catalyst definition list` | `spec/definitions.schema.json` |
+| `catalyst definition migrate` | `spec/definition-migrate.schema.json` |
+| `catalyst sync plan` | *(not described yet)* |
+| `catalyst sync apply` | *(not described yet)* |
+| `catalyst inbox` | `spec/inbox.schema.json` |
+| `catalyst impact` | `spec/impact.schema.json` |
+| `catalyst module list` | *(not described yet)* |
+| `catalyst module install` | *(not described yet)* |
+| `catalyst module available` | `spec/module-releases.schema.json` |
+| `catalyst module upgrade` | *(not described yet)* |
+| `catalyst module verify` | *(not described yet)* |
+| `catalyst where` | *(not described yet)* |
+| `catalyst agent status` | *(not described yet)* |
+| `catalyst agent run` | `spec/run-event.schema.json` |
+| `catalyst agent runs` | `spec/runs.schema.json` |
+| `catalyst runtime status` | *(not described yet)* |
+| `catalyst workspace status` | *(not described yet)* |
+| `catalyst analysis status` | `spec/analysis.schema.json` |
+| `catalyst analysis list` | `spec/analyses.schema.json` |
+| `catalyst try` | `spec/try.schema.json` |
+| `catalyst propose` | *(not described yet)* |
+| `catalyst open` | *(not described yet)* |
+| `catalyst share info` | *(not described yet)* |
+| `catalyst share status` | `spec/share-status.schema.json` |
+| `catalyst share push` | *(not described yet)* |
+
+<!-- end generated: cli-json -->
+
 ## Options reference
 
 <!-- generated: cli-options (scripts/gen_docs.py; do not edit by hand) -->
