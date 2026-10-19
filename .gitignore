@@ -10,3 +10,6 @@ tests/fixtures/*-golden-corpus.*
 
 # per-machine Claude Code settings
 .claude/settings.local.json
+
+# CI checks the fixture modules out here (tests/test_second_module.py)
+_fixtures/

@@ -118,7 +118,7 @@ def test_format_is_declared_and_checked(project):
     data["format"] = "1.0-rc"
     pointer.write_text(json.dumps(data), encoding="utf-8")
     report = run_checks(load(project))
-    assert not any("format" in m for m in report.errors + report.warnings)
+    assert not any("format" in m for m in report.errors + report.warnings if not m.startswith("legacy:"))
 
 
 def test_paths_and_versions_are_not_ids(project):

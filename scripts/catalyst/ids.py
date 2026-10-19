@@ -61,7 +61,11 @@ def resolve_signer(
             raise IdError("cannot tell who is signing — pass --as <name|git_username>")
         user = active[0]
     if command:
-        from catalyst import permissions
+        from catalyst import permissions, unrecorded
+
+        legacy = unrecorded.legacy_message(dep)
+        if legacy and unrecorded.released(dep):
+            raise IdError(f"read-only: {legacy}")
 
         why = permissions.refusal(dep, user, command, also)
         if why and permissions.mode(dep) == "warn":

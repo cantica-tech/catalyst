@@ -82,6 +82,31 @@ class Journaled:
         return after in chain[start:]
 
 
+def released(dep: Deployment) -> bool:
+    """Whether the deployment's format is a release (`1.0`), not a release
+    candidate (`1.0-rc`): what the beta's warnings become errors at."""
+    fmt = str(dep.pointer.get("format") or "")
+    return bool(fmt) and "-" not in fmt
+
+
+def legacy_message(dep: Deployment) -> str | None:
+    """The 0.x parts of a deployment, and what to do about them (R3.4): read
+    and written until 1.0, read-only at a release format, unsupported a
+    minor later. None for a current or standalone deployment."""
+    import project_file
+
+    if dep.standalone:
+        return None
+    parts = project_file.legacy_parts(dep.project_root, dep.root)
+    if not parts:
+        return None
+    return (
+        f"this project uses {' and '.join(parts)}: `catalyst move --to-home` makes it a `catalyst.toml` with its "
+        "criterion in catalyst's home. A legacy deployment is read-only from format 1.0 and unsupported a minor "
+        "later (R3.4)"
+    )
+
+
 def level(dep: Deployment) -> str:
     """ "error" once the deployment is out of the beta (a release format) or
     opts in; "warning" while its format is a release candidate."""

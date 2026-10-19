@@ -34,6 +34,23 @@ def find(directory: Path) -> Path | None:
     return legacy[0] if legacy else None
 
 
+def legacy_parts(project_root: Path, criterion: Path) -> list[str]:
+    """What of a deployment is still a 0.x model (R3.4): a `<name>.catalyst`
+    pointer instead of `catalyst.toml`, a criterion inside the project instead
+    of catalyst's home. Empty for a current deployment."""
+    parts = []
+    found = find(project_root)
+    if found is not None and found.suffix == LEGACY_SUFFIX:
+        parts.append(f"the legacy pointer {found.name}")
+    try:
+        homed = criterion.resolve().is_relative_to(home().resolve())
+    except OSError:
+        homed = False
+    if not homed:
+        parts.append(f"a criterion outside catalyst's home ({LEGACY_DIRNAME} in the project, or a path)")
+    return parts
+
+
 def is_project(directory: Path) -> bool:
     return find(directory) is not None
 
