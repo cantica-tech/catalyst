@@ -468,10 +468,16 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
             for cond in conditions if isinstance(conditions, list) else [conditions]:
                 if isinstance(cond, dict):
                     guards.setdefault(str(state), []).extend((str(k), str(v)) for k, v in cond.items())
+        transitions = [
+            WorkflowTransition(from_state=str(t["from"]), to_state=str(t["to"]))
+            for t in wf_raw.get("transitions") or []
+            if isinstance(t, dict) and "from" in t and "to" in t
+        ]  # BUG: declared since the ETD schema's first version, never read until now
         wf = WorkflowDefinition(
             initial=wf_raw.get("initial", "Open"),
             states=wf_raw.get("states", []),
             closed_states=wf_raw.get("closed_states", []),
+            transitions=transitions,
             guards=guards,
         )
     else:

@@ -530,6 +530,21 @@ def append(dep: Deployment, req: AppendRequest) -> dict:
         return _append(dep, req)
 
 
+_ID_LIKE = re.compile(r"^[A-Za-z]{1,12}[-.]?[0-9][\w.-]*$")  # REQ-000070, R4.8, ADR-002, a3
+
+
+def intent_thin(intent: list[str]) -> bool:
+    """Whether an intent says too little to tell why (R4.8): fewer than three
+    words once IDs and roadmap numbers are left out ("work starts",
+    "acceptance met", "R4.8"). An empty intent is not thin: the verb writes
+    its own."""
+    text = " ".join(intent).strip()
+    if not text:
+        return False
+    words = [w for w in re.findall(r"[\w.-]+", text) if not _ID_LIKE.match(w) and re.search(r"[A-Za-z]{2}", w)]
+    return len(words) < 3
+
+
 def command_known(dep: Deployment, command: str) -> bool:
     """Whether an entry's `command` is one this deployment has (R4.8): a
     command of the deployed §4 or one of its aliases (`/create-<type>`), a
