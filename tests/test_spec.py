@@ -106,3 +106,27 @@ def test_every_schema_in_spec_is_listed_in_its_readme():
     readme = (schema_check.SPEC / "README.md").read_text(encoding="utf-8")
     for f in sorted(schema_check.SPEC.glob("*.schema.json")):
         assert f"`{f.name}`" in readme, f.name
+
+
+@pytest.mark.parametrize(
+    ("schema", "argv"),
+    [
+        ("change", ["new", "SUB", "--title", "Another sub", "--as", "ada", "--field", f"Item={ITEM}"]),
+        ("change", ["status", "set", ITEM, "Done", "--as", "ada", "--intent", "the item is finished and checked"]),
+        ("user", ["user", "add", "Grace Hopper", "Developer", "--git-username", "grace", "--as", "ada"]),
+        ("role", ["role", "add", "Auditor", "--action", "/journal", "--as", "ada"]),
+        ("freeze", ["freeze", ITEM, "--as", "ada", "--intent", "the item is settled"]),
+    ],
+    ids=["new", "status set", "user add", "role add", "freeze"],
+)
+def test_each_writing_verb_prints_what_its_schema_describes(project, capsys, schema, argv):
+    """R4.4 phase 2: the writing and administration verbs' `--json` output, described."""
+    payload = _json(capsys, *argv)
+    assert schema_check.problems(payload, schema_check.load(schema)) == []
+
+
+def test_the_ratchet_holds_every_json_command_to_a_schema_or_the_known_gaps():
+    import gen_docs
+
+    assert gen_docs.json_drift() == []
+    assert "catalyst new" not in gen_docs.UNDESCRIBED  # described now
