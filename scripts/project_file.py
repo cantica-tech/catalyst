@@ -17,6 +17,108 @@ from pathlib import Path
 from typing import Any
 
 NAME = "catalyst.toml"
+
+# Every key a project file may carry: (key, type, meaning, what checks it). `FORMAT.md` §1's table is generated
+# from this (R4.4 phase 3), and `gen_docs.py --check` fails when the code reads a key this does not list.
+KEYS: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "project_name",
+        "string",
+        "The project's name: its criterion is `$CATALYST_HOME/projects/<project_name>/criterion`.",
+        "—",
+    ),
+    (
+        "format",
+        "string",
+        "The format version this deployment is written in: `1.0-rc` today, `1.0` read ahead of the release.",
+        "`check`: warning if absent, error if not supported.",
+    ),
+    (
+        "kernel_version",
+        "string",
+        "The kernel version the deployment is at.",
+        "Structure: must equal the criterion's `version.txt` (`version drift`).",
+    ),
+    (
+        "module",
+        "string",
+        "The first installed module's id; `modules/modules.json` records every one.",
+        "A module that cannot be found leaves the checks kernel-only (the check's scope line says so).",
+    ),
+    (
+        "agent",
+        "string",
+        "The project's default agent, e.g. `claude-code` (`unknown` if none was given). Each user's own choice wins: `catalyst open --agent <id>` records it in `$CATALYST_HOME/projects/<name>/agent`, never here.",
+        "—",
+    ),
+    (
+        "workspace",
+        "string",
+        "Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, users and roles (R3.1b).",
+        "—",
+    ),
+    (
+        "role_check",
+        "string",
+        "Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose roles do not grant its command, or warns with `warn` (decision D5).",
+        "—",
+    ),
+    (
+        "embed_origins",
+        "string",
+        "Optional: the origins, comma-separated (`https://wiki.example.com, http://localhost:3000`), whose pages may read this criterion through `catalyst serve --local` (decision B8): their reads get CORS headers, each with its reader's token; nothing is written. Absent: no other origin.",
+        "`serve` refuses an origin that is not `scheme://host[:port]`.",
+    ),
+    (
+        "analysis_passes",
+        "integer",
+        "Optional: the default number of independent passes of an analysis, `2` (four-eyes, the default) or `1`; `catalyst analysis start --passes` overrides it for one analysis.",
+        "`catalyst analysis start` refuses another value.",
+    ),
+    (
+        "governance",
+        "string",
+        "Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything.",
+        "—",
+    ),
+    (
+        "share",
+        "string",
+        "Optional: the criterion's sharing driver, `git`, `serve` or `local` (`catalyst share`). Absent: `git` when the criterion has a remote or `catalyst_repo_url` is set, else `local`.",
+        "An unknown driver is refused by `catalyst share`.",
+    ),
+    (
+        "share_url",
+        "string",
+        "With `share = \"serve\"`: the server's URL (`catalyst serve`). Each user's token for it is in `$CATALYST_HOME/credentials` (`catalyst share login`), never here.",
+        "`catalyst share` refuses `serve` without it.",
+    ),
+    ("repoed", "boolean", "`true` once the deployment is shared (INV-18).", "—"),
+    ("catalyst_repo", "string or null", "Informational name of the criterion repository.", "—"),
+    ("catalyst_repo_url", "string or null", "The criterion repository's URL, when shared.", "—"),
+    ("criterion_branch", "string or null", "The shared branch; `null` means `criterion`.", "—"),
+    ("created_by", "string or null", "The installing user's name (`ACCESS-CONTROL.md`). Informational.", "—"),
+    ("created", "date", "When the project file was written.", "—"),
+    ("updated", "date", "When it last changed.", "—"),
+    (
+        "journal_since",
+        "string",
+        'The baseline for changes made outside catalyst: the product commit after which every commit\'s changes must be in the journal (`catalyst init` writes `HEAD`); `""` checks the whole history.',
+        "`check`: warning if absent (history not checked); unrecorded changes after it reported (§7).",
+    ),
+    (
+        "strict_journal",
+        "boolean",
+        "Optional, default `false`: `true` makes unrecorded changes errors before format `1.0`.",
+        "—",
+    ),
+)
+# Keys only an older project file carries: read, never written.
+LEGACY_KEYS: tuple[tuple[str, str], ...] = (
+    ("name", "`project_name` before it had that name."),
+    ("framework_version", "`kernel_version` before 0.35.0."),
+    ("agent-source", "A path to the criterion, written by kernels before 0.37.0; honoured when present."),
+)
 LEGACY_SUFFIX = ".catalyst"
 HEADER = (
     "# catalyst project file: names this project's criterion "
