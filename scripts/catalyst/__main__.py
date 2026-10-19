@@ -116,6 +116,7 @@ def cmd_journal(args) -> int:
         from catalyst.ids import resolve_signer
 
         signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+        _warn_thin(args.intent or [])
         if not j.command_known(dep, args.cmd):
             # R4.8: a warning while 0.x, the entry still written
             print(
@@ -397,6 +398,18 @@ def cmd_approvals(args) -> int:
     return 0
 
 
+def _warn_thin(intent: list[str]) -> None:
+    """R4.8: an intent that cannot tell why is warned about while 0.x; the change is still made."""
+    from catalyst.journal import intent_thin
+
+    if intent_thin(intent):
+        print(
+            f"catalyst: warning: the intent {' '.join(intent)!r} says too little to tell why: say what the change "
+            "is for in a sentence (the journal is read without this session)",
+            file=sys.stderr,
+        )
+
+
 def cmd_edit(args) -> int:
     """Writing verbs (R2 W2): new, rename, restore, status set, link."""
     from catalyst import edit
@@ -404,6 +417,7 @@ def cmd_edit(args) -> int:
     from catalyst.ids import resolve_signer
 
     dep = open_deployment(args)
+    _warn_thin(getattr(args, "intent", None) or [])
     corpus = load_corpus(dep)
     try:
         if getattr(args, "tier", None) is not None:
@@ -458,6 +472,7 @@ def cmd_edit(args) -> int:
                 signer,
                 args.intent or [],
                 force=args.force,
+                through=args.through,
                 command=args.cmd or "/status",
                 tier=args.tier,
             )
@@ -2300,6 +2315,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="write a status outside the type's statuses, or past a failing guard (journaled)",
+    )
+    q.add_argument(
+        "--through",
+        action="store_true",
+        help="reach a later status through the states between, each transition and guard checked; one journal entry",
     )
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")

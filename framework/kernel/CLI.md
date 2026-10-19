@@ -124,7 +124,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--gate`, `--intent`, `--json`, `--tier` |
 | `catalyst approvals <id>` | the gates covering an entity: approvals counted and missing | `--json` |
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--to` |
-| `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--tier` |
+| `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--through`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
 | `catalyst user add <name> <role>` | register a user with a fresh userid and one role | `--as`, `--git-username`, `--intent`, `--json` |
 | `catalyst user remove <name>` | deactivate a user (never deleted; never the last active one) | `--as`, `--intent`, `--json` |
@@ -897,7 +897,10 @@ back-references, regenerates the indexes and writes one journal entry
 (`--intent` repeatable, `--command` names the slash command it runs for,
 `--tier`; without `--tier`, the tier the artifact's type opens when exactly one
 tier names it, so a requirement's change is a feature's without saying so).
-Each takes `--json` and exits `1`, changing nothing, on a refusal.
+Each takes `--json` and exits `1`, changing nothing, on a refusal. An
+`--intent` of fewer than three words once IDs are left out ("work starts",
+"R4.8") is warned about on stderr, as by `journal append`; the change is
+still made (R4.8).
 
 - `catalyst new <type> --title <t> [--field NAME=VALUE ...]`: the next ID,
   the type's latest template with its fields filled (ID, name, file name,
@@ -908,7 +911,11 @@ Each takes `--json` and exits `1`, changing nothing, on a refusal.
   one it can reach when the ETD declares transitions, and one whose guards
   hold (`workflow.guards`: the refusal names each failing condition);
   `--force` writes any value and passes a failing guard, which the journal
-  entry records. A `RECON-` case is refused: only `/reconcile` changes one.
+  entry records. With `--through`, a status the declared transitions reach
+  only through other states is reached through the shortest such path, each
+  state's gates and guards checked, in one journal entry naming the path
+  (never with `--force`). A `RECON-` case is refused: only `/reconcile`
+  changes one.
 - `catalyst repair derived [--as <user>] [--tier <tier>]`: rewrite every
   derived field (another type's `backref`) that disagrees with its sources,
   in one journal entry (by default the module's tier with no artifact).

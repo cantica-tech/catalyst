@@ -419,6 +419,25 @@ def new(
 
 
 # --- status set -----------------------------------------------------------
+def _path(moves: list[tuple[str, str]], start: str, goal: str) -> list[str]:
+    """The shortest run of states from `start` to `goal` over the declared
+    transitions, without `start` (`[]` when there is none); ties go to the
+    order the type declares them in."""
+    from collections import deque
+
+    seen = {start: [start]}
+    queue = deque([start])
+    while queue:
+        here = queue.popleft()
+        for frm, to in moves:
+            if frm == here and to not in seen:
+                seen[to] = [*seen[here], to]
+                if to == goal:
+                    return seen[to][1:]
+                queue.append(to)
+    return []
+
+
 def set_status(
     dep: Deployment,
     corpus: Corpus,
@@ -429,6 +448,7 @@ def set_status(
     force: bool = False,
     command: str = "/status",
     tier: str | None = None,
+    through: bool = False,
 ) -> Result:
     art = _artifact(corpus, item_id)
     if art.prefix == RECONCILIATION:
@@ -443,24 +463,38 @@ def set_status(
             f"'{status}' is not a {etd.name} status ({', '.join(fd.allowed_values)}); force writes it anyway"
         )
     allowed = {(t.from_state, t.to_state) for t in etd.workflow.transitions}
-    if allowed and (old, status) not in allowed and not force:
+    if through and force:
+        raise EditError("--through checks every state on the way; it does not go with --force")
+    path = [status]
+    if through and allowed and (old, status) not in allowed:
+        path = _path([(t.from_state, t.to_state) for t in etd.workflow.transitions], old, status)
+        if not path:
+            raise EditError(f"{etd.name} has no way from {old} to {status} through its transitions")
+    elif allowed and (old, status) not in allowed and not force:
         nexts = sorted(t for f, t in allowed if f == old)
-        raise EditError(f"{etd.name} cannot go from {old} to {status} (from {old}: {', '.join(nexts) or 'nothing'})")
+        raise EditError(
+            f"{etd.name} cannot go from {old} to {status} (from {old}: {', '.join(nexts) or 'nothing'}; "
+            "--through walks the states between)"
+        )
     from catalyst import gates
-
-    try:
-        refused = gates.refusal(dep, corpus, item_id, status)  # before the guards: --force never passes a gate
-    except gates.GateError as exc:
-        raise EditError(str(exc)) from None
-    if refused:
-        raise EditError(refused)
     from catalyst.guards import failures
 
-    blocked = failures(dep, corpus, art, status)
-    if blocked and not force:
-        raise EditError(
-            f"{item_id} cannot become {status}: {'; '.join(blocked)} (the module's guards; --force overrides, journaled)"
-        )
+    blocked: list[str] = []
+    for state in path:  # each state on the way passes its gates and guards, as one `status set` would
+        try:
+            refused = gates.refusal(dep, corpus, item_id, state)  # before the guards: --force never passes a gate
+        except gates.GateError as exc:
+            raise EditError(str(exc)) from None
+        if refused:
+            raise EditError(refused)
+        blocked = failures(dep, corpus, art, state)
+        if blocked and not force:
+            raise EditError(
+                f"{item_id} cannot become {state}: {'; '.join(blocked)} (the module's guards; --force overrides, "
+                "journaled)"
+            )
+    if len(path) > 1:
+        intent = [*(intent or []), f"{item_id}: {old or '(none)'} -> {' -> '.join(path)}"]
     if blocked:
         intent = [
             *(intent or [f"{item_id}: {old or '(none)'} -> {status}"]),
