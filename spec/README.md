@@ -28,6 +28,9 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `audit.schema.json` | `catalyst audit --json` | `GET /v1/audit` (local mode) |
 | `definitions.schema.json` | `catalyst definition list --json` | `GET /v1/definitions` |
 | `share-status.schema.json` | `catalyst share status --json` | `GET /v1/share` (local mode) |
+| `validate.schema.json` | `catalyst validate --json` | — |
+| `journal-verify.schema.json` | `catalyst journal verify --json` | — |
+| `report.schema.json` | `catalyst report --json` | — |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`), with the schema of a deployment's approval
