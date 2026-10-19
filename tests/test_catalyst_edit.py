@@ -208,3 +208,15 @@ def test_rename_moves_the_file_and_its_fields_never_the_id(tmp_path, capsys):
     dep, corpus = _state(project)
     assert not [f for f in validate(dep, corpus) if f.level == ERROR]
     assert main(["--project", str(project), "rename", "ITEM-999999", "--title", "x"]) == 1
+
+
+def test_a_reference_may_cite_an_entity_stored_as_a_table_row(tmp_path):
+    """BUG-000020: a roadmap's `RM-` rows are entities a feature cites; `new` and `link` accept them."""
+    from module_loader import FieldDefinition
+
+    dep, corpus = _state(_project(tmp_path))
+    roadmap = FieldDefinition(name="Roadmap", kind="ref", required=False, target_type="RM")
+    corpus.row_items["RM"] = {f"RM-000001-{USERID}"}
+    edit._check_refs(dep, corpus, roadmap, [f"RM-000001-{USERID}"])
+    with pytest.raises(edit.EditError, match="does not exist"):
+        edit._check_refs(dep, corpus, roadmap, [f"RM-000002-{USERID}"])
