@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.97.0 — 2026-10-19
+
+The kernel's reference generated from the code, phase 1 (owner decision D7, R4.4). No layout change, no migration.
+
+- `CLI.md` gains an "Options reference": every command's arguments and options with their help, choices and
+  defaults, generated from the CLI's parser (REQ-000077).
+- Every argument has help text now (105 had none), so `catalyst <command> --help` says what each is.
+- `scripts/gen_docs.py --check` fails when `CLI.md`'s prose names an option no command has.
+
 ## 0.96.0 — 2026-10-19
 
 A status line after each command. No layout change, no migration.
