@@ -49,7 +49,7 @@ exactly that.
 | R2 exit: ≥ 80% of command steps in code | met (kernel 0.71.0, 2026-10-16) | `01b` §7: 29 of 34 applicable rows (85%), after `rename`, `id next --count`, a default `journal restore` directory and the tier artifact check; open: roadmap Status refresh and removal (module verbs), kernel-behind warning, untested rules (a module notion); two rows concern parked plugins |
 | R2 exit: install = `init` + ≤ 3 judgment questions | met | `BOOTSTRAP.md` §2: name and git username default; module, rule documents with prefixes, and greenfield or retrofit remain |
 | R3.1, R3.1a, R3.2, R3.3, R3.5, R3.6 | done | `where`, `runtime`, `share`, journal shards, `open` |
-| R3.1b workspace criterion | done, in part not audited | `workspace init\|status` and tests; inheritance of rules, users and roles not audited |
+| R3.1b workspace criterion | done (audited 2026-10-19) | `workspace init\|status` and tests; the audit found roles not inherited and a proposal on an inherited rule crashing, both fixed in 0.92.0 (BUG-000021); rules, domains and users were inherited as documented |
 | R3.1c agent adapters at user level | done | `catalyst mcp`; `agent install` for claude-code, copilot, vscode, cursor, codex, gemini |
 | R3.4 legacy deployments | decided | `move --to-home` exists; `catalyst migrate` was not built (optional) |
 | R3.7 pinned CLI hash | done | `bin/catalyst.pyz.sha256`, verified by the gate |
