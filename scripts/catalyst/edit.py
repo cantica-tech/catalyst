@@ -384,6 +384,13 @@ def new(
             row_values[fd.name] = day
         elif fd.kind in REF_KINDS:
             row_values[fd.name] = NONE_YET
+        elif (
+            not fd.required
+            and fd.name != "Status"
+            and re.search(rf"^\|\s*\*\*{re.escape(fd.name)}\*\*\s*\|", text, re.M)
+        ):
+            # an optional field not given is empty, never the template's hint (BUG-000022)
+            row_values[fd.name] = NONE_YET
     for name_, value in row_values.items():
         try:
             text = set_field(text, name_, value)
