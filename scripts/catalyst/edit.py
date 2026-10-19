@@ -575,12 +575,9 @@ def reconciliation_level(dep: Deployment, signer: dict) -> tuple[str, str]:
     """The signer's reconciliation level — the highest among their roles'
     `reconciliation` (a role without one counts as `none`) — and the role
     that grants it."""
-    import json
+    from catalyst.corpus import roles as deployment_roles
 
-    try:
-        roles = json.loads((dep.root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8")).get("roles", [])
-    except (OSError, ValueError):
-        roles = []
+    roles = deployment_roles(dep)  # a workspace member's inherited roles too (R3.1b)
     by_name = {str(r.get("name")): str(r.get("reconciliation") or "none") for r in roles if isinstance(r, dict)}
     best = ("none", "")
     for role in signer.get("roles") or []:

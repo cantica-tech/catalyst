@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.92.0 — 2026-10-19
+
+A workspace member inherits the workspace's roles. No layout change, no migration.
+
+- Fixed: a member of a VS Code workspace did not inherit the workspace criterion's roles. The roles list, the gates'
+  role check and the reconciliation level read only the member's own; they now read the member's roles, then the
+  workspace's whose names the member does not use (BUG-000021, R3.1b audit).
+- Fixed: proposing a change to a rule inherited from the workspace crashed; it is refused, read-only in the member.
+
 ## 0.91.0 — 2026-10-19
 
 Status changes in one step, intents that say why, and declared transitions enforced. No layout change, no migration.
