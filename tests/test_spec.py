@@ -63,6 +63,9 @@ CASES = [
     ("graph", ["graph"]),
     ("journal", ["journal", "show"]),
     ("check", ["check"]),
+    ("validate", ["validate"]),
+    ("journal-verify", ["journal", "verify"]),
+    ("report", ["report"]),
 ]
 
 
@@ -90,6 +93,9 @@ def test_the_payloads_cover_what_their_schemas_describe(project, capsys):
         ("graph", {"rules": [], "domains": [], "artifacts": [], "types": {}, "extra": 1}),
         ("journal", [{"timestamp": "now"}]),
         ("check", {"ok": "yes", "errors": [], "warnings": []}),
+        ("validate", {"ok": True, "findings": [{"level": "fatal", "code": "x", "where": "y", "message": "z"}]}),
+        ("journal-verify", {"ok": True, "issues": [{"level": "error", "code": "chain", "at": "j:1", "message": "m"}]}),
+        ("report", {"entries": -1}),
     ],
 )
 def test_a_wrong_payload_is_refused(schema, wrong):

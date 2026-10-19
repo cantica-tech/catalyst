@@ -21,7 +21,9 @@ from check_deployment import structural_errors
 # On-disk format versions this CLI reads (framework/kernel/FORMAT.md). A
 # deployment declares its own in the pointer's `format` field.
 FORMAT = "1.0-rc"
-SUPPORTED_FORMATS = {"1.0-rc"}
+# `1.0` is read too, ahead of the release: a deployment that declares it gets the release's strictness
+# (unrecorded changes are errors, a legacy deployment is read-only); new ones still get FORMAT
+SUPPORTED_FORMATS = {"1.0-rc", "1.0"}
 
 # Files operating systems drop into any directory: never product work, so never
 # an unrecorded change (anything else is opted out with .catalystignore).
