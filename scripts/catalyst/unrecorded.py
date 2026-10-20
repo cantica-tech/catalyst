@@ -101,7 +101,7 @@ def legacy_message(dep: Deployment) -> str | None:
     if not parts:
         return None
     return (
-        f"this project uses {' and '.join(parts)}: `catalyst move --to-home` makes it a `catalyst.toml` with its "
+        f"this project uses {' and '.join(parts)}: `catalyst migrate --apply` makes it a `catalyst.toml` with its "
         "criterion in catalyst's home. A legacy deployment is read-only from format 1.0 and unsupported a minor "
         "later (R3.4)"
     )

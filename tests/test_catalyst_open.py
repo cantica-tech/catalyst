@@ -76,7 +76,7 @@ def test_the_agent_is_this_users_choice_never_a_project_edit(tmp_path, monkeypat
 def test_open_names_what_is_left_to_do(tmp_path, monkeypatch):
     project = make_project(tmp_path / "w", git=True)
     o = open_project(project, act=False)
-    assert o.kind == "legacy" and any("catalyst move --to-home" in t for t in o.todo)
+    assert o.kind == "legacy" and any("catalyst migrate --apply" in t for t in o.todo)
     move.to_home(project, runtime=False)
     toml = project / "catalyst.toml"
     project_file.write(toml, dict(project_file.read(toml), kernel_version="9.9.9"))
