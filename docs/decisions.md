@@ -10,7 +10,7 @@ Smaller decisions are recorded as ADRs ([`adr/`](adr/)).
 |---|---|---|
 | A1 | Governance data inside the product repository, as the default? | First yes (2026-10-07), **superseded 2026-10-08** by the home-store requirement ([`13`](design/13-criterion-home-requirement.md)): the criterion lives in `$HOME/.catalyst/projects/<name>/criterion` (a workspace's in `$HOME/.catalyst/workspaces/<name>/criterion`), nothing in the project but `catalyst.toml`; a runtime per criterion; the name "criterion" stays |
 | A2 | A multi-user server or database within about six months? | **Yes** (2026-10-07): the server driver scheduled as R3.9 and R5 ([`19`](design/19-server-design.md)), not "later" |
-| A3 | Migrate the three existing deployments, or keep them as legacy? | **Legacy if it cuts work** (2026-10-07): `catalyst migrate` optional; read-only legacy support for one minor (R3.4) |
+| A3 | Migrate the three existing deployments, or keep them as legacy? | **Legacy if it cuts work** (2026-10-07): `catalyst migrate` optional; read-only legacy support for one minor (R3.4). **Built** (2026-10-20, the owner): one `catalyst migrate` for the legacy layout and the migrations' mechanical steps (0.102.0) |
 | A4 | Windows a 1.0 target? | **Yes** (2026-10-07): Windows in CI from R0.21; no symlinks, colons or absolute paths |
 | A5 | Redact a secret journaled by mistake, although that weakens "immutable"? | **Yes, as an auditable tombstone** (2026-10-14): a redaction is itself a journal entry; the content gives way to a tombstone and its blob leaves the pins; the entry and its hash stay (R3.7, `catalyst journal redact`) |
 

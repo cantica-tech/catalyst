@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.102.0 — 2026-10-20
+
+`catalyst migrate` (R3.4, built on the owner's decision). No layout change, no migration.
+
+- Added: `catalyst migrate` lists what a deployment is behind on and changes nothing: a legacy layout; each templates
+  folder that does not hold the template the kernel or its module ships today; and the judgment steps of the
+  migrations since the previous sync (or `--since <version>`), each with its qualifier and its migration.
+- Added: `catalyst migrate --apply` moves a legacy layout to the home store (as `move --to-home`) and adds the
+  kernel's templates as next versions, with catalog rows, journaled; a module's templates, which its migrations call
+  optional, only with `--template <type>` or `all`. A template already held, even copied raw, is never added again,
+  and judgment steps are never taken. `--json` prints what `spec/migrate.schema.json` describes.
+
 ## 0.101.2 — 2026-10-20
 
 A fix. No layout change, no migration.
