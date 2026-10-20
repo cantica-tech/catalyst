@@ -19,7 +19,13 @@
           "gate": { "type": "string" },
           "role": { "type": "string" },
           "approvals": { "type": "integer", "minimum": 1 },
-          "covers": { "type": "object" },
+          "covers": {
+            "description": "What the gate covers, as `IAM/gates.json` declares it: the rules of one domain, or an entity type entering one state.",
+            "anyOf": [
+              {"type": "object", "required": ["rules"], "additionalProperties": false, "properties": {"rules": {"type": "object", "required": ["domain"], "additionalProperties": false, "properties": {"domain": {"type": "string"}}}}},
+              {"type": "object", "required": ["type", "to"], "additionalProperties": false, "properties": {"type": {"type": "string"}, "to": {"type": "string"}}}
+            ]
+          },
           "counted": { "type": "array", "items": { "type": "string" } },
           "missing": { "type": "integer", "minimum": 0 }
         }
