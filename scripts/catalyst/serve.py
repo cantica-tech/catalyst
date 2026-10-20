@@ -811,7 +811,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         port = getattr(self.server, "server_port", None)
         return origin not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
+    def _drain(self) -> None:
+        """Read a request's body this handler refused before reading, so the client gets the refusal, not a
+        connection reset (Windows aborts a connection closed with its body unread). Never a body too large."""
+        if getattr(self, "_body_read", True):
+            return
+        self._body_read = True
+        length = int(self.headers.get("Content-Length") or 0)
+        if 0 < length <= MAX_BODY:
+            self.rfile.read(length)
+
     def _route(self, method: str) -> None:
+        self._body_read = method not in ("POST", "PUT", "PATCH")
         try:
             url = urllib.parse.urlparse(self.path)
             if getattr(self.app, "static", None) is not None and method == "GET" and not url.path.startswith(API):
@@ -872,6 +883,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length") or 0)
                 if length > MAX_BODY:
                     raise ServeError(413, "the push is too large")
+                self._body_read = True
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if path == "/have":
                     return self._send(200, {"missing": self.app.missing([str(s) for s in body.get("shas", [])])})
@@ -882,8 +894,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send(200, res)
             raise ServeError(404, f"no such endpoint: {method} {url.path}")
         except ServeError as e:
+            if e.status != 413:  # a body too large is never read
+                self._drain()
             self._send(e.status, e.payload())
         except (ValueError, TypeError) as e:
+            self._drain()
             self._send(400, {"error": f"bad request: {e}"})
 
     def do_GET(self):  # http.server's name
