@@ -61,3 +61,22 @@ def test_the_prose_may_name_only_options_the_cli_has():
     assert gen_docs.flag_drift("`git commit --no-verify` skips the hook.") == []  # another tool's flag
     assert gen_docs.flag_drift("Pass `--frobnicate` to `catalyst check`.") == ["--frobnicate"]
     assert gen_docs.flag_drift("`--nothing-*` stands for options no command has.") == ["--nothing-*"]
+
+
+def test_the_project_file_keys_come_from_the_registry(monkeypatch):
+    """R4.4 phase 3: FORMAT.md's catalyst.toml table, from project_file.KEYS; a key the code reads must be there."""
+    import project_file
+
+    table = gen_docs.project_keys()
+    assert "| `role_check` | string |" in table and "| `workspace` | string |" in table
+    assert "- `framework_version`:" in table  # a legacy key, read and never written
+    assert gen_docs.key_drift() == []
+    monkeypatch.setattr(project_file, "KEYS", tuple(k for k in project_file.KEYS if k[0] != "role_check"))
+    assert gen_docs.key_drift() == ["role_check"]  # read by the code, no longer listed
+
+
+def test_the_module_specification_tables_come_from_the_schemas():
+    manifest = gen_docs.manifest_fields()
+    assert "| `entities` | `map` | Conditional |" in manifest and "| `tiers` | `list[object]` | No |" in manifest
+    assert "| `hint` | `string` | No |" in gen_docs.etd_field_definitions()
+    assert "| `guards` | `map` | No |" in gen_docs.etd_workflow()

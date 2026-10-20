@@ -17,20 +17,20 @@
     "id_prefix": {
       "type": "string",
       "pattern": "^[A-Z0-9]+$",
-      "description": "Uppercase prefix used for entity IDs (e.g. ITEM)."
+      "description": "Uppercase ID prefix."
     },
     "name": {
       "type": "string",
-      "description": "Singular human-readable name of entity."
+      "description": "Singular name."
     },
     "plural_name": {
       "type": "string",
-      "description": "Plural human-readable name of entity."
+      "description": "Plural name."
     },
     "folder": {
       "type": "string",
       "pattern": "^[a-z0-9_-]+$",
-      "description": "Storage folder relative to project root."
+      "description": "The type's folder name."
     },
     "grounding": {
       "type": "string",
@@ -39,11 +39,12 @@
         "inherited",
         "none"
       ],
-      "description": "How the entity grounds to the module's grounding type: directly, via its parent, or not at all."
+      "description": "`required` (links directly to the grounding type), `inherited` (through a parent entity), or `none`."
     },
     "grounding_field": {
       "type": "string",
-      "description": "Name of field containing the grounding link."
+      "description": "Field holding the grounding link; required unless `grounding` is `none`.",
+      "x-required": "Conditional"
     },
     "fields": {
       "type": "array",
@@ -57,7 +58,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Field header name in artifact file."
+            "description": "Exact field name in the artifact file."
           },
           "kind": {
             "type": "string",
@@ -70,39 +71,42 @@
               "user",
               "user-list"
             ],
-            "description": "Data type for the field."
+            "description": "`text`, `enum`, `ref`, `ref-list`, `date`, `user`, `user-list`."
           },
           "required": {
             "type": "boolean",
-            "description": "True if field must be present."
+            "description": "Whether every instance must carry it."
           },
           "allowed_values": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Allowed string options when kind is enum."
+            "description": "Values for `enum`.",
+            "x-required": "Conditional"
           },
           "target_type": {
             "type": "string",
-            "description": "Target entity prefix when kind is ref or ref-list."
+            "description": "Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`.",
+            "x-required": "Conditional"
           },
           "backref": {
             "type": "string",
-            "description": "Corresponding field on target entity to back-populate."
+            "description": "The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand."
           },
           "required_when_closed": {
             "type": "boolean",
-            "description": "The field must be non-empty once the entity's Status is one of its workflow's closed states."
+            "description": "For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`."
           },
           "hint": {
             "type": "string",
-            "description": "What the item template's cell for this field tells its author (module format v3)."
+            "description": "What the item template's cell tells the artifact's author, in place of the kind's placeholder (format 3; `catalyst new` writes an optional field it is not given as `*(none yet)*`)."
           }
         },
         "additionalProperties": false
       },
-      "minItems": 1
+      "minItems": 1,
+      "description": "Ordered field definitions."
     },
     "workflow": {
       "type": "object",
@@ -114,7 +118,7 @@
       "properties": {
         "initial": {
           "type": "string",
-          "description": "Initial status string upon creation."
+          "description": "Status on creation."
         },
         "states": {
           "type": "array",
@@ -122,18 +126,18 @@
             "type": "string"
           },
           "minItems": 1,
-          "description": "All valid status strings."
+          "description": "All valid statuses."
         },
         "closed_states": {
           "type": "array",
           "items": {
             "type": "string"
           },
-          "description": "Status strings indicating entity is closed/done."
+          "description": "Statuses meaning done."
         },
         "guards": {
           "type": "object",
-          "description": "State -> the conditions entering it requires: each an object with one of children_closed (a reference field whose every cited artifact must be closed), nonempty (a field), section_written (a section heading whose text must differ from the type's template's). catalyst status set enforces them; --force overrides, journaled.",
+          "description": "State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one.",
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -141,9 +145,15 @@
               "minProperties": 1,
               "maxProperties": 1,
               "properties": {
-                "children_closed": { "type": "string" },
-                "nonempty": { "type": "string" },
-                "section_written": { "type": "string" }
+                "children_closed": {
+                  "type": "string"
+                },
+                "nonempty": {
+                  "type": "string"
+                },
+                "section_written": {
+                  "type": "string"
+                }
               },
               "additionalProperties": false
             }
@@ -166,10 +176,12 @@
               }
             },
             "additionalProperties": false
-          }
+          },
+          "description": "Allowed `from` → `to` moves."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "Lifecycle states and transitions."
     },
     "naming": {
       "type": "string",
@@ -178,11 +190,11 @@
         "free-form"
       ],
       "default": "id-summary",
-      "description": "File naming: `id-summary` (`<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7)."
+      "description": "`id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7)."
     },
     "location": {
       "type": "string",
-      "description": "Parent folder of `folder` inside the working copy, e.g. `development` (default: the working copy's root)."
+      "description": "Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first."
     }
   },
   "additionalProperties": false

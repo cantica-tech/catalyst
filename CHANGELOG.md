@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.99.0 — 2026-10-20
+
+The kernel's reference generated from the code, phase 3 (D7, R4.4). No layout change, no migration.
+
+- `FORMAT.md`'s `catalyst.toml` table is generated from one registry of the project file's keys in the code, which adds
+  the two it lacked (`workspace`, `role_check`); `gen_docs.py --check` fails when the code reads a key it does not list
+  (REQ-000079).
+- The module manifest schema describes module format 3 (it refused every format-3 module before), and
+  `MODULE-SPECIFICATION.md`'s manifest, type, field and workflow tables are generated from the kernel's schemas.
+
 ## 0.98.0 — 2026-10-20
 
 The kernel's reference generated from the code, phase 2 (D7, R4.4). No layout change, no migration.

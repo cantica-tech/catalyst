@@ -241,6 +241,79 @@ def flag_drift(text: str) -> list[str]:
     return drift
 
 
+def project_keys() -> str:
+    """`catalyst.toml`'s keys, from `project_file.KEYS` (R4.4 phase 3)."""
+    import project_file
+
+    lines = ["| Field | Type | Meaning | Checked |", "|---|---|---|---|"]
+    lines += [f"| `{k}` | {t} | {m} | {c} |" for k, t, m, c in project_file.KEYS]
+    lines += ["", "Read from an older project file, never written:", ""]
+    lines += [f"- `{k}`: {m}" for k, m in project_file.LEGACY_KEYS]
+    return "\n".join(lines)
+
+
+def key_drift() -> list[str]:
+    """Each key the code reads off a project file that `project_file.KEYS` does not list (R4.4 phase 3)."""
+    import project_file
+
+    known = {k for k, *_ in project_file.KEYS} | {k for k, _ in project_file.LEGACY_KEYS}
+    read: set[str] = set()
+    scripts = Path(__file__).resolve().parent  # the code itself, wherever the documents are
+    for path in [*(scripts / "catalyst").glob("*.py"), scripts / "project_file.py"]:
+        text = path.read_text(encoding="utf-8")
+        read |= set(re.findall(r"pointer(?: or \{\})?\)?\.get\(\"([a-z_-]+)\"", text))
+        read |= set(re.findall(r"read_dir\([^)]*\)\.get\(\"([a-z_-]+)\"", text))
+        if path.name == "project_file.py":
+            read |= set(re.findall(r"\bdata\.get\(\"([a-z_-]+)\"", text))
+    return sorted(read - known)
+
+
+def _schema_type(prop: dict) -> str:
+    """A property's type as MODULE-SPECIFICATION.md writes it: `string`, `list[object]`, `map`."""
+    kind = prop.get("type")
+    if kind == "array":
+        inner = prop.get("items", {}).get("type", "object")
+        return f"list[{inner}]"
+    if kind == "object" and "properties" not in prop:
+        return "map"
+    if isinstance(kind, list):
+        return " or ".join(kind)
+    return str(kind or "any")
+
+
+def _schema_table(schema: dict) -> str:
+    """A field table from a JSON Schema object: each property's type, whether it is required, its description."""
+    required = set(schema.get("required", []))
+    lines = ["| Field | Type | Required | Description |", "|---|---|---|---|"]
+    for name, prop in schema.get("properties", {}).items():
+        need = prop.get("x-required") or ("Yes" if name in required else "No")
+        desc = " ".join(str(prop.get("description", "")).split()).replace("|", "\\|")
+        lines.append(f"| `{name}` | `{_schema_type(prop)}` | {need} | {desc} |")
+    return "\n".join(lines)
+
+
+def _kernel_schema(name: str) -> dict:
+    import json
+
+    return json.loads((KERNEL / "schemas" / f"{name}.schema.json").read_text(encoding="utf-8"))
+
+
+def manifest_fields() -> str:
+    return _schema_table(_kernel_schema("module-manifest"))
+
+
+def etd_fields() -> str:
+    return _schema_table(_kernel_schema("entity-type-definition"))
+
+
+def etd_field_definitions() -> str:
+    return _schema_table(_kernel_schema("entity-type-definition")["properties"]["fields"]["items"])
+
+
+def etd_workflow() -> str:
+    return _schema_table(_kernel_schema("entity-type-definition")["properties"]["workflow"])
+
+
 def kernel_types() -> str:
     from module_loader import load_kernel_entities
 
@@ -263,6 +336,11 @@ SECTIONS: dict[str, tuple[Path, Callable[[], str]]] = {
     "kernel-types": (KERNEL / "FORMAT.md", kernel_types),
     "cli-options": (KERNEL / "CLI.md", cli_options),
     "cli-json": (KERNEL / "CLI.md", cli_json),
+    "project-keys": (KERNEL / "FORMAT.md", project_keys),
+    "manifest-fields": (KERNEL / "MODULE-SPECIFICATION.md", manifest_fields),
+    "etd-fields": (KERNEL / "MODULE-SPECIFICATION.md", etd_fields),
+    "etd-field-definitions": (KERNEL / "MODULE-SPECIFICATION.md", etd_field_definitions),
+    "etd-workflow": (KERNEL / "MODULE-SPECIFICATION.md", etd_workflow),
 }
 
 
@@ -287,6 +365,10 @@ def main(argv: list[str] | None = None) -> int:
     drift = flag_drift((KERNEL / "CLI.md").read_text(encoding="utf-8"))
     if drift:
         print("CLI.md names options no command has: " + ", ".join(drift))
+        return 1
+    unregistered = key_drift()
+    if unregistered:
+        print("the code reads project-file keys project_file.KEYS does not list: " + ", ".join(unregistered))
         return 1
     unschema = json_drift()
     if unschema:

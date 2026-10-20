@@ -20,7 +20,7 @@ the code defines.
 |---|---|---|---|
 | 1 (0.97.0) | `CLI.md`: every command's arguments and options with their help, choices, defaults | the CLI's parser; every argument now has help text | the prose may name only options the CLI has (`flag_drift`) |
 | 2 (0.98.0) | `CLI.md`: each machine-readable output, the schema that describes it | `spec/*.schema.json` and `spec/README.md` | a new `--json` command comes with its schema; the 20 still without one may only shrink |
-| 3 | `FORMAT.md`: `catalyst.toml`'s keys; `MODULE-SPECIFICATION.md`: `module.yaml`'s keys | one registry of project-file keys in the code; `framework/kernel/schemas/*.json` | the prose names only keys that exist |
+| 3 (0.99.0) | `FORMAT.md`: `catalyst.toml`'s keys; `MODULE-SPECIFICATION.md`: `module.yaml`'s and a type's keys | `project_file.KEYS`; `framework/kernel/schemas/*.json` | every key the code reads is registered; every real module holds to the schemas |
 | 4 | `SYNCHRONIZE.md`: the migrations, from–to and summary | `framework/kernel/migrations/migrations.md` | the list matches the index |
 | 5 | `INVARIANTS.md`: the law-and-invariant table's "enforced by" | the checks that cite each invariant | each invariant names code that enforces it, or says it is judged |
 
@@ -41,3 +41,10 @@ kernel documents a sync already recomposes.
   the 56 `--json` commands have one, against 22 before.
 - `scripts/gen_docs.py`: `cli_json`, and `json_drift` with `UNDESCRIBED`, the 20 still without a schema.
 - `CLI.md`: a "Machine-readable output" section.
+
+## Phase 3, done in 0.99.0
+
+- `project_file.KEYS`: the project file's keys, with the two FORMAT.md lacked (`workspace`, `role_check`).
+- The module manifest schema now describes format 3, which every real module uses and which the schema refused. Both
+  kernel schemas carry the specification's descriptions, and four of its tables are generated from them.
+- The test suite's validator now checks `anyOf` with the other keywords.
