@@ -180,6 +180,17 @@
               "defect"
             ]
           },
+          "title": {"type": "string"},
+          "statement": {"type": "string"},
+          "area": {"type": "string", "description": "The domain it belongs to."},
+          "code": {"type": "string", "description": "A domain's proposed code."},
+          "status": {"type": "string", "description": "A rule's: holds, partial or missing."},
+          "confidence": {"type": "string", "description": "high, medium or low."},
+          "breaks": {"type": "string", "description": "A defect's: the rule it breaks."},
+          "notes": {"type": "string"},
+          "evidence": {"type": "array", "items": {"type": "object", "required": ["path"], "properties": {"path": {"type": "string"}, "line": {"type": "integer", "minimum": 1}}}},
+          "sources": {"type": "array", "items": {"type": "string"}, "description": "The passes' findings it reconciles (`A:<id>`, `B:<id>`)."},
+          "verification": {"type": "string", "description": "What the reconciliation checked."},
           "decision": {
             "type": [
               "object",
