@@ -39,7 +39,7 @@ kernel documents a sync already recomposes.
 
 - Five schemas, for the writing verbs, the user and role verbs, `freeze`/`unfreeze` and `definition migrate`: 36 of
   the 56 `--json` commands have one, against 22 before.
-- `scripts/gen_docs.py`: `cli_json`, and `json_drift` with `UNDESCRIBED`, the 20 still without a schema.
+- `scripts/gen_docs.py`: `cli_json`, and `json_drift` with `UNDESCRIBED`, the 20 still without a schema (empty since 0.101.0: all 56 described).
 - `CLI.md`: a "Machine-readable output" section.
 
 ## Phase 3, done in 0.99.0

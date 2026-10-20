@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 from catalyst import journal as j
 from catalyst.__main__ import main
 from catalyst.deployment import load
@@ -243,7 +244,7 @@ def test_cli_append_verify_pin(project, capsys):
         == 0
     )
     entry = json.loads(capsys.readouterr().out)
-    assert entry["actor"] == "ada"
+    assert entry["actor"] == "ada" and schema_check.problems(entry, schema_check.load("journal-entry")) == []
     assert main(["journal", "verify"]) == 0
     assert main(["journal", "pin"]) == 0
     assert (

@@ -100,6 +100,7 @@ def test_an_approval_is_of_a_version_and_never_the_authors(lived, capsys):  # no
     assert main(["approve", item, "--gate", "item-done", "--as", "bob", "--intent", "Reviewed", "--json"]) == 0
     entry = json.loads(capsys.readouterr().out)
     assert (entry["action"], entry["gate"], entry["actor"], entry["missing"]) == ("approve", "item-done", "bob", 0)
+    assert schema_check.problems(entry, schema_check.load("approve")) == []
     assert entry["approved"]["blob"] == before["version"] and entry["files"] == []
     assert journal_entries(project / ".criterion")[-1]["action"] == "approve"
     assert main(["approve", item, "--gate", "item-done", "--as", "bob"]) == 1

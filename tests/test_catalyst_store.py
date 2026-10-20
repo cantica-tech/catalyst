@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+import schema_check
 import test_catalyst_criterion as shared
 from catalyst import criterion as cr, store
 from catalyst.__main__ import main
@@ -40,6 +41,9 @@ def test_a_criterion_without_a_remote_is_local_and_says_how_to_share(tmp_path, m
     with pytest.raises(store.ShareError, match="share create"):
         share.pull()
     assert main(["share", "info"]) == 0 and "(not shared)" in capsys.readouterr().out
+    assert main(["share", "info", "--json"]) == 0
+    info = json.loads(capsys.readouterr().out)
+    assert info["driver"] == "local" and schema_check.problems(info, schema_check.load("share-info")) == []
     assert main(["share", "pull"]) == 1 and "not shared" in capsys.readouterr().err
 
 
@@ -117,7 +121,15 @@ def test_two_machines_share_one_criterion_through_git(tmp_path, monkeypatch, cap
     shared.add_item(bob, "ada", "Second from machine B")
     assert main(["share", "push", "-m", "more", "--no-pr"]) == 3
     assert f"added to the open topic branch {topic}" in capsys.readouterr().out
-    assert main(["share", "push", "-m", "more", "--no-pr", "--yes"]) == 0
+    assert main(["share", "push", "-m", "more", "--no-pr", "--yes", "--json"]) == 0
+    pushed = json.loads(capsys.readouterr().out)
+    assert (
+        pushed["branch"] == topic
+        and pushed["commits"]
+        and schema_check.problems(pushed, schema_check.load("share-push")) == []
+    )
+    assert main(["share", "push", "-m", "nothing", "--no-pr", "--yes", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["commits"] == 0  # nothing to publish, still JSON
     shared.merge_topic({"tmp": tmp_path, "remote": remote}, topic)
 
     monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "machine-a"))

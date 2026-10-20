@@ -125,8 +125,13 @@ def test_each_writing_verb_prints_what_its_schema_describes(project, capsys, sch
     assert schema_check.problems(payload, schema_check.load(schema)) == []
 
 
-def test_the_ratchet_holds_every_json_command_to_a_schema_or_the_known_gaps():
+def test_runtime_status_prints_what_its_schema_describes(project, capsys):
+    payload = _json(capsys, "runtime", "status")
+    assert payload["criterion"] and schema_check.problems(payload, schema_check.load("runtime-status")) == []
+
+
+def test_every_json_command_is_described():
+    """R4.4: the ratchet ran to zero; a new `--json` command ships with its schema."""
     import gen_docs
 
-    assert gen_docs.json_drift() == []
-    assert "catalyst new" not in gen_docs.UNDESCRIBED  # described now
+    assert gen_docs.json_drift() == [] and set() == gen_docs.UNDESCRIBED

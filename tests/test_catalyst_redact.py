@@ -10,6 +10,7 @@ import subprocess
 
 import pytest
 
+import schema_check
 from catalyst import criterion as cr, history, journal as j
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
@@ -40,12 +41,15 @@ def test_a_redaction_is_an_entry_and_takes_the_blob_out_of_the_pins(secret, caps
     project, _, sha = secret
     dep = load(project)
     assert sha in j.pinned(dep.root)
-    assert main(["journal", "redact", sha, "--intent", "an API key was journaled", "--as", "ada"]) == 0
-    out = capsys.readouterr().out
-    assert "redacted 1 blob(s)" in out and "Rotate the secret" in out
+    assert main(["journal", "redact", sha, "--intent", "an API key was journaled", "--as", "ada", "--json"]) == 0
+    printed = json.loads(capsys.readouterr().out)
     entry = j.read(load(project))[-1][1]
+    assert entry and {k: printed[k] for k in entry} == entry  # the entry it wrote, and where the blob was
+    assert printed["paths"] == [".criterion/items/ITEM-000002-second.md"]
+    assert schema_check.problems(printed, schema_check.load("journal-entry")) == []
     assert entry and entry["action"] == "redact" and entry["redacted"] == [sha] and entry["files"] == []
     assert entry["intent"] == ["an API key was journaled"] and entry["actor"] == "ada"
+    assert schema_check.problems(entry, schema_check.load("journal-entry")) == []
     root = load(project).root
     assert sha not in j.pinned(root) and j.pinned(root)  # the others stay pinned
     assert _git(root, "rev-list", "--count", j.PIN_REF) == "1"  # no older pin commit keeps it reachable
@@ -56,6 +60,8 @@ def test_a_redaction_is_an_entry_and_takes_the_blob_out_of_the_pins(secret, caps
 def test_the_readers_treat_it_as_redacted(secret, tmp_path, capsys):
     project, item, sha = secret
     assert main(["journal", "redact", sha, "--intent", "a key", "--as", "ada"]) == 0
+    out = capsys.readouterr().out
+    assert "redacted 1 blob(s)" in out and "Rotate the secret" in out
     dep = load(project)
     h = history.history(dep, load_corpus(dep), item)
     leaked = next(e for e in h["entries"] if e["after"] == sha)
