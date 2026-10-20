@@ -134,30 +134,9 @@ def cli_options() -> str:
 
 SPEC = ROOT / "spec"
 
-# `--json` commands whose output has no schema yet (R4.4 phase 2): this list may only shrink; a new `--json`
-# command comes with its schema (`json_drift`)
-UNDESCRIBED = {
-    "catalyst unrecorded",
-    "catalyst journal append",
-    "catalyst journal adopt",
-    "catalyst journal redact",
-    "catalyst repair derived",
-    "catalyst approve",
-    "catalyst sync plan",
-    "catalyst sync apply",
-    "catalyst module list",
-    "catalyst module install",
-    "catalyst module upgrade",
-    "catalyst module verify",
-    "catalyst where",
-    "catalyst agent status",
-    "catalyst runtime status",
-    "catalyst workspace status",
-    "catalyst propose",
-    "catalyst open",
-    "catalyst share info",
-    "catalyst share push",
-}
+# `--json` commands whose output has no schema yet (R4.4 phase 2): empty since 0.101.0, and it stays so; a new
+# `--json` command comes with its schema (`json_drift`)
+UNDESCRIBED: set[str] = set()
 
 
 def _described() -> dict[str, list[str]]:

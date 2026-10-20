@@ -1723,7 +1723,10 @@ def cmd_share(args) -> int:
     signer = resolve_signer(dep, load_corpus(dep), args.as_user, "share")
     pv = share.preview()
     if pv.empty:
-        print(pv.describe())
+        if args.json:  # what a push of nothing prints (spec/share-push.schema.json)
+            print(json.dumps({"branch": None, "commits": 0, "pull_request": None, "regenerated": []}, indent=2))
+        else:
+            print(pv.describe())
         return 0
     if not _assented(args, pv.describe()):
         return NEEDS_ASSENT

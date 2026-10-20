@@ -1,6 +1,6 @@
 # spec
 
-JSON Schemas of what catalyst's read verbs print with `--json` and its
+JSON Schemas of what every catalyst command prints with `--json` and its
 server returns, one file per payload. A client generates its types from
 them; `tests/test_spec.py` and each verb's own tests check its output
 against its schema, with the checker in `tests/schema_check.py`.
@@ -36,6 +36,22 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `role.schema.json` | `catalyst role add --json`, `catalyst role modify --json` | — |
 | `freeze.schema.json` | `catalyst freeze --json`, `catalyst unfreeze --json` | — |
 | `definition-migrate.schema.json` | `catalyst definition migrate --json` | — |
+| `journal-entry.schema.json` | `catalyst journal append --json`, `catalyst journal adopt --json`, `catalyst journal redact --json` | — |
+| `approve.schema.json` | `catalyst approve <id> --json` | — |
+| `repair-derived.schema.json` | `catalyst repair derived --json` | — |
+| `unrecorded.schema.json` | `catalyst unrecorded --json` | — |
+| `sync-plan.schema.json` | `catalyst sync plan --json`, `catalyst module upgrade <id> --plan --json` | — |
+| `sync-apply.schema.json` | `catalyst sync apply --json`, `catalyst module upgrade <id> --json` | — |
+| `module-list.schema.json` | `catalyst module list --json`, `catalyst module verify --json` | `GET /v1/modules` (under `modules`, local mode) |
+| `module-install.schema.json` | `catalyst module install <source> --json` | — |
+| `where.schema.json` | `catalyst where --json` | — |
+| `agent-status.schema.json` | `catalyst agent status --json` | — |
+| `runtime-status.schema.json` | `catalyst runtime status --json` | — |
+| `workspace-status.schema.json` | `catalyst workspace status <file> --json` | — |
+| `propose.schema.json` | `catalyst propose <id> --from <file> --json` | — |
+| `open.schema.json` | `catalyst open --json` | — |
+| `share-info.schema.json` | `catalyst share info --json` | — |
+| `share-push.schema.json` | `catalyst share push --yes --json` | — |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`), with the schema of a deployment's approval

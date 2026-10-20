@@ -8,6 +8,7 @@ import subprocess
 
 import pytest
 
+import schema_check
 from catalyst import journal as j, unrecorded as u
 from catalyst.__main__ import main
 from catalyst.check import run as check_run
@@ -166,6 +167,14 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     assert "nothing to adopt" in capsys.readouterr().out
 
 
+def test_adopt_prints_the_entry_it_wrote(proj, capsys):
+    sha = manual_commit(proj)
+    assert main(["journal", "adopt", sha[:10], "--intent", "hand-written greeting", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out)
+    assert entry["commit"] == sha and entry["origin"] == "manual"
+    assert schema_check.problems(entry, schema_check.load("journal-entry")) == []
+
+
 def test_adopt_keeps_an_unregistered_author_and_asks_a_fix_for_its_artifact(proj):
     """BUG-000017: an author who is no registered user is recorded as git
     gives them; a fix or feature adopted names its artifact, as on append."""
@@ -229,6 +238,7 @@ def test_unrecorded_command_and_report(proj, capsys):
     assert main(["unrecorded", "--json"]) == 0
     listed = json.loads(capsys.readouterr().out)
     assert listed[0]["commit"] == sha and listed[0]["files"][0]["path"] == "src/app.py"
+    assert schema_check.problems(listed, schema_check.load("unrecorded")) == []
     from catalyst.report import build, render
 
     r = build(load(proj))

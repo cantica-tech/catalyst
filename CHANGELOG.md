@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.101.0 — 2026-10-20
+
+Every `--json` command described (R4.4 phase 2 completed). No layout change, no migration.
+
+- Added: a schema in `spec/` for each of the 20 `--json` commands that had none: `unrecorded`,
+  `journal append|adopt|redact`, `repair derived`, `approve`, `sync plan|apply`, `module list|install|upgrade|verify`,
+  `where`, `agent status`, `runtime status`, `workspace status`, `propose`, `open`, `share info|push`. Each command's
+  test checks its real output against its schema. All 56 `--json` commands are now described, and the ratchet that
+  listed the gaps is empty: a new `--json` command ships with its schema.
+- Fixed: `catalyst share push --json` printed a plain sentence when there was nothing to publish; it now prints the
+  push result with `commits` 0 (BUG-000024).
+
 ## 0.100.1 — 2026-10-20
 
 A fix. No layout change, no migration.

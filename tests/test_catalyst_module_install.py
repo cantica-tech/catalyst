@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 from catalyst import modules
 from catalyst.__main__ import main
 from catalyst.check import run as run_checks
@@ -87,8 +88,11 @@ def test_init_still_refuses_to_choose_a_module(tmp_path, capsys):
 
 def test_install_from_a_directory_seeds_the_module_as_init_does(tmp_path, capsys):
     project, module = _bare(tmp_path / "later")
-    assert _install(project, module) == 0
-    assert "installed module example-process 0.2.0" in capsys.readouterr().out
+    assert _install(project, module, "--json") == 0
+    done = json.loads(capsys.readouterr().out)
+    assert (done["id"], done["version"]) == ("example-process", "0.2.0") and schema_check.problems(
+        done, schema_check.load("module-install")
+    ) == []
     dep = load(project)
     assert dep.module is not None and dep.module.id == "example-process"
     assert run_checks(dep).errors == []
@@ -182,7 +186,9 @@ def test_upgrade_goes_through_sync(tmp_path, capsys):
     assert main([*args, str(newer), "--kernel", str(kernel), "--plan"]) == 0
     assert "module 0.2.0 -> 0.3.0" in capsys.readouterr().out and _files(root, skip=(".git",)) == before
 
-    assert main([*args, str(newer), "--kernel", str(kernel)]) == 0
+    assert main([*args, str(newer), "--kernel", str(kernel), "--json"]) == 0
+    applied = json.loads(capsys.readouterr().out)
+    assert applied["to_module"] == "0.3.0" and schema_check.problems(applied, schema_check.load("sync-apply")) == []
     (entry,) = modules.read_record(root)
     assert entry["version"] == "0.3.0" and (root / "modules" / "example-process" / "guidance.md").is_file()
     assert [f.state for f in modules.verify(root)] == ["ok"]
@@ -194,7 +200,8 @@ def test_sync_takes_a_git_repository_for_the_module(tmp_path, capsys):
     bare, head = _repository(tmp_path, tmp_path / "example-process")
     kernel = _release(tmp_path, deployed)
     args = ["--project", str(project), "sync", "apply", "--kernel", str(kernel), "--base-kernel", str(kernel)]
-    assert main([*args, "--module", f"{bare}@v1"]) == 0
+    assert main([*args, "--module", f"{bare}@v1", "--json"]) == 0
+    assert schema_check.problems(json.loads(capsys.readouterr().out), schema_check.load("sync-apply")) == []
     (entry,) = modules.read_record(project / ".criterion")
     assert entry["commit"] == head and entry["source"] == "example-process"
     assert main([*args, "--module", f"{bare}@nope"]) == 1

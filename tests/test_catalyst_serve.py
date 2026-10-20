@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 import test_catalyst_criterion as shared
 from catalyst import journal as j, move, serve, store
 from catalyst.__main__ import main
@@ -135,7 +136,9 @@ def test_a_conflict_is_refused_with_nothing_applied_and_stops_the_pull(machines,
     from catalyst.store import ShareError
 
     _edit(machines("bob"), "bob", "\nBob's note\n")
-    assert main(["share", "push", "-m", "note", "--as", "bob", "--yes"]) == 0
+    assert main(["share", "push", "-m", "note", "--as", "bob", "--yes", "--json"]) == 0
+    pushed = json.loads(capsys.readouterr().out)
+    assert pushed["seq"] and schema_check.problems(pushed, schema_check.load("share-push")) == []
     ada = machines("ada")
     _edit(ada, "ada", "\nAda's note\n")
     head = _app(server).head()
