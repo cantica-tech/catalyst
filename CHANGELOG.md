@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.102.1 — 2026-10-20
+
+A fix and a wording change. No layout change, no migration.
+
+- Fixed: `spec/try.schema.json` typed `try`'s `impact` only as an object; it now carries the impact schema, kept equal
+  to `spec/impact.schema.json` by a test (BUG-000027).
+- Changed: the messages for a legacy deployment (`open`, `unrecorded`, `runtime`, `move --name`, sharing through a
+  server) point to `catalyst migrate --apply`, which moves it to the home store and catches it up in one step.
+
 ## 0.102.0 — 2026-10-20
 
 `catalyst migrate` (R3.4, built on the owner's decision). No layout change, no migration.
