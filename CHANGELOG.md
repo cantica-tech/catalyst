@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.101.1 — 2026-10-20
+
+A fix. No layout change, no migration.
+
+- Fixed: `spec/approvals.schema.json` described a gate's `covers` only as an object; it now gives the two shapes
+  `IAM/gates.json` allows, so a malformed one is refused. `spec/analysis.schema.json` names a dropped finding's
+  `source` and `reason` (BUG-000025).
+
 ## 0.101.0 — 2026-10-20
 
 Every `--json` command described (R4.4 phase 2 completed). No layout change, no migration.

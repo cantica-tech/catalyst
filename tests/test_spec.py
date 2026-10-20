@@ -96,6 +96,16 @@ def test_the_payloads_cover_what_their_schemas_describe(project, capsys):
         ("validate", {"ok": True, "findings": [{"level": "fatal", "code": "x", "where": "y", "message": "z"}]}),
         ("journal-verify", {"ok": True, "issues": [{"level": "error", "code": "chain", "at": "j:1", "message": "m"}]}),
         ("report", {"entries": -1}),
+        (
+            "approvals",
+            {
+                "id": "X",
+                "version": "v",
+                "gates": [
+                    {"gate": "g", "role": "r", "approvals": 1, "covers": {"domain": "X"}, "counted": [], "missing": 0}
+                ],
+            },
+        ),
     ],
 )
 def test_a_wrong_payload_is_refused(schema, wrong):
