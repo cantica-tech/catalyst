@@ -106,6 +106,8 @@ When the command `/sync-framework [latest|<version>] [--force <scope>]` is enter
 mechanical items below (3, 4's retired command files and hooks, 6, 7's definitions, CLI and
 version, 8's journal entry); what remains is the confirmation (2), each
 migration's judgment steps, `DEPLOYMENT.md` and the four-eyes verification.
+`catalyst migrate` lists those judgment steps and, with `--apply`, adds the
+template versions the migrations ask for (`CLI.md`).
 
 1. Check the framework repository on the `release` branch for the latest
    version and changes.

@@ -93,15 +93,21 @@ def _latest_definition(type_dir: Path) -> Path | None:
     return max(versioned)[1] if versioned else None
 
 
+def seeded_text(src: Path, params: compose.Params | None) -> str:
+    """A template as a deployment holds it: its "copy this file to ..."
+    notice dropped and its instantiation placeholders resolved, so it reads
+    as the project's own (`catalyst migrate` compares with it)."""
+    text = src.read_text(encoding="utf-8")
+    if src.suffix != ".md" or params is None:
+        return text
+    return compose.sign_meta_ids(compose.resolve(compose.strip_notice(text), params), params.userid)
+
+
 def _seed_template(src: Path, dest: Path, params: compose.Params | None) -> None:
-    """Copy a template, dropping its "copy this file to ..." notice and
-    resolving the instantiation placeholders, so the deployed copy reads as
-    this project's own."""
     if src.suffix != ".md" or params is None:
         shutil.copyfile(src, dest)
         return
-    text = compose.resolve(compose.strip_notice(src.read_text(encoding="utf-8")), params)
-    dest.write_text(compose.sign_meta_ids(text, params.userid), encoding="utf-8")
+    dest.write_text(seeded_text(src, params), encoding="utf-8")
 
 
 PARAMS: compose.Params | None = None  # set by _install for _type_folder
@@ -152,6 +158,18 @@ def type_rel(etd) -> str:
     return f"{etd.location}/{etd.folder}" if etd.location else etd.folder
 
 
+def type_templates(tree: Path, manifest, etd) -> tuple[str, Path | None, Path | None]:
+    """A module type's template name (`TEMPLATE-<name>-vN`), its item
+    template and its index template in the module's tree."""
+    srcs = [tree / t.template_path for t in manifest.templates if t.entity_type == etd.id_prefix]
+    # with two templates, the index one is named after the folder
+    # (<folder>.template.md); a single template is the item's, unless
+    # the type is generated (v3): then it can only be the index's
+    index_src = next((t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None)
+    item = next((t for t in srcs if t is not index_src), None)
+    return re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-"), item, index_src
+
+
 def scaffold_type(root: Path, tree: Path, manifest, etd, stamp: str) -> None:
     """One module type's folder: its templates (the module's, or the
     generated one of a v3 type), their catalog and README, its index and its
@@ -159,14 +177,8 @@ def scaffold_type(root: Path, tree: Path, manifest, etd, stamp: str) -> None:
     a type the deployment has no folder for yet."""
     from catalyst import generate
 
-    prefix = etd.id_prefix
-    rel = type_rel(etd)
-    srcs = [tree / t.template_path for t in manifest.templates if t.entity_type == prefix]
-    # with two templates, the index one is named after the folder
-    # (<folder>.template.md); a single template is the item's, unless
-    # the type is generated (v3): then it can only be the index's
-    index_src = next((t for t in srcs if (len(srcs) > 1 or etd.generated) and t.name.split(".")[0] == etd.folder), None)
-    item = next((t for t in srcs if t is not index_src), None)
+    prefix, rel = etd.id_prefix, type_rel(etd)
+    type_name, item, index_src = type_templates(tree, manifest, etd)
     index_text = (
         ""
         if etd.naming == "free-form"
@@ -176,7 +188,6 @@ def scaffold_type(root: Path, tree: Path, manifest, etd, stamp: str) -> None:
             else f"# {etd.plural_name} index\n\n| ID | Title | Status |\n|---|---|---|\n"
         )
     )
-    type_name = re.sub(r"[^A-Z0-9]+", "-", etd.name.upper()).strip("-")
 
     _type_folder(
         root,

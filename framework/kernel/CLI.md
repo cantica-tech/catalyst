@@ -163,6 +163,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
 | `catalyst runtime status` | runtimes, launcher and the criterion's runtime version | `--json` |
 | `catalyst move` | move a legacy deployment into $HOME/.catalyst, or rename a project | `--as`, `--name`, `--no-runtime`, `--to-home` |
+| `catalyst migrate` | what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part | `--apply`, `--as`, `--intent`, `--json`, `--kernel`, `--no-runtime`, `--since`, `--template` |
 | `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--git-username`, `--kernel`, `--user` |
 | `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
 | `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
@@ -764,6 +765,26 @@ entries win on a clash. `catalyst where` names the workspace.
 - `--name <new>` renames a home-store project: its criterion directory and
   `project_name` in `catalyst.toml`.
 
+### `catalyst migrate [--apply] [--template <TYPE>] [--since <version>] [--kernel <dir|zip>] [--json]`
+
+What the deployment is behind on, and the mechanical part of catching up (R3.4). Without `--apply` it writes
+nothing and lists, in order:
+
+- `layout`: a legacy deployment (a `*.catalyst` pointer, a `.criterion` in the project, a symlink or a submodule),
+  moved to the home store as `move --to-home` does.
+- `template`: each templates folder that does not hold the template the kernel or its module ships today, to be
+  added as its next version (`TEMPLATE-<T>-v<N+1>`, with a catalog row). A copy the deployment already holds, as any
+  version and even copied raw, counts as held, so a team's own later version stays the latest. The kernel's are
+  taken by `--apply` (its migrations require them where templates are kept); a module's are optional, as its
+  migrations say, and taken only with `--template <prefix or name>` (repeatable, or `all`).
+- `judgment`: each step the migrations since the kernel before the last sync (or `--since <version>`) leave to a
+  person, with its qualifier ("optional", "only if the owner asks") and its migration. Never taken.
+
+`--apply` takes the layout and the kernel's template steps, and the module templates asked for, journaled as one
+`catalyst migrate` entry; a second run finds nothing more to add. `--kernel` is a catalyst checkout's
+`framework/kernel` or a kernel release (directory or zip); from a checkout it defaults to the checkout's own. Without
+one, the kernel's templates and migrations are not compared.
+
 ### `catalyst sync plan|apply --kernel <dir|zip> [--module <dir|zip|git-url>]`
 
 The mechanical half of `/sync-framework`. `--kernel` is a catalyst
@@ -789,7 +810,8 @@ the deployed version; `--base-kernel` names it otherwise.
   but that was edited locally, or a kernel document edited locally, is reported, never removed or overwritten; a recompose conflict stops
   the sync before anything is written; a file no release ships is never
   touched.
-  The migrations' judgment steps stay with the agent. A criterion with its
+  The migrations' judgment steps stay with the agent; `catalyst migrate` lists
+  them and adds the template versions they ask for. A criterion with its
   own runtime (`.venv`) has it brought to the vendored CLI, so the launcher
   and the hooks run the version just deployed.
 - Both refuse a module that needs a kernel newer than the one the shared
@@ -1759,6 +1781,7 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst agent run` | `spec/run-event.schema.json` |
 | `catalyst agent runs` | `spec/runs.schema.json` |
 | `catalyst runtime status` | `spec/runtime-status.schema.json` |
+| `catalyst migrate` | `spec/migrate.schema.json` |
 | `catalyst workspace status` | `spec/workspace-status.schema.json` |
 | `catalyst analysis status` | `spec/analysis.schema.json` |
 | `catalyst analysis list` | `spec/analyses.schema.json` |
@@ -2027,6 +2050,14 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--name` `NAME` | rename a home-store project |
 |  | `--no-runtime` | do not fill the criterion's .venv now |
 |  | `--as` `AS_USER` | actor recorded in the journal |
+| `catalyst migrate` | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout, or a kernel release (dir or zip) |
+|  | `--apply` | move a legacy layout and add the templates, journaled |
+|  | `--template` `TYPE` | with --apply: also add this module type's new template (its prefix or template name, or `all`) (repeatable) |
+|  | `--since` `VERSION` | list the judgment steps of every migration after this kernel |
+|  | `--no-runtime` | when moving: do not fill the criterion's .venv now |
+|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--intent` `INTENT` | why (repeatable; journaled) |
+|  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst workspace init` | `<file>` | the <name>.code-workspace file |
 |  | `--user` `USER` | the first user, Admin (default: git config user.name) |
 |  | `--git-username` `GIT_USERNAME` | the first user's git username (default: their name) |

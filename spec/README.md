@@ -52,6 +52,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `open.schema.json` | `catalyst open --json` | — |
 | `share-info.schema.json` | `catalyst share info --json` | — |
 | `share-push.schema.json` | `catalyst share push --yes --json` | — |
+| `migrate.schema.json` | `catalyst migrate [--apply] --json` | — |
 
 The schemas of a module's own files are with the kernel
 (`framework/kernel/schemas/`), with the schema of a deployment's approval

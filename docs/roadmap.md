@@ -51,7 +51,7 @@ exactly that.
 | R3.1, R3.1a, R3.2, R3.3, R3.5, R3.6 | done | `where`, `runtime`, `share`, journal shards, `open` |
 | R3.1b workspace criterion | done (audited 2026-10-19) | `workspace init\|status` and tests; the audit found roles not inherited and a proposal on an inherited rule crashing, both fixed in 0.92.0 (BUG-000021); rules, domains and users were inherited as documented |
 | R3.1c agent adapters at user level | done | `catalyst mcp`; `agent install` for claude-code, copilot, vscode, cursor, codex, gemini |
-| R3.4 legacy deployments | decided; window built | `move --to-home` exists; `catalyst migrate` was not built (optional); 0.94.0 warns about a legacy deployment and makes it read-only at format 1.0 (REQ-000073) |
+| R3.4 legacy deployments | done (the owner decided 2026-10-20 to build `catalyst migrate`; 0.102.0) | `catalyst migrate` lists what a deployment is behind on (a legacy layout, the templates its migrations add, their judgment steps) and `--apply` moves the layout and adds the kernel's templates, a module's on request (design G-43's executable migrations, for their mechanical part); `move --to-home` stays; 0.94.0 warns about a legacy deployment and makes it read-only at format 1.0 (REQ-000073) |
 | R3.7 pinned CLI hash | done | `bin/catalyst.pyz.sha256`, verified by the gate |
 | R3.7 redaction tombstones | done | A5 decided 2026-10-14; 0.67.0 (REQ-000036): `catalyst journal redact`; purging git history stays the owner's |
 | R3.8 Python consolidation | done, but `catalyst dev` | 0.65.2 (HK-000001): one git runner, no PyYAML, `stop_hook.py` gone; repo-only checks under `catalyst dev` and the plugin scripts left out |
