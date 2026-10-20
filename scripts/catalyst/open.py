@@ -124,7 +124,10 @@ def open_project(project: Path, act: bool = True, fetch: bool = False, agent: st
         criterion, o.kind, o.criterion = home, "home", str(home)
         o.done.append(f"joined: cloned {url} into {home}")
     if o.kind == "legacy":
-        o.todo.append("`catalyst move --to-home` (this deployment keeps its criterion in the project)")
+        o.todo.append(
+            "`catalyst migrate --apply` (this deployment keeps its criterion in the project: it moves to the home "
+            "store, and catches up)"
+        )
         return o
 
     if criterion is None:  # unreachable: missing was joined or returned above

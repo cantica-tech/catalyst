@@ -1327,7 +1327,7 @@ def create(dep, url: str, signer: dict) -> list[str]:
 
     toml = project_file.find(dep.project_root)
     if toml is None or toml.name != project_file.NAME:
-        raise ShareError("sharing through a server needs a catalyst.toml (`catalyst move --to-home` first)")
+        raise ShareError("sharing through a server needs a catalyst.toml (`catalyst migrate --apply` first)")
     data = project_file.read(toml)
     data.update({"share": "serve", "share_url": _norm(url)})
     project_file.write(toml, data)

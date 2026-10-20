@@ -145,3 +145,11 @@ def test_every_json_command_is_described():
     import gen_docs
 
     assert gen_docs.json_drift() == [] and set() == gen_docs.UNDESCRIBED
+
+
+def test_try_carries_the_impact_schema_unchanged():
+    """`try`'s `impact` is `catalyst impact --json`: a copy in its `$defs`, since a schema refers only within itself."""
+    impact, tried = schema_check.load("impact"), schema_check.load("try")
+    body = {k: v for k, v in impact.items() if k not in ("$schema", "$id", "title", "$defs")}
+    assert tried["$defs"]["impact"] == body
+    assert tried["$defs"]["reached"] == impact["$defs"]["reached"]
