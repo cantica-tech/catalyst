@@ -314,6 +314,53 @@ def etd_workflow() -> str:
     return _schema_table(_kernel_schema("entity-type-definition")["properties"]["workflow"])
 
 
+def migrations() -> str:
+    """The kernel's migrations, from `framework/kernel/migrations/migrations.md` (R4.4 phase 4)."""
+    index = (KERNEL / "migrations" / "migrations.md").read_text(encoding="utf-8")
+    rows = re.findall(r"^\| \[`([^`]+)`\]\(([^)]*)\) \| `([^`]+)` \| `([^`]+)` \| (.*) \|$", index, re.M)
+    lines = ["| From | To | Migration | What it migrates |", "|---|---|---|---|"]
+    lines += [f"| `{frm}` | `{to}` | [`{name}`](migrations/{link}) | {what} |" for name, link, frm, to, what in rows]
+    return "\n".join(lines)
+
+
+def _commands() -> set[str]:
+    """Every command path the CLI has, leaves and groups, without `catalyst`: `check`, `user remove`, `share`."""
+    paths: set[str] = set()
+
+    def walk(parser: argparse.ArgumentParser, prefix: str) -> None:
+        for action in parser._actions:
+            if isinstance(action, argparse._SubParsersAction):
+                for name, sub in action.choices.items():
+                    path = f"{prefix} {name}".strip()
+                    paths.add(path)
+                    walk(sub, path)
+
+    walk(_parser(), "")
+    return paths
+
+
+def invariant_drift() -> list[str]:
+    """R4.4 phase 5: INVARIANTS.md's "enforced by" cells name only commands the CLI has and scripts that exist, and
+    every `INV-n` the code cites is an invariant INVARIANTS.md defines."""
+    text = (KERNEL / "INVARIANTS.md").read_text(encoding="utf-8")
+    commands, problems = _commands(), []
+    scripts = Path(__file__).resolve().parent
+    for row in re.findall(r"^\| (INV-[^|]+) \| [^|]* \| ([^|]*) \|$", text, re.M):
+        for named in re.findall(r"`([^`]+)`", row[1]):
+            name = named.removeprefix("catalyst ").strip()
+            if name.endswith(".py"):
+                if not (scripts / name).is_file():
+                    problems.append(f"{row[0].split()[0]} names {named}, which is no script")
+            elif re.fullmatch(r"[a-z][a-z -]*", name) and name not in commands:
+                problems.append(f"{row[0].split()[0]} names `{named}`, which is no command")
+    defined = set(re.findall(r"^- \*\*(INV-\d+)\b", text, re.M))
+    for path in [*(scripts / "catalyst").glob("*.py"), *scripts.glob("*.py")]:
+        for inv in set(re.findall(r"\bINV-(\d+)\b", path.read_text(encoding="utf-8"))):
+            if f"INV-{inv}" not in defined:
+                problems.append(f"{path.name} cites INV-{inv}, which INVARIANTS.md does not define")
+    return sorted(set(problems))
+
+
 def kernel_types() -> str:
     from module_loader import load_kernel_entities
 
@@ -337,6 +384,7 @@ SECTIONS: dict[str, tuple[Path, Callable[[], str]]] = {
     "cli-options": (KERNEL / "CLI.md", cli_options),
     "cli-json": (KERNEL / "CLI.md", cli_json),
     "project-keys": (KERNEL / "FORMAT.md", project_keys),
+    "migrations": (KERNEL / "SYNCHRONIZE.md", migrations),
     "manifest-fields": (KERNEL / "MODULE-SPECIFICATION.md", manifest_fields),
     "etd-fields": (KERNEL / "MODULE-SPECIFICATION.md", etd_fields),
     "etd-field-definitions": (KERNEL / "MODULE-SPECIFICATION.md", etd_field_definitions),
@@ -369,6 +417,10 @@ def main(argv: list[str] | None = None) -> int:
     unregistered = key_drift()
     if unregistered:
         print("the code reads project-file keys project_file.KEYS does not list: " + ", ".join(unregistered))
+        return 1
+    unenforced = invariant_drift()
+    if unenforced:
+        print("invariants: " + "; ".join(unenforced))
         return 1
     unschema = json_drift()
     if unschema:
