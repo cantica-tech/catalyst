@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.100.0 — 2026-10-20
+
+The kernel's reference generated from the code, phases 4 and 5 (D7, R4.4 done). No layout change, no migration.
+
+- `SYNCHRONIZE.md`'s migrations are a table generated from `migrations/migrations.md`: the hand-written list stopped
+  at 0.51.x and missed six later migrations (REQ-000080).
+- `gen_docs.py --check` fails when `INVARIANTS.md`'s "enforced by" names a command the CLI lacks or a script that does
+  not exist, or when the code cites an invariant `INVARIANTS.md` does not define.
+
 ## 0.99.0 — 2026-10-20
 
 The kernel's reference generated from the code, phase 3 (D7, R4.4). No layout change, no migration.
