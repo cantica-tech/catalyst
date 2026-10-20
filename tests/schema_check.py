@@ -35,9 +35,13 @@ def problems(value, schema: dict, root: dict | None = None, at: str = "$") -> li
     root = root or schema
     if "$ref" in schema:
         return problems(value, root["$defs"][schema["$ref"].rsplit("/", 1)[1]], root, at)
-    if "anyOf" in schema:
+    if "anyOf" in schema:  # checked with the schema's other keywords, as JSON Schema does
         tries = [problems(value, option, root, at) for option in schema["anyOf"]]
-        return [] if any(not t for t in tries) else [f"{at}: matches none of anyOf ({min(tries, key=len)[0]})"]
+        if not any(not t for t in tries):
+            return [f"{at}: matches none of anyOf ({min(tries, key=len)[0]})"]
+        if len(schema) == 1:
+            return []
+        schema = {k: v for k, v in schema.items() if k != "anyOf"}
     kinds = schema.get("type")
     if kinds and not any(_is(value, k) for k in ([kinds] if isinstance(kinds, str) else kinds)):
         return [f"{at}: {type(value).__name__} is not {kinds}"]

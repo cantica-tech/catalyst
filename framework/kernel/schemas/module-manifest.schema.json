@@ -9,31 +9,87 @@
     "name",
     "version",
     "description",
-    "grounding_type",
-    "entity_types"
+    "grounding_type"
   ],
   "properties": {
     "id": {
       "type": "string",
       "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-      "description": "Unique lowercase hyphenated module identifier."
+      "description": "Unique module identifier, lowercase and hyphen-separated."
     },
     "name": {
       "type": "string",
-      "description": "Human-readable module name."
+      "description": "Human-readable name."
     },
     "version": {
       "type": "string",
       "pattern": "^\\d+\\.\\d+\\.\\d+$",
-      "description": "SemVer format version string."
+      "description": "SemVer version."
     },
     "description": {
       "type": "string",
-      "description": "Concise summary of module domain and capabilities."
+      "description": "One-line summary of the process domain."
     },
     "grounding_type": {
       "type": "string",
-      "description": "Primary grounding artifact type (e.g. rule, policy)."
+      "description": "The kernel entity the module's artifacts ground to (for example `rule`)."
+    },
+    "kernel_version": {
+      "type": "string",
+      "description": "The kernel versions the module works with, as a version specifier (for example `>=0.42.0`, `>=0.52,<1.0`). A release's manifest states it as `kernelVersion`; without it, the kernel that packages the release is assumed. Enforced: `catalyst init` and `catalyst sync` refuse a kernel outside it, and `catalyst check` reports a deployment outside it."
+    },
+    "format": {
+      "type": "integer",
+      "enum": [
+        3
+      ],
+      "description": "`3` for a module that declares its types in this file (§3.3); absent, the v2 layout of §2. The kernel reads both until 1.0."
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9]*$",
+      "description": "The module's own meta-rule and invariant namespace (`SE`): its meta-rules are `rr-<NS>-NNN`, its invariants `INV-<NS>-n` (ADR-019). Composition widens and signs them like `rr-META-`."
+    },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Old ID → the ID it is now (`rr-META-009: rr-SE-001`). An old ID, short or widened and signed, keeps resolving: `validate` and `view` take it as the rule it now is, and `catalyst why <old>` explains the new one."
+    },
+    "tiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "artifact"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The tier's name, e.g. `chore`."
+          },
+          "artifact": {
+            "type": "string",
+            "description": "The entity type the tier opens, or `none`."
+          },
+          "commit": {
+            "type": "string",
+            "description": "For a tier with no artifact: the commit-subject prefix that marks it, e.g. `chore:`."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`."
+    },
+    "entities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      },
+      "description": "Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, sections and definition. Required unless the module lists `entity_types`.",
+      "x-required": "Conditional"
     },
     "entity_types": {
       "type": "array",
@@ -56,7 +112,9 @@
         },
         "additionalProperties": false
       },
-      "minItems": 1
+      "minItems": 1,
+      "description": "The module's ETD files (`id`, `schema`). Format 2; required unless the module declares `entities` (format 3).",
+      "x-required": "Conditional"
     },
     "commands": {
       "type": "array",
@@ -85,28 +143,8 @@
           }
         },
         "additionalProperties": false
-      }
-    },
-    "skills": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "name",
-          "spec_path"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Name of exported agent skill."
-          },
-          "spec_path": {
-            "type": "string",
-            "description": "Path to skill definition SKILL.md file relative to module root."
-          }
-        },
-        "additionalProperties": false
-      }
+      },
+      "description": "Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused."
     },
     "templates": {
       "type": "array",
@@ -127,11 +165,12 @@
           }
         },
         "additionalProperties": false
-      }
+      },
+      "description": "Document templates (`entity_type`, `template_path`)."
     },
     "definitions": {
       "type": "array",
-      "description": "Versioned prose definitions the module contributes (MODULE-SPECIFICATION \u00a76.3).",
+      "description": "Entity definitions (`entity_type`, `path`).",
       "items": {
         "type": "object",
         "required": [
@@ -151,36 +190,9 @@
         "additionalProperties": false
       }
     },
-    "contributions": {
-      "type": "object",
-      "description": "Content composed into a deployment (MODULE-SPECIFICATION \u00a76).",
-      "properties": {
-        "rules_of_rules": {
-          "type": "string",
-          "description": "Module meta-rules appended to the deployed Rules-of-Rules.md (\u00a76.1)."
-        },
-        "code_of_conduct": {
-          "type": "string",
-          "description": "Module document types and commands inserted into CODE-OF-CONDUCT \u00a73/\u00a74 (\u00a76.2)."
-        },
-        "invariants": {
-          "type": "string",
-          "description": "Module invariants read with the kernel INVARIANTS.md (\u00a76.4)."
-        },
-        "taskfile": {
-          "type": "string",
-          "description": "Module tasks appended to the deployed Taskfile.common.yml (\u00a76.5)."
-        },
-        "migrations": {
-          "type": "string",
-          "description": "Folder holding the module's migrations and migrations.md index (\u00a76.6)."
-        }
-      },
-      "additionalProperties": false
-    },
     "required_paths": {
       "type": "array",
-      "description": "Paths every deployment of this module must carry, checked by check_deployment.py.",
+      "description": "Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`.",
       "items": {
         "type": "object",
         "required": [
@@ -202,7 +214,68 @@
         },
         "additionalProperties": false
       }
+    },
+    "contributions": {
+      "type": "object",
+      "description": "Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `taskfile`, `migrations`.",
+      "properties": {
+        "rules_of_rules": {
+          "type": "string",
+          "description": "Module meta-rules appended to the deployed Rules-of-Rules.md (§6.1)."
+        },
+        "code_of_conduct": {
+          "type": "string",
+          "description": "Module document types and commands inserted into CODE-OF-CONDUCT §3/§4 (§6.2)."
+        },
+        "invariants": {
+          "type": "string",
+          "description": "Module invariants read with the kernel INVARIANTS.md (§6.4)."
+        },
+        "taskfile": {
+          "type": "string",
+          "description": "Module tasks appended to the deployed Taskfile.common.yml (§6.5)."
+        },
+        "migrations": {
+          "type": "string",
+          "description": "Folder holding the module's migrations and migrations.md index (§6.6)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "spec_path"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of exported agent skill."
+          },
+          "spec_path": {
+            "type": "string",
+            "description": "Path to skill definition SKILL.md file relative to module root."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Agent skills (`name`, `spec_path`)."
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "entity_types"
+      ]
+    },
+    {
+      "required": [
+        "entities"
+      ]
+    }
+  ]
 }

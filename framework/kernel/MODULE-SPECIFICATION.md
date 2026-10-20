@@ -66,6 +66,8 @@ catalyst-<module-id>/
 
 ### 3.1 Field reference
 
+<!-- generated: manifest-fields (scripts/gen_docs.py; do not edit by hand) -->
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | `string` | Yes | Unique module identifier, lowercase and hyphen-separated. |
@@ -78,13 +80,16 @@ catalyst-<module-id>/
 | `namespace` | `string` | No | The module's own meta-rule and invariant namespace (`SE`): its meta-rules are `rr-<NS>-NNN`, its invariants `INV-<NS>-n` (ADR-019). Composition widens and signs them like `rr-META-`. |
 | `aliases` | `map` | No | Old ID → the ID it is now (`rr-META-009: rr-SE-001`). An old ID, short or widened and signed, keeps resolving: `validate` and `view` take it as the rule it now is, and `catalyst why <old>` explains the new one. |
 | `tiers` | `list[object]` | No | The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`. |
-| `entity_types` | `list[object]` | Yes | The module's ETD files (`id`, `schema`). |
+| `entities` | `map` | Conditional | Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, sections and definition. Required unless the module lists `entity_types`. |
+| `entity_types` | `list[object]` | Conditional | The module's ETD files (`id`, `schema`). Format 2; required unless the module declares `entities` (format 3). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
 | `definitions` | `list[object]` | No | Entity definitions (`entity_type`, `path`). |
 | `required_paths` | `list[object]` | No | Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`. |
 | `contributions` | `object` | No | Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `taskfile`, `migrations`. |
 | `skills` | `list[object]` | No | Agent skills (`name`, `spec_path`). |
+
+<!-- end generated: manifest-fields -->
 
 ### 3.2 Manifest example
 
@@ -162,20 +167,26 @@ format and live in `framework/kernel/entities/`.
 
 ### 4.1 Field reference
 
+<!-- generated: etd-fields (scripts/gen_docs.py; do not edit by hand) -->
+
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id_prefix` | `string` | Yes | Uppercase ID prefix. |
 | `name` | `string` | Yes | Singular name. |
 | `plural_name` | `string` | Yes | Plural name. |
 | `folder` | `string` | Yes | The type's folder name. |
-| `location` | `string` | No | Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first. |
-| `naming` | `string` | No | `id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7). |
 | `grounding` | `string` | Yes | `required` (links directly to the grounding type), `inherited` (through a parent entity), or `none`. |
 | `grounding_field` | `string` | Conditional | Field holding the grounding link; required unless `grounding` is `none`. |
 | `fields` | `list[object]` | Yes | Ordered field definitions. |
 | `workflow` | `object` | Yes | Lifecycle states and transitions. |
+| `naming` | `string` | No | `id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7). |
+| `location` | `string` | No | Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first. |
+
+<!-- end generated: etd-fields -->
 
 ### 4.2 Field definitions (`fields[]`)
+
+<!-- generated: etd-field-definitions (scripts/gen_docs.py; do not edit by hand) -->
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -184,22 +195,29 @@ format and live in `framework/kernel/entities/`.
 | `required` | `boolean` | Yes | Whether every instance must carry it. |
 | `allowed_values` | `list[string]` | Conditional | Values for `enum`. |
 | `target_type` | `string` | Conditional | Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`. |
-| `backref` | `string` | Optional | The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand. |
-| `required_when_closed` | `boolean` | Optional | For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`. |
+| `backref` | `string` | No | The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand. |
+| `required_when_closed` | `boolean` | No | For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`. |
+| `hint` | `string` | No | What the item template's cell tells the artifact's author, in place of the kind's placeholder (format 3; `catalyst new` writes an optional field it is not given as `*(none yet)*`). |
+
+<!-- end generated: etd-field-definitions -->
 
 ### 4.3 Workflow (`workflow`)
+
+<!-- generated: etd-workflow (scripts/gen_docs.py; do not edit by hand) -->
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `initial` | `string` | Yes | Status on creation. |
 | `states` | `list[string]` | Yes | All valid statuses. |
 | `closed_states` | `list[string]` | Yes | Statuses meaning done. |
-| `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
 | `guards` | `map` | No | State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one. |
+| `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
 
-The machine-readable form of this schema is
-`schemas/entity-type-definition.schema.json`; it carries `location` and
-the per-field `required_when_closed`.
+<!-- end generated: etd-workflow -->
+
+These tables are generated from `schemas/entity-type-definition.schema.json`
+(and §3.1's from `schemas/module-manifest.schema.json`), the schemas the
+modules are checked against: what they say is what is validated (R4.4).
 
 ### 4.4 ETD example (`schemas/item.yaml`)
 
