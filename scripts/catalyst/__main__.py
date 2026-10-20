@@ -1109,6 +1109,78 @@ def cmd_move(args) -> int:
     return 0
 
 
+def cmd_migrate(args) -> int:
+    """`migrate [--apply]` (R3.4, G-43): what this deployment is behind on —
+    a legacy layout, the templates its migrations add, the steps left to a
+    person — and, with --apply, the mechanical part, journaled."""
+    import project_file
+    from catalyst import migrate
+    from module_loader import REPO_ROOT
+
+    start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
+    project = project_file.find_up(start)
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return 1
+    kernel = args.kernel
+    if kernel is None and (REPO_ROOT / "framework" / "kernel" / "rules-of-rules.template.md").is_file():
+        kernel = REPO_ROOT / "framework" / "kernel"
+    try:
+        with migrate.with_kernel(kernel) as kdir:
+            if not args.apply:
+                p = migrate.plan(project, kdir, args.since)
+                done: list[str] = []
+            else:
+                actor = args.as_user
+                criterion = project_file.resolve(project)
+                if criterion is not None and actor is None:
+                    from catalyst.corpus import load_corpus
+                    from catalyst.ids import resolve_signer
+
+                    dep = open_deployment(args)
+                    signer = resolve_signer(dep, load_corpus(dep), None, "sync-framework")
+                    actor = str(signer.get("git_username") or signer.get("name"))
+                p, done = migrate.apply(
+                    project,
+                    kdir,
+                    actor or "",
+                    args.intent or [],
+                    runtime=not args.no_runtime,
+                    templates=set(args.template or []),
+                    since=args.since,
+                )
+    except (migrate.MigrateError, IdError, JournalError, OSError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({**p.as_dict(), "applied": args.apply, "done": done}, indent=2))
+        return 0
+    if kernel is None:
+        print("note: no --kernel, so the kernel's templates and migrations are not compared")
+    if not p.steps:
+        print(f"nothing to migrate: {p.project} is up to date with kernel {p.kernel or '?'}")
+        return 0
+    for s in p.steps:
+        if s.taken:
+            continue
+        mark = "auto" if s.auto else "you "
+        print(f"  {mark}  {s.kind:<9} {s.detail}" + (f"  ({s.source})" if s.source else ""))
+    for d in done:
+        print(f"  done  {d}")
+    left = [s for s in p.steps if not s.auto and not s.taken]
+    if not args.apply and any(s.auto for s in p.steps):
+        print(
+            "Next: `catalyst migrate --apply` takes the auto steps, journaled"
+            + ("; the others are yours." if left else ".")
+        )
+    elif left:
+        print(
+            f"Left to a person: {len(left)} step(s) above"
+            + (f"; judgment from the migrations since kernel {p.since}." if p.since else ".")
+        )
+    return 0
+
+
 def cmd_workspace(args) -> int:
     """`workspace init|status` (R3.1b): a VS Code workspace's meta criterion."""
     from catalyst import workspace as ws
@@ -2626,6 +2698,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
     p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
     p.set_defaults(func=cmd_move)
+
+    p = sub.add_parser(
+        "migrate",
+        help="what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part",
+    )
+    p.add_argument(
+        "--kernel", type=Path, help="framework/kernel of a catalyst checkout, or a kernel release (dir or zip)"
+    )
+    p.add_argument("--apply", action="store_true", help="move a legacy layout and add the templates, journaled")
+    p.add_argument(
+        "--template",
+        action="append",
+        metavar="TYPE",
+        help="with --apply: also add this module type's new template (its prefix or template name, or `all`)",
+    )
+    p.add_argument("--since", metavar="VERSION", help="list the judgment steps of every migration after this kernel")
+    p.add_argument("--no-runtime", action="store_true", help="when moving: do not fill the criterion's .venv now")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--json", action="store_true", help="machine-readable output (JSON on stdout)")
+    p.set_defaults(func=cmd_migrate)
 
     p = sub.add_parser("workspace", help="a VS Code workspace's meta criterion: shared rules, users, roles")
     wss = p.add_subparsers(dest="workspace_command", required=True)

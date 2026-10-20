@@ -200,7 +200,7 @@ closely are the *Drop* and *Park* ones, and the 35 open ones, whose verdict stil
 | PR-43 | Close a resolved case | 01b §3.5 P-43 | kernel CLI | Keep | `/reconcile <id> close` (defined by R0.7) → `catalyst reconcile` (07 §12) | R0.7 (done) | shipped |
 | PR-44 | Install | 01b §3.6 P-44 | kernel CLI | Keep | `catalyst init` (07 §5.2); install simplification (R1.2: user from git config, command dir from the agent, found modules listed) | R0.3 (done), R1.2 (done) | shipped |
 | PR-45 | Project remove / export / import | 01b §3.6 P-45 | kernel CLI | Merge | Merges into `catalyst move` (07 §8, *owner, 2026-10-08*) | R2 W5 | shipped |
-| PR-46 | Pre-pointer migration | 01b §3.6 P-46 | kernel CLI | Park | Until R3.4 decides whether the optional `catalyst migrate` is built | R3.4 | settled |
+| PR-46 | Pre-pointer migration | 01b §3.6 P-46 | kernel CLI | Keep | `catalyst migrate` (0.102.0): a legacy layout moved to the home store, with the migrations' mechanical steps | R3.4 | done |
 | PR-47 | Agent switch | 01b §3.6 P-47 | kernel CLI | Merge | Merges into `catalyst move` + agent-neutral store (07 §8); `catalyst agent switch` only until `move` exists (*owner, 2026-10-08*) | R2 W5, R3.5 | shipped |
 | PR-48 | Share (criterion create/join/push/sync/status/protect) | 01b §3.6 P-48 | kernel CLI | Merge | Merges into store driver `git-remote` + `publish` (07 §12); `protect` becomes a `publish` option, R3.6 required (*owner, 2026-10-08*) | R3.6 | shipped |
 | PR-49 | Merge-conflict handling | 01b §3.6 P-49 | kernel CLI | Keep | RECON + laws L3/L5, no AI merges (07 §7) | R3.6 | shipped |
