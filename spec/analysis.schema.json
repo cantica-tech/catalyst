@@ -148,7 +148,15 @@
       "type": "array",
       "items": {
         "type": "object",
-        "description": "A finding of a pass dropped at reconciliation: its `source` (`A:<id>`, `B:<id>`) and `reason`."
+        "description": "A finding of a pass dropped at reconciliation: its `source` (`A:<id>`, `B:<id>`) and `reason`; one missing is in `problems`.",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
       }
     },
     "items": {
