@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.101.2 — 2026-10-20
+
+A fix. No layout change, no migration.
+
+- Fixed: `spec/analysis.schema.json` named a reconciled finding's fields only in prose; it now describes each field of
+  the findings format (title, statement, evidence, sources, verification, …), all optional (BUG-000026).
+
 ## 0.101.1 — 2026-10-20
 
 A fix. No layout change, no migration.
