@@ -4,6 +4,9 @@ one that disagrees, `catalyst repair derived` rewrites it, journaled."""
 
 from __future__ import annotations
 
+import json
+
+import schema_check
 from catalyst import derived
 from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
@@ -41,3 +44,8 @@ def test_drift_both_ways_and_a_journaled_repair_that_runs_once(tmp_path, monkeyp
     assert entry["tier"] == "chore" and entry["files"][0]["path"].endswith("ITEM-000001-first-item.md")
     assert main(["repair", "derived", "--as", "ada"]) == 0
     assert "every derived field agrees" in capsys.readouterr().out
+    item.write_text(text.replace(f"| **Subs** | `{SUB}` |", "| **Subs** | *(none yet)* |"), encoding="utf-8")
+    assert main(["repair", "derived", "--as", "ada", "--json"]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert printed == [{"id": f"ITEM-000001-{USERID}", "field": "Subs", "added": [SUB], "removed": []}]
+    assert schema_check.problems(printed, schema_check.load("repair-derived")) == []

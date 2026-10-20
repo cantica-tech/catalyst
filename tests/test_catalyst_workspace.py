@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 
 import project_file as pf
+import schema_check
 from catalyst import move, workspace as ws
+from catalyst.__main__ import main
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
 from catalyst.validate import ERROR, validate
@@ -117,3 +119,12 @@ def test_a_member_inherits_the_workspace_roles_and_cannot_propose_an_inherited_r
     assert grace is not None and reconciliation_level(dep, grace) == ("full", "Platform Reviewer")
     with pytest.raises(proposals.ProposalError, match="inherited from the workspace criterion"):
         proposals.propose(dep, corpus, SHARED, "# changed\n", grace)
+
+
+def test_status_prints_the_folders_and_their_projects(tmp_path, capsys):
+    file, _, _ = _workspace(tmp_path)
+    assert main(["workspace", "status", str(file), "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["workspace"] == "platform" and out["criterion"] is None
+    assert [(r["project"], r["member"]) for r in out["folders"]] == [("app", False), ("billing", False), (None, False)]
+    assert schema_check.problems(out, schema_check.load("workspace-status")) == []

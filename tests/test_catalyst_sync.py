@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 from catalyst import sync
 from catalyst.__main__ import main
 from catalyst.deployment import load
@@ -155,6 +156,10 @@ def test_the_cli_plans_without_writing(tmp_path, capsys):
     before = (project / ".criterion" / "version.txt").read_text(encoding="utf-8")
     assert main(["--project", str(project), "sync", "plan", "--kernel", str(new), "--base-kernel", str(base)]) == 0
     assert "Plan: kernel" in capsys.readouterr().out
+    args = ["--project", str(project), "sync", "plan", "--kernel", str(new), "--base-kernel", str(base), "--json"]
+    assert main(args) == 0
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["to_kernel"] == "9.9.9" and schema_check.problems(plan, schema_check.load("sync-plan")) == []
     assert (project / ".criterion" / "version.txt").read_text(encoding="utf-8") == before
     assert main(["--project", str(project), "sync", "plan", "--kernel", str(tmp_path / "nope")]) == 1
 

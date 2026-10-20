@@ -7,6 +7,7 @@ import sys
 import pytest
 
 import project_file as pf
+import schema_check
 from catalyst.corpus import load_corpus
 from catalyst.deployment import load
 from catalyst.validate import ERROR, validate
@@ -80,6 +81,7 @@ def test_where_reports_the_home_store_or_a_legacy_working_copy(tmp_path, capsys)
     assert main(["--project", str(project), "where", "--json"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["kind"] == "legacy" and out["name"] == "app"
+    assert schema_check.problems(out, schema_check.load("where")) == []
     target = pf.home_criterion("app")
     target.parent.mkdir(parents=True)
     shutil.move(str(project / ".criterion"), target)

@@ -62,7 +62,9 @@ def _offer(project, tmp_path, capsys, who="bob", item=ITEM, change=("Text.", "Be
     assert main(["propose", item, "--from", str(src), "--as", who, "--intent", "Clearer", "--json"]) == 0, (
         capsys.readouterr().err
     )
-    return json.loads(capsys.readouterr().out), proposed
+    found = json.loads(capsys.readouterr().out)
+    assert schema_check.problems(found, schema_check.load("propose")) == []
+    return found, proposed
 
 
 def _case(project, case_id):

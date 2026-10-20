@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import schema_check
 from catalyst import agents
 from catalyst.__main__ import main
 
@@ -99,3 +100,12 @@ def test_the_claude_code_plugin_runs_what_the_installer_writes(home):
     assert start.endswith('/.catalyst/bin/catalyst" hook start --quiet')
     session_start = agents.changes("claude-code")[1].value
     assert isinstance(session_start, list) and session_start[0]["hooks"][0]["command"].endswith("hook start --quiet")
+
+
+def test_status_prints_each_agents_parts(home, capsys):
+    agents.run("codex", install=True)
+    assert main(["agent", "status", "--json"]) == 0
+    rows = json.loads(capsys.readouterr().out)
+    assert {r["agent"] for r in rows} == set(agents.AGENTS)
+    assert [r["installed"] for r in rows if r["agent"] == "codex"] == [True]
+    assert schema_check.problems(rows, schema_check.load("agent-status")) == []

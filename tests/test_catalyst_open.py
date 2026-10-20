@@ -7,6 +7,7 @@ import json
 import subprocess
 
 import project_file
+import schema_check
 import test_catalyst_criterion as shared
 from catalyst import move
 from catalyst.__main__ import main
@@ -67,6 +68,7 @@ def test_the_agent_is_this_users_choice_never_a_project_edit(tmp_path, monkeypat
     assert main(["open", "--agent", "codex", "--json"]) in (0, 1)
     report = json.loads(capsys.readouterr().out)
     assert report["agent"] == "codex" and any("agent codex recorded" in d for d in report["done"])
+    assert schema_check.problems(report, schema_check.load("open")) == []
     assert project_file.agent_of(project_file.read_dir(project)) == "codex"
     assert (project / "catalyst.toml").read_text(encoding="utf-8") == before
 

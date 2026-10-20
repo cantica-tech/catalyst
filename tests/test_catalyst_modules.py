@@ -8,6 +8,7 @@ import json
 import shutil
 import subprocess
 
+import schema_check
 from catalyst import modules, sync
 from catalyst.__main__ import main
 from catalyst.check import run as run_checks
@@ -79,6 +80,9 @@ def test_a_module_file_changed_by_hand_fails_verify_and_check(tmp_path, capsys):
     assert finding.state == "changed" and finding.actual != finding.sha256
     assert main(["--project", str(project), "module", "verify", "example-process"]) == 1
     assert "differs from its record" in capsys.readouterr().out
+    assert main(["--project", str(project), "module", "verify", "--json"]) == 1
+    (row,) = json.loads(capsys.readouterr().out)
+    assert row["state"] == "changed" and schema_check.problems([row], schema_check.load("module-list")) == []
     assert any(e.startswith("module: example-process differs") for e in run_checks(load(project)).errors)
     assert main(["--project", str(project), "module", "verify", "nope"]) == 1
 
@@ -143,6 +147,7 @@ def test_module_list_prints_the_record(tmp_path, capsys):
     assert main(["--project", str(project), "module", "list", "--json"]) == 0
     (row,) = json.loads(capsys.readouterr().out)
     assert row["id"] == "example-process" and row["state"] == "ok"
+    assert schema_check.problems([row], schema_check.load("module-list")) == []
 
 
 def test_a_module_in_a_larger_repository_is_recorded_with_its_folder(tmp_path):

@@ -1716,21 +1716,21 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst check` | `spec/check.schema.json` |
 | `catalyst report` | `spec/report.schema.json` |
 | `catalyst audit` | `spec/audit.schema.json` |
-| `catalyst unrecorded` | *(not described yet)* |
+| `catalyst unrecorded` | `spec/unrecorded.schema.json` |
 | `catalyst spec` | `spec/commands.schema.json`, `spec/command-spec.schema.json` |
-| `catalyst journal append` | *(not described yet)* |
-| `catalyst journal adopt` | *(not described yet)* |
+| `catalyst journal append` | `spec/journal-entry.schema.json` |
+| `catalyst journal adopt` | `spec/journal-entry.schema.json` |
 | `catalyst journal verify` | `spec/journal-verify.schema.json` |
 | `catalyst journal show` | `spec/history.schema.json`, `spec/journal.schema.json` |
-| `catalyst journal redact` | *(not described yet)* |
+| `catalyst journal redact` | `spec/journal-entry.schema.json` |
 | `catalyst list` | `spec/list.schema.json` |
 | `catalyst view` | `spec/view.schema.json` |
 | `catalyst backlog` | `spec/backlog.schema.json` |
-| `catalyst repair derived` | *(not described yet)* |
+| `catalyst repair derived` | `spec/repair-derived.schema.json` |
 | `catalyst graph` | `spec/graph.schema.json` |
 | `catalyst new` | `spec/change.schema.json` |
 | `catalyst rename` | `spec/change.schema.json` |
-| `catalyst approve` | *(not described yet)* |
+| `catalyst approve` | `spec/approve.schema.json` |
 | `catalyst approvals` | `spec/approvals.schema.json` |
 | `catalyst restore` | `spec/change.schema.json` |
 | `catalyst status set` | `spec/change.schema.json` |
@@ -1745,29 +1745,29 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst unfreeze` | `spec/freeze.schema.json` |
 | `catalyst definition list` | `spec/definitions.schema.json` |
 | `catalyst definition migrate` | `spec/definition-migrate.schema.json` |
-| `catalyst sync plan` | *(not described yet)* |
-| `catalyst sync apply` | *(not described yet)* |
+| `catalyst sync plan` | `spec/sync-plan.schema.json` |
+| `catalyst sync apply` | `spec/sync-apply.schema.json` |
 | `catalyst inbox` | `spec/inbox.schema.json` |
 | `catalyst impact` | `spec/impact.schema.json` |
-| `catalyst module list` | *(not described yet)* |
-| `catalyst module install` | *(not described yet)* |
+| `catalyst module list` | `spec/module-list.schema.json` |
+| `catalyst module install` | `spec/module-install.schema.json` |
 | `catalyst module available` | `spec/module-releases.schema.json` |
-| `catalyst module upgrade` | *(not described yet)* |
-| `catalyst module verify` | *(not described yet)* |
-| `catalyst where` | *(not described yet)* |
-| `catalyst agent status` | *(not described yet)* |
+| `catalyst module upgrade` | `spec/sync-plan.schema.json`, `spec/sync-apply.schema.json` |
+| `catalyst module verify` | `spec/module-list.schema.json` |
+| `catalyst where` | `spec/where.schema.json` |
+| `catalyst agent status` | `spec/agent-status.schema.json` |
 | `catalyst agent run` | `spec/run-event.schema.json` |
 | `catalyst agent runs` | `spec/runs.schema.json` |
-| `catalyst runtime status` | *(not described yet)* |
-| `catalyst workspace status` | *(not described yet)* |
+| `catalyst runtime status` | `spec/runtime-status.schema.json` |
+| `catalyst workspace status` | `spec/workspace-status.schema.json` |
 | `catalyst analysis status` | `spec/analysis.schema.json` |
 | `catalyst analysis list` | `spec/analyses.schema.json` |
 | `catalyst try` | `spec/try.schema.json` |
-| `catalyst propose` | *(not described yet)* |
-| `catalyst open` | *(not described yet)* |
-| `catalyst share info` | *(not described yet)* |
+| `catalyst propose` | `spec/propose.schema.json` |
+| `catalyst open` | `spec/open.schema.json` |
+| `catalyst share info` | `spec/share-info.schema.json` |
 | `catalyst share status` | `spec/share-status.schema.json` |
-| `catalyst share push` | *(not described yet)* |
+| `catalyst share push` | `spec/share-push.schema.json` |
 
 <!-- end generated: cli-json -->
 
