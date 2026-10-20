@@ -80,3 +80,27 @@ def test_the_module_specification_tables_come_from_the_schemas():
     assert "| `entities` | `map` | Conditional |" in manifest and "| `tiers` | `list[object]` | No |" in manifest
     assert "| `hint` | `string` | No |" in gen_docs.etd_field_definitions()
     assert "| `guards` | `map` | No |" in gen_docs.etd_workflow()
+
+
+def test_the_migrations_table_comes_from_the_index():
+    """R4.4 phase 4: SYNCHRONIZE.md lists every kernel migration the index has, the latest included."""
+    table = gen_docs.migrations()
+    assert (
+        "| `0.92.0` | `0.93.0` | [`0.93.0/roles-grant-commands.md`](migrations/0.93.0/roles-grant-commands.md) |"
+        in table
+    )
+    assert table.count("\n| `") >= 37
+
+
+def test_the_invariants_name_only_commands_and_scripts_that_exist(tmp_path, monkeypatch):
+    """R4.4 phase 5: an "enforced by" cell naming a command the CLI lacks fails the check."""
+    assert gen_docs.invariant_drift() == []
+    kernel = tmp_path / "kernel"
+    kernel.mkdir()
+    text = (gen_docs.KERNEL / "INVARIANTS.md").read_text(encoding="utf-8")
+    text = text.replace("| `check` (structure) |", "| `check` (structure), `catalyst frobnicate`, `nope.py` |", 1)
+    (kernel / "INVARIANTS.md").write_text(text, encoding="utf-8")
+    monkeypatch.setattr(gen_docs, "KERNEL", kernel)
+    drift = gen_docs.invariant_drift()
+    assert any("`catalyst frobnicate`, which is no command" in d for d in drift)
+    assert any("nope.py, which is no script" in d for d in drift)

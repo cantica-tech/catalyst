@@ -21,8 +21,8 @@ the code defines.
 | 1 (0.97.0) | `CLI.md`: every command's arguments and options with their help, choices, defaults | the CLI's parser; every argument now has help text | the prose may name only options the CLI has (`flag_drift`) |
 | 2 (0.98.0) | `CLI.md`: each machine-readable output, the schema that describes it | `spec/*.schema.json` and `spec/README.md` | a new `--json` command comes with its schema; the 20 still without one may only shrink |
 | 3 (0.99.0) | `FORMAT.md`: `catalyst.toml`'s keys; `MODULE-SPECIFICATION.md`: `module.yaml`'s and a type's keys | `project_file.KEYS`; `framework/kernel/schemas/*.json` | every key the code reads is registered; every real module holds to the schemas |
-| 4 | `SYNCHRONIZE.md`: the migrations, from–to and summary | `framework/kernel/migrations/migrations.md` | the list matches the index |
-| 5 | `INVARIANTS.md`: the law-and-invariant table's "enforced by" | the checks that cite each invariant | each invariant names code that enforces it, or says it is judged |
+| 4 (0.100.0) | `SYNCHRONIZE.md`: the migrations, from–to and summary | `framework/kernel/migrations/migrations.md` | generated, so it matches the index |
+| 5 (0.100.0) | `INVARIANTS.md`: the law-and-invariant table's "enforced by" | checked, not generated: no code structure says which code enforces which invariant | each command or script a cell names exists; each invariant the code cites is defined |
 
 Each phase ships in its own release with no migration: generated sections change no deployed file except the
 kernel documents a sync already recomposes.
@@ -48,3 +48,13 @@ kernel documents a sync already recomposes.
 - The module manifest schema now describes format 3, which every real module uses and which the schema refused. Both
   kernel schemas carry the specification's descriptions, and four of its tables are generated from them.
 - The test suite's validator now checks `anyOf` with the other keywords.
+
+## Phases 4 and 5, done in 0.100.0
+
+- `SYNCHRONIZE.md`: 36 hand-written entries, which stopped at 0.51.x, are replaced by a table generated from the
+  migrations index, so the six later migrations appear.
+- `INVARIANTS.md`: its "enforced by" stays prose, because no code structure records which code enforces which
+  invariant, and generating one would only move the table into the code. It is checked instead: every command or
+  script it names exists, and every invariant the code cites is defined.
+
+R4.4 is done: every fact the code holds is generated or checked.
