@@ -53,6 +53,16 @@ The kernel's 746 tests pass, with ruff, pyright, purity and the generated docume
 pass (core 183, the browser views 142, and the rest), with `tsc`, eslint and prettier. Every pull request merged only
 after every check passed, Windows included.
 
+## Problems along the way
+
+The UI's first pull request for 0.57.0 failed CI twice; the gate stopped both times, so nothing merged until it passed.
+
+- **A stale build:** local checks passed on incremental build information, which hid a type error in the VS Code
+  host's tests. CI builds from nothing and caught it. Fixed, and the checks were rerun from a clean build.
+- **A bundle that reached node modules:** the browser views imported the shared row helpers from the core package's
+  root, which also loads the parts that run commands. Bundling for a browser failed. The helpers now have their own
+  browser-safe entry.
+
 ## What's left
 
 **Your decisions:**
