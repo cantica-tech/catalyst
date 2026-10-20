@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.100.1 — 2026-10-20
+
+A fix. No layout change, no migration.
+
+- Fixed: `catalyst serve` refused some writes (a read-only server's `POST /push` and `/have`, a missing endpoint)
+  before reading the request's body; on Windows the client then saw a connection abort instead of the refusal. The
+  body is now read first, up to the size limit (BUG-000023).
+
 ## 0.100.0 — 2026-10-20
 
 The kernel's reference generated from the code, phases 4 and 5 (D7, R4.4 done). No layout change, no migration.
