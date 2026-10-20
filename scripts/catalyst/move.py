@@ -214,7 +214,7 @@ def rename(project: Path, new: str, actor: str | None = None) -> tuple[Path, lis
         raise MoveError(f"'{new}' must be letters, digits, '.', '_' or '-'")
     toml = project / project_file.NAME
     if not toml.is_file():
-        raise MoveError(f"{project} has no catalyst.toml — `catalyst move --to-home` first")
+        raise MoveError(f"{project} has no catalyst.toml — `catalyst migrate --apply` first")
     data = project_file.read(toml)
     old = project_file.project_name(data)
     source, target = project_file.home_criterion(old), project_file.home_criterion(new)

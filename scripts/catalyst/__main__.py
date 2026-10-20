@@ -1077,7 +1077,9 @@ def cmd_runtime(args) -> int:
                 venv, changed = rt.install_into(criterion, version, pyz)
                 lines.append(f"criterion runtime: {venv} ({'installed' if changed else 'already ' + version})")
             elif criterion is not None:
-                lines.append("legacy deployment (.criterion in the project): no .venv; `catalyst move --to-home` first")
+                lines.append(
+                    "legacy deployment (.criterion in the project): no .venv; `catalyst migrate --apply` first"
+                )
     except (rt.RuntimeError_, OSError, subprocess.CalledProcessError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
