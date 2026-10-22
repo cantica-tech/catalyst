@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.104.1 — 2026-10-22
+
+No layout change, no migration.
+
+- Changed: the second production module's CI fixture moves to its next release, which uses workflow governance (its
+  guards hold field conditions, and its sources fall due); the kernel names neither.
+
 ## 0.104.0 — 2026-10-22
 
 Workflow governance (REQ-000084). A migration: `migrations/0.104.0/workflow-governance.md`.

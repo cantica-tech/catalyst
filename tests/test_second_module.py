@@ -200,6 +200,8 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
         "Repository=git@example.com:support/kb.git",
         "--field",
         "Freshness=30 days",
+        "--field",
+        "Curator=ada",
         "--intent",
         "support needs one place to find the product's answers",
     )
@@ -215,6 +217,8 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
         "Location=https://wiki.example.com/support",
         "--field",
         "Classification=Internal",
+        "--field",
+        "Next check=2026-01-01",
         "--intent",
         "the wiki holds most of the answers",
     )
@@ -245,6 +249,8 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
         "Ceiling=Internal",
         "--field",
         "Embedding model=nomic-embed-text-v1.5, local",
+        "--field",
+        "Classification=Internal",
         "--intent",
         "the first vector database support's assistant ingests",
     )
@@ -254,6 +260,10 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
     build_file = root / json.loads(_cli(capsys, "view", build, "--json"))["file"]
     _write_section(capsys, build_file, "Verification", "Checksums match; nothing above Internal in it.", build)
     _cli(capsys, "status", "set", build, "Published", "--intent", "support's assistant may use it")
+
+    # a source past its next check waits in the inbox (kernel 0.104.0, `due`)
+    overdue = [i["id"] for i in json.loads(_cli(capsys, "inbox", "--json"))["items"] if i["kind"] == "overdue"]
+    assert overdue == [source]
 
     # what a person reads: the list, the graph, the audit, and a clean check
     assert {r["id"] for r in json.loads(_cli(capsys, "list", "KB", "--json"))} == {kb}
