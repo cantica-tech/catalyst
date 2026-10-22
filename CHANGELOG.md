@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.103.1 — 2026-10-22
+
+No layout change, no migration.
+
+- Changed: the second production module is catalogued and checked out in CI under its new id and repository, at its
+  next release; the kernel names neither.
+
 ## 0.103.0 — 2026-10-22
 
 The second production module changes. No layout change, no migration.

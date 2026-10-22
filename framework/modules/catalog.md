@@ -12,4 +12,4 @@ listed here.
 | Id | Repository | Default branch |
 |---|---|---|
 | `software-engineering` | `git@github.com:cantica-tech/catalyst-software-engineering.git` | `main` |
-| `cantica-knowledge-base` | `git@github.com:cantica-tech/catalyst-cantica-knowledge-base.git` | `main` |
+| `knowledge-base` | `git@github.com:cantica-tech/catalyst-knowledge-base.git` | `main` |
