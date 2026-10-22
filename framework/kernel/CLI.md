@@ -966,8 +966,11 @@ Opt-in (decision G): a deployment declares its gates in `IAM/gates.json`
 (`framework/kernel/schemas/gates.schema.json`); without the file there is
 no gate. A gate covers the rules of one domain, or an entity type entering
 one state, and asks for a number of approvals from one role of
-`IAM/roles/roles.json`. `catalyst check` reports a malformed gate, or one
-naming an unknown role, domain, type or state, as an error.
+`IAM/roles/roles.json`. A type's gate may carry `"when"`, a condition on the
+entity's fields (`"Classification at least Confidential"`, below): it then
+applies only to an entity for which it holds. `catalyst check` reports a
+malformed gate, or one naming an unknown role, domain, type, state, field
+or value, as an error.
 
 - `catalyst approve <ID> --gate <gate> [--as <user>] [--intent <why>]`:
   one journal entry (action `approve`, no file changed) naming the gate and
@@ -996,6 +999,30 @@ Gates are enforced (`Rules-of-Rules.md` §11):
   left out.
 - `catalyst inbox` lists what waits (kind `approval`), and
   `GET approvals/<id>` answers `catalyst approvals <id> --json`.
+
+### Workflow governance: conditions, due dates, governing workflows
+
+- **A condition** on an entity's fields is one line: `<Field> is|is not
+  <value>`, `<Field> in|not in <value>, …`, `<Field> at least|at most
+  <value>` (ordered by the field's enum values, else as numbers, else as
+  dates), `<Field> is set|is empty`. A module's guard `holds: <condition>`
+  must hold to enter its state; a gate's `when` makes it apply only where
+  one holds; a governing workflow's `When` column limits a move to it.
+- **A due date:** a type's `due` (`Due`, or `Checked + 30 days`) makes an
+  open entity past it `overdue`: `catalyst inbox` lists it (kind
+  `overdue`: its status, the date field, the date, the days past it and the
+  role its governing workflow escalates to) and `catalyst check` warns. A
+  `due` naming a field that is not a date is a `check` error.
+- **A governing workflow:** a `WORKFLOW-` that names a type (`Governs`) and
+  is `Active` lists the moves that type may make in its `## Transitions`
+  table (`From`, `To`, `Role`, `When`; `From` may be `*`). `catalyst status
+  set` refuses a move it does not list, one whose `Role` the signer does not
+  hold (an `Admin` holds every role) and one whose `When` does not hold;
+  `--force` does not pass it. `Escalates to` names the role an overdue
+  entity of the type is escalated to. `catalyst check` reports, as errors,
+  two active workflows governing one type, a state, role, field or value
+  the type or the deployment does not have, and a governing workflow with
+  no move.
 
 ### Proposals: `propose`
 
@@ -1105,7 +1132,7 @@ generate its types from.
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
 - `catalyst inbox`: what waits for a person, each item with its `evidence`
-  and `settle`, the commands that settle it. Six kinds: a commit made
+  and `settle`, the commands that settle it. Seven kinds: a commit made
   outside catalyst whose changes the journal does not record
   (`unrecorded-commit`: adopt it or revert it); a changed or new project
   file not journaled yet (`unrecorded-change`); a reconciliation case that
@@ -1116,7 +1143,8 @@ generate its types from.
   for its current version; `catalyst approve` settles it); a proposal
   being decided (`proposal`: its entity, file, base, proposed blob and
   author; the `reconcile` decisions settle it), listed apart from the
-  disputes. It lists and
+  disputes; an open entity past its type's due date (`overdue`: moving it
+  on, or a new date, settles it). It lists and
   settles nothing, and exits `0` whether or not anything waits. A bare
   working copy has no project history and lists the last four kinds only.
   The payload is described by `spec/inbox.schema.json`.

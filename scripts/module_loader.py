@@ -54,8 +54,10 @@ class WorkflowDefinition:
     closed_states: list[str] = field(default_factory=list)
     transitions: list[WorkflowTransition] = field(default_factory=list)
     # state -> the conditions entering it requires, each (condition, argument):
-    # children_closed / nonempty <field>, section_written <heading>
+    # children_closed / nonempty <field>, section_written <heading>, holds <condition>
     guards: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    # when an open entity is due: "<date field>" or "<date field> + <n> days" (W2)
+    due: str | None = None
 
 
 @dataclass
@@ -421,6 +423,7 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
                 "states": states,
                 "closed_states": [str(x) for x in spec.get("closed") or []],
                 "guards": spec.get("guards") or {},
+                "due": spec.get("due"),
             },
         }
     )
@@ -479,6 +482,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
             closed_states=wf_raw.get("closed_states", []),
             transitions=transitions,
             guards=guards,
+            due=str(wf_raw["due"]) if wf_raw.get("due") else None,
         )
     else:
         wf = WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])

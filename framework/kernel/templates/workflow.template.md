@@ -12,8 +12,10 @@
 |---|---|
 | **ID** | `WORKFLOW-NNNNNN-<userid>` — the userid suffix is the resolved signer's (`Rules-of-Rules.md` §20) |
 | **Name** | short descriptive summary summarizing the workflow's purpose — follows Rules of Rules naming conventions |
-| **Status** | `Active` / `Deprecated` |
+| **Status** | `Draft` / `Active` / `Deprecated` (starts `Draft`; `Deprecated` is its closed state) |
 | **Defined** | YYYY-MM-DD |
+| **Governs** | *(optional)* the entity type prefix whose moves this workflow governs while `Active`, e.g. `KBUILD`; one active workflow per type |
+| **Escalates to** | *(optional)* the role an overdue entity of that type is escalated to |
 | **Signed-off-by** | name of the registered user (`IAM/users/users.json`) who signed this workflow — see `CODE-OF-CONDUCT.md` §2 |
 
 ## Purpose
@@ -25,6 +27,18 @@ rather than tribal knowledge.
 
 1. …
 2. …
+
+## Transitions
+
+*(Only for a workflow that `Governs` a type.)* The moves it allows, one per
+row; while it is `Active`, `catalyst status set` refuses any other, and
+`--force` does not pass it. `From` may be `*` (any state); `Role` is the
+role the signer must hold (an `Admin` holds every one; empty: anyone);
+`When` is a condition on the entity's fields (`<Field> is|is not|in|not
+in|at least|at most <value>`, `<Field> is set|is empty`; empty: always).
+
+| From | To | Role | When |
+|---|---|---|---|
 
 ## Gates / exit criteria
 

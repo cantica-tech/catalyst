@@ -4,7 +4,9 @@ one version of an entity, `catalyst approvals` says what each gate covering
 an entity has and lacks.
 
 A gate covers the rules of one domain, or an entity type entering one
-state, and asks for a number of approvals from one role. An approval is of
+state, and asks for a number of approvals from one role; a type's gate may
+apply only `when` a condition on the entity's fields holds
+(`catalyst.conditions`, workflow governance W1). An approval is of
 a version: the entity file's blob, as the journal already keeps it. It
 counts when its signer is active, holds the role, did not write that
 version (law L4: the author never approves their own change) and has not
@@ -40,6 +42,16 @@ class Gate:
     domain: str | None = None  # covers the rules of this domain
     type: str | None = None  # or this entity type entering `to`
     to: str | None = None
+    when: str | None = None  # a type's gate: only while this condition holds
+
+    def applies_to(self, art, etd) -> bool:
+        """Whether the gate asks anything of `art` (an entity of its type): always,
+        unless its `when` does not hold for the entity's fields."""
+        if not self.when or etd is None:
+            return True
+        from catalyst import conditions
+
+        return conditions.holds(conditions.parse(self.when), art, etd)
 
     def covers_rule(self, rule_id: str) -> bool:
         parts = rule_id.split("-")
@@ -50,7 +62,8 @@ class Gate:
 
     def describe(self) -> str:
         what = f"rules of domain {self.domain}" if self.domain else f"{self.type} entering {self.to}"
-        return f"{self.id}: {self.approvals} approval(s) from {self.role} for {what}"
+        when = f" when {self.when}" if self.when else ""
+        return f"{self.id}: {self.approvals} approval(s) from {self.role} for {what}{when}"
 
 
 def _raw(dep: Deployment) -> list | None:
@@ -115,6 +128,15 @@ def problems(dep: Deployment, corpus: Corpus) -> list[str]:
                 out.append(f"{where}: type {prefix!r} is not declared")
             elif to not in etd.workflow.states:
                 out.append(f"{where}: {to!r} is not a {etd.name} state ({', '.join(etd.workflow.states)})")
+            elif g.get("when") is not None:
+                from catalyst import conditions
+
+                try:
+                    out += [f"{where}: {p}" for p in conditions.problems(conditions.parse(str(g["when"])), etd)]
+                except conditions.ConditionError as exc:
+                    out.append(f"{where}: {exc}")
+        if "rules" in covers and g.get("when") is not None:
+            out.append(f"{where}: `when` applies to a type's gate, not to a domain's rules")
     return out
 
 
@@ -135,6 +157,7 @@ def load(dep: Deployment, corpus: Corpus) -> list[Gate]:
                 domain=rules["domain"] if rules else None,
                 type=covers.get("type"),
                 to=covers.get("to"),
+                when=g.get("when"),
             )
         )
     return gates
@@ -220,8 +243,8 @@ def covering(dep: Deployment, corpus: Corpus, item_id: str) -> list[Gate]:
     gates = load(dep, corpus)
     if item_id in corpus.rules:
         return [g for g in gates if g.covers_rule(item_id)]
-    prefix = corpus.artifacts[item_id][0].prefix if item_id in corpus.artifacts else None
-    return [g for g in gates if prefix and g.type == prefix]
+    art = corpus.artifacts[item_id][0] if item_id in corpus.artifacts else None
+    return [g for g in gates if art and g.type == art.prefix and g.applies_to(art, dep.etds.get(art.prefix))]
 
 
 def approve(
@@ -334,24 +357,26 @@ def report(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
 
 
 # --- enforcing them (design 25 A3, A4) ------------------------------------------
-def entering(dep: Deployment, corpus: Corpus, prefix: str, state: str) -> list[Gate]:
-    """The gates an entity of this type passes to enter this state. A malformed
-    `IAM/gates.json` refuses every move it could cover: a gate fails closed."""
+def entering(dep: Deployment, corpus: Corpus, prefix: str, state: str, art=None) -> list[Gate]:
+    """The gates an entity of this type passes to enter this state — those whose
+    `when` holds for `art`, when given (without it, every one: a gate fails
+    closed). A malformed `IAM/gates.json` refuses every move it could cover."""
     try:
         gates = load(dep, corpus)
     except GateError as exc:
         if (dep.root / GATES).is_file():
             raise GateError(f"{exc} — fix {GATES.as_posix()} before moving an entity") from None
         raise
-    return [g for g in gates if g.covers_move(prefix, state)]
+    etd = dep.etds.get(prefix)
+    return [g for g in gates if g.covers_move(prefix, state) and (art is None or g.applies_to(art, etd))]
 
 
 def refusal(dep: Deployment, corpus: Corpus, item_id: str, state: str) -> str | None:
     """Why the entity may not enter `state` yet — the gates whose approvals for
     its current version are missing, how many and from which role — or None."""
-    prefix = corpus.artifacts[item_id][0].prefix if item_id in corpus.artifacts else None
+    art = corpus.artifacts[item_id][0] if item_id in corpus.artifacts else None
     short = []
-    for g in entering(dep, corpus, prefix or "", state):
+    for g in entering(dep, corpus, art.prefix if art else "", state, art):
         _, missing = counted(dep, corpus, g, item_id)
         if missing:
             short.append(f"gate {g.id} lacks {missing} of {g.approvals} approval(s) from {g.role}")
@@ -420,6 +445,8 @@ def waiting(dep: Deployment, corpus: Corpus) -> list[dict]:
             if state == g.to or state in etd.workflow.closed_states:
                 continue
             if moves and (state, g.to) not in moves:
+                continue
+            if not g.applies_to(art, etd):
                 continue
             current = version(dep, corpus, art.id)
             counts, missing = counted(dep, corpus, g, art.id, entries, current)
