@@ -17,7 +17,7 @@ SCHEMAS = ROOT / "framework" / "kernel" / "schemas"
 MODULES = [
     ROOT / "framework" / "modules" / "sample-process",
     ROOT.parent / "catalyst-software-engineering",
-    ROOT.parent / "catalyst-cantica-knowledge-base",
+    ROOT.parent / "catalyst-knowledge-base",
 ]
 
 

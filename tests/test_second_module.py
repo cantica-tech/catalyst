@@ -1,11 +1,11 @@
 """The second module as a fixture (roadmap R7, owner decision B1, revised
-2026-10-22): the published cantica-knowledge-base module, checked out beside
+2026-10-22): the published knowledge-base module, checked out beside
 the kernel, installed into a scratch project and driven through every verb a
 person would use. It shows the kernel needs nothing of the
 software-engineering module.
 
 The module is found at `$CATALYST_KB_MODULE`, else as the sibling checkout
-`../catalyst-cantica-knowledge-base`; the test is skipped without it, except
+`../catalyst-knowledge-base`; the test is skipped without it, except
 where `CATALYST_REQUIRE_FIXTURES` is set (CI checks the module out at a
 release tag).
 """
@@ -25,13 +25,13 @@ from catalyst.__main__ import main
 
 ROOT = Path(__file__).resolve().parent.parent
 KERNEL = ROOT / "framework" / "kernel"
-MODULE = Path(os.environ.get("CATALYST_KB_MODULE") or ROOT.parent / "catalyst-cantica-knowledge-base")
+MODULE = Path(os.environ.get("CATALYST_KB_MODULE") or ROOT.parent / "catalyst-knowledge-base")
 
 if os.environ.get("CATALYST_REQUIRE_FIXTURES") and not (MODULE / "module.yaml").is_file():
-    raise RuntimeError(f"CATALYST_REQUIRE_FIXTURES is set but there is no cantica-knowledge-base module at {MODULE}")
+    raise RuntimeError(f"CATALYST_REQUIRE_FIXTURES is set but there is no knowledge-base module at {MODULE}")
 
 pytestmark = [
-    pytest.mark.skipif(not (MODULE / "module.yaml").is_file(), reason=f"no cantica-knowledge-base module at {MODULE}"),
+    pytest.mark.skipif(not (MODULE / "module.yaml").is_file(), reason=f"no knowledge-base module at {MODULE}"),
     pytest.mark.skipif(sys.version_info < (3, 11), reason="catalyst.toml needs Python 3.11+"),
 ]
 
@@ -52,7 +52,7 @@ def project(tmp_path, monkeypatch, capsys):
                 "--name",
                 "app",
                 "--module",
-                "cantica-knowledge-base",
+                "knowledge-base",
                 "--module-dir",
                 str(MODULE),
                 "--git-username",
