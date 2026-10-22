@@ -1,12 +1,13 @@
-"""The second module as a fixture (roadmap R7, owner decision B1): the
-published risk-management module, checked out beside the kernel, installed
-into a scratch project and driven through every verb a person would use. It
-shows the kernel needs nothing of the software-engineering module.
+"""The second module as a fixture (roadmap R7, owner decision B1, revised
+2026-10-22): the published cantica-knowledge-base module, checked out beside
+the kernel, installed into a scratch project and driven through every verb a
+person would use. It shows the kernel needs nothing of the
+software-engineering module.
 
-The module is found at `$CATALYST_RISK_MODULE`, else as the sibling checkout
-`../catalyst-risk-management`; the test is skipped without it, except where
-`CATALYST_REQUIRE_FIXTURES` is set (CI checks the module out at a release
-tag).
+The module is found at `$CATALYST_KB_MODULE`, else as the sibling checkout
+`../catalyst-cantica-knowledge-base`; the test is skipped without it, except
+where `CATALYST_REQUIRE_FIXTURES` is set (CI checks the module out at a
+release tag).
 """
 
 from __future__ import annotations
@@ -24,13 +25,13 @@ from catalyst.__main__ import main
 
 ROOT = Path(__file__).resolve().parent.parent
 KERNEL = ROOT / "framework" / "kernel"
-MODULE = Path(os.environ.get("CATALYST_RISK_MODULE") or ROOT.parent / "catalyst-risk-management")
+MODULE = Path(os.environ.get("CATALYST_KB_MODULE") or ROOT.parent / "catalyst-cantica-knowledge-base")
 
 if os.environ.get("CATALYST_REQUIRE_FIXTURES") and not (MODULE / "module.yaml").is_file():
-    raise RuntimeError(f"CATALYST_REQUIRE_FIXTURES is set but there is no risk-management module at {MODULE}")
+    raise RuntimeError(f"CATALYST_REQUIRE_FIXTURES is set but there is no cantica-knowledge-base module at {MODULE}")
 
 pytestmark = [
-    pytest.mark.skipif(not (MODULE / "module.yaml").is_file(), reason=f"no risk-management module at {MODULE}"),
+    pytest.mark.skipif(not (MODULE / "module.yaml").is_file(), reason=f"no cantica-knowledge-base module at {MODULE}"),
     pytest.mark.skipif(sys.version_info < (3, 11), reason="catalyst.toml needs Python 3.11+"),
 ]
 
@@ -51,13 +52,13 @@ def project(tmp_path, monkeypatch, capsys):
                 "--name",
                 "app",
                 "--module",
-                "risk-management",
+                "cantica-knowledge-base",
                 "--module-dir",
                 str(MODULE),
                 "--git-username",
                 "ada",
                 "--rule-doc",
-                "controls-rules.md:cr",
+                "knowledge-rules.md:kr",
                 "--agent",
                 "claude-code",
                 "--no-runtime",
@@ -110,18 +111,18 @@ def _write_section(capsys, path: Path, heading: str, text: str, artifact: str) -
     )
 
 
-def test_the_risk_module_runs_end_to_end(project, capsys):
+def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
     root = _criterion(capsys)
     rules = root / "rules"
     # a domain and a rule, the way a person adds them: files, then the journal
     domains = rules / "domains" / "domains.md"
     domains.write_text(
         domains.read_text(encoding="utf-8")
-        + "| [`ACCESS`](cr-ACCESS-access-control.md) | rules/controls-rules.md | 2026-10-19 |\n",
+        + "| [`KNOW`](kr-KNOW-shared-knowledge.md) | rules/knowledge-rules.md | 2026-10-22 |\n",
         encoding="utf-8",
     )
-    (rules / "domains" / "cr-ACCESS-access-control.md").write_text(
-        "# `ACCESS` — Access control\n\n## Scope\n\nWho may reach what.\n", encoding="utf-8"
+    (rules / "domains" / "kr-KNOW-shared-knowledge.md").write_text(
+        "# `KNOW` — Shared knowledge\n\n## Scope\n\nWhat the team must be able to find.\n", encoding="utf-8"
     )
     _cli(
         capsys,
@@ -132,29 +133,30 @@ def test_the_risk_module_runs_end_to_end(project, capsys):
         "--action",
         "create",
         "--artifact",
-        "domain ACCESS",
+        "domain KNOW",
         "--file",
         str(domains),
         "--file",
-        str(rules / "domains" / "cr-ACCESS-access-control.md"),
+        str(rules / "domains" / "kr-KNOW-shared-knowledge.md"),
         "--intent",
-        "the access-control domain the first rule belongs to",
+        "the shared-knowledge domain the first rule belongs to",
         "--tier",
         "chore",
     )
-    rule = _cli(capsys, "id", "next-rule", "cr", "ACCESS", "--as", "ada").strip()
-    doc, index = rules / "controls-rules.md", rules / "rules.md"
+    rule = _cli(capsys, "id", "next-rule", "kr", "KNOW", "--as", "ada").strip()
+    doc, index = rules / "knowledge-rules.md", rules / "rules.md"
     doc.write_text(
         doc.read_text(encoding="utf-8").replace(
             "## Contents\n\n*(no rules yet)*",
-            f"## Contents\n\n### `{rule}` Only staff reach the admin console\n\n**Status:** ✅\n\n"
-            "The admin console answers staff accounts only.",
+            f"## Contents\n\n### `{rule}` Support answers from the product's documentation\n\n**Status:** ✅\n\n"
+            "Support finds every answer in one knowledge base.",
         ),
         encoding="utf-8",
     )
     index.write_text(
         index.read_text(encoding="utf-8").replace(
-            "## Rule IDs\n\n*(none yet)*", f"## Rule IDs\n\n- `{rule}` — Only staff reach the admin console"
+            "## Rule IDs\n\n*(none yet)*",
+            f"## Rule IDs\n\n- `{rule}` — Support answers from the product's documentation",
         ),
         encoding="utf-8",
     )
@@ -173,83 +175,90 @@ def test_the_risk_module_runs_end_to_end(project, capsys):
         "--file",
         str(index),
         "--intent",
-        "the first rule the risks are grounded in",
+        "the first rule the knowledge base serves",
         "--tier",
         "chore",
     )
 
-    risk = _id(
+    kb = _id(
         capsys,
         "new",
-        "RISK",
+        "KB",
         "--title",
-        "A leaked staff password opens the admin console",
+        "Support knowledge base",
         "--field",
-        f"Threatens={rule}",
+        f"Serves={rule}",
         "--field",
-        "Domain=ACCESS",
+        "Kind=Project",
         "--field",
-        "Likelihood=Possible",
+        "Classification=Internal",
         "--field",
-        "Impact=Major",
+        "Default classification=Confidential",
+        "--field",
+        "Hosted embedding up to=Internal",
+        "--field",
+        "Repository=git@example.com:support/kb.git",
+        "--field",
+        "Freshness=30 days",
         "--intent",
-        "an attacker reaches the console with a staff password",
+        "support needs one place to find the product's answers",
     )
-    control = _id(
+    source = _id(
         capsys,
         "new",
-        "CONTROL",
+        "KSOURCE",
         "--title",
-        "Second factor on staff accounts",
+        "The support wiki",
         "--field",
-        f"Implements={rule}",
+        f"Knowledge base={kb}",
         "--field",
-        f"Treats={risk}",
+        "Location=https://wiki.example.com/support",
         "--field",
-        "Kind=Preventive",
+        "Classification=Internal",
         "--intent",
-        "a second factor stops a leaked password alone",
+        "the wiki holds most of the answers",
     )
-    assert control in json.loads(_cli(capsys, "view", risk, "--json"))["Controls"]  # the back-reference
+    assert source in json.loads(_cli(capsys, "view", kb, "--json"))["Sources"]  # the back-reference
 
-    # each closing state's guard holds until its section is written
-    assert main(["status", "set", control, "Effective", "--intent", "the second factor is enforced"]) == 1
-    assert "`## Evidence` is not written" in capsys.readouterr().err
-    control_file = root / json.loads(_cli(capsys, "view", control, "--json"))["file"]
-    _write_section(
-        capsys, control_file, "Evidence", "Every staff login asks for a second factor since 2026-10-19.", control
-    )
-    _cli(capsys, "status", "set", control, "Effective", "--intent", "the second factor is enforced for staff")
+    # each state's guard holds until its section is written
+    kb_file = root / json.loads(_cli(capsys, "view", kb, "--json"))["file"]
+    assert main(["status", "set", kb, "Established", "--intent", "the repository is laid out"]) == 1
+    assert "`## Structure` is not written" in capsys.readouterr().err
+    _write_section(capsys, kb_file, "Structure", "docs/ by product area; pointers/ mirrors it.", kb)
+    _cli(capsys, "status", "set", kb, "Established", "--intent", "the repository is laid out")
+    assert main(["status", "set", kb, "Active", "--intent", "its policy is decided"]) == 1
+    _write_section(capsys, kb_file, "Policy", "Internal; new and unmarked documents Confidential.", kb)
+    _write_section(capsys, kb_file, "Maintenance", "Pointers checked monthly; rebuilt at each release.", kb)
+    _cli(capsys, "status", "set", kb, "Active", "--intent", "its policy and its maintenance are decided")
 
-    incident = _id(
+    build = _id(
         capsys,
         "new",
-        "INCIDENT",
+        "KBUILD",
         "--title",
-        "A contractor's account reached the console",
+        "Support knowledge base 1.0.0",
         "--field",
-        f"Breaks={rule}",
+        f"Knowledge base={kb}",
         "--field",
-        f"Risks={risk}",
+        "Version=1.0.0",
         "--field",
-        "Severity=High",
+        "Ceiling=Internal",
+        "--field",
+        "Embedding model=nomic-embed-text-v1.5, local",
         "--intent",
-        "an incident shows the risk materialised",
+        "the first vector database support's assistant ingests",
     )
-    assert main(["status", "set", incident, "Closed", "--intent", "the incident is over and reviewed"]) == 1
-    incident_file = root / json.loads(_cli(capsys, "view", incident, "--json"))["file"]
-    _write_section(capsys, incident_file, "Lessons", "Contractor accounts are staff accounts no longer.", incident)
-    _cli(capsys, "status", "set", incident, "Closed", "--intent", "the incident is over and its lessons drawn")
-    assert main(["status", "set", risk, "Treated", "--intent", "the second factor treats the risk"]) == 1
-    risk_file = root / json.loads(_cli(capsys, "view", risk, "--json"))["file"]
-    _write_section(capsys, risk_file, "Treatment", f"Treated by {control}: a second factor on staff accounts.", risk)
-    _cli(capsys, "status", "set", risk, "Treated", "--intent", "the second factor treats the risk")
+    assert build in json.loads(_cli(capsys, "view", kb, "--json"))["Builds"]
+    _cli(capsys, "status", "set", build, "Built", "--intent", "the vectors are written")
+    assert main(["status", "set", build, "Published", "--intent", "support's assistant may use it"]) == 1
+    build_file = root / json.loads(_cli(capsys, "view", build, "--json"))["file"]
+    _write_section(capsys, build_file, "Verification", "Checksums match; nothing above Internal in it.", build)
+    _cli(capsys, "status", "set", build, "Published", "--intent", "support's assistant may use it")
 
-    # what a person reads: the list, the graph, the backlog, the audit, and a clean check
-    listed = {r["id"] for r in json.loads(_cli(capsys, "list", "RISK", "--json"))}
-    assert listed == {risk}
+    # what a person reads: the list, the graph, the audit, and a clean check
+    assert {r["id"] for r in json.loads(_cli(capsys, "list", "KB", "--json"))} == {kb}
     graph = json.loads(_cli(capsys, "graph", "--json"))
-    assert {"RISK", "CONTROL", "INCIDENT"} <= set(graph["types"])
+    assert {"KB", "KSOURCE", "KBUILD"} <= set(graph["types"])
     assert json.loads(_cli(capsys, "audit", "--json"))["rules"]
     entries = [
         json.loads(line)
@@ -258,7 +267,7 @@ def test_the_risk_module_runs_end_to_end(project, capsys):
         if line.startswith("{")
     ]
     tiers = {e.get("artifact"): e.get("tier") for e in entries if e.get("action") == "create"}
-    assert tiers[risk] == "risk" and tiers[incident] == "incident"  # the module's tiers, inferred
+    assert tiers[kb] == "kb" and tiers[build] == "build"  # the module's tiers, inferred
     report = _cli(capsys, "check")
     assert "0 error(s)" in report and "legacy:" not in report  # catalyst.toml, the criterion in catalyst's home
     assert "software-engineering" not in json.dumps(graph)  # nothing of the other module
