@@ -137,7 +137,7 @@
         },
         "guards": {
           "type": "object",
-          "description": "State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one.",
+          "description": "State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's), `holds: <condition>` (a condition on its fields, e.g. `Classification at least Confidential`: `<Field> is|is not|in|not in|at least|at most <value>` or `<Field> is set|is empty`, ordered by the field's enum values, else as numbers or dates). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one.",
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -152,6 +152,9 @@
                   "type": "string"
                 },
                 "section_written": {
+                  "type": "string"
+                },
+                "holds": {
                   "type": "string"
                 }
               },
@@ -178,6 +181,10 @@
             "additionalProperties": false
           },
           "description": "Allowed `from` → `to` moves."
+        },
+        "due": {
+          "type": "string",
+          "description": "When an open entity of the type is due: a date field (`Due`), or a date field plus days (`Checked + 30 days`). Past it, `catalyst inbox` lists it as `overdue`, with the role a governing workflow escalates to, and `catalyst check` warns."
         }
       },
       "additionalProperties": false,

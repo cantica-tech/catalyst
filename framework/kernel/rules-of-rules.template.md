@@ -200,7 +200,10 @@ lives in the `catalyst` repository, not in deployments; never reused.
 
 A `WORKFLOW-` documents a recurring procedure. When an artifact or a case
 names one, read it before acting. A workflow has no target and is never
-itself done (`definitions/workflow`).
+itself done (`definitions/workflow`). One that `Governs` a type and is
+`Active` is enforced: its type moves only as its Transitions table allows,
+by the role and under the condition each row names, and `--force` does not
+pass it (`CLI.md`, "Workflow governance").
 
 ## 20. `rr-META-020` Entity IDs carry their signer's userid
 

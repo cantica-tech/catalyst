@@ -128,3 +128,11 @@ def test_outside_a_project_it_says_so(tmp_path, capsys):
     subprocess.run(["git", "init", "-q", str(tmp_path / "empty")], check=True)
     assert main(["--project", str(tmp_path / "empty"), "migrate"]) == 1
     assert "no catalyst.toml" in capsys.readouterr().err
+
+
+def test_a_migration_starting_before_the_previous_kernel_still_lists_its_judgment_steps(tmp_path):
+    """0.104.0's migration starts at 0.103.0; a deployment synced from 0.103.1 still owes its steps (BUG-000028)."""
+    project = _home(tmp_path)
+    p = migrate.plan(project, KERNEL, since="0.103.1")
+    sources = {s.source for s in p.steps if s.kind == "judgment"}
+    assert "kernel: migrations/0.104.0/workflow-governance.md" in sources

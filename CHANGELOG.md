@@ -6,6 +6,23 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.104.0 — 2026-10-22
+
+Workflow governance (REQ-000084). A migration: `migrations/0.104.0/workflow-governance.md`.
+
+- Added: conditions on an entity's fields, one line each (`Classification at least Confidential`, `Kind in Project,
+  Reflective`, `Owner is set`). A module's guard `holds: <condition>` must hold to enter its state; a gate's `when`
+  makes it apply only where one holds; `check` refuses one naming an unknown field or value.
+- Added: a type's `due` (`Due`, or `Checked + 30 days`): an open entity past it is listed by `catalyst inbox` as
+  `overdue`, with the role it escalates to, and `catalyst check` warns.
+- Added: a `WORKFLOW-` that `Governs` a type and is `Active` is enforced: its `## Transitions` table (`From`, `To`,
+  `Role`, `When`) is the moves the type may make; `status set` refuses any other, by a role it does not name or under
+  a condition that fails, and `--force` does not pass it. `catalyst view` lists its moves; `check` reports two
+  governing one type and anything a workflow names wrongly. The workflow template gains `Governs`, `Escalates to` and
+  Transitions (a new template version, which `catalyst migrate --apply` adds).
+- Fixed: `catalyst migrate` left out the judgment steps of a migration starting before the deployment's previous
+  kernel (BUG-000028).
+
 ## 0.103.1 — 2026-10-22
 
 No layout change, no migration.

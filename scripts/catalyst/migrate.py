@@ -186,7 +186,8 @@ def _judgment_steps(dep: Deployment, kernel: Path | None, since: str | None, cur
         if folder is None:
             continue
         top = current if owner == "kernel" else "999.0.0"
-        for m in sync.migrations(folder / "migrations.md", since, top, owner):
+        # a migration applies when its target is past `since`, whatever version it starts from
+        for m in sync.migrations(folder / "migrations.md", "0.0.0", top, owner):
             if _vt(m["to"]) <= _vt(since):
                 continue
             doc = folder / m["file"]

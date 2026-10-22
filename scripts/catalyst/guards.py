@@ -2,8 +2,10 @@
 `workflow.guards` maps a state to conditions — `children_closed: <field>`
 (every artifact the field cites is closed), `nonempty: <field>`,
 `section_written: <heading>` (the section's text differs from the type's
-template's). `status set` refuses to enter a guarded state while one fails;
-`check` warns about an artifact already in one."""
+template's), `holds: <condition>` (a field condition, `catalyst.conditions`:
+`Classification at least Confidential`). `status set` refuses to enter a
+guarded state while one fails; `check` warns about an artifact already in
+one."""
 
 from __future__ import annotations
 
@@ -57,6 +59,19 @@ def failures(dep: Deployment, corpus: Corpus, art: Artifact, state: str) -> list
             text = _section(art.file.read_text(encoding="utf-8"), arg)
             if not text or text == _template_section(dep, art.prefix, arg):
                 out.append(f"`## {arg}` is not written")
+        elif cond == "holds":
+            from catalyst import conditions
+
+            try:
+                c = conditions.parse(arg)
+            except conditions.ConditionError as exc:
+                out.append(str(exc))
+                continue
+            wrong = conditions.problems(c, etd)
+            if wrong:
+                out.extend(wrong)
+            elif not conditions.holds(c, art, etd):
+                out.append(f"`{c}` does not hold (`{c.field}` is {conditions.value_of(art, c.field) or 'empty'})")
         else:
-            out.append(f"unknown guard `{cond}` (children_closed, nonempty, section_written)")
+            out.append(f"unknown guard `{cond}` (children_closed, nonempty, section_written, holds)")
     return out

@@ -204,12 +204,16 @@ def _next_states(dep: Deployment, corpus: Corpus, art: Artifact) -> list[dict]:
     """The states an artifact may move to from its own (its type's declared
     transitions, or every other state when it declares none), each with what
     its guards say blocks it now (`status set` refuses those, R6.7)."""
+    from catalyst import workflows
     from catalyst.guards import failures
 
     etd = dep.etds.get(art.prefix)
     if etd is None:
         return []
     current = art.get("Status") or ""
+    governed = workflows.next_moves(dep, corpus, art)  # a governing workflow's moves win (W3)
+    if governed is not None:
+        return [{"state": s, "blocked_by": why + failures(dep, corpus, art, s)} for s, why in governed.items()]
     declared = [t.to_state for t in etd.workflow.transitions if t.from_state == current]
     states = declared if etd.workflow.transitions else [s for s in etd.workflow.states if s != current]
     return [{"state": s, "blocked_by": failures(dep, corpus, art, s)} for s in dict.fromkeys(states)]

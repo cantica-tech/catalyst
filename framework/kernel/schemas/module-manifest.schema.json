@@ -88,7 +88,7 @@
       "additionalProperties": {
         "type": "object"
       },
-      "description": "Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, sections and definition. Required unless the module lists `entity_types`.",
+      "description": "Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, `due`, sections and definition. Required unless the module lists `entity_types`.",
       "x-required": "Conditional"
     },
     "entity_types": {
