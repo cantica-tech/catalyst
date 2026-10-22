@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.103.0 — 2026-10-22
+
+The second production module changes. No layout change, no migration.
+
+- Changed: the catalogue of production modules (`framework/modules/catalog.md`) names a new second module, which
+  catalyst's CI installs at its release tag and drives end to end (`tests/test_second_module.py`); the previous second
+  module leaves the catalogue for now, its repository and release kept. The kernel names neither.
+
 ## 0.102.1 — 2026-10-20
 
 A fix and a wording change. No layout change, no migration.

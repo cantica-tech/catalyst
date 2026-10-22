@@ -227,7 +227,7 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 
 ## R7 — Prove and release 1.0 (M)
 
-* Second module as CI fixture and a real pilot: **risk management** (owner decision B1, 2026-10-17: software engineering first, with a foray into risk management; not a 1.0 product promise); **a CI fixture since 2026-10-19** (HK-000005: `tests/test_second_module.py`, the published module at its release tag, driven end to end on every change).
+* Second module as CI fixture and a real pilot: **cantica-knowledge-base** since 2026-10-22 (owner decision B1, revised: knowledge bases, project or reflective of the Cantica ecosystem, classified, with versioned vector-database builds; REQ-000083), after **risk management**, out of scope for now (B1, 2026-10-17; its repository and 0.1.0 release kept); not a 1.0 product promise. **A CI fixture since 2026-10-19** (HK-000005: `tests/test_second_module.py`, the published module at its release tag, driven end to end on every change).
 * Human beta trial (RM-026/028/029 in the existing roadmap were waiting on this) using `beta/` material rewritten for the new flow — **the owner is the first beta tester** (D3, 2026-10-17), so it can start.
 * First-class agents at 1.0: **Claude Code, GitHub Copilot and Gemini CLI** (B2, 2026-10-17): `catalyst agent install` wires all three; `catalyst agent run` needs Copilot and Gemini CLI adapters (R5.5 follow-up).
 * Format changes keep coming as many small releases, each with its migration (B6, 2026-10-17).

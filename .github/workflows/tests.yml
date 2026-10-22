@@ -25,9 +25,9 @@ jobs:
       - name: The second module, a fixture (R7; tests/test_second_module.py)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
-          repository: cantica-tech/catalyst-risk-management
+          repository: cantica-tech/catalyst-cantica-knowledge-base
           ref: 0.1.0
-          path: _fixtures/catalyst-risk-management
+          path: _fixtures/catalyst-cantica-knowledge-base
           persist-credentials: false
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
@@ -41,6 +41,6 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: Run tests
         env:
-          CATALYST_RISK_MODULE: ${{ github.workspace }}/_fixtures/catalyst-risk-management
+          CATALYST_KB_MODULE: ${{ github.workspace }}/_fixtures/catalyst-cantica-knowledge-base
           CATALYST_REQUIRE_FIXTURES: "1"  # the fixture module is present here: its test may not skip
         run: python -m pytest -q
