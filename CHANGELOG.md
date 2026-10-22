@@ -20,6 +20,8 @@ Workflow governance (REQ-000084). A migration: `migrations/0.104.0/workflow-gove
   a condition that fails, and `--force` does not pass it. `catalyst view` lists its moves; `check` reports two
   governing one type and anything a workflow names wrongly. The workflow template gains `Governs`, `Escalates to` and
   Transitions (a new template version, which `catalyst migrate --apply` adds).
+- Fixed: `catalyst migrate` left out the judgment steps of a migration starting before the deployment's previous
+  kernel (BUG-000028).
 
 ## 0.103.1 — 2026-10-22
 
