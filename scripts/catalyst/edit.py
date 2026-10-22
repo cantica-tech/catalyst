@@ -343,7 +343,9 @@ def new(
         from catalyst import gates
 
         try:
-            entered = gates.entering(dep, corpus, etd.id_prefix, str(given[status.name]))
+            fields = {k: ", ".join(v) if isinstance(v, list) else str(v) for k, v in given.items()}
+            draft = Artifact(id="", prefix=etd.id_prefix, file=Path(), title=title, fields=fields)
+            entered = gates.entering(dep, corpus, etd.id_prefix, str(given[status.name]), draft)
         except gates.GateError as exc:
             raise EditError(str(exc)) from None
         if entered:  # a version nobody approved yet: create it, approve it, then `status set`
@@ -485,11 +487,16 @@ def set_status(
             f"{etd.name} cannot go from {old} to {status} (from {old}: {', '.join(nexts) or 'nothing'}; "
             "--through walks the states between)"
         )
-    from catalyst import gates
+    from catalyst import gates, workflows
     from catalyst.guards import failures
 
     blocked: list[str] = []
-    for state in path:  # each state on the way passes its gates and guards, as one `status set` would
+    prev = old
+    for state in path:  # each state on the way passes its workflow, gates and guards, as one `status set` would
+        governed = workflows.refusal(dep, corpus, art, prev, state, signer)  # --force never passes a workflow
+        if governed:
+            raise EditError(governed)
+        prev = state
         try:
             refused = gates.refusal(dep, corpus, item_id, state)  # before the guards: --force never passes a gate
         except gates.GateError as exc:

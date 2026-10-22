@@ -39,7 +39,11 @@
             ]
           },
           "approvals": { "type": "integer", "minimum": 1 },
-          "role": { "type": "string" }
+          "role": { "type": "string" },
+          "when": {
+            "type": "string",
+            "description": "A gate covering an entity type: it applies only when this condition on the entity's fields holds, e.g. `Classification at least Confidential` (`<Field> is|is not|in|not in|at least|at most <value>`, `<Field> is set|is empty`)."
+          }
         }
       }
     }

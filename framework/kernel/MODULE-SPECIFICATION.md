@@ -80,7 +80,7 @@ catalyst-<module-id>/
 | `namespace` | `string` | No | The module's own meta-rule and invariant namespace (`SE`): its meta-rules are `rr-<NS>-NNN`, its invariants `INV-<NS>-n` (ADR-019). Composition widens and signs them like `rr-META-`. |
 | `aliases` | `map` | No | Old ID → the ID it is now (`rr-META-009: rr-SE-001`). An old ID, short or widened and signed, keeps resolving: `validate` and `view` take it as the rule it now is, and `catalyst why <old>` explains the new one. |
 | `tiers` | `list[object]` | No | The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`. |
-| `entities` | `map` | Conditional | Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, sections and definition. Required unless the module lists `entity_types`. |
+| `entities` | `map` | Conditional | Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, `due`, sections and definition. Required unless the module lists `entity_types`. |
 | `entity_types` | `list[object]` | Conditional | The module's ETD files (`id`, `schema`). Format 2; required unless the module declares `entities` (format 3). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
@@ -137,8 +137,10 @@ generates what the module would otherwise ship (module v3, M3):
   (`kind`, `required`, `to` for a reference's target — a list for several —,
   `values` for an enum, `backref`, `required_when_closed`, `hint`), `states`,
   `status_hint`,
-  `initial`, `closed`, `guards`, `storage: rows` for a type kept as table
-  rows. It reads into the same type a §4 schema gives.
+  `initial`, `closed`, `guards` (each `section_written`, `nonempty`,
+  `children_closed` or `holds: <condition>`), `due` (`<date field>` or
+  `<date field> + <n> days`: when an open entity is overdue), `storage: rows`
+  for a type kept as table rows. It reads into the same type a §4 schema gives.
 - **Its template**: the title, the field table `catalyst new` fills (a
   field's `hint`, or `status_hint` for `Status`, is what its cell tells the
   author; otherwise a placeholder for its kind), `Signed-off-by`, then each
@@ -210,8 +212,9 @@ format and live in `framework/kernel/entities/`.
 | `initial` | `string` | Yes | Status on creation. |
 | `states` | `list[string]` | Yes | All valid statuses. |
 | `closed_states` | `list[string]` | Yes | Statuses meaning done. |
-| `guards` | `map` | No | State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one. |
+| `guards` | `map` | No | State → the conditions entering it requires, each one of `children_closed: <field>` (every artifact the field cites is in a closed state), `nonempty: <field>`, `section_written: <heading>` (the section's text differs from the type's template's), `holds: <condition>` (a condition on its fields, e.g. `Classification at least Confidential`: `<Field> is\|is not\|in\|not in\|at least\|at most <value>` or `<Field> is set\|is empty`, ordered by the field's enum values, else as numbers or dates). `catalyst status set` refuses to enter a state while one fails (`--force` overrides it, journaled); `catalyst check` warns about an artifact already in a guarded state that fails one. |
 | `transitions` | `list[object]` | No | Allowed `from` → `to` moves. |
+| `due` | `string` | No | When an open entity of the type is due: a date field (`Due`), or a date field plus days (`Checked + 30 days`). Past it, `catalyst inbox` lists it as `overdue`, with the role a governing workflow escalates to, and `catalyst check` warns. |
 
 <!-- end generated: etd-workflow -->
 

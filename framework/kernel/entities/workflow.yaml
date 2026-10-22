@@ -15,6 +15,12 @@ fields:
       - Draft
       - Active
       - Deprecated
+  - name: Governs
+    kind: text
+    required: false
+  - name: Escalates to
+    kind: text
+    required: false
 
 workflow:
   initial: Draft

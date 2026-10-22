@@ -132,6 +132,13 @@ def run(dep: Deployment) -> Report:
     from catalyst import gates
 
     report.errors += [f"gates: {p}" for p in gates.problems(dep, corpus)]
+    from catalyst import workflows
+
+    report.errors += [f"workflow: {p}" for p in workflows.problems(dep, corpus)]
+    report.errors += [f"type: {p}" for p in workflows.definition_problems(dep)]
+    for o in workflows.overdue(dep, corpus):
+        to = f"; escalate to {o['escalate_to']}" if o["escalate_to"] else ""
+        report.warnings.append(f"overdue: {o['id']} is {o['status']}, due {o['due']} ({o['days']} day(s) ago){to}")
     from catalyst import proposals
 
     report.errors += [f"proposal: {p}" for p in proposals.problems(dep, corpus)]

@@ -281,7 +281,7 @@ def _check_gated_move(dep: Deployment, corpus: Corpus, p: dict, content: str) ->
     if not then or then == now:
         return
     try:
-        entering = gates.entering(dep, corpus, art.prefix, then)
+        entering = gates.entering(dep, corpus, art.prefix, then, art)
     except gates.GateError as exc:
         raise ProposalError(str(exc)) from None
     short = []
