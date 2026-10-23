@@ -12,7 +12,7 @@ They decided four questions on stage two (design `28`, ADR-000048).
 
 | What | Where |
 |---|---|
-| Kernel 0.105.0: identity providers (REQ-000086) | `cantica-tech/catalyst` |
+| Kernel [0.105.0](https://github.com/cantica-tech/catalyst/releases/tag/0.105.0): identity providers (REQ-000086) | `cantica-tech/catalyst`; the distribution repository `cantica-tech/cantica-tech` |
 | catalyst-users 0.1.0 | [`cantica-tech/catalyst-users`](https://github.com/cantica-tech/catalyst-users/releases/tag/0.1.0) |
 | Build 1.0.0 of the identity-design knowledge base (`KBUILD-000001` of catalyst-users) | The curator's machine (Internal) |
 
@@ -60,7 +60,12 @@ They decided four questions on stage two (design `28`, ADR-000048).
 - The identity tests: 26 with a fake provider, and 4 for the vendored code.
 - An end-to-end run against a real Keycloak (catalyst-users' dev realm), recorded as TEST-000001: login, signing, the
   ledger, roles, a gate, a serve import and push, forged and missing tokens, a rewritten ledger, and logged out.
-- `task check:all`, `task lint`: see the final run below.
+- `task check:all`: deployment valid, command parity and kernel purity pass, 791 tests pass locally. The release's
+  CI ran pytest on Ubuntu, macOS and Windows with Python 3.11 and 3.13, plus the standards lint and the deployment
+  check, on each pull request (#311 into `main`, #312 into `release`): all passed.
+- **Windows found one test assuming POSIX file modes.** The first CI run of #311 failed on Windows only, where a
+  token file reads `0o666`; the mode is now asserted on POSIX only. Windows keeps a user's home private by its own
+  access-control lists.
 - Pyright: 0 errors. 4 new warnings, all in the vendored code; they are fixed in catalyst-users and arrive with its
   next release.
 
@@ -81,9 +86,20 @@ They decided four questions on stage two (design `28`, ADR-000048).
 
 ## What's left
 
-- **catalyst-users 0.1.1** (the vendored code's typing fix), then vendor it again.
 - **Migrating a `local` deployment's users into a provider:** a later command.
 - **Key-backed signatures for approvals** (`gitsign`, SSH commit signing): a separate decision.
 - **The UI** may want `catalyst identity` and the new spec schemas (`identity-whoami`, `identity-status`,
   `approve.roles`, `role.provider_role`).
 - **The journal's time-order warning across shards** could take shard order into account.
+
+## Afterwards (the same day)
+
+- **catalyst-users 0.1.1** released: the typing fix; Keycloak's dev database kept in `.keycloack/` (the owner's
+  choice, outside git); `keycloak/set_admin.py` makes the owner the realm's only admin from the macOS keychain, with
+  nothing personal in the public repository (REQ-000004). The new volume broke CI's integration job on a fresh
+  runner (BUG-000001: Docker created the mount root-owned); CI now creates it writable.
+- **Kernel 0.105.1** vendors catalyst-users 0.1.1: pyright reports nothing in the identity code.
+- **catalyst's `BACKLOG.md`** is refreshed (last done 2026-09-29): 13 bugs `Fixed` and awaiting closure, no open
+  requirement, 12 flagged rules with no open work; roadmap row RM-000034 is Done (its requirement is Completed).
+- **Still left from the backlog:** closing the 13 fixed bugs once each test plan names its covering test, and the
+  roadmaps' "Not triaged" rows that no feature or requirement links yet.

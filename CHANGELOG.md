@@ -6,6 +6,13 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.105.1 — 2026-10-23
+
+No layout change, no migration.
+
+- Changed: the vendored identity code is `cantica-tech/catalyst-users` 0.1.1 (`Tokens.from_dict` typed, no behaviour
+  change), so pyright reports nothing in it.
+
 ## 0.105.0 — 2026-10-23
 
 Identity providers (REQ-000086, design 28, ADR-000048). A migration: `migrations/0.105.0/identity-providers.md`.
