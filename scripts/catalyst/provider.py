@@ -125,7 +125,7 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
         return backend.whoami(as_user if backend.kind == "static" else None)
     except NotLoggedInError:
         system = system_backend(backend.issuer, transport)
-        if system is None or (as_user and as_user.strip().lower() != str(getattr(system, "username", "")).lower()):
+        if system is None:
             raise ProviderError(
                 f"no verified identity: not logged in to {backend.issuer} (`catalyst identity login`)"
             ) from None
@@ -133,6 +133,10 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
             who = system.system_whoami()
         except CatalystUsersError as exc:
             raise ProviderError(f"no one is logged in, and the system account cannot sign in: {exc}") from None
+        if as_user and as_user.strip().lower() not in {who.username.lower(), who.name.lower(), who.subject.lower()}:
+            raise ProviderError(  # --as names someone else: never the system account for them
+                f"no verified identity: not logged in to {backend.issuer} (`catalyst identity login`)"
+            ) from None
         print(f"catalyst: no one is logged in: signing as the system account {who.username}", file=sys.stderr)
         return who
     except CatalystUsersError as exc:

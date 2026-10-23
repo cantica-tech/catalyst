@@ -29,6 +29,9 @@ A layout change, with a migration (`migrations/0.106.0/users-outside-catalyst.md
   settings, the system account).
 - Changed: `spec/identity-whoami.schema.json` carries groups, grants and the reconciliation level;
   `spec/identity-status.schema.json` drops `client`.
+- Fixed: reading several journal shards, an entry that only creates files keeps its place in time instead of
+  overtaking an earlier entry that waits on its own shard's chain, which reported every later entry out of time
+  order (BUG-000030).
 - Fixed: `catalyst spec <command>` keeps a procedure's numbered or bulleted list, code block or indented text with that
   procedure even when its first line names another command; such a list was printed under the command it named, and
   the procedure it belonged to came out with no steps (BUG-000029).
