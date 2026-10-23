@@ -204,7 +204,13 @@ def user_assign_role(dep: Deployment, name: str, role: str, signer: dict, intent
 
 # --- roles ----------------------------------------------------------------
 def role_add(
-    dep: Deployment, role: str, actions: list[str], signer: dict, intent: list[str], reconciliation: str = "propose"
+    dep: Deployment,
+    role: str,
+    actions: list[str],
+    signer: dict,
+    intent: list[str],
+    reconciliation: str = "propose",
+    provider_role: str | None = None,
 ) -> dict:
     if reconciliation not in RECONCILIATION_LEVELS:
         raise AdminError(f"reconciliation is one of {', '.join(RECONCILIATION_LEVELS)}")
@@ -213,6 +219,8 @@ def role_add(
     if _find(data["roles"], role):
         raise AdminError(f"role '{role}' exists — use `role modify`")
     entry = {"name": role, "actions": actions, "reconciliation": reconciliation}
+    if provider_role:
+        entry["provider_role"] = provider_role  # the identity provider's role that grants it (fw-IDENTITY-000004)
     data["roles"].append(entry)
     _save(dep.root / ROLES, data)
     _journal(
@@ -221,19 +229,37 @@ def role_add(
     return entry
 
 
-def role_modify(dep: Deployment, role: str, actions: list[str], signer: dict, intent: list[str]) -> dict:
+def role_modify(
+    dep: Deployment,
+    role: str,
+    actions: list[str] | None,
+    signer: dict,
+    intent: list[str],
+    provider_role: str | None = None,
+) -> dict:
+    """Replace a role's actions; with `provider_role` alone, set only the identity provider's role that grants
+    it (`""` removes it)."""
     data = _load(dep, ROLES, "roles", [])
     entry = _find(data["roles"], role)
     if entry is None:
         raise AdminError(f"no role '{role}' — use `role add`")
-    entry["actions"] = actions  # signatures already recorded are not touched
+    if actions is not None or provider_role is None:
+        entry["actions"] = actions or []  # signatures already recorded are not touched
+    if provider_role is not None:
+        if provider_role:
+            entry["provider_role"] = provider_role
+        else:
+            entry.pop("provider_role", None)
     _save(dep.root / ROLES, data)
     _journal(
         dep,
         "/role-modify",
         "update",
         f"role {role}",
-        intent or [f"Role {role}: actions replaced"],
+        intent
+        or [
+            f"Role {role}: {'actions replaced' if actions is not None or provider_role is None else 'provider role set'}"
+        ],
         [dep.root / ROLES],
         signer,
     )

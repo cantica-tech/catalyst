@@ -89,6 +89,9 @@ the first, in name order, that parses as a JSON object is read.
 | `agent` | string | The project's default agent, e.g. `claude-code` (`unknown` if none was given). Each user's own choice wins: `catalyst open --agent <id>` records it in `$CATALYST_HOME/projects/<name>/agent`, never here. | — |
 | `workspace` | string | Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, users and roles (R3.1b). | — |
 | `role_check` | string | Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose roles do not grant its command, or warns with `warn` (decision D5). | — |
+| `identity` | string | Optional: the deployment's identity provider, `local` (the default: `IAM/users/users.json`) or `oidc` (an OIDC provider's accounts sign, verified; design 28). Set by `catalyst identity configure`. | `check`: error for another value, or `oidc` without `identity_issuer`. |
+| `identity_issuer` | string | With `identity = "oidc"`: the provider's issuer URL (`https://id.example.com/realms/catalyst`), HTTPS except on a loopback host. | `check`: required with `oidc`; the login refuses a discovery document naming another issuer. |
+| `identity_client` | string | With `identity = "oidc"`: the provider's public client with the device grant that `catalyst identity login` uses (default `catalyst-cli`). | — |
 | `embed_origins` | string | Optional: the origins, comma-separated (`https://wiki.example.com, http://localhost:3000`), whose pages may read this criterion through `catalyst serve --local` (decision B8): their reads get CORS headers, each with its reader's token; nothing is written. Absent: no other origin. | `serve` refuses an origin that is not `scheme://host[:port]`. |
 | `analysis_passes` | integer | Optional: the default number of independent passes of an analysis, `2` (four-eyes, the default) or `1`; `catalyst analysis start --passes` overrides it for one analysis. | `catalyst analysis start` refuses another value. |
 | `governance` | string | Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything. | — |
@@ -413,7 +416,24 @@ one user is active (INV-16), every userid is well-formed and unique
 file exists. A role's `actions` entries that start with `/` grant those
 commands, `*` grants all, and so does the `Admin` role; a writing verb
 refuses a signer whose roles grant none for its change (`Rules-of-Rules.md`
-§11), unless `catalyst.toml` sets `role_check = "warn"`.
+§11), unless `catalyst.toml` sets `role_check = "warn"`. A role may name
+`provider_role`: with an identity provider (`identity = "oidc"`), a signer
+holds the role when the provider gives it that role (`check` warns of a role
+without one there).
+
+`IAM/signers.jsonl`, with an identity provider only: the signers ledger, one
+JSON object per line, appended by catalyst at an identity's first signature
+(journaled), never edited or removed, merged by union in a shared criterion:
+
+```json
+{"userid": "Xk3pQ9aB", "iss": "https://id.example.com/realms/catalyst", "sub": "3c154a14-…", "username": "alice", "name": "Alice Developer", "first_signed": "2026-10-23"}
+```
+
+The person is `iss` + `sub`; `username` (the journal's `actor` for their
+entries) and `name` are a snapshot. Structure: every line is JSON with
+`userid`, `iss`, `sub` and `username`; a userid names one identity; no line
+the journal recorded is changed or removed. Its userids are registered for
+INV-26.
 
 ## 7. The journal
 

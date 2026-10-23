@@ -48,18 +48,44 @@ def resolve_signer(
     """The registered, active user signing this operation (CODE-OF-CONDUCT.md
     §2): `--as` when given, else the only active user. Never guessed from git
     config — with several users and no `--as`, the caller must ask. With
-    `command`, one of the signer's roles must grant it (D5, `permissions`)."""
+    `command`, one of the signer's roles must grant it (D5, `permissions`).
+    With an identity provider (`identity = "oidc"`), the signer is the
+    verified, logged-in identity instead (fw-IDENTITY-000002)."""
+    from catalyst import provider
+
+    if provider.is_oidc(dep):
+        try:
+            user = provider.signer(dep, _roles(dep), as_user)
+        except provider.ProviderError as exc:
+            raise IdError(str(exc)) from None
+        return provider.enrolled(dep, _granted(dep, user, command, also))
     if as_user:
         user = corpus.user(as_user)
         if user is None:
             raise IdError(f"'{as_user}' is not a registered user — /user add first")
         if not user.get("active", True):
             raise IdError(f"'{as_user}' is deactivated and signs nothing (INV-16)")
+        if user.get("iss"):
+            raise IdError(f"'{as_user}' signed with an identity provider; this deployment's provider is local")
     else:
-        active = [u for u in corpus.users if u.get("active", True)]
+        active = [u for u in corpus.users if u.get("active", True) and not u.get("iss")]
         if len(active) != 1:
             raise IdError("cannot tell who is signing — pass --as <name|git_username>")
         user = active[0]
+    return _granted(dep, user, command, also)
+
+
+def _roles(dep: Deployment) -> list[dict]:
+    try:
+        data = json.loads((dep.root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    roles = data.get("roles", []) if isinstance(data, dict) else []
+    return [r for r in roles if isinstance(r, dict)]
+
+
+def _granted(dep: Deployment, user: dict, command: str | None, also: tuple[str, ...]) -> dict:
+    """`user`, once one of its roles grants `command` (D5); refused otherwise."""
     if command:
         from catalyst import permissions, unrecorded
 

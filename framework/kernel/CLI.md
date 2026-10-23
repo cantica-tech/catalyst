@@ -137,8 +137,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst user remove <name>` | deactivate a user (never deleted; never the last active one) | `--as`, `--intent`, `--json` |
 | `catalyst user modify <name> <field> <value>` | change one field (not name, registered, userid or roles) | `--as`, `--intent`, `--json` |
 | `catalyst user assign-role <name> <role>` | add a role to a user | `--as`, `--intent`, `--json` |
-| `catalyst role add <name>` | add a role with its actions and reconciliation level | `--action`, `--as`, `--intent`, `--json`, `--reconciliation` |
-| `catalyst role modify <name>` | replace a role's actions | `--action`, `--as`, `--intent`, `--json` |
+| `catalyst role add <name>` | add a role with its actions and reconciliation level | `--action`, `--as`, `--intent`, `--json`, `--provider-role`, `--reconciliation` |
+| `catalyst role modify <name>` | replace a role's actions, or set its provider role | `--action`, `--as`, `--intent`, `--json`, `--provider-role` |
 | `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
 | `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
 | `catalyst definition list` | each deployed definition: its slug, version and description | `--json` |
@@ -196,6 +196,11 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst criterion sync` | fast-forward to the shared branch (refuses with local work) | `--url`, `--yes` |
 | `catalyst criterion integrity` | fail if a merge lost any ID, index row or journal line | `--head`, `--parent` |
 | `catalyst criterion protect` | branch protection for the shared branch (GitHub) | `--yes` |
+| `catalyst identity configure <provider>` | choose the provider: local (users.json) or oidc (writes catalyst.toml) | `--as`, `--client`, `--intent`, `--issuer` |
+| `catalyst identity login` | log in with a code shown in your browser (the device flow) | `--json` |
+| `catalyst identity logout` | revoke your session and delete your tokens | — |
+| `catalyst identity whoami` | who the provider says you are, your userid and your roles here | `--json` |
+| `catalyst identity status` | the provider, and whether you are logged in (no network) | `--json` |
 | `catalyst userid gen` | draw a new unique userid (INV-26) | — |
 
 <!-- end generated: cli-index -->
@@ -960,6 +965,35 @@ still made (R4.8).
   other rules, no version at that time, a version redacted or no longer
   held, a file already as it stood then.
 
+### Identity providers: `catalyst identity`
+
+Who signs (design 28). `catalyst.toml` `identity = "local"`, the default, keeps
+`IAM/users/users.json` as the registry. `identity = "oidc"` makes an OIDC
+provider's accounts the deployment's people:
+
+- `identity configure local|oidc [--issuer <url>] [--client <id>]` writes the
+  keys, signed (`--as`) under the provider in force before the change and
+  journaled. Map the roles first (`role modify <role> --provider-role <role>`),
+  while a registered user can still sign.
+- `identity login` (the device flow: open the link, confirm the code),
+  `identity logout` (revokes), `identity whoami`, `identity status` (no
+  network). Tokens are kept owner-only under `$CATALYST_HOME/identity/`, never
+  in a criterion or a project.
+- Every writing verb signs as the logged-in identity, refreshed and confirmed
+  by the provider; `--as` names only that identity; with no verified identity
+  (not logged in, the provider unreachable) nothing is signed, and the read
+  verbs still work. An identity's first signature appends its line to
+  `IAM/signers.jsonl` (`FORMAT.md` §6); its userid ends every ID it creates and
+  the journal's `actor` is the ledger's username.
+- Its roles are the deployment's roles whose `provider_role` the provider gives
+  it. An approval records them, and its gate counts it with them.
+- `user add|remove|modify|assign-role` refuse: people are managed in the
+  provider.
+
+The OIDC code is catalyst-users' standard-library core, vendored under
+`scripts/catalyst/identity/` at a release (`VERSION`); it is changed there, then
+vendored again with `scripts/vendor_identity.py`.
+
 ### Approval gates: `approve`, `approvals`
 
 Opt-in (decision G): a deployment declares its gates in `IAM/gates.json`
@@ -1491,6 +1525,15 @@ only its signers are not checked.
 
 Tokens are managed on the server's host, by whoever runs the server.
 
+With `--identity-issuer <url>` (and `--identity-api-client <id>`, default
+`catalyst-api`; its secret in `CATALYST_IDENTITY_API_SECRET`), the server also
+accepts that identity provider's access tokens: only when the provider's
+introspection says the token is active, issued by that issuer and meant for the
+API client, kept at most 30 seconds. The signer of a push is the line of
+`IAM/signers.jsonl` for the token's issuer and subject; a push may add ledger
+lines for its own identity only (an import, every signer's) and never change
+one. The client of an `oidc` deployment sends its provider token.
+
 Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
 adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
 requests get `Access-Control-Allow-Origin` and the preflight for a GET is
@@ -1819,6 +1862,9 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst share info` | `spec/share-info.schema.json` |
 | `catalyst share status` | `spec/share-status.schema.json` |
 | `catalyst share push` | `spec/share-push.schema.json` |
+| `catalyst identity login` | `spec/identity-whoami.schema.json` |
+| `catalyst identity whoami` | `spec/identity-whoami.schema.json` |
+| `catalyst identity status` | `spec/identity-status.schema.json` |
 
 <!-- end generated: cli-json -->
 
@@ -1996,11 +2042,13 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst role add` | `<name>` | the role's name |
 |  | `--action` `ACTION` | an action the role may take (repeatable) |
 |  | `--reconciliation` `RECONCILIATION` | what the role may do with a reconciliation case: decide it, propose, or nothing (one of `full`, `propose`, `none`; default `propose`) |
+|  | `--provider-role` `PROVIDER_ROLE` | the identity provider's role that grants it (identity = oidc) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst role modify` | `<name>` | the role's name |
 |  | `--action` `ACTION` | an action the role may take (repeatable) |
+|  | `--provider-role` `PROVIDER_ROLE` | the identity provider's role that grants it (identity = oidc; alone, actions are kept; "" removes it) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2180,6 +2228,15 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst criterion integrity` | `--head` `HEAD` | the merge commit to check (default `HEAD`) |
 |  | `--parent` `PARENT` | compare against this revision (repeatable; default: the head's own parents) |
 | `catalyst criterion protect` | `--yes` | apply it (without: show what would be set) |
+| `catalyst identity configure` | `<provider>` | One of `local`, `oidc` |
+|  | `--issuer` `ISSUER` | oidc: the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst` |
+|  | `--client` `CLIENT` | oidc: the public client with the device grant (default: catalyst-cli) |
+|  | `--as` `AS_USER` | signer, under the provider in force before the change |
+|  | `--intent` `INTENT` | why (repeatable; journaled) |
+| `catalyst identity login` | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst identity logout` | — | — |
+| `catalyst identity whoami` | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst identity status` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst userid gen` | — | — |
 
 <!-- end generated: cli-options -->

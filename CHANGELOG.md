@@ -6,6 +6,26 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.105.0 — 2026-10-23
+
+Identity providers (REQ-000086, design 28, ADR-000048). A migration: `migrations/0.105.0/identity-providers.md`.
+
+- Added: `catalyst.toml` `identity`: `local` (the default, unchanged) or `oidc` with `identity_issuer` and
+  `identity_client`, set by `catalyst identity configure`. With a provider, the deployment's people are its accounts.
+- Added: `catalyst identity login` (the device flow), `logout`, `whoami`, `status`; tokens owner-only in catalyst's
+  home. Every writing verb signs as the verified, logged-in identity; `--as` names only it; with no verified identity
+  nothing is signed, and the read verbs still work. `catalyst user …` refuses with a provider.
+- Added: the signers ledger `IAM/signers.jsonl`: an identity's first signature appends its userid, issuer, subject and
+  a name snapshot, journaled; never edited (`check` reports a changed or removed line); merged by union in a shared
+  criterion. Its userids are registered (INV-26).
+- Added: a role's `provider_role` (`catalyst role add|modify --provider-role`): a provider's signer holds the roles its
+  provider gives it; an approval records them and the gate counts it with them; `check` warns of an unmapped role.
+- Added: `catalyst serve --identity-issuer` also accepts the provider's access tokens by introspection; a push is
+  signed by the ledger line of the token's identity and may add ledger lines for its own identity only. An `oidc`
+  deployment's client sends its provider token.
+- Added: the OIDC code is the standard-library core of `cantica-tech/catalyst-users` 0.1.0, vendored under
+  `scripts/catalyst/identity/` with its hashes checked (`scripts/vendor_identity.py`).
+
 ## 0.104.1 — 2026-10-22
 
 No layout change, no migration.
