@@ -142,6 +142,20 @@ def run(dep: Deployment) -> Report:
     from catalyst import proposals
 
     report.errors += [f"proposal: {p}" for p in proposals.problems(dep, corpus)]
+    from catalyst import provider
+
+    if not dep.standalone:
+        report.errors += [f"identity: {p}" for p in provider.problems(dep.pointer)]
+    report.errors += [f"identity: {p}" for p in provider.ledger_problems(dep.root)]
+    report.errors += [f"identity: {p}" for p in provider.ledger_history_problems(dep)]
+    if provider.is_oidc(dep):
+        from catalyst.ids import _roles
+
+        for name in provider.unmapped_roles(_roles(dep)):
+            report.warnings.append(
+                f"identity: role {name} has no provider_role, so nobody holds it with an identity provider "
+                f"(`catalyst role modify '{name}' --provider-role <role>`)"
+            )
     for w in gates.unapproved_rules(dep, corpus):
         report.errors.append(
             f"gates unapproved: {w['id']}: its current text lacks {w['missing']} of {w['approvals']} approval(s) "

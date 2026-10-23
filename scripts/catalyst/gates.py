@@ -216,6 +216,20 @@ def recorded(dep: Deployment, item_id: str, gate_id: str, blob: str, entries: li
     return out
 
 
+def _roles_recorded(item_id: str, gate_id: str, blob: str, entries: list[dict]) -> dict[str, list[str]]:
+    """The roles each approval of this version recorded (its first one), by actor."""
+    out: dict[str, list[str]] = {}
+    for entry in entries:
+        if (
+            entry.get("action") == APPROVE
+            and entry.get("artifact") == item_id
+            and entry.get("gate") == gate_id
+            and (entry.get("approved") or {}).get("blob") == blob
+        ):
+            out.setdefault(str(entry.get("actor")), [str(r) for r in entry.get("roles") or []])
+    return out
+
+
 def counted(
     dep: Deployment,
     corpus: Corpus,
@@ -231,9 +245,12 @@ def counted(
     path, blob = current or version(dep, corpus, item_id)
     wrote = wrote if current and wrote is not None else author(dep, path, blob, entries)
     counts = []
+    held = _roles_recorded(item_id, gate.id, blob, entries)
     for actor in recorded(dep, item_id, gate.id, blob, entries):
         user = corpus.user(actor)
-        if user and user.get("active", True) and gate.role in (user.get("roles") or []) and not _same(user, wrote):
+        # an identity provider's signer holds the roles its approval recorded (fw-IDENTITY-000004)
+        roles = held.get(actor, []) if user and user.get("iss") else (user or {}).get("roles") or []
+        if user and user.get("active", True) and gate.role in roles and not _same(user, wrote):
             counts.append(actor)
     return counts, max(0, gate.approvals - len(counts))
 
@@ -310,6 +327,8 @@ def approve(
     }
     if case is not None:
         entry["proposal"] = case.id
+    if signer.get("iss"):  # verified by the identity provider: its roles now are the approval's (fw-IDENTITY-000004)
+        entry["roles"] = list(signer.get("roles") or [])
     if tier:
         entry["tier"] = tier
     with journal.journal_lock(dep):

@@ -105,9 +105,17 @@ In a shared deployment (`rr-META-013`):
   registration lands through a pull request like any other change. Their
   `userid` suffixes every ID they allocate, which is what keeps IDs unique
   across contributors (`Rules-of-Rules.md` §6).
-- **Identity is still self-declared.** `--as <user>` and `Signed-off-by`
-  record who the operator says they are; catalyst cannot verify it, and a
-  signature already written is never rewritten.
+- **Identity is self-declared, unless a provider verifies it.** `--as <user>`
+  and `Signed-off-by` record who the operator says they are; catalyst
+  cannot verify it, and a signature already written is never rewritten.
+- **An identity provider verifies who signs.** With `identity = "oidc"`
+  (`catalyst identity configure`), the signer is the identity logged in
+  with `catalyst identity login`, confirmed by the provider at each
+  signature; `--as` names only that identity, and with no verified identity
+  nothing is signed. Its roles come from the provider through each role's
+  `provider_role`; people are added and disabled in the provider, never with
+  `/user`. Each identity's first signature adds it to `IAM/signers.jsonl`,
+  append-only, so every signature stays resolvable (L7).
 - **The real controls are the host's.** Who can push to the criterion
   repository, who may merge a pull request into the shared branch, and
   whether review and the `catalyst` check are required. `catalyst criterion
@@ -119,7 +127,9 @@ In a shared deployment (`rr-META-013`):
   (`share = "serve"`), every request carries the user's token, and the
   server refuses a journal entry signed by anyone else and a `RECON-`
   decision beyond the signer's `reconciliation` level. Who holds a token is
-  the server host's control (`catalyst serve token`).
+  the server host's control (`catalyst serve token`); started with
+  `--identity-issuer`, the server also accepts the provider's tokens, by
+  introspection, and lets a push add ledger lines for its own identity only.
 - **The AI never applies a merge.** A conflict stops `/share push`; a
   resolution the agent proposes waits as a `RECON-` case, and resolving it
   stays role-gated (§1, `catalyst reconcile`).
