@@ -18,13 +18,13 @@
 | **Workflow** | `WORKFLOW-NNNNNN` guiding this case's resolution, if any — optional, leave blank unless a documented procedure for this recurring kind of conflict exists (`Rules-of-Rules.md` §19) |
 | **Trigger** | `rights-mismatch` / `merge-conflict` / `unrecorded-change` / `manual` / `proposal` |
 | **Status** | `Open` / `Under Review` / `Resolved-Accepted` / `Resolved-Accepted-with-Edits` / `Resolved-Rejected` / `Closed` |
-| **Proposer** | name (role) — see `IAM/users/users.json` |
+| **Proposer** | name (role) — the signer (`IAM/signers.jsonl`); the role is catalyst-users' |
 | **Baseline** | content hash + short description of `criterion`'s version at open time (a proposal: the entity's file when proposed, its base) |
 | **Proposed** | content hash + short description of the proposer's version (a proposal: its `<RECON-id>.proposed` file) |
 | **Opened** | YYYY-MM-DD |
 | **Resolved** | YYYY-MM-DD (blank until `Status` leaves `Open`/`Under Review`) |
 | **Resolver** | name (role) — blank until resolved |
-| **Signed-off-by** | name of the registered user who opened this case — see `CODE-OF-CONDUCT.md` §2 |
+| **Signed-off-by** | name of the signer who opened this case — see `CODE-OF-CONDUCT.md` §2 |
 
 ## Description
 

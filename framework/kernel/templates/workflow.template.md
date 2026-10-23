@@ -16,7 +16,7 @@
 | **Defined** | YYYY-MM-DD |
 | **Governs** | *(optional)* the entity type prefix whose moves this workflow governs while `Active`, e.g. `KBUILD`; one active workflow per type |
 | **Escalates to** | *(optional)* the role an overdue entity of that type is escalated to |
-| **Signed-off-by** | name of the registered user (`IAM/users/users.json`) who signed this workflow — see `CODE-OF-CONDUCT.md` §2 |
+| **Signed-off-by** | name of the signer (`IAM/signers.jsonl`) who signed this workflow — see `CODE-OF-CONDUCT.md` §2 |
 
 ## Purpose
 

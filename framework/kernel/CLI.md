@@ -84,11 +84,13 @@ is unreachable fails: `check` exits `1`, `hook stop` exits `2`.
 ### Signer
 
 Commands that write a signed value (`id next`, `id next-rule`,
-`journal append`) resolve the registered user signing it
-(`CODE-OF-CONDUCT.md` §2): `--as <name|git_username>` when given, else
-the only active user. It never guesses from git config: with several
-users and no `--as`, the command fails and the agent asks who is
-signing. An unregistered user fails with a pointer to `/user add`.
+`journal append`) sign as the identity catalyst-users verifies at that
+moment (`CODE-OF-CONDUCT.md` §2; `IAM/identity.json` points at it): the
+person logged in with `catalyst identity login`, or, with no one logged in,
+this machine's system account, when its settings point at the same
+provider (said on standard error). `--as <username>` names only that
+identity. It never guesses from git config: with no verified identity the
+command fails, signs nothing, and points to `catalyst identity login`.
 
 ## Commands
 
@@ -99,7 +101,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | Command | What it does | Options |
 |---|---|---|
 | `catalyst validate` | validate the traceability chain against the ETDs | `--json`, `--strict` |
-| `catalyst init` | install catalyst into this project (explicit only, INV-2) | `--agent`, `--at`, `--git-username`, `--kernel`, `--module`, `--module-dir`, `--name`, `--no-module`, `--no-runtime`, `--rule-doc`, `--test-locations`, `--user` |
+| `catalyst init` | install catalyst into this project (explicit only, INV-2) | `--agent`, `--at`, `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--module`, `--module-dir`, `--name`, `--no-module`, `--no-runtime`, `--rule-doc`, `--test-locations`, `--user` |
 | `catalyst check` | run every check: structure, chain, journal, indexes | `--json`, `--strict` |
 | `catalyst hook stop` | end-of-turn hook: block the stop with the failures | `--format`, `--strict` |
 | `catalyst hook commit-msg <message_file>` | git commit-msg hook: the message must trace to the chain | `--route` |
@@ -133,12 +135,12 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--to` |
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--through`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
-| `catalyst user add <name> <role>` | register a user with a fresh userid and one role | `--as`, `--git-username`, `--intent`, `--json` |
-| `catalyst user remove <name>` | deactivate a user (never deleted; never the last active one) | `--as`, `--intent`, `--json` |
-| `catalyst user modify <name> <field> <value>` | change one field (not name, registered, userid or roles) | `--as`, `--intent`, `--json` |
-| `catalyst user assign-role <name> <role>` | add a role to a user | `--as`, `--intent`, `--json` |
-| `catalyst role add <name>` | add a role with its actions and reconciliation level | `--action`, `--as`, `--intent`, `--json`, `--provider-role`, `--reconciliation` |
-| `catalyst role modify <name>` | replace a role's actions, or set its provider role | `--action`, `--as`, `--intent`, `--json`, `--provider-role` |
+| `catalyst user add <name> <role>` | refuses: add people in catalyst-users | `--as`, `--git-username`, `--intent`, `--json` |
+| `catalyst user remove <name>` | refuses: disable people in catalyst-users | `--as`, `--intent`, `--json` |
+| `catalyst user modify <name> <field> <value>` | refuses: change people in catalyst-users | `--as`, `--intent`, `--json` |
+| `catalyst user assign-role <name> <role>` | refuses: grant roles in catalyst-users | `--as`, `--intent`, `--json` |
+| `catalyst role add <name>` | refuses: provision roles in catalyst-users | `--action`, `--as`, `--intent`, `--json`, `--provider-role`, `--reconciliation` |
+| `catalyst role modify <name>` | refuses: change what a role grants in catalyst-users | `--action`, `--as`, `--intent`, `--json`, `--provider-role` |
 | `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
 | `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
 | `catalyst definition list` | each deployed definition: its slug, version and description | `--json` |
@@ -164,7 +166,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst runtime status` | runtimes, launcher and the criterion's runtime version | `--json` |
 | `catalyst move` | move a legacy deployment into $HOME/.catalyst, or rename a project | `--as`, `--name`, `--no-runtime`, `--to-home` |
 | `catalyst migrate` | what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part | `--apply`, `--as`, `--intent`, `--json`, `--kernel`, `--no-runtime`, `--since`, `--template` |
-| `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--git-username`, `--kernel`, `--user` |
+| `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--user` |
 | `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
 | `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
 | `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--mode`, `--name`, `--passes` |
@@ -196,11 +198,11 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst criterion sync` | fast-forward to the shared branch (refuses with local work) | `--url`, `--yes` |
 | `catalyst criterion integrity` | fail if a merge lost any ID, index row or journal line | `--head`, `--parent` |
 | `catalyst criterion protect` | branch protection for the shared branch (GitHub) | `--yes` |
-| `catalyst identity configure <provider>` | choose the provider: local (users.json) or oidc (writes catalyst.toml) | `--as`, `--client`, `--intent`, `--issuer` |
-| `catalyst identity login` | log in with a code shown in your browser (the device flow) | `--json` |
-| `catalyst identity logout` | revoke your session and delete your tokens | — |
-| `catalyst identity whoami` | who the provider says you are, your userid and your roles here | `--json` |
-| `catalyst identity status` | the provider, and whether you are logged in (no network) | `--json` |
+| `catalyst identity configure` | point the deployment at catalyst-users (writes IAM/identity.json) | `--as`, `--catalyst-client`, `--client`, `--intent`, `--issuer`, `--provider` |
+| `catalyst identity login` | log in with a code shown in your browser (the device flow) | `--client`, `--issuer`, `--json` |
+| `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
+| `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
+| `catalyst identity status` | the provider, and whether you are logged in (no network) | `--client`, `--issuer`, `--json` |
 | `catalyst userid gen` | draw a new unique userid (INV-26) | — |
 
 <!-- end generated: cli-index -->
@@ -208,8 +210,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 ### `catalyst init`
 
 ```
-catalyst init --name <name> (--module <module-id> | --no-module) [--user <name>] [--git-username <u>]
-              [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
+catalyst init --name <name> (--module <module-id> | --no-module) [--identity-issuer <url>]
+              [--user <name>] [--git-username <u>] [--rule-doc <file>:<prefix> ...] [--test-locations <where>]
               [--agent <id>] [--no-runtime]
               [--kernel <framework/kernel>] [--module-dir <dir>]
 ```
@@ -227,8 +229,15 @@ it (`INSTANTIATION-GUIDE.md` §1).
   one elsewhere is given with `--module-dir`. `--no-module` installs the
   kernel's types only; `catalyst module install` adds a module later, by
   the same code, and leaves the same criterion.
-- `--user` and `--git-username` register the first user, as Admin, with a
-  fresh userid (INV-16, INV-26). `--user` defaults to the project's
+- `--identity-issuer <url>` (with `--identity-client`, `--catalyst-client`)
+  points the deployment at catalyst-users (`IAM/identity.json`, INV-16);
+  without it, at the provider this machine's catalyst-users is set up for.
+  The installer is the identity catalyst-users verifies there: log in first
+  (`catalyst identity login --issuer <url>`), or, with no one logged in, the
+  machine's system account signs. Nothing is installed without a verified
+  identity. The installer's first signature draws its userid (INV-26).
+- `--user` and `--git-username` name the installer in `DEPLOYMENT.md` and
+  the criterion's git configuration. `--user` defaults to the project's
   `git config user.name`, `--git-username` to `--user`.
 - `--rule-doc <file>:<prefix>` (repeatable) seeds a rule document and its
   ID prefix, e.g. `business-rules:br` (`.md` is added). Default: one
@@ -257,7 +266,7 @@ What it writes, in order (the tree: `ARTIFACT-LAYOUT.md`):
   `rules-of-rules.module.md` appended), `ACCESS-CONTROL.md` (verbatim) and
   `Taskfile.common.yml` (one task per §4 command), with `{{RULES_DIR}}`,
   `{{RULE_DOCS_LIST}}` and `{{TEST_LOCATIONS}}` resolved and the meta-rule
-  IDs signed by the first user (`MODULE-SPECIFICATION.md` §6);
+  IDs signed by the installer (`MODULE-SPECIFICATION.md` §6);
 - the whole module, into `modules/<module-id>/`;
 - every entity folder, kernel and module, at the place its type names,
   each with `templates/` (`README.md`, the catalog with a `v1` row,
@@ -267,8 +276,9 @@ What it writes, in order (the tree: `ARTIFACT-LAYOUT.md`):
   requires;
 - the latest definition of every type at `definitions/<type>.md`, with
   `definitions/README.md`, frozen from then on (INV-23);
-- `IAM/users/` and `IAM/roles/`, the first user as Admin and the default
-  role mapping (INV-16, INV-26);
+- `IAM/identity.json`, the pointer to catalyst-users; `IAM/signers.jsonl`
+  with the installer's line; `IAM/users/`, `IAM/roles/` and `IAM/groups/`,
+  each with its display template (INV-16, INV-26);
 - `version.txt`, `DEPLOYMENT.md`, a root `README.md` stub,
   `ANALYSIS-PLAYBOOK.md`, `INVARIANTS.md` (what `catalyst mcp` and the
   session-start hook re-inject) and the CLI at `bin/catalyst.pyz`;
@@ -374,8 +384,8 @@ Findings come in two levels.
 | `closed-incomplete` | The artifact's `Status` is one of its workflow's closed states, but a field the ETD marks `required_when_closed` is empty (`MODULE-SPECIFICATION.md` §4.2). |
 | `derived` | A derived field (another type's `backref`) disagrees with its sources: it misses an artifact that cites it, or cites one that does not cite it back. `catalyst repair derived` rewrites it. |
 | `ungrounded` | An artifact whose type grounds (`required` or `inherited`) has no resolvable grounding link (INV-5). |
-| `signer` | `Signed-off-by` is missing or names an unregistered user (INV-16). |
-| `id-shape` | An ID is not `<PREFIX>-NNNNNN-<registered userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
+| `signer` | `Signed-off-by` is missing or names no known signer: none in the signers ledger, nor in a retired users registry (INV-16). |
+| `id-shape` | An ID is not `<PREFIX>-NNNNNN-<a signer's userid>`, or its filename does not start with `<PREFIX>-NNNNNN-`. |
 | `rule-unindexed` | A rule is not listed in `rules/rules.md` (INV-8). |
 | `rule-strength` | A rule states a strength other than `must`, `should` or `may` (`FORMAT.md` §5.2). |
 | `rule-file-heading` | A file named as a rule (`<ID>-<slug>.md`) also holds a rule heading (`FORMAT.md` §5.2). |
@@ -387,7 +397,7 @@ promotes them to errors:
 | Code | Meaning |
 |---|---|
 | `enum-value` | An enum field holds a value outside the ETD's allowed values. |
-| `unknown-user` | A `user` or `user-list` field names someone who is not a registered user. |
+| `unknown-user` | A `user` or `user-list` field names someone who is not a known signer. |
 | `guard` | An artifact is in a state whose guards it fails (`MODULE-SPECIFICATION.md` §4.3); it may predate the guard. |
 | `ref-type` | A reference resolves, but to a different type than the ETD expects. |
 | `cardinality` | A single-reference field holds several values. |
@@ -745,16 +755,18 @@ A VS Code workspace is a `<name>.code-workspace` file (comments and trailing
 commas allowed); its members are its folders holding a `catalyst.toml`.
 
 - `init` creates the meta criterion `$CATALYST_HOME/workspaces/<name>/criterion`
-  — rules and domains, users and roles (the first user, Admin: `--user`,
-  default `git config user.name`), its own journal and git repository, no
-  process module — and writes `workspace = "<name>"` into each member's
+  — rules and domains, the pointer to catalyst-users and the signers
+  ledger (`--identity-issuer`, as for `init`; the installer is the identity
+  it verifies), its own journal and git repository, no process module —
+  and writes `workspace = "<name>"` into each member's
   `catalyst.toml` (not committed). A member of another workspace is left
   alone; a workspace name already used on the machine is refused.
 - `status` lists the folders and which are members.
 
-A member also sees the workspace's rules, domains and users, read-only: its
-artifacts may target a workspace rule, and a workspace user may sign. Its own
-entries win on a clash. `catalyst where` names the workspace.
+A member also sees the workspace's rules, domains and signers, read-only:
+its artifacts may target a workspace rule, and it inherits the workspace's
+pointer to catalyst-users when it has none of its own. Its own entries win
+on a clash. `catalyst where` names the workspace.
 
 ### `catalyst move --to-home | --name <new>`
 
@@ -909,12 +921,12 @@ has none of them.
 Each refuses what its slash command refuses, writes, and journals one entry
 (`--as`, `--intent`, `--json`; exit `1` and no change on a refusal).
 
-- `catalyst user add <name> <role> [--git-username <u>]`, `user remove
-  <name>` (deactivates; never the last active user), `user modify <name>
-  <field> <value>` (not `name`, `registered`, `userid`, `roles`), `user
-  assign-role <name> <role>`. A new user gets a drawn userid (INV-26).
-- `catalyst role add <role> --action <a>... [--reconciliation
-  full|propose|none]` (default `propose`), `role modify <role> --action <a>...`.
+- `catalyst user add|remove|modify|assign-role` and `catalyst role
+  add|modify` always refuse, exit `1`: people, roles and what each role
+  grants are catalyst-users' (design 29). The refusal names where to make
+  the change: `catalyst-users users …` for people, `catalyst-users roles
+  provision` to write the roles template into the provider; a grant is then
+  changed in the provider.
 - `catalyst freeze <item>` / `unfreeze <item>`: an artifact ID, entity type,
   template name or working-copy path, listed in (or removed from) the
   working copy's `.frozen`.
@@ -926,7 +938,7 @@ Each refuses what its slash command refuses, writes, and journals one entry
 ### Writing verbs: `new`, `status set`, `link`, `restore`
 
 The mechanical half of creating and changing artifacts, from the entity type
-definitions. Each signs (`--as`, else the only active user), keeps
+definitions. Each signs as the verified identity (Signer, above), keeps
 back-references, regenerates the indexes and writes one journal entry
 (`--intent` repeatable, `--command` names the slash command it runs for,
 `--tier`; without `--tier`, the tier the artifact's type opens when exactly one
@@ -967,28 +979,44 @@ still made (R4.8).
 
 ### Identity providers: `catalyst identity`
 
-Who signs (design 28). `catalyst.toml` `identity = "local"`, the default, keeps
-`IAM/users/users.json` as the registry. `identity = "oidc"` makes an OIDC
-provider's accounts the deployment's people:
+Who signs (design 29). A criterion holds no user or role registry:
+`IAM/identity.json` points at the deployment's catalyst-users configuration
+(`{"provider": "keycloak", "issuer": "https://id.example.com/realms/catalyst"}`,
+`FORMAT.md` §6), and people, roles and groups are catalyst-users':
 
-- `identity configure local|oidc [--issuer <url>] [--client <id>]` writes the
-  keys, signed (`--as`) under the provider in force before the change and
-  journaled. Map the roles first (`role modify <role> --provider-role <role>`),
-  while a registered user can still sign.
+- `identity configure --issuer <url> [--provider keycloak] [--client <id>]
+  [--catalyst-client <id>]` writes the pointer, signed (`--as`) by the
+  identity the new pointer verifies, or the one before it, and journaled.
+  `check` reports a missing or broken pointer; a workspace member may
+  inherit its workspace's.
 - `identity login` (the device flow: open the link, confirm the code),
-  `identity logout` (revokes), `identity whoami`, `identity status` (no
-  network). Tokens are kept owner-only under `$CATALYST_HOME/identity/`, never
-  in a criterion or a project.
-- Every writing verb signs as the logged-in identity, refreshed and confirmed
-  by the provider; `--as` names only that identity; with no verified identity
-  (not logged in, the provider unreachable) nothing is signed, and the read
-  verbs still work. An identity's first signature appends its line to
-  `IAM/signers.jsonl` (`FORMAT.md` §6); its userid ends every ID it creates and
-  the journal's `actor` is the ledger's username.
-- Its roles are the deployment's roles whose `provider_role` the provider gives
-  it. An approval records them, and its gate counts it with them.
-- `user add|remove|modify|assign-role` refuse: people are managed in the
-  provider.
+  `identity logout` (revokes), `identity whoami` (userid, groups, roles and
+  grants, verified now), `identity status` (no network). With `--issuer
+  <url>` each works outside any deployment, e.g. before `catalyst init`.
+  Tokens are kept owner-only under `$CATALYST_HOME/identity/`, never in a
+  criterion or a project.
+- Every writing verb signs as the identity catalyst-users verifies: the
+  logged-in person, refreshed and confirmed by the provider, or, with no one
+  logged in, this machine's system account (the admin `catalyst-users
+  setup` named), when its settings point at the same provider; catalyst says
+  so on standard error. `--as` names only that identity. With no verified
+  identity (not logged in and no system account, the provider unreachable)
+  nothing is signed, and the read verbs still work. An identity's first
+  signature appends its line to `IAM/signers.jsonl` (`FORMAT.md` §6); its
+  userid ends every ID it creates and the journal's `actor` is the ledger's
+  username.
+- The logged-in identity is kept per machine as a read-only snapshot
+  (username, name, groups, roles, grants) with a hash of its content,
+  rewritten at each signature; an edited one is discarded and its owner
+  authenticated anew. A change of roles or groups in the provider is seen
+  at the next signature.
+- What a signer may do is their grants from the provider: `cmd:<command>`,
+  `cmd:*`, and `reconcile:<level>` for `catalyst reconcile`; a role's name
+  grants nothing. An approval records the signer's roles, and its gate
+  counts it with them.
+- `user …` and `role …` refuse: people and roles are managed in
+  catalyst-users. The users, roles and groups templates
+  (`IAM/{users,roles,groups}/templates/`) only shape how people are shown.
 
 The OIDC code is catalyst-users' standard-library core, vendored under
 `scripts/catalyst/identity/` at a release (`VERSION`); it is changed there, then
@@ -999,8 +1027,9 @@ vendored again with `scripts/vendor_identity.py`.
 Opt-in (decision G): a deployment declares its gates in `IAM/gates.json`
 (`framework/kernel/schemas/gates.schema.json`); without the file there is
 no gate. A gate covers the rules of one domain, or an entity type entering
-one state, and asks for a number of approvals from one role of
-`IAM/roles/roles.json`. A type's gate may carry `"when"`, a condition on the
+one state, and asks for a number of approvals from one role: a role of
+the deployment's roles template, held as the provider's role of that name.
+A type's gate may carry `"when"`, a condition on the
 entity's fields (`"Classification at least Confidential"`, below): it then
 applies only to an entity for which it holds. `catalyst check` reports a
 malformed gate, or one naming an unknown role, domain, type, state, field
@@ -1069,7 +1098,7 @@ reconciliation case with `Trigger: proposal`.
   case as `reconciliations/<RECON-id>.proposed` (`Proposed`, its blob); one
   journal entry, the entity's file untouched. A rule is proposed as its
   rule document, whole. `-` reads the content from standard input. Needs a
-  `propose` or `full` reconciliation role.
+  `propose` or `full` reconciliation level (a `reconcile:<level>` grant).
 - `catalyst reconcile <case> accept` writes the proposed content to the
   entity (its derived fields recomputed), journaled by the acceptor with
   `proposal` and `proposed_by` (the proposed version's author); refused
@@ -1122,7 +1151,9 @@ generate its types from.
 
 - `catalyst list <type> [--filter KEY=VALUE ...] [--type <family>]`:
   artifacts of an entity type (its prefix, name or folder), or `rule`,
-  `user`, `role`, `template` (`--type` narrows to one family), or `all`.
+  `user` (the signers ledger, with the people of a retired registry),
+  `role` (the roles template, for display), `template` (`--type` narrows
+  to one family), or `all`.
   A filter keeps items whose field matches, with `*`/`?` wildcards. An
   unknown type exits `1` and names the known ones.
 - `catalyst view <ID>`: one artifact or rule, its fields, the IDs it links
@@ -1235,9 +1266,10 @@ accepted).
 
 ### `catalyst userid gen`
 
-Prints a new userid for `/user add`: 8 characters drawn uniformly from
-`[A-Za-z0-9]` with a cryptographic random source, redrawn if it has no
-uppercase letter or collides with a registered userid (INV-26).
+Prints a new userid: 8 characters drawn uniformly from `[A-Za-z0-9]` with
+a cryptographic random source, redrawn if it has no uppercase letter or
+collides with a known one (INV-26). An identity's first signature draws its
+own the same way.
 
 ### `catalyst journal append`
 
@@ -1519,8 +1551,9 @@ git history, so the journal checks run where the criterion is. The first
 push to an empty server is an import: it brings the history as it is, so
 only its signers are not checked.
 
-- `serve token issue <userid>`: a token for a registered user, printed once
-  (the server keeps only its hash); they keep it with `share login`.
+- `serve token issue <userid>`: a token for a signer of the criterion,
+  printed once (the server keeps only its hash); they keep it with `share
+  login`.
 - `serve token list`, `serve token revoke <n>`.
 
 Tokens are managed on the server's host, by whoever runs the server.
@@ -1532,7 +1565,8 @@ introspection says the token is active, issued by that issuer and meant for the
 API client, kept at most 30 seconds. The signer of a push is the line of
 `IAM/signers.jsonl` for the token's issuer and subject; a push may add ledger
 lines for its own identity only (an import, every signer's) and never change
-one. The client of an `oidc` deployment sends its provider token.
+one. A client sends its provider token when it is logged in, else its
+`share login` token.
 
 Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
 adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
@@ -1880,8 +1914,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output |
 | `catalyst init` | `--name` `NAME` | the project name (the pointer is <name>.catalyst) |
 |  | `--module` `MODULE` | the active process module id (no default: without it, init lists the modules it finds) |
-|  | `--user` `USER` | the first user's name, who becomes Admin (default: git config user.name) |
-|  | `--git-username` `GIT_USERNAME` | the first user's git username (default: --user) |
+|  | `--user` `USER` | the installer's name, as catalyst-users knows them (default: git config user.name) |
+|  | `--git-username` `GIT_USERNAME` | the installer's username (default: --user) |
 |  | `--rule-doc` `FILE:PREFIX` | a rule document and its ID prefix, e.g. business-rules:br (repeatable) |
 |  | `--test-locations` `TEST_LOCATIONS` | where the project's tests live (Rules-of-Rules §2) |
 |  | `--at` `AT` | legacy: an agent-owned location reached through a .criterion symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project) |
@@ -1890,6 +1924,9 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout or release (default: this checkout's) |
 |  | `--module-dir` `MODULE_DIR` | the module's directory (default: searched) |
 |  | `--no-module` | install the kernel only; `catalyst module install` adds a module later |
+|  | `--identity-issuer` `IDENTITY_ISSUER` | catalyst-users: the provider's issuer URL people sign through (design 29); log in first with `catalyst identity login --issuer <url>` |
+|  | `--identity-client` `IDENTITY_CLIENT` | its public client with the device grant (default: catalyst-cli) |
+|  | `--catalyst-client` `CATALYST_CLIENT` | the client whose roles are catalyst grants (default: catalyst) |
 | `catalyst check` | `--strict` | treat warnings as errors |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst hook stop` | `--strict` | block on warnings too, not only on errors |
@@ -2042,13 +2079,13 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst role add` | `<name>` | the role's name |
 |  | `--action` `ACTION` | an action the role may take (repeatable) |
 |  | `--reconciliation` `RECONCILIATION` | what the role may do with a reconciliation case: decide it, propose, or nothing (one of `full`, `propose`, `none`; default `propose`) |
-|  | `--provider-role` `PROVIDER_ROLE` | the identity provider's role that grants it (identity = oidc) |
+|  | `--provider-role` `PROVIDER_ROLE` | no longer used: roles are catalyst-users' (design 29) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst role modify` | `<name>` | the role's name |
 |  | `--action` `ACTION` | an action the role may take (repeatable) |
-|  | `--provider-role` `PROVIDER_ROLE` | the identity provider's role that grants it (identity = oidc; alone, actions are kept; "" removes it) |
+|  | `--provider-role` `PROVIDER_ROLE` | no longer used: roles are catalyst-users' (design 29) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2135,8 +2172,11 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst workspace init` | `<file>` | the <name>.code-workspace file |
-|  | `--user` `USER` | the first user, Admin (default: git config user.name) |
-|  | `--git-username` `GIT_USERNAME` | the first user's git username (default: their name) |
+|  | `--user` `USER` | the installer's name, as catalyst-users knows them (default: git config user.name) |
+|  | `--git-username` `GIT_USERNAME` | the installer's username (default: their name) |
+|  | `--identity-issuer` `IDENTITY_ISSUER` | catalyst-users: the provider's issuer URL (design 29) |
+|  | `--identity-client` `IDENTITY_CLIENT` | its public client (default: catalyst-cli) |
+|  | `--catalyst-client` `CATALYST_CLIENT` | the client whose roles are catalyst grants (default: catalyst) |
 |  | `--kernel` `KERNEL` | framework/kernel (default: this checkout's) |
 | `catalyst workspace status` | `<file>` | the <name>.code-workspace file |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2228,15 +2268,24 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst criterion integrity` | `--head` `HEAD` | the merge commit to check (default `HEAD`) |
 |  | `--parent` `PARENT` | compare against this revision (repeatable; default: the head's own parents) |
 | `catalyst criterion protect` | `--yes` | apply it (without: show what would be set) |
-| `catalyst identity configure` | `<provider>` | One of `local`, `oidc` |
-|  | `--issuer` `ISSUER` | oidc: the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst` |
-|  | `--client` `CLIENT` | oidc: the public client with the device grant (default: catalyst-cli) |
+| `catalyst identity configure` | `--provider` `PROVIDER` | the catalyst-users backend (one of `keycloak`, `static`; default `keycloak`) |
+|  | `--issuer` `ISSUER` | the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst` |
+|  | `--client` `CLIENT` | the public client with the device grant (default: catalyst-cli) |
+|  | `--catalyst-client` `CATALYST_CLIENT` | the client whose roles are catalyst grants (default: catalyst) |
 |  | `--as` `AS_USER` | signer, under the provider in force before the change |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
-| `catalyst identity login` | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst identity logout` | — | — |
-| `catalyst identity whoami` | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst identity status` | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst identity login` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
+|  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
+|  | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst identity logout` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
+|  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
+| `catalyst identity whoami` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
+|  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
+|  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--as` `AS_USER` | the tests' static backend: which declared person |
+| `catalyst identity status` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
+|  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
+|  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst userid gen` | — | — |
 
 <!-- end generated: cli-options -->

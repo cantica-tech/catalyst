@@ -54,31 +54,13 @@ KEYS: tuple[tuple[str, str, str, str], ...] = (
     (
         "workspace",
         "string",
-        "Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, users and roles (R3.1b).",
+        "Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, roles template and, when it has none, its pointer to catalyst-users (R3.1b, design 29).",
         "—",
     ),
     (
         "role_check",
         "string",
-        "Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose roles do not grant its command, or warns with `warn` (decision D5).",
-        "—",
-    ),
-    (
-        "identity",
-        "string",
-        "Optional: the deployment's identity provider, `local` (the default: `IAM/users/users.json`) or `oidc` (an OIDC provider's accounts sign, verified; design 28). Set by `catalyst identity configure`.",
-        "`check`: error for another value, or `oidc` without `identity_issuer`.",
-    ),
-    (
-        "identity_issuer",
-        "string",
-        'With `identity = "oidc"`: the provider\'s issuer URL (`https://id.example.com/realms/catalyst`), HTTPS except on a loopback host.',
-        "`check`: required with `oidc`; the login refuses a discovery document naming another issuer.",
-    ),
-    (
-        "identity_client",
-        "string",
-        'With `identity = "oidc"`: the provider\'s public client with the device grant that `catalyst identity login` uses (default `catalyst-cli`).',
+        "Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose grants from catalyst-users do not allow its command, or warns with `warn` (decision D5, design 29).",
         "—",
     ),
     (
@@ -136,6 +118,12 @@ LEGACY_KEYS: tuple[tuple[str, str], ...] = (
     ("name", "`project_name` before it had that name."),
     ("framework_version", "`kernel_version` before 0.35.0."),
     ("agent-source", "A path to the criterion, written by kernels before 0.37.0; honoured when present."),
+    (
+        "identity",
+        "`local` or `oidc` (0.105.x, design 28); migration 0.106.0 moves the pointer into `IAM/identity.json`.",
+    ),
+    ("identity_issuer", "The provider's issuer (0.105.x); migration 0.106.0 moves it into `IAM/identity.json`."),
+    ("identity_client", "The provider's login client (0.105.x); migration 0.106.0 moves it into `IAM/identity.json`."),
 )
 LEGACY_SUFFIX = ".catalyst"
 HEADER = (

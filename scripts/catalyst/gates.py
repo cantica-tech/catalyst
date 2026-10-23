@@ -25,7 +25,7 @@ from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
 GATES = Path("IAM") / "gates.json"
-ROLES = Path("IAM") / "roles" / "roles.json"
+ROLES = Path("IAM") / "roles" / "templates"  # the roles a gate may name: the roles template (design 29)
 GATE_ID = re.compile(r"^[a-z][a-z0-9-]{0,40}$")
 APPROVE = "approve"
 
@@ -112,7 +112,7 @@ def problems(dep: Deployment, corpus: Corpus) -> list[str]:
         if not isinstance(n, int) or isinstance(n, bool) or n < 1:
             out.append(f"{where}: `approvals` is a whole number, at least 1")
         if g.get("role") not in roles:
-            out.append(f"{where}: `role` {g.get('role')!r} is not a role of {ROLES.as_posix()}")
+            out.append(f"{where}: `role` {g.get('role')!r} is not a role of the roles template ({ROLES.as_posix()}/)")
         covers = g.get("covers")
         if not isinstance(covers, dict) or len(covers) != (2 if "type" in (covers or {}) else 1):
             out.append(f'{where}: `covers` is {{"rules": {{"domain": …}}}} or {{"type": …, "to": …}}')

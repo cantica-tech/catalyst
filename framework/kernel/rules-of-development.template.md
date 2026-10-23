@@ -18,18 +18,20 @@ each tier needs: `Rules-of-Rules.md` §6 and the active module's part.
 
 ## 2. Users, roles, and signing
 
-The signer is a registered user, declared with `--as` and confirmed when more
-than one could sign — never guessed (`Rules-of-Rules.md` §11). Its roles must
-grant the command (§11 there); reconciliation (§16 there) and the approval
-gates a deployment declares (`IAM/gates.json`) check more. The registry files:
-`FORMAT.md` §6.
+The signer is the identity catalyst-users verifies at each signature — the
+person logged in (`catalyst identity login`), or, with no one logged in, the
+machine's system account — never guessed (`Rules-of-Rules.md` §11). Its
+grants must allow the command (§11 there); reconciliation (§16 there) and
+the approval gates a deployment declares (`IAM/gates.json`) check more.
+People, roles and grants are catalyst-users'; the pointer to it and the
+signers ledger: `FORMAT.md` §6.
 
 ## 3. Standard document types
 
 The kernel's own types are rules and domains (`rules/`), reconciliation
 cases (`RECON-`), workflows (`WORKFLOW-`), analyses (`ANALYSIS-`) and the
-user and role registries (`IAM/`). Formats are in `FORMAT.md`, meanings in
-`definitions/`. The active module's types follow.
+users, roles and groups display templates (`IAM/`). Formats are in
+`FORMAT.md`, meanings in `definitions/`. The active module's types follow.
 
 ## 4. Slash-command entry points
 
@@ -58,17 +60,11 @@ A product commit made for the change cites the artifact or rule it serves
 (or its subject starts `chore:`) — §9, "Traced commits".
 
 - `/user` (`/user-add`, `/user-remove`, `/user-modify`, `/user-assign-role`,
-  `/user-list`) — the users of `IAM/users/users.json`: `add <name> <role>`
-  registers one with a role from `IAM/roles/roles.json` (refused if the name
-  is registered); `remove <name>` sets `active` to `false`, never deletes
-  (§2), and is refused for the last active user; `modify <name> <field>
-  <value>` edits descriptive fields (not `roles`, the identity fields, nor
-  `active` set to false); `assign-role <name> <role>` adds a role;
-  `list [--role <role>] [--active-only]` lists them.
-- `/role` (`/role-add`, `/role-modify`) — the roles of
-  `IAM/roles/roles.json`: `add <role> <actions> [full|propose|none]` adds one
-  with its `reconciliation` level (refused if it exists); `modify <role>
-  <actions>` replaces a role's actions (refused if it does not exist).
+  `/user-list`) — the people who sign: `list` lists the signers ledger;
+  `add`, `remove`, `modify` and `assign-role` refuse, since people are
+  added, disabled and granted roles in catalyst-users (§2).
+- `/role` (`/role-add`, `/role-modify`) — the roles: `add` and `modify`
+  refuse, since a role and what it grants are catalyst-users' (§2).
 - `/create <type> <title>` — create an artifact of a type the active
   modules declare. Each type is a part of this command, listed after the
   kernel's commands as `/create <type>` with its alias `/create-<type>`;
@@ -99,11 +95,13 @@ A product commit made for the change cites the artifact or rule it serves
 - `/reconcile <RECON-id> accept|accept-with-edits|reject|propose <text>|close`
   — decide, or move toward deciding, a reconciliation case
   (`Rules-of-Rules.md` §16, `INVARIANTS.md` INV-21) with `catalyst
-  reconcile`, which enforces the signer's `reconciliation` level: `full`
-  may use every verb, `propose` only `propose`, `none` none.
+  reconcile`, which enforces the signer's reconciliation level (their
+  `reconcile:<level>` grant): `full` may use every verb, `propose` only
+  `propose`, `none` none.
 - `/status` — update an artifact or work item's `Status` field, then
   regenerate indexes and journal the change. Refuses a `RECON-` case:
-  its `Status` changes only through `/reconcile` (role-gated).
+  its `Status` changes only through `/reconcile` (gated by the
+  reconciliation level).
 - `/run-analysis [<path>...] [--bootstrap|--incremental] [--passes 1|2]` — analyse
   existing code to infer domains, rules and the defects where the code
   breaks a rule, with a four-eyes process: two independent blind passes
@@ -134,40 +132,23 @@ A product commit made for the change cites the artifact or rule it serves
   its one-line purpose (from this section: kernel and module entries alike)
   and the artifact types; with a command, that command's help.
 
-When the user enters `/user add <name> <role>: ...`, run `catalyst user add
-"<name>" "<role>" [--git-username <u>] --intent "<why>"`. It refuses a name
-already registered and a role `IAM/roles/roles.json` lacks (then ask
-whether to pick an existing role or `/role add` it first), creates the IAM
-files from their templates when missing, draws the userid (INV-26) and
-journals. If this is the project's first registered user, note that the
-"at least one active user" requirement (§2) is now satisfied.
+When the user enters `/user add`, `/user remove`, `/user modify` or `/user
+assign-role`, change nothing: people are added, disabled and given roles in
+catalyst-users, not in the criterion (§2). Say so and name where: the
+deployment's provider (`IAM/identity.json`), through `catalyst-users users
+…`, by someone it allows. `catalyst user …` refuses the same way. A person
+gets their userid at their first signature (INV-26).
 
-When the user enters `/user remove <name>`, run `catalyst user remove
-"<name>" --intent "<why>"`: it deactivates, never deletes (signatures stay
-resolvable), and refuses to deactivate the only active user (§2) — then
-point at `/user add` for a replacement first.
+When the user enters `/user list`, run `catalyst list user` and report what
+it prints: the identities that have signed, from the signers ledger; never
+add people it does not list. Their roles and groups are catalyst-users'
+(`catalyst identity whoami` shows one's own).
 
-When the user enters `/user modify <name> <field> <value>: ...`, run
-`catalyst user modify "<name>" <field> "<value>" --intent "<why>"`. It refuses
-`roles` (use `/user assign-role`), the identity fields `name`/`registered`/
-`userid`, and `active` set to false (use `/user remove`).
-
-When the user enters `/user assign-role <name> <role>: ...`, run `catalyst user
-assign-role "<name>" "<role>" --intent "<why>"`; on an unknown role, ask
-whether to pick an existing one or `/role add` it first.
-
-When the user enters `/user list [--role <role>] [--active-only]`, run
-`catalyst list user` (`--filter roles=<role>`, `--filter active=true`) and
-report what it prints; never add users it does not list.
-
-When the user enters `/role add <role> <actions>: ...`, run `catalyst role add
-"<role>" --action <a> ... [--reconciliation full|propose|none] --intent
-"<why>"` (`propose` when not given, never silently `full`;
-`Rules-of-Rules.md` §16). It refuses a role that exists (use `/role modify`).
-
-When the user enters `/role modify <role> <actions>: ...`, run `catalyst role
-modify "<role>" --action <a> ... --intent "<why>"`: it replaces the role's
-actions and never changes a `Signed-off-by` already recorded.
+When the user enters `/role add` or `/role modify`, change nothing: a role
+and the commands it grants (`cmd:<command>`, `reconcile:<level>`) are
+catalyst-users'. Say so and name where: `catalyst-users roles provision`
+writes the roles template into the provider once; a grant is changed in
+the provider afterwards. `catalyst role …` refuses the same way.
 
 When the user enters `/create <type> <title>`, follow that type's part
 (`catalyst spec create <type>`): every part allocates the ID with
@@ -203,7 +184,7 @@ first when adopting several, so each file's chain stays unbroken — and
 `catalyst check`. To reject: propose `git revert <commit>` and run it only
 with the user's assent (INV-4); the revert is itself a change to journal.
 When the change is contested, or the actor may not decide it (their
-`reconciliation` rights in `IAM/roles/roles.json`), open a `RECON-` case
+reconciliation level, a `reconcile:<level>` grant), open a `RECON-` case
 instead (`Trigger: unrecorded-change`, `Entity` the commit and its files,
 `Baseline` the parent's version, `Proposed` the commit's —
 `Rules-of-Rules.md` §16) for a human to decide with `/reconcile`.
@@ -234,9 +215,10 @@ someone else's work, never something to overwrite.
 When the user enters `/share join [<url>]`: in a clone of the product
 repository, run `catalyst open` — it clones the criterion `catalyst.toml`
 names into this machine's catalyst home — or `catalyst share join <url>`
-when `catalyst.toml` names none. A person not yet in `IAM/users/users.json`
-registers with `/user add` before signing anything, and lands that with
-`/share push`.
+when `catalyst.toml` names none. A person signs once logged in to the
+deployment's catalyst-users provider (`catalyst identity login`); their
+first signature adds their line to the signers ledger, which they land
+with `/share push`.
 
 When the user enters `/share pull`: run `catalyst share pull`. If it
 refuses because local work is unpublished, report why and offer `/share
@@ -246,8 +228,8 @@ push`. When the user enters `/share info` or `/share status`: run
 When the user enters `/reconcile <RECON-id> <verb> [<text>]`: if the case
 names a `Workflow` (`WORKFLOW-NNNNNN`, `Rules-of-Rules.md` §19), read it
 first. Run `catalyst reconcile <RECON-id> <verb> [--text "<text>"] --as
-<signer>`; it refuses a verb the signer's role does not allow — then say
-who may act, never retry as someone else. After `accept` or
+<signer>`; it refuses a verb the signer's reconciliation level does not
+allow — then say who may act, never retry as someone else. After `accept` or
 `accept-with-edits`, applying the accepted version to the case's `Entity`
 is ordinary work, journaled like any other change; `close` only once it has
 landed.

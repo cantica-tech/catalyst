@@ -155,6 +155,114 @@ def _template_steps(dep: Deployment, kernel: Path | None) -> list[tuple[Step, Pa
     return steps
 
 
+# --- people out of the criterion (migration 0.106.0, design 29) ---------------------------
+def _identity_step(dep: Deployment) -> Step | None:
+    """What a deployment still holds of people that catalyst-users now holds: a registry to retire, a
+    `catalyst.toml` pointer to move into `IAM/identity.json`, the groups templates to add."""
+    from catalyst import provider
+
+    iam = dep.root / "IAM"
+    parts = []
+    if not (dep.root / provider.POINTER).is_file() and (dep.pointer or {}).get("identity_issuer"):
+        parts.append("write IAM/identity.json from catalyst.toml's identity_* keys")
+    for kept in ("users/users.json", "roles/roles.json"):
+        if (iam / kept).is_file():
+            parts.append(f"retire IAM/{kept} as {kept.split('/')[1].replace('.json', '.retired.json')}")
+    if (iam / "roles" / "roles.json").is_file():
+        parts.append("keep its roles as the roles template's next version (display names and ids)")
+    if not (iam / "groups" / "templates").is_dir():
+        parts.append("add the groups templates")
+    return Step("identity", "IAM", "; ".join(parts), True) if parts else None
+
+
+def _take_identity(dep: Deployment, kernel: Path | None, stamp: str) -> tuple[list[Path], list[str]]:
+    import json
+
+    from catalyst import provider
+
+    iam = dep.root / "IAM"
+    touched: list[Path] = []
+    done: list[str] = []
+    toml = project_file.find(dep.project_root) if not dep.standalone else None
+    data = project_file.read(toml) if toml is not None else {}
+    if not (dep.root / provider.POINTER).is_file() and data.get("identity_issuer"):
+        doc = {"provider": "keycloak", "issuer": str(data["identity_issuer"]).rstrip("/")}
+        if data.get("identity_client"):
+            doc["client"] = data["identity_client"]
+        (dep.root / provider.POINTER).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        touched.append(dep.root / provider.POINTER)
+        for key in ("identity", "identity_issuer", "identity_client"):
+            data.pop(key, None)
+        if toml is not None:
+            project_file.write(toml, data)
+        done.append(f"wrote IAM/identity.json ({doc['issuer']}); catalyst.toml's identity keys removed")
+    roles = iam / "roles" / "roles.json"
+    if roles.is_file():
+        try:
+            listed = json.loads(roles.read_text(encoding="utf-8")).get("roles") or []
+        except (OSError, ValueError, AttributeError):
+            listed = []
+        catalogue = {
+            "roles": [
+                {
+                    "name": r["name"],
+                    "id": provider.role_id(r),
+                    **{k: v for k, v in r.items() if k not in ("name", "id", "provider_role")},
+                }
+                for r in listed
+                if isinstance(r, dict) and r.get("name")
+            ]
+        }
+        folder = iam / "roles" / "templates"
+        folder.mkdir(parents=True, exist_ok=True)
+        held = [
+            int(m.group(1))
+            for f in folder.glob("TEMPLATE-ROLES-v*.json")
+            if (m := re.search(r"-v(\d+)\.json$", f.name))
+        ]
+        n = max(held, default=0) + 1
+        file = folder / f"TEMPLATE-ROLES-v{n}.json"
+        file.write_text(json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        catalog = folder / "templates-role.md"
+        rows = (
+            catalog.read_text(encoding="utf-8")
+            if catalog.is_file()
+            else "# `ROLES` templates — catalog\n\n| Version | File | Timestamp | Notes |\n|---|---|---|---|\n"
+        )
+        catalog.write_text(
+            rows.rstrip("\n")
+            + f"\n| v{n} | `{file.name}` | {stamp} | The deployment's roles, for display (migration 0.106.0). |\n",
+            encoding="utf-8",
+        )
+        touched += [file, catalog]
+        done.append(
+            f"kept the deployment's {len(catalogue['roles'])} role(s) as TEMPLATE-ROLES-v{n}.json (display only)"
+        )
+    for kept in ("users", "roles"):
+        old = iam / kept / f"{kept}.json"
+        if old.is_file():
+            new = old.with_name(f"{kept}.retired.json")
+            old.rename(new)
+            touched += [old, new]
+            done.append(f"retired IAM/{kept}/{kept}.json as {new.name}")
+    groups = iam / "groups" / "templates"
+    if not groups.is_dir():
+        groups.mkdir(parents=True)
+        src = (kernel / "templates" / "groups.template.json") if kernel else None
+        text = src.read_text(encoding="utf-8") if src and src.is_file() else '{\n  "groups": []\n}\n'
+        (groups / "TEMPLATE-GROUPS-v1.json").write_text(text, encoding="utf-8")
+        (groups / "templates-group.md").write_text(
+            f"# `GROUPS` templates — catalog\n\n| Version | File | Timestamp | Notes |\n|---|---|---|---|\n| v1 | `TEMPLATE-GROUPS-v1.json` | {stamp} | Initial version (migration 0.106.0). |\n",
+            encoding="utf-8",
+        )
+        (groups / "README.md").write_text(
+            "# `groups` templates\n\nHow groups are shown (fw-IDENTITY-000010): display only.\n", encoding="utf-8"
+        )
+        touched += [groups / "TEMPLATE-GROUPS-v1.json", groups / "templates-group.md", groups / "README.md"]
+        done.append("added the groups templates")
+    return touched, done
+
+
 def _since(dep: Deployment, current: str) -> str | None:
     """The kernel this deployment was at before its last sync, from the
     journal's sync entries; None when the journal names none."""
@@ -241,6 +349,9 @@ def plan(project: Path, kernel: Path | None, since: str | None = None) -> Plan:
     current = (dep.root / "version.txt").read_text(encoding="utf-8").strip()
     p.kernel = current
     p.steps += [s for s, *_ in _template_steps(dep, kernel)]
+    identity = _identity_step(dep)
+    if identity is not None:
+        p.steps.append(identity)
     p.since = since or _since(dep, current)
     p.steps += _judgment_steps(dep, kernel, p.since, current)
     return p
@@ -291,6 +402,12 @@ def apply(
         for s in before.steps:
             if s.target == step.target:
                 s.taken = True
+    identity = next((s for s in before.steps if s.kind == "identity"), None)
+    if identity is not None:
+        moved, said = _take_identity(dep, kernel, stamp)
+        touched += moved
+        done += said
+        identity.taken = True
     if touched:
         journal.append(
             dep,

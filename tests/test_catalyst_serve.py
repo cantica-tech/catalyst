@@ -227,6 +227,32 @@ def _entry(actor: str, path: str, before, after) -> str:
     )
 
 
+# A provider token's claims (design 29): a reconciliation level comes only from its grants, the signer from its
+# signers-ledger line; a `cst_` token's signer has no grant (fw-IDENTITY-000005, -000008).
+ISS = "https://id.example.com/realms/catalyst"
+ADA = {
+    "iss": ISS,
+    "sub": "sub-ada",
+    "preferred_username": "ada",
+    "name": "Ada",
+    "resource_access": {"catalyst": {"roles": ["cmd:*", "reconcile:full"]}},
+}
+BOB_USER = {
+    "iss": ISS,
+    "sub": "sub-bob",
+    "preferred_username": "bob",
+    "name": "Bob",
+    "resource_access": {"catalyst": {"roles": ["cmd:status", "reconcile:propose"]}},
+}
+SIGNERS = "".join(
+    json.dumps(
+        {"userid": u, "iss": ISS, "sub": f"sub-{n}", "username": n, "name": n.title(), "first_signed": "2026-10-23"}
+    )
+    + "\n"
+    for u, n in ((USERID, "ada"), (BOB, "bob"))
+)
+
+
 @pytest.fixture
 def seeded(tmp_path):
     """A server holding users, roles and one reconciliation case."""
@@ -242,10 +268,12 @@ def seeded(tmp_path):
         "IAM/users/users.json": (root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"),
         "IAM/roles/roles.json": (root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8"),
         "reconciliations/RECON-000001-case.md": case,
+        "IAM/identity.json": json.dumps({"provider": "keycloak", "issuer": ISS}),
+        "IAM/signers.jsonl": SIGNERS,
     }
     blobs = dict(_blob(t) for t in files.values())
     changes = [{"path": p, "before": None, "after": serve.blob_sha(t.encode())} for p, t in files.items()]
-    app.push(USERID, 0, changes, blobs)
+    app.push(ADA, 0, changes, blobs)
     return app, case
 
 
@@ -267,17 +295,25 @@ def test_deciding_a_case_needs_a_full_reconciliation_role(seeded):
     app, case = seeded
     decided = case.replace("| Open |", "| Resolved-Accepted |")
     with pytest.raises(serve.ServeError, match="needs a `full`") as err:
-        _push_change(app, BOB, "bob", "reconciliations/RECON-000001-case.md", case, decided)
+        _push_change(app, BOB_USER, "bob", "reconciliations/RECON-000001-case.md", case, decided)
     assert err.value.status == 403 and app.head()["seq"] == 1
     proposed = case + "\n| 2 | Bob | keep both |\n"
-    assert _push_change(app, BOB, "bob", "reconciliations/RECON-000001-case.md", case, proposed)["seq"] == 2
-    assert _push_change(app, USERID, "ada", "reconciliations/RECON-000001-case.md", proposed, decided)["seq"] == 3
+    assert _push_change(app, BOB_USER, "bob", "reconciliations/RECON-000001-case.md", case, proposed)["seq"] == 2
+    assert _push_change(app, ADA, "ada", "reconciliations/RECON-000001-case.md", proposed, decided)["seq"] == 3
+
+
+def test_a_cst_tokens_signer_carries_no_grant_and_touches_no_case(seeded):
+    """A `cst_` token resolves through the ledger, with no grant (design 29): only a provider token carries a level."""
+    app, case = seeded
+    with pytest.raises(serve.ServeError, match="no reconciliation rights") as err:
+        _push_change(app, USERID, "ada", "reconciliations/RECON-000001-case.md", case, case + "\n")
+    assert err.value.status == 403
 
 
 def test_an_id_already_held_by_another_file_is_refused(seeded):
     app, case = seeded
     with pytest.raises(serve.ServeError, match=re.escape("already reconciliations/RECON-000001-case.md")) as err:
-        _push_change(app, USERID, "ada", "reconciliations/RECON-000001-copy.md", None, case)
+        _push_change(app, ADA, "ada", "reconciliations/RECON-000001-copy.md", None, case)
     assert err.value.status == 409
 
 

@@ -40,21 +40,9 @@ def required(dep: Deployment, command: str, also: tuple[str, ...] = ()) -> list[
 
 
 def grants(dep: Deployment, signer: dict) -> set[str]:
-    """The commands the signer's roles grant (`*` for all)."""
-    from catalyst.corpus import roles
-
-    held = {str(r) for r in signer.get("roles") or []}
-    out: set[str] = {EVERYTHING} if ADMIN in held else set()
-    for role in roles(dep):
-        if str(role.get("name")) not in held:
-            continue
-        for action in role.get("actions") or []:
-            text = str(action).strip()
-            if text == EVERYTHING:
-                out.add(EVERYTHING)
-            elif text.startswith("/") and len(text) > 1:
-                out.add(text[1:].split(" ")[0])
-    return out
+    """The commands the signer's grants allow (`*` for all), from catalyst-users: the `cmd:<command>` client roles
+    their token carries (fw-IDENTITY-000008)."""
+    return {str(g)[4:] for g in signer.get("grants") or [] if str(g).startswith("cmd:")}
 
 
 def mode(dep: Deployment) -> str:
@@ -73,7 +61,7 @@ def refusal(dep: Deployment, signer: dict, command: str, also: tuple[str, ...] =
         return None
     roles = ", ".join(str(r) for r in signer.get("roles") or []) or "no role"
     return (
-        f"{signer.get('name')} ({roles}) may not run /{needed[0]}: none of their roles grants it. "
-        f"Grant it with `catalyst role modify <role> --action /{needed[-1]}`, or assign a role that has it "
-        "(`catalyst user assign-role`); D5, rr-META-011"
+        f"{signer.get('name')} ({roles}) may not run /{needed[0]}: none of their grants allows it. "
+        f"Grant it in catalyst-users: `cmd:{needed[-1]}` composed into one of their roles, or a role that has it "
+        "(fw-IDENTITY-000008, rr-META-011)"
     )

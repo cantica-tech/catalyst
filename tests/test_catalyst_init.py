@@ -66,15 +66,18 @@ def test_init_produces_a_deployment_that_passes_every_check(tmp_path):
     init(req)
     dep = load(req.project)
     report = run_checks(dep)
-    assert report.errors == [] and [w for w in report.warnings if not w.startswith("legacy:")] == []
+    static = "identity: IAM/identity.json: the static provider verifies nobody"  # the tests' pointer (design 29)
+    assert report.errors == [] and [w for w in report.warnings if not w.startswith(("legacy:", static))] == []
     root = dep.root
     assert (req.project / ".criterion").is_symlink()
     assert "/.criterion" in (req.project / ".gitignore").read_text(encoding="utf-8")
     pointer = json.loads((req.project / "app.catalyst").read_text(encoding="utf-8"))
     assert pointer["module"] == "example-process" and pointer["repoed"] is False
     assert pointer["journal_since"] == ""  # no commit yet: the whole history is governed
-    user = json.loads((root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))["users"][0]
-    assert user["git_username"] == "ada" and len(user["userid"]) == 8
+    # the installer signs first, in the signers ledger; no users.json (design 29)
+    user = json.loads((root / "IAM" / "signers.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert user["username"] == "ada" and len(user["userid"]) == 8
+    assert not (root / "IAM" / "users" / "users.json").exists()
     coc = (root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
     assert "### From module example-process" in coc and f"rr-META-000009-{user['userid']}" in coc
     assert "{{RULES_DIR}}" not in coc
@@ -178,6 +181,7 @@ def test_failed_install_rolls_back_and_can_be_rerun(tmp_path, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("disk full")
 
+    real_git = ci._git
     monkeypatch.setattr(ci, "_git", boom)
     with pytest.raises(InitError, match="rolled back"):
         init(req)
@@ -185,7 +189,7 @@ def test_failed_install_rolls_back_and_can_be_rerun(tmp_path, monkeypatch):
     assert not (req.project / ".criterion").exists() and not (req.project / ".criterion").is_symlink()
     assert not req.at.exists()
     assert (req.project / ".gitignore").exists() == before
-    monkeypatch.undo()
+    monkeypatch.setattr(ci, "_git", real_git)  # not undo(): that would drop the tests' static identity too
     init(req)  # re-run succeeds
     assert run_checks(load(req.project)).errors == []
 
@@ -337,11 +341,12 @@ def test_rollback_leaves_an_existing_empty_target_empty(tmp_path, monkeypatch):
 
     req = request(tmp_path)
     req.at.mkdir(parents=True)
+    real_git = ci._git
     monkeypatch.setattr(ci, "_git", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("disk full")))
     with pytest.raises(InitError, match="rolled back"):
         init(req)
     assert req.at.is_dir() and list(req.at.iterdir()) == []
-    monkeypatch.undo()
+    monkeypatch.setattr(ci, "_git", real_git)
     init(req)
     assert run_checks(load(req.project)).errors == []
 
@@ -439,8 +444,10 @@ def test_init_takes_the_user_from_git_config_and_records_the_agent(tmp_path):
         tmp_path, "--module", "example-process", "--module-dir", str(mod), "--agent", "claude-code"
     )
     assert code == 0
-    users = json.loads((project / ".criterion" / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
-    assert [(u["name"], u["git_username"]) for u in users["users"]] == [("Grace Hopper", "Grace Hopper")]
+    # people are catalyst-users' (design 29): the installer is the tests' static pointer's one person
+    identity = json.loads((project / ".criterion" / "IAM" / "identity.json").read_text(encoding="utf-8"))
+    assert [(p["name"], p["username"]) for p in identity["people"]] == [("Grace Hopper", "Grace Hopper")]
+    assert not (project / ".criterion" / "IAM" / "users" / "users.json").exists()
     assert not (project / ".claude").exists()
 
 

@@ -50,7 +50,7 @@ codes are listed in `CLI.md`.
 - Dates are `YYYY-MM-DD`; timestamps are ISO 8601 in UTC,
   `YYYY-MM-DDTHH:MM:SSZ`.
 - A **userid** is 8 characters from `[A-Za-z0-9]` with at least one
-  uppercase letter, unique among registered users (INV-26).
+  uppercase letter, unique in the signers ledger (§6, INV-26).
 - Readers ignore JSON fields they do not know; writers that rewrite a
   JSON file keep the fields they do not know.
 
@@ -87,11 +87,8 @@ the first, in name order, that parses as a JSON object is read.
 | `kernel_version` | string | The kernel version the deployment is at. | Structure: must equal the criterion's `version.txt` (`version drift`). |
 | `module` | string | The first installed module's id; `modules/modules.json` records every one. | A module that cannot be found leaves the checks kernel-only (the check's scope line says so). |
 | `agent` | string | The project's default agent, e.g. `claude-code` (`unknown` if none was given). Each user's own choice wins: `catalyst open --agent <id>` records it in `$CATALYST_HOME/projects/<name>/agent`, never here. | — |
-| `workspace` | string | Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, users and roles (R3.1b). | — |
-| `role_check` | string | Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose roles do not grant its command, or warns with `warn` (decision D5). | — |
-| `identity` | string | Optional: the deployment's identity provider, `local` (the default: `IAM/users/users.json`) or `oidc` (an OIDC provider's accounts sign, verified; design 28). Set by `catalyst identity configure`. | `check`: error for another value, or `oidc` without `identity_issuer`. |
-| `identity_issuer` | string | With `identity = "oidc"`: the provider's issuer URL (`https://id.example.com/realms/catalyst`), HTTPS except on a loopback host. | `check`: required with `oidc`; the login refuses a discovery document naming another issuer. |
-| `identity_client` | string | With `identity = "oidc"`: the provider's public client with the device grant that `catalyst identity login` uses (default `catalyst-cli`). | — |
+| `workspace` | string | Optional: the VS Code workspace this project is a member of; it inherits that workspace criterion's rules, domains, roles template and, when it has none, its pointer to catalyst-users (R3.1b, design 29). | — |
+| `role_check` | string | Optional: `enforce` (the default) or `warn`. A writing verb refuses a signer whose grants from catalyst-users do not allow its command, or warns with `warn` (decision D5, design 29). | — |
 | `embed_origins` | string | Optional: the origins, comma-separated (`https://wiki.example.com, http://localhost:3000`), whose pages may read this criterion through `catalyst serve --local` (decision B8): their reads get CORS headers, each with its reader's token; nothing is written. Absent: no other origin. | `serve` refuses an origin that is not `scheme://host[:port]`. |
 | `analysis_passes` | integer | Optional: the default number of independent passes of an analysis, `2` (four-eyes, the default) or `1`; `catalyst analysis start --passes` overrides it for one analysis. | `catalyst analysis start` refuses another value. |
 | `governance` | string | Optional. `suspended`: the owner suspended enforcement — `catalyst hook stop` reports it and never blocks; `catalyst check` still reports everything. | — |
@@ -112,6 +109,9 @@ Read from an older project file, never written:
 - `name`: `project_name` before it had that name.
 - `framework_version`: `kernel_version` before 0.35.0.
 - `agent-source`: A path to the criterion, written by kernels before 0.37.0; honoured when present.
+- `identity`: `local` or `oidc` (0.105.x, design 28); migration 0.106.0 moves the pointer into `IAM/identity.json`.
+- `identity_issuer`: The provider's issuer (0.105.x); migration 0.106.0 moves it into `IAM/identity.json`.
+- `identity_client`: The provider's login client (0.105.x); migration 0.106.0 moves it into `IAM/identity.json`.
 
 <!-- end generated: project-keys -->
 
@@ -137,7 +137,7 @@ submodule or a directory), read for one minor.
 |---|---|---|
 | `version.txt` | The kernel version, one line. | Structure: must exist and equal `catalyst.toml`'s `kernel_version`. |
 | `CODE-OF-CONDUCT.md` | The composed rules of development (`MODULE-SPECIFICATION.md` §6). | — (its §4 is what `catalyst spec` reads) |
-| `ACCESS-CONTROL.md` | Per-role rights, verbatim from the kernel. | — |
+| `ACCESS-CONTROL.md` | Who may write what, and the default roles' grants, verbatim from the kernel. | — |
 | `DEPLOYMENT.md` | Project, kernel, module and version, installer, sharing — a Markdown bullet list, informational. | — |
 | `README.md` | The deployment's landing page. | — |
 | `Taskfile.common.yml` | The composed common tasks. | — |
@@ -156,8 +156,9 @@ submodule or a directory), read for one minor.
 
 Every entity type — the kernel's (`rules/`, `rules/domains/`,
 `reconciliations/`, `workflows/`, `analyses/`,
-`IAM/users/`, `IAM/roles/`) and each of the active module's — has one
-folder of this shape (INV-20):
+`IAM/users/`, `IAM/roles/`, `IAM/groups/`) and each of the active
+module's — has one folder of this shape (INV-20); the `IAM/` folders hold
+only their `README.md` and display `templates/` (`.json`, §6):
 
 ```
 <folder>/
@@ -237,7 +238,7 @@ The name may also carry the userid after the number
   plural `s` or `(s)` are ignored (`Target(s)` = `Targets`).
 - **The ID.** The `ID` field's first cited value (below); if there is no
   `ID` field, the `<PREFIX>-NNNNNN` the file name starts with. Validate:
-  the ID must be `<PREFIX>-NNNNNN-<registered userid>` and the file name
+  the ID must be `<PREFIX>-NNNNNN-<a signer's userid>` and the file name
   must start with `<PREFIX>-NNNNNN-` (`id-shape`); an ID defined in two
   files is `duplicate-id`.
 - **References.** A reference field cites IDs as backticked tokens
@@ -261,9 +262,10 @@ The name may also carry the userid after the number
 - **Grounding.** A type whose ETD grounding is `required` or `inherited`
   must have at least one resolvable value in its `grounding_field`
   (`ungrounded`, an error — INV-5).
-- **Signer.** `Signed-off-by` names a registered user by `name`,
-  `git_username` or `userid` (any case, backticks ignored); missing or
-  unregistered is `signer` (an error — INV-16).
+- **Signer.** `Signed-off-by` names a signer of the ledger (§6) by
+  `name`, `username` or `userid` (any case, backticks ignored), or a person
+  of a retired users registry; missing or unknown is `signer` (an error —
+  INV-16).
 
 **Free-form types** (ETD `naming: free-form`, e.g. items kept as rows of a
 hand-edited table) store no file per instance: an item is a table row in
@@ -340,7 +342,7 @@ A heading-defined rule:
   number, an optional parent segment (`Rules-of-Rules.md` §3), and the
   signer's userid last (8 characters with at least one uppercase letter,
   which is how `<ID>-<slug>` splits). Structure: the number must have six
-  digits and the last segment must be a registered userid (INV-26).
+  digits and the last segment must be a signer's userid (INV-26).
 - A rule's body runs to the next heading. It is **retired** when its
   heading contains `🗑`, or a line of its body contains both `🗑` and the
   word "status" (`Rules-of-Rules.md` §4).
@@ -382,48 +384,48 @@ At least one `TEMPLATE-RULE-vN.md` exists, and only in `rules/templates/`
   registered code. `catalyst id next-rule` refuses a domain not
   registered here (`META` is always accepted).
 
-## 6. Users and roles
+## 6. People: the pointer, the signers ledger, the display templates
 
-`IAM/users/users.json`:
+A criterion holds no user or role registry: people, roles, groups and what
+each may do are catalyst-users' (design 29, INV-16).
 
-```json
-{
-  "users": [
-    {"name": "Ada Lovelace", "git_username": "ada", "roles": ["Admin"],
-     "registered": "2026-09-28", "active": true, "notes": "", "userid": "Ab3xR9pQ"}
-  ]
-}
-```
-
-`name`, `roles` (role names from `roles.json`), `registered` (date),
-`active` (boolean), `notes` and `userid` are always present;
-`git_username` is optional. A user is never deleted, only set
-`"active": false`. Structure: the file exists and is valid JSON, at least
-one user is active (INV-16), every userid is well-formed and unique
-(INV-26).
-
-`IAM/roles/roles.json`:
+`IAM/identity.json`: the pointer to the deployment's catalyst-users
+configuration, written by `catalyst identity configure` (or `catalyst
+init`):
 
 ```json
-{
-  "roles": [
-    {"name": "Admin", "actions": ["/user-add", "/freeze"], "reconciliation": "full"}
-  ]
-}
+{"provider": "keycloak", "issuer": "https://id.example.com/realms/catalyst", "client": "catalyst-cli", "catalyst_client": "catalyst"}
 ```
 
-`reconciliation` is `full`, `propose` or `none` (INV-21). Structure: the
-file exists. A role's `actions` entries that start with `/` grant those
-commands, `*` grants all, and so does the `Admin` role; a writing verb
-refuses a signer whose roles grant none for its change (`Rules-of-Rules.md`
-§11), unless `catalyst.toml` sets `role_check = "warn"`. A role may name
-`provider_role`: with an identity provider (`identity = "oidc"`), a signer
-holds the role when the provider gives it that role (`check` warns of a role
-without one there).
+`provider` names the catalyst-users backend (`keycloak`); a `keycloak`
+pointer gives its `issuer`, or its `url` and `realm`. `client` (the public
+client with the device grant, default `catalyst-cli`) and `catalyst_client`
+(the client whose roles are the grants, default `catalyst`) are optional.
+Structure: the file exists, or the workspace's does for a member, and is a
+pointer its backend accepts; a `static` pointer (catalyst's tests only)
+is a warning.
 
-`IAM/signers.jsonl`, with an identity provider only: the signers ledger, one
-JSON object per line, appended by catalyst at an identity's first signature
-(journaled), never edited or removed, merged by union in a shared criterion:
+Grants come from the provider's token, never from the criterion:
+`cmd:<command>` allows that command, `cmd:*` every one, and
+`reconcile:<level>` sets the reconciliation level (`full`, `propose`;
+none: `none`, INV-21). A writing verb refuses a signer whose grants allow
+none for its change (`Rules-of-Rules.md` §11), unless `catalyst.toml` sets
+`role_check = "warn"`.
+
+`IAM/users/templates/`, `IAM/roles/templates/` and `IAM/groups/templates/`
+(`TEMPLATE-USERS-vN.json`, `TEMPLATE-ROLES-vN.json`,
+`TEMPLATE-GROUPS-vN.json`, INV-20) shape how users, roles and groups are
+shown: their fields, labels and order, and the roles' names. They hold no
+person and grant nothing. A gate's or a workflow's role names a role of the
+latest roles template, held as the provider's role of that name.
+
+A deployment migrated from kernel 0.105 keeps `IAM/users/users.retired.json`
+and `IAM/roles/roles.retired.json`: history only, read to resolve who signed
+before; nothing writes them.
+
+`IAM/signers.jsonl`: the signers ledger, one JSON object per line, appended
+by catalyst at an identity's first signature (journaled), never edited or
+removed, merged by union in a shared criterion:
 
 ```json
 {"userid": "Xk3pQ9aB", "iss": "https://id.example.com/realms/catalyst", "sub": "3c154a14-…", "username": "alice", "name": "Alice Developer", "first_signed": "2026-10-23"}
@@ -470,7 +472,7 @@ development/journal.jsonl            # before 0.50 only: read, never written
 | Field | Type | Meaning |
 |---|---|---|
 | `timestamp` | string | UTC, `YYYY-MM-DDTHH:MM:SSZ`; non-decreasing down a shard. |
-| `actor` | string | The signer: a registered user's `git_username`, else `name`. |
+| `actor` | string | The signer: its `username` in the signers ledger (§6); before kernel 0.106, a registered user's `git_username`, else `name`. |
 | `command` | string | The command, e.g. `/create-item`; for a tiered change outside any command, the tier (`chore`). |
 | `action` | string | `create`, `update`, `close`, `retire`, `status-change` or `sync`. |
 | `artifact` | string | The artifact or rule ID, or a short description when there is none. |

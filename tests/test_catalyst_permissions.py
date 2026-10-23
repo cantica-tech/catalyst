@@ -58,23 +58,26 @@ def team(tmp_path, monkeypatch, capsys):
     return project
 
 
-def _user(name: str, roles: list[str]) -> dict:
-    return {"name": name, "roles": roles}
+def _user(name: str, roles: list[str], grants: list[str] = ()) -> dict:
+    """A signer as catalyst-users presents it: its roles shown, its grants from the token (fw-IDENTITY-000008)."""
+    return {"name": name, "roles": roles, "grants": list(grants)}
 
 
 def test_what_a_role_grants(team):
     dep = load(team)
-    assert permissions.grants(dep, _user("Bob", ["Developer"])) == {"status"}
-    assert permissions.grants(dep, _user("Dee", ["Lead"])) == {"*"}
-    assert permissions.grants(dep, _user("Ada", ["Admin"])) >= {"*"}  # the Admin role, by name
+    developer = _user("Bob", ["Developer"], ["cmd:status", "reconcile:propose"])
+    assert permissions.grants(dep, developer) == {"status"}  # a reconciliation level is no command
+    assert permissions.grants(dep, _user("Dee", ["Lead"], ["cmd:*"])) == {"*"}
+    assert permissions.grants(dep, _user("Ada", ["Admin"])) == set()  # a role's name grants nothing: its grants do
     assert permissions.required(dep, "/status on tasks") == ["status"]
     assert permissions.required(dep, "/user-add") == ["user-add", "user"]
     assert permissions.required(dep, "create", ("create-item", "create-nothing")) == ["create", "create-item"]
     assert permissions.required(dep, "chore") is None  # a tier is not a command
     assert permissions.required(dep, "/implement") is None  # nor a command the deployment lacks
-    assert permissions.refusal(dep, _user("Cy", ["Onboarder"]), "/user-add") is None  # an alias grants itself
-    assert permissions.refusal(dep, _user("Cy", ["Onboarder"]), "/user-remove") is not None
-    assert permissions.refusal(dep, _user("Ada", ["Admin"]), "/user-remove") is None  # a command grants its aliases
+    onboarder = _user("Cy", ["Onboarder"], ["cmd:user-add"])
+    assert permissions.refusal(dep, onboarder, "/user-add") is None  # an alias grants itself
+    assert permissions.refusal(dep, onboarder, "/user-remove") is not None
+    assert permissions.refusal(dep, _user("Ada", ["Admin"], ["cmd:user"]), "/user-remove") is None  # and its aliases
 
 
 def test_a_writing_verb_refuses_what_no_role_grants(team, capsys):
@@ -82,13 +85,13 @@ def test_a_writing_verb_refuses_what_no_role_grants(team, capsys):
     capsys.readouterr()
     assert main(["new", "ITEM", "--title", "Another", "--as", "bob", "--field", "Domain=AUTH"]) == 1
     err = capsys.readouterr().err
-    assert "Bob (Developer) may not run /create" in err and "catalyst role modify" in err
+    assert "Bob (Developer) may not run /create" in err and "Grant it in catalyst-users" in err
     assert main(["new", "SUB", "--title", "A sub", "--as", "dee", "--field", f"Item={ITEM}"]) == 0  # `*`
 
 
 def test_a_deactivated_user_signs_nothing(team, capsys):
     assert main(["status", "set", ITEM, "Done", "--as", "eve"]) == 1
-    assert "deactivated" in capsys.readouterr().err
+    assert "eve is disabled" in capsys.readouterr().err  # disabled in catalyst-users, never deleted
 
 
 def test_warn_mode_writes_and_says_why(team, capsys):
