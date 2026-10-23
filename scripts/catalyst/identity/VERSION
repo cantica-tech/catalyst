@@ -1,12 +1,12 @@
 {
   "package": "catalyst-users",
   "repository": "cantica-tech/catalyst-users",
-  "release": "0.1.0",
+  "release": "0.1.1",
   "files": {
     "errors.py": "3572b06e75ffa9192df31b8199f0067c171068b276fbba747d4cdb795f328e27",
     "config.py": "ff0fb47d603626628d85a9756ac14eceb3387fc75e80e858c74bf6b446ba23ba",
     "http.py": "590704e9b0b62b1e1fe104a88d60795e70f3f92cc42688f096b8d8e823708314",
-    "oidc.py": "65e218871c2ca6fd2465557b3eb9be8a361c6dee65e5a54d6e3497ddb9826ef0",
+    "oidc.py": "d84801efa93acbd67834b199798228c7aff434932686aafd910af99580cbc6f5",
     "identity.py": "219767041bff25aaa844c7a0e59b7f5a0d720ceaa117cc44e80100e7a535942e",
     "credentials.py": "5fb138ed0fce7d5babbe2c4cd5832b1a0d44c4f25f0d3bb67207b2a6554dd6f9",
     "session.py": "b1be870227aa966a02578738d6f1189b399509a661a943de494ee1e5c6b40ec3",
