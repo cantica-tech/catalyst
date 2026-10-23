@@ -175,7 +175,10 @@ to the active module keeps a one-line placeholder here
   (INV-21) and the approval gates of `IAM/gates.json` add their own checks
   (`Rules-of-Rules.md` §11). `/user remove` never deletes a user's entry;
   it sets `"active": false`, and refuses if doing so would leave zero active
-  users.
+  users. With an identity provider (`catalyst.toml` `identity = "oidc"`),
+  the provider's accounts sign: the signer is the verified, logged-in
+  identity, holding the roles whose `provider_role` its provider gives it,
+  and `users.json` keeps who signed before (`CLI.md`, "Identity providers").
 - **INV-17 — Append-only, replayable journal.** The journal always
   exists: one shard per actor, machine and month under
   `development/journal/` (`<actor>@<machine>/<YYYY-MM>.jsonl`), plus, in a
@@ -293,7 +296,9 @@ to the active module keeps a one-line placeholder here
   case-sensitive alphanumeric, containing at least one uppercase
   letter, drawn cryptographically at `/user add` time and regenerated
   on collision against every existing `userid` in the registry
-  (`Rules-of-Rules.md` rr-META-011). From that point on, every rule,
+  (`Rules-of-Rules.md` rr-META-011) — or, with an identity provider, at an
+  identity's first signature, in the append-only signers ledger
+  `IAM/signers.jsonl`, keyed by its issuer and subject. From that point on, every rule,
   `WORKFLOW-`, and `RECON-` ID, and every ID of an active-module entity
   type (`<PREFIX>-NNNNNN`), carries its creator/signer's `userid` as a
   trailing `-XXXXXXXX` suffix, assigned once at creation and never changed

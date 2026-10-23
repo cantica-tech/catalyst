@@ -244,7 +244,8 @@ def attribute_paths(dep: Deployment) -> list[str]:
     catalyst regenerates (rows from both sides are kept, then regenerated)."""
     # rules/rules.md is hand-maintained (not regenerated): concurrent edits
     # there must surface as conflicts, not as silently duplicated rows.
-    paths = ["development/journal.jsonl", "development/journal/**/*.jsonl"]
+    # the signers ledger is append-only too: two first signatures on two machines both stay (fw-IDENTITY-000003)
+    paths = ["development/journal.jsonl", "development/journal/**/*.jsonl", "IAM/signers.jsonl"]
     for etd in dep.etds.values():
         folder = dep.folder(etd)
         if folder is not None and etd.naming != "free-form":

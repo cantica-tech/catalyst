@@ -21,6 +21,8 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `run-event.schema.json` | `catalyst agent run <command> --json` (one per line) | — (no route starts a run) |
 | `runs.schema.json` | `catalyst agent runs --json` | `GET /v1/runs` (local mode) |
 | `approvals.schema.json` | `catalyst approvals <id> --json` | `GET /v1/approvals/<id>` |
+| `identity-whoami.schema.json` | `catalyst identity whoami --json`, `catalyst identity login --json` | — (a user's own login) |
+| `identity-status.schema.json` | `catalyst identity status --json` | — (a user's own login) |
 | `try.schema.json` | `catalyst try <verb …> --json` | — (the host runs it, design 27) |
 | `analyses.schema.json` | `catalyst analysis list --json` | `GET /v1/analyses` |
 | `analysis.schema.json` | `catalyst analysis status <id> --json` | `GET /v1/analyses/<id>` |

@@ -64,6 +64,24 @@ KEYS: tuple[tuple[str, str, str, str], ...] = (
         "—",
     ),
     (
+        "identity",
+        "string",
+        "Optional: the deployment's identity provider, `local` (the default: `IAM/users/users.json`) or `oidc` (an OIDC provider's accounts sign, verified; design 28). Set by `catalyst identity configure`.",
+        "`check`: error for another value, or `oidc` without `identity_issuer`.",
+    ),
+    (
+        "identity_issuer",
+        "string",
+        'With `identity = "oidc"`: the provider\'s issuer URL (`https://id.example.com/realms/catalyst`), HTTPS except on a loopback host.',
+        "`check`: required with `oidc`; the login refuses a discovery document naming another issuer.",
+    ),
+    (
+        "identity_client",
+        "string",
+        'With `identity = "oidc"`: the provider\'s public client with the device grant that `catalyst identity login` uses (default `catalyst-cli`).',
+        "—",
+    ),
+    (
         "embed_origins",
         "string",
         "Optional: the origins, comma-separated (`https://wiki.example.com, http://localhost:3000`), whose pages may read this criterion through `catalyst serve --local` (decision B8): their reads get CORS headers, each with its reader's token; nothing is written. Absent: no other origin.",

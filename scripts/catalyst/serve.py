@@ -63,6 +63,7 @@ import sqlite3
 import subprocess
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -73,6 +74,7 @@ API = "/v1"
 WC = ".criterion/"
 LEVELS = {"none": 0, "propose": 1, "full": 2}
 USERS = "IAM/users/users.json"
+SIGNERS = "IAM/signers.jsonl"  # the signers ledger of a deployment with an identity provider (fw-IDENTITY-000003)
 ROLES = "IAM/roles/roles.json"
 MAX_BODY = 512 * 1024 * 1024
 ID_FIELD = re.compile(r"^\| \*\*ID\*\* \| `([^`]+)` \|", re.M)
@@ -274,8 +276,52 @@ class Reads:
         return seq, data
 
 
+class ProviderTokens:
+    """An identity provider's access tokens, accepted by introspection (fw-IDENTITY-000005): only when the
+    provider says the token is active, issued by this issuer and meant for the server's API client. A
+    result is kept at most 30 seconds and never past the token's expiry, keyed by the token's hash."""
+
+    TTL = 30.0
+    SIZE = 10_000
+
+    def __init__(self, issuer: str, api_client_id: str, api_client_secret: str, transport=None, clock=time.time):
+        from catalyst.identity.http import Http
+        from catalyst.identity.oidc import OIDCClient
+        from catalyst.provider import ProviderSettings
+
+        conf = ProviderSettings(
+            issuer=issuer.rstrip("/"), api_client_id=api_client_id, api_client_secret=api_client_secret
+        )
+        self.issuer = conf.issuer
+        self.oidc = OIDCClient(conf, Http(transport, timeout=conf.timeout), clock=clock)  # type: ignore[arg-type]
+        self.clock = clock
+        self._cache: dict[str, tuple[float, dict]] = {}
+        self._lock = threading.Lock()
+
+    def claims(self, token: str) -> dict | None:
+        from catalyst.identity.errors import CatalystUsersError
+
+        key, now = _hash(token), self.clock()
+        with self._lock:
+            hit = self._cache.get(key)
+        if hit and hit[0] > now:
+            return hit[1]
+        try:
+            found = self.oidc.introspect(token)
+        except CatalystUsersError:
+            raise ServeError(503, "the identity provider cannot be reached") from None
+        if not self.oidc.accepts(found):
+            return None
+        with self._lock:
+            if len(self._cache) >= self.SIZE:
+                self._cache.clear()
+            self._cache[key] = (min(now + self.TTL, float(found["exp"])), found)
+        return found
+
+
 class Server(Reads):
-    def __init__(self, db: Path):
+    def __init__(self, db: Path, provider_tokens: ProviderTokens | None = None):
+        self.provider_tokens = provider_tokens
         self.db = Path(db)
         self.db.parent.mkdir(parents=True, exist_ok=True)
         self._write = threading.Lock()
@@ -310,10 +356,15 @@ class Server(Reads):
             rows = c.execute("SELECT id, userid, created, revoked FROM tokens ORDER BY id").fetchall()
         return [{"id": r[0], "userid": r[1], "created": r[2], "revoked": r[3]} for r in rows]
 
-    def user_for(self, token: str) -> str | None:
+    def user_for(self, token: str) -> str | dict | None:
+        """The userid a `cst_` token was issued to; with a provider, the claims of its accepted token."""
         with self._conn() as c:
             row = c.execute("SELECT userid FROM tokens WHERE hash = ? AND revoked IS NULL", (_hash(token),)).fetchone()
-        return row[0] if row else None
+        if row:
+            return row[0]
+        if self.provider_tokens is not None and not token.startswith("cst_"):
+            return self.provider_tokens.claims(token)
+        return None
 
     # reads
     def head(self) -> dict:
@@ -347,7 +398,9 @@ class Server(Reads):
             ]
 
     # the one write
-    def push(self, userid: str, base: int, changes: list[dict], blobs: dict[str, bytes], message: str = "") -> dict:
+    def push(
+        self, userid: str | dict, base: int, changes: list[dict], blobs: dict[str, bytes], message: str = ""
+    ) -> dict:
         with self._write, self._conn() as c:
             c.execute("BEGIN IMMEDIATE")
             try:
@@ -360,7 +413,9 @@ class Server(Reads):
             self.changed.notify_all()
         return out
 
-    def _apply(self, c, userid: str, base: int, changes: list[dict], blobs: dict[str, bytes], message: str) -> dict:
+    def _apply(
+        self, c, userid: str | dict, base: int, changes: list[dict], blobs: dict[str, bytes], message: str
+    ) -> dict:
         for sha, data in blobs.items():
             if blob_sha(data, len(sha)) != sha:
                 raise ServeError(422, f"blob {sha[:10]} does not match its content")
@@ -399,7 +454,13 @@ class Server(Reads):
             cur = _current(c, path)
             return content(cur) if cur else content(after_of.get(path))
 
-        user = _user(pre(USERS), userid)
+        importing = c.execute("SELECT COUNT(*) FROM batches").fetchone()[0] == 0
+        if isinstance(userid, dict):  # a provider's token: the signer is its ledger line (fw-IDENTITY-000005)
+            cur = _current(c, SIGNERS)
+            pushed = (content(after_of[SIGNERS]),) if SIGNERS in after_of else None
+            user = _provider_user(content(cur) if cur else None, pushed, pre(ROLES), userid, own_only=not importing)
+        else:
+            user = _user(pre(USERS), userid)
         entries = []
         for p, before, after in rows:
             if is_journal(p):
@@ -407,7 +468,6 @@ class Server(Reads):
             elif after is not None:
                 content(after)
         names = {slug(user.get("name")), slug(user.get("git_username"))} - {""}
-        importing = c.execute("SELECT COUNT(*) FROM batches").fetchone()[0] == 0
         journaled = set()
         for entry in entries:
             if not importing and slug(entry.get("actor")) not in names:
@@ -447,7 +507,8 @@ class Server(Reads):
 
         previous = c.execute("SELECT COALESCE(MAX(seq), 0) FROM batches").fetchone()[0]
         seq = previous + 1
-        c.execute("INSERT INTO batches(seq, userid, time, message) VALUES (?, ?, ?, ?)", (seq, userid, now(), message))
+        who = str(user.get("userid"))  # a provider's signer: its ledger userid
+        c.execute("INSERT INTO batches(seq, userid, time, message) VALUES (?, ?, ?, ?)", (seq, who, now(), message))
         for sha, data in blobs.items():
             c.execute("INSERT OR IGNORE INTO blobs(sha, bytes) VALUES (?, ?)", (sha, data))
         for p, before, after in rows:
@@ -707,6 +768,39 @@ def _user(users: bytes | None, userid: str) -> dict:
     raise ServeError(403, "this token's user is not a registered user of the criterion")
 
 
+def _lines(data: bytes | None) -> list[str]:
+    return [line for line in (data or b"").decode("utf-8").splitlines() if line.strip()]
+
+
+def _provider_user(
+    server: bytes | None, pushed: tuple[bytes | None] | None, roles: bytes | None, claims: dict, own_only: bool = True
+) -> dict:
+    """The signer of a push made with a provider's token: the ledger's line for its issuer and subject. A
+    push may append ledger lines for its own identity only (`own_only`; the first push, an import, brings
+    every signer's), and never changes or removes one."""
+    from catalyst import provider
+
+    lines = _lines(server)
+    if pushed is not None:
+        new = _lines(pushed[0])
+        if not set(lines) <= set(new):
+            raise ServeError(403, f"this push changes or removes lines of {SIGNERS}: it is append-only")
+        for line in sorted(set(new) - set(lines)):
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                raise ServeError(422, f"{SIGNERS}: a line is not JSON") from None
+            if own_only and (entry.get("iss"), entry.get("sub")) != (claims.get("iss"), claims.get("sub")):
+                raise ServeError(403, f"{SIGNERS}: a push adds lines for its own identity only")
+        lines = new
+    entries = [e for e in (json.loads(line) for line in lines) if isinstance(e, dict)]
+    entry = provider.find(entries, str(claims.get("iss")), str(claims.get("sub")))
+    if entry is None:
+        raise ServeError(403, f"no line in {SIGNERS} for this identity: sign once with the CLI, then push")
+    held = set((claims.get("realm_access") or {}).get("roles") or ()) | set(claims.get("roles") or ())
+    return provider.as_user(entry, provider.roles_for(_json(roles, "roles"), tuple(sorted(held))))
+
+
 def _levels(roles: bytes | None) -> dict[str, str]:
     return {str(r.get("name")): str(r.get("reconciliation") or "none") for r in _json(roles, "roles")}
 
@@ -938,10 +1032,14 @@ class _Server(http.server.ThreadingHTTPServer):
 
 
 def make_server(
-    db: Path, host: str = "127.0.0.1", port: int = 8765, origins: tuple[str, ...] = ()
+    db: Path,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    origins: tuple[str, ...] = (),
+    provider_tokens: ProviderTokens | None = None,
 ) -> http.server.ThreadingHTTPServer:
     allowed = frozenset(check_origin(o) for o in origins)
-    handler = type("BoundHandler", (Handler,), {"app": Server(db), "origins": allowed})
+    handler = type("BoundHandler", (Handler,), {"app": Server(db, provider_tokens), "origins": allowed})
     return _Server((host, port), handler)
 
 
@@ -1156,7 +1254,18 @@ class ServeShare:
         return str(url)
 
     def client(self) -> Client:
-        return Client(self.url, token_for(self.url))
+        """With an identity provider, the provider's access token (fw-IDENTITY-000005); else this server's."""
+        from catalyst import provider
+
+        token = os.environ.get("CATALYST_TOKEN")
+        if not token and provider.is_oidc(self.dep):  # type: ignore[arg-type]
+            from catalyst.identity.errors import CatalystUsersError
+
+            try:
+                token = provider.session(provider.settings(self.dep.pointer)).access_token()  # type: ignore[attr-defined]
+            except (CatalystUsersError, provider.ProviderError):
+                token = None
+        return Client(self.url, token or token_for(self.url))
 
     # what this criterion last saw of the server
     def _state_file(self) -> Path:

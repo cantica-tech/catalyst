@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalyst identity whoami",
+  "description": "Who the identity provider says is logged in, the userid the signers ledger gives them (null before their first signature) and the deployment's roles they hold through each role's provider_role (design 28, fw-IDENTITY-000002..000004).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "username",
+    "name",
+    "issuer",
+    "subject",
+    "userid",
+    "provider_roles",
+    "roles"
+  ],
+  "properties": {
+    "username": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "userid": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "provider_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
