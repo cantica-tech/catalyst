@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.105.2 — 2026-10-23
+
+No layout change, no migration.
+
+- Fixed: `catalyst spec <command>` keeps a procedure's numbered or bulleted list, code block or indented text with that
+  procedure even when its first line names another command; such a list was printed under the command it named, and
+  the procedure it belonged to came out with no steps (BUG-000029).
+
 ## 0.105.1 — 2026-10-23
 
 No layout change, no migration.
