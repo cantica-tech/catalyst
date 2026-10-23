@@ -12,7 +12,7 @@ They decided four questions on stage two (design `28`, ADR-000048).
 
 | What | Where |
 |---|---|
-| Kernel 0.105.0: identity providers (REQ-000086) | `cantica-tech/catalyst` |
+| Kernel [0.105.0](https://github.com/cantica-tech/catalyst/releases/tag/0.105.0): identity providers (REQ-000086) | `cantica-tech/catalyst`; the distribution repository `cantica-tech/cantica-tech` |
 | catalyst-users 0.1.0 | [`cantica-tech/catalyst-users`](https://github.com/cantica-tech/catalyst-users/releases/tag/0.1.0) |
 | Build 1.0.0 of the identity-design knowledge base (`KBUILD-000001` of catalyst-users) | The curator's machine (Internal) |
 
@@ -60,7 +60,12 @@ They decided four questions on stage two (design `28`, ADR-000048).
 - The identity tests: 26 with a fake provider, and 4 for the vendored code.
 - An end-to-end run against a real Keycloak (catalyst-users' dev realm), recorded as TEST-000001: login, signing, the
   ledger, roles, a gate, a serve import and push, forged and missing tokens, a rewritten ledger, and logged out.
-- `task check:all`, `task lint`: see the final run below.
+- `task check:all`: deployment valid, command parity and kernel purity pass, 791 tests pass locally. The release's
+  CI ran pytest on Ubuntu, macOS and Windows with Python 3.11 and 3.13, plus the standards lint and the deployment
+  check, on each pull request (#311 into `main`, #312 into `release`): all passed.
+- **Windows found one test assuming POSIX file modes.** The first CI run of #311 failed on Windows only, where a
+  token file reads `0o666`; the mode is now asserted on POSIX only. Windows keeps a user's home private by its own
+  access-control lists.
 - Pyright: 0 errors. 4 new warnings, all in the vendored code; they are fixed in catalyst-users and arrive with its
   next release.
 
@@ -87,3 +92,6 @@ They decided four questions on stage two (design `28`, ADR-000048).
 - **The UI** may want `catalyst identity` and the new spec schemas (`identity-whoami`, `identity-status`,
   `approve.roles`, `role.provider_role`).
 - **The journal's time-order warning across shards** could take shard order into account.
+- **catalyst's `development/BACKLOG.md`** was last refreshed on 2026-09-29: a `/show-backlog` of its own.
+- **catalyst-users' `compose.yaml`** gained, outside this session, a volume keeping Keycloak's H2 database at
+  `./.keycloack/data`: uncommitted, the path spelled "keycloack", and not yet in `.gitignore`.
