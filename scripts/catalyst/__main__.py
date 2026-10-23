@@ -93,6 +93,14 @@ def cmd_identity(args) -> int:
             doc["client"] = args.client
         return _identity_session(args, sub, doc, None)
     dep = open_deployment(args)
+    if sub == "link":
+        try:
+            entry = provider.link(dep, args.user, args.as_user)
+        except provider.ProviderError as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        print(f"{entry['username']} signs with userid {entry['userid']}")
+        return 0
     if sub == "configure":
         from catalyst.identity.provider import pointer_problems
 
@@ -3184,6 +3192,10 @@ def build_parser() -> argparse.ArgumentParser:
         if verb == "whoami":
             q.add_argument("--as", dest="as_user", help="the tests' static backend: which declared person")
         q.set_defaults(func=cmd_identity, json=False)
+    q = ids_.add_parser("link", help="keep a retired user's userid as yours, once (migration 0.106.0)")
+    q.add_argument("user", help="the retired user (name, username or userid), who must be you")
+    q.add_argument("--as", dest="as_user", help="the tests' static backend: which declared person")
+    q.set_defaults(func=cmd_identity, json=False)
 
     p = sub.add_parser("userid", help="userid operations")
     uid = p.add_subparsers(dest="userid_command", required=True)

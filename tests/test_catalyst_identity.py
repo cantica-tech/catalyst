@@ -361,3 +361,33 @@ def test_the_zipapp_stays_standard_library_only():
     modules = "catalyst.provider, catalyst.identity.session, catalyst.identity.providers.keycloak"
     code = f"import sys; sys.path.insert(0, {scripts!r}); import {modules}"
     assert subprocess.run([sys.executable, "-I", "-S", "-c", code], capture_output=True, check=False).returncode == 0
+
+
+# --- keeping a userid across the move (migration 0.106.0) ----------------------------------
+def test_link_keeps_a_retired_users_userid_for_that_person_only(deployment, capsys):
+    """`catalyst identity link`: the verified identity takes the userid it had in the retired registry, once, so
+    the IDs it creates keep ending with it; nobody else may take it."""
+    project, who = deployment
+    who["now"] = Whoami(ISSUER, "sub-ada", "ada", "Ada Lovelace", grants=("cmd:*",))
+    assert main(["identity", "link", "ada"]) == 0
+    assert capsys.readouterr().out.strip() == f"ada signs with userid {USERID}"
+    [line] = _ledger(project)
+    assert (line["userid"], line["iss"], line["sub"]) == (USERID, ISSUER, "sub-ada")
+    assert journal_entries(project / ".criterion")[-1]["command"] == "catalyst identity link"
+    assert main(["new", "ITEM", "--title", "Still mine", *FIELDS]) == 0
+    assert capsys.readouterr().out.split()[0].endswith(USERID)  # the same suffix as before the move
+    assert main(["identity", "link", "ada"]) == 1  # once
+    assert "never rewritten" in capsys.readouterr().err
+    who["now"] = Whoami(ISSUER, "sub-other", "ada", "Ada Lovelace", grants=("cmd:*",))
+    assert main(["identity", "link", "ada"]) == 1  # one identity per userid
+    assert "already linked" in capsys.readouterr().err
+
+
+def test_link_refuses_someone_who_is_not_the_retired_user(deployment, capsys):
+    project, who = deployment
+    who["now"] = Whoami(ISSUER, "sub-mallory", "mallory", "Mallory", grants=("cmd:*",))
+    assert main(["identity", "link", "ada"]) == 1
+    assert "taken only by them" in capsys.readouterr().err
+    assert main(["identity", "link", "nobody"]) == 1
+    assert "no retired user 'nobody'" in capsys.readouterr().err
+    assert _ledger(project) == []

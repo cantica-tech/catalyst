@@ -363,6 +363,69 @@ def enroll(dep: Deployment, who) -> dict:
     return entry
 
 
+def link(dep: Deployment, retired: str, as_user_name: str | None = None, transport: Any = None) -> dict:
+    """The verified identity takes a retired user's userid (migration 0.106.0, owner decision of 2026-10-23), so the
+    IDs it creates keep ending with it: once per identity and per userid, only by the person themselves (the retired
+    user's name or username is the identity's), journaled. Its ledger line is the one `enroll` would have written,
+    with that userid."""
+    from catalyst import journal
+    from catalyst.corpus import local_users
+
+    doc = pointer(dep)
+    if doc is None:
+        raise ProviderError(f"{POINTER.as_posix()} is missing: `catalyst identity configure --issuer <url>`")
+    who = verify(doc, as_user_name, transport)
+    wanted = retired.strip().lower()
+    person = next(
+        (
+            u
+            for u in local_users(dep.root)
+            if wanted in {str(u.get(k, "")).lower() for k in ("name", "git_username", "userid")}
+        ),
+        None,
+    )
+    if person is None or not person.get("userid"):
+        raise ProviderError(f"no retired user {retired!r} with a userid (IAM/users/users.retired.json)")
+    theirs = {str(person.get(k, "")).lower() for k in ("name", "git_username")} - {""}
+    if not theirs & {who.username.lower(), who.name.lower()}:
+        raise ProviderError(
+            f"{who.username} ({who.name}) is not {person.get('name')}: a retired user's userid is taken only by them"
+        )
+    entries = ledger(dep.root)
+    if find(entries, who.issuer, who.subject) is not None:
+        raise ProviderError(f"{who.username} already has a line in {SIGNERS.as_posix()}: it is never rewritten")
+    if any(str(e["userid"]) == str(person["userid"]) for e in entries):
+        raise ProviderError(f"userid {person['userid']} is already linked to another identity")
+    taken = {str(e["username"]).lower() for e in entries}
+    username = who.username if who.username.lower() not in taken else f"{who.username}-{person['userid']}"
+    entry = {
+        "userid": str(person["userid"]),
+        "iss": who.issuer,
+        "sub": who.subject,
+        "username": username,
+        "name": who.name,
+        "first_signed": datetime.now(UTC).date().isoformat(),
+    }
+    path = dep.root / SIGNERS
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst identity link",
+            action="create",
+            artifact=f"signer {entry['userid']}",
+            targets=[],
+            intent=[f"{username} signs as {person.get('name')} did before: they keep userid {entry['userid']}"],
+            files=[str(path)],
+            actor=username,
+            tier="chore",
+        ),
+    )
+    return entry
+
+
 # --- the signer (fw-IDENTITY-000002, 000008) ------------------------------------------------
 def signer(dep: Deployment, as_user_name: str | None = None, transport: Any = None) -> dict:
     """The verified identity signing, as a user record: its roles (display names), groups, grants and

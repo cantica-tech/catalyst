@@ -203,6 +203,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
 | `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
 | `catalyst identity status` | the provider, and whether you are logged in (no network) | `--client`, `--issuer`, `--json` |
+| `catalyst identity link <user>` | keep a retired user's userid as yours, once (migration 0.106.0) | `--as` |
 | `catalyst userid gen` | draw a new unique userid (INV-26) | — |
 
 <!-- end generated: cli-index -->
@@ -2286,6 +2287,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst identity status` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
 |  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
 |  | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst identity link` | `<user>` | the retired user (name, username or userid), who must be you |
+|  | `--as` `AS_USER` | the tests' static backend: which declared person |
 | `catalyst userid gen` | — | — |
 
 <!-- end generated: cli-options -->

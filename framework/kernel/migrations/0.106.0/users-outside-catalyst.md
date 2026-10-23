@@ -32,4 +32,5 @@ From `0.105.x` to `0.106.0` (design 29, ADR-000049, REQ-000087).
 4. **Judgment:** the `user` and `role` definitions gain v2 (an identity catalyst-users verifies; a provider role
    composed of grants): `catalyst definition migrate user 2` and `catalyst definition migrate role 2`. The workflow,
    reconciliation and analysis templates gain a new version (a signer is the ledger's, not a registered user's).
-5. `catalyst identity login`, then `catalyst check`.
+5. `catalyst identity login`; each person who signed before keeps their userid with `catalyst identity link <their
+   retired name>` before their first signature (once, only by themselves); then `catalyst check`.
