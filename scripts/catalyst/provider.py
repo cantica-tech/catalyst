@@ -215,10 +215,15 @@ def write_snapshot(doc: dict[str, Any], user: dict[str, Any]) -> Path:
     }
     data["hash"] = _digest(data)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if path.exists():
+    # written aside and renamed into place: parallel signatures (sub-agents) never write the read-only file itself
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.chmod(0o400)
+    try:
+        tmp.replace(path)
+    except PermissionError:  # Windows will not replace a read-only file
         path.chmod(0o600)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    path.chmod(0o400)
+        tmp.replace(path)
     return path
 
 
@@ -238,9 +243,11 @@ def read_snapshot(doc: dict[str, Any]) -> dict[str, Any] | None:
 
 def discard_snapshot(doc: dict[str, Any]) -> None:
     path = snapshot_path(doc)
-    if path.exists():
+    try:
         path.chmod(0o600)
         path.unlink()
+    except FileNotFoundError:  # already gone (another process discarded it)
+        pass
 
 
 # --- the signers ledger (fw-IDENTITY-000003) -------------------------------------------

@@ -208,7 +208,12 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
             user = provider.signer(dep, getattr(args, "as_user", None))  # verified now; the snapshot rewritten
         else:
             who = provider.verify(doc)
-            user = {"git_username": who.username, "name": who.name, "iss": who.issuer, "sub": who.subject}
+            user: dict[str, Any] = {
+                "git_username": who.username,
+                "name": who.name,
+                "iss": who.issuer,
+                "sub": who.subject,
+            }
             user.update({"groups": who.groups, "roles": who.roles, "grants": who.grants})
             user["reconciliation"] = who.reconciliation
     except provider.ProviderError as exc:

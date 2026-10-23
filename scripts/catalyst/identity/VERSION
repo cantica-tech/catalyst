@@ -1,10 +1,10 @@
 {
   "package": "catalyst-users",
   "repository": "cantica-tech/catalyst-users",
-  "release": "0.4.0",
+  "release": "0.4.1",
   "files": {
     "errors.py": "3572b06e75ffa9192df31b8199f0067c171068b276fbba747d4cdb795f328e27",
-    "config.py": "9643ea921b2ba09a3ccc23852e6283dac62ca139c28b91903d87f442206fd71a",
+    "config.py": "53f8a86c50d1b857a0852a3ffd0825a725a342168b6405e57b1a285efd54c616",
     "http.py": "590704e9b0b62b1e1fe104a88d60795e70f3f92cc42688f096b8d8e823708314",
     "oidc.py": "64b71e86df918add0b5bf9763f10b441da6c452bff8eaa7251622c9d5570f8d2",
     "identity.py": "219767041bff25aaa844c7a0e59b7f5a0d720ceaa117cc44e80100e7a535942e",
@@ -14,7 +14,7 @@
     "keychain.py": "e384b102cdf095a84542cc62d9715bc7f9cca0e0db8972a90685c2e9b15c4a24",
     "provider.py": "45b88bbe9dc79f92db1c1e9505b2626d259b928ddc9c21016dd89fac905a0309",
     "providers/__init__.py": "bab4ebed0c1e5aa29b89682d86e2479f98d0b46a28ab76651832c475fc97edee",
-    "providers/keycloak.py": "da0d3d9f75167db89ecb3bd12e55ea15ac4bff5e0159577d9c55aa9c58899f9c",
+    "providers/keycloak.py": "19975de1313a00cd72c09cf0216442f21a261c419a48aca7b78f352f2f7b7005",
     "providers/static.py": "43cb43aa79a88ba9a679f5ddfd66e592e9174ba5d7fb3b2db44671492afb655f",
     "__init__.py": "fe09ba6e26e9f942cebefb04980dd02702da3feadef4af117ef34e0f07f36975"
   }

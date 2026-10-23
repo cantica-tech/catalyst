@@ -25,7 +25,7 @@ A layout change, with a migration (`migrations/0.106.0/users-outside-catalyst.md
   one is discarded.
 - Added: `catalyst identity link <retired user>`: a person who signed before keeps their userid, once, only for
   themselves.
-- Changed: the vendored identity code is `cantica-tech/catalyst-users` 0.4.0 (the provider registry, setup's
+- Changed: the vendored identity code is `cantica-tech/catalyst-users` 0.4.1 (the provider registry, setup's
   settings, the system account).
 - Changed: `spec/identity-whoami.schema.json` carries groups, grants and the reconciliation level;
   `spec/identity-status.schema.json` drops `client`.
