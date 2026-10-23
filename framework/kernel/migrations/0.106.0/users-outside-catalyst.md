@@ -25,7 +25,8 @@ From `0.105.x` to `0.106.0` (design 29, ADR-000049, REQ-000087).
    next version (their names and ids, for display); `IAM/users/users.json` and `IAM/roles/roles.json` retired in place
    as `*.retired.json` (history: who signed before); the groups templates added.
 2. **Judgment, a `local` deployment:** point it at catalyst-users (`catalyst-users setup`, then
-   `catalyst identity configure --issuer <url>`): nothing is signed until it is.
+   `catalyst identity configure --issuer <url> --link <your retired name>`, which keeps your userid before its own
+   signature): nothing is signed until it is.
 3. **Judgment:** provision the deployment's roles into the provider (`catalyst-users roles provision
    <the retired roles.json>`), and import its people (`catalyst-users users import <the retired users.json> --roles
    <the retired roles.json>`), with the owner's agreement. A gate's `role` names the provider's role.

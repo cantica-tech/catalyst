@@ -391,3 +391,14 @@ def test_link_refuses_someone_who_is_not_the_retired_user(deployment, capsys):
     assert main(["identity", "link", "nobody"]) == 1
     assert "no retired user 'nobody'" in capsys.readouterr().err
     assert _ledger(project) == []
+
+
+def test_configure_can_link_before_its_own_signature(deployment, capsys):
+    """Moving a deployment: configure's own signature would draw a new userid, so --link keeps the old one first."""
+    project, who = deployment
+    (project / ".criterion" / "IAM" / "identity.json").unlink()
+    who["now"] = Whoami(ISSUER, "sub-ada", "ada", "Ada Lovelace", grants=("cmd:*",))
+    assert main(["identity", "configure", "--issuer", ISSUER, "--link", "ada", "--intent", "moving to Keycloak"]) == 0
+    [line] = _ledger(project)
+    assert line["userid"] == USERID
+    assert journal_entries(project / ".criterion")[-1]["actor"] == "ada"

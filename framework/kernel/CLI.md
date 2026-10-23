@@ -198,7 +198,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst criterion sync` | fast-forward to the shared branch (refuses with local work) | `--url`, `--yes` |
 | `catalyst criterion integrity` | fail if a merge lost any ID, index row or journal line | `--head`, `--parent` |
 | `catalyst criterion protect` | branch protection for the shared branch (GitHub) | `--yes` |
-| `catalyst identity configure` | point the deployment at catalyst-users (writes IAM/identity.json) | `--as`, `--catalyst-client`, `--client`, `--intent`, `--issuer`, `--provider` |
+| `catalyst identity configure` | point the deployment at catalyst-users (writes IAM/identity.json) | `--as`, `--catalyst-client`, `--client`, `--intent`, `--issuer`, `--link`, `--provider` |
 | `catalyst identity login` | log in with a code shown in your browser (the device flow) | `--client`, `--issuer`, `--json` |
 | `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
 | `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
@@ -2273,6 +2273,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--issuer` `ISSUER` | the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst` |
 |  | `--client` `CLIENT` | the public client with the device grant (default: catalyst-cli) |
 |  | `--catalyst-client` `CATALYST_CLIENT` | the client whose roles are catalyst grants (default: catalyst) |
+|  | `--link` `LINK` | first keep this retired user's userid as yours (`identity link`), then sign |
 |  | `--as` `AS_USER` | signer, under the provider in force before the change |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 | `catalyst identity login` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |

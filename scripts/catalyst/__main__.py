@@ -123,6 +123,11 @@ def cmd_identity(args) -> int:
                 from catalyst.corpus import load_corpus
                 from catalyst.ids import resolve_signer
 
+                if args.link:  # before the first signature, which would draw a new userid (migration 0.106.0)
+                    try:
+                        provider.link(dep, args.link, args.as_user)
+                    except provider.ProviderError as exc:
+                        raise IdError(str(exc)) from None
                 signer = resolve_signer(dep, load_corpus(dep), args.as_user, "identity")
             except IdError:
                 if old is None:
@@ -3175,6 +3180,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--issuer", help="the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst`")
     q.add_argument("--client", help="the public client with the device grant (default: catalyst-cli)")
     q.add_argument("--catalyst-client", help="the client whose roles are catalyst grants (default: catalyst)")
+    q.add_argument("--link", help="first keep this retired user's userid as yours (`identity link`), then sign")
     q.add_argument("--as", dest="as_user", help="signer, under the provider in force before the change")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.set_defaults(func=cmd_identity)
