@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -281,7 +282,9 @@ def test_verify_asks_the_provider(tmp_path, monkeypatch):
 
     provider.session(conf, transport).store.save(ISSUER, conf.client_id, Tokens("at", "rt", time.time() + 300))
     path = provider.credentials_path(conf)
-    assert path.parent.parent == tmp_path / "home" and oct(path.stat().st_mode & 0o777) == "0o600"
+    assert path.parent.parent == tmp_path / "home"
+    if sys.platform != "win32":  # POSIX modes; Windows keeps a user's home private by its own ACLs
+        assert oct(path.stat().st_mode & 0o777) == "0o600"
     who = provider.verify(conf, transport)
     assert (who.iss, who.sub, who.username, who.provider_roles) == (ISSUER, "s1", "alice", ("developer",))
 
@@ -300,4 +303,4 @@ def test_identity_whoami_and_status_print_their_schemas(oidc, capsys):
 def test_the_zipapp_stays_standard_library_only(tmp_path):
     scripts = str(Path(__file__).resolve().parents[1] / "scripts")
     code = f"import sys; sys.path.insert(0, {scripts!r}); import catalyst.provider, catalyst.identity.session"
-    assert subprocess.run(["python3", "-I", "-S", "-c", code], capture_output=True, check=False).returncode == 0
+    assert subprocess.run([sys.executable, "-I", "-S", "-c", code], capture_output=True, check=False).returncode == 0
