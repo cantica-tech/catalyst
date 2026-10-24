@@ -198,3 +198,27 @@ def test_an_oidc_client_sends_its_provider_token(tmp_path, monkeypatch):
     (tmp_path / "IAM" / "identity.json").unlink()  # no pointer: the server's own token
     monkeypatch.setattr(serve, "token_for", lambda url: "cst_mine")
     assert serve.ServeShare(dep).client().token == "cst_mine"
+
+
+# --- the served criterion and its admins (fw-IDENTITY-000005, -000011; REQ-000090) ----------------------
+def test_the_server_records_the_criterion_it_serves_once(tmp_path):
+    db = tmp_path / "s.db"
+    assert serve.Server(db).head()["criterion"] is None
+    assert serve.Server(db, criterion="catalyst").head()["criterion"] == "catalyst"
+    assert serve.Server(db).criterion == "catalyst"  # recorded: a later start need not name it
+    with pytest.raises(serve.ServeError, match="serves the criterion catalyst, not other") as err:
+        serve.Server(db, criterion="other")
+    assert err.value.status == 409
+    with pytest.raises(serve.ServeError, match="not a criterion name"):
+        serve.Server(tmp_path / "t.db", criterion="Not/A-Name")
+
+
+def test_a_pusher_holds_every_grant_only_in_the_criterion_they_administer():
+    ledger = _line("sub-kim", "Ki12Mm34", "kim").encode()
+    claims = _claims("sub-kim", groups=["/criteria/catalyst/admins"])
+    signer = serve._provider_user(None, (ledger,), None, claims, criterion="catalyst")
+    assert (signer["reconciliation"], signer["administers"]) == ("full", ["catalyst"])
+    assert {"cmd:*", "reconcile:full"} <= set(signer["grants"])
+    for served in ("catalyst-ui", None):  # another criterion, or a server that names none
+        other = serve._provider_user(None, (ledger,), None, claims, criterion=served)
+        assert (other["grants"], other["reconciliation"]) == ([], "none")

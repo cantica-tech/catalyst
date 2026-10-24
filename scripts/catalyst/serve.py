@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, sha TEXT NOT NULL, seq I
 CREATE TABLE IF NOT EXISTS ids(id TEXT PRIMARY KEY, path TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS tokens(id INTEGER PRIMARY KEY, hash TEXT UNIQUE NOT NULL, userid TEXT NOT NULL,
                                   created TEXT NOT NULL, revoked TEXT);
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
 
@@ -322,7 +323,7 @@ class ProviderTokens:
 
 
 class Server(Reads):
-    def __init__(self, db: Path, provider_tokens: ProviderTokens | None = None):
+    def __init__(self, db: Path, provider_tokens: ProviderTokens | None = None, criterion: str | None = None):
         self.provider_tokens = provider_tokens
         self.db = Path(db)
         self.db.parent.mkdir(parents=True, exist_ok=True)
@@ -332,6 +333,25 @@ class Server(Reads):
         self.changed = threading.Condition()  # notified when a batch lands (the events stream)
         with self._conn() as c:
             c.executescript(SCHEMA)
+        self.criterion = self._criterion(criterion)
+
+    def _criterion(self, name: str | None) -> str | None:
+        """The criterion this database serves (fw-IDENTITY-000005): named once by the operator (`--criterion`), never
+        by a push, whose `catalyst.toml` is only the client's word; another name later is refused."""
+        with self._conn() as c:
+            row = c.execute("SELECT value FROM meta WHERE key = 'criterion'").fetchone()
+            if name is None or (row and row[0] == name):
+                return row[0] if row else None
+            if row:
+                raise ServeError(409, f"{self.db} serves the criterion {row[0]}, not {name}")
+            from catalyst.identity.provider import ProviderError, criterion_name
+
+            try:
+                criterion_name(name)
+            except ProviderError as exc:
+                raise ServeError(422, str(exc)) from None
+            c.execute("INSERT INTO meta(key, value) VALUES ('criterion', ?)", (name,))
+            return name
 
     @contextlib.contextmanager
     def _conn(self):
@@ -373,7 +393,7 @@ class Server(Reads):
         with self._conn() as c:
             seq = c.execute("SELECT COALESCE(MAX(seq), 0) FROM batches").fetchone()[0]
             count = c.execute("SELECT COUNT(*) FROM files").fetchone()[0]
-        return {"seq": seq, "files": count}
+        return {"seq": seq, "files": count, "criterion": self.criterion}
 
     def changes_since(self, since: int) -> dict:
         """Each path changed after batch `since`, at its current version
@@ -460,7 +480,14 @@ class Server(Reads):
         if isinstance(userid, dict):  # a provider's token: the signer is its ledger line (fw-IDENTITY-000005)
             cur = _current(c, SIGNERS)
             pushed = (content(after_of[SIGNERS]),) if SIGNERS in after_of else None
-            user = _provider_user(content(cur) if cur else None, pushed, pre(POINTER), userid, own_only=not importing)
+            user = _provider_user(
+                content(cur) if cur else None,
+                pushed,
+                pre(POINTER),
+                userid,
+                own_only=not importing,
+                criterion=self.criterion,
+            )
         else:
             user = _user(pre(USERS) or pre(RETIRED_USERS), userid, pre(SIGNERS))
         entries = []
@@ -786,11 +813,17 @@ def _lines(data: bytes | None) -> list[str]:
 
 
 def _provider_user(
-    server: bytes | None, pushed: tuple[bytes | None] | None, pointer: bytes | None, claims: dict, own_only: bool = True
+    server: bytes | None,
+    pushed: tuple[bytes | None] | None,
+    pointer: bytes | None,
+    claims: dict,
+    own_only: bool = True,
+    criterion: str | None = None,
 ) -> dict:
-    """The signer of a push made with a provider's token: the ledger's line for its issuer and subject. A
-    push may append ledger lines for its own identity only (`own_only`; the first push, an import, brings
-    every signer's), and never changes or removes one."""
+    """The signer of a push made with a provider's token: the ledger's line for its issuer and subject, with every
+    grant where they administer the served `criterion` (fw-IDENTITY-000011). A push may append ledger lines for its
+    own identity only (`own_only`; the first push, an import, brings every signer's), and never changes or removes
+    one."""
     from catalyst import provider
 
     lines = _lines(server)
@@ -819,7 +852,9 @@ def _provider_user(
     client = str((doc if isinstance(doc, dict) else {}).get("catalyst_client") or "catalyst")
     who = whoami_from_claims(claims, str(claims.get("iss")), client)
     user = provider.as_user(entry, list(who.roles))
-    user.update({"groups": list(who.groups), "grants": list(who.grants), "reconciliation": who.reconciliation})
+    grants, level = provider.in_criterion(criterion, who)
+    user.update({"groups": list(who.groups), "grants": grants, "reconciliation": level})
+    user["administers"] = list(who.administers)
     return user
 
 
@@ -1055,9 +1090,10 @@ def make_server(
     port: int = 8765,
     origins: tuple[str, ...] = (),
     provider_tokens: ProviderTokens | None = None,
+    criterion: str | None = None,
 ) -> http.server.ThreadingHTTPServer:
     allowed = frozenset(check_origin(o) for o in origins)
-    handler = type("BoundHandler", (Handler,), {"app": Server(db, provider_tokens), "origins": allowed})
+    handler = type("BoundHandler", (Handler,), {"app": Server(db, provider_tokens, criterion), "origins": allowed})
     return _Server((host, port), handler)
 
 
