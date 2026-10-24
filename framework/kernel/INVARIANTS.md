@@ -35,7 +35,8 @@ it. The active module may add up to three laws (`INVARIANTS.module.md`).
   deleted. The signers ledger is never rewritten.
 - **L8 — Install, sync and share only when asked**, with the matching
   command; reading catalyst never installs it.
-- **L9 — The kernel knows no module; no module knows an agent.** Modules and
+- **L9 — The kernel knows no module; no module knows another module or an
+  agent.** A module works alone and beside any other. Modules and
   extensions act on the deployed project, never on catalyst itself.
 - **L10 — Say what you did and what you checked.** Report outcomes as they
   are — failed checks, skipped steps, unverified claims; call it "catalyst";
@@ -73,7 +74,7 @@ to the active module keeps a one-line placeholder here
 | INV-25 act without asking | — (how to work: `Rules-of-Rules.md`) | — |
 | INV-26 signed IDs | L7 | `id next`, `check` |
 | INV-29 atomic, real-time updates | L1 | journal, end-of-turn hook |
-| INV-30 module-agnostic kernel | L9 | `check_kernel_purity.py` in CI |
+| INV-30 module-agnostic kernel; modules compose | L9 | `check_kernel_purity.py` in CI; `module install`'s composition checks; CI installs the second production module alone and beside another |
 
 ## The invariants in full
 
@@ -315,7 +316,7 @@ to the active module keeps a one-line placeholder here
   never reused.
 - **INV-28** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
   never reused.
-- **INV-30 — The kernel is module-agnostic.** The kernel
+- **INV-30 — The kernel is module-agnostic, and modules compose.** The kernel
   (`framework/kernel/`), catalyst's tooling (`scripts/`) and root documents
   never name a specific process module or any of its entity ID prefixes,
   folders, commands, templates or definitions; only generic references
@@ -323,7 +324,17 @@ to the active module keeps a one-line placeholder here
   module's own repository and is composed into deployments
   (`MODULE-SPECIFICATION.md` §6). Enforced by
   `scripts/check_kernel_purity.py`, which derives its denylist from the
-  modules in `framework/modules/catalog.md`.
+  modules in `framework/modules/catalog.md`. Likewise every process module
+  works as a deployment's only module and beside any other module the
+  composition rules admit (`MODULE-SPECIFICATION.md` §1), in either install
+  order, and never requires, names or assumes another: not its entity
+  types, ID prefixes, folders, commands or tiers. A module that serves any
+  project (one that builds knowledge bases, say) is therefore added beside
+  whatever module already governs it, neither changing. Enforced by
+  `catalyst module install`, which refuses what two modules may not share,
+  and by catalyst's CI, which installs the second production module alone,
+  beside another module, and with another beside it
+  (`fw-STRUCTURE-000018`).
 
 ## Plugins (retired)
 

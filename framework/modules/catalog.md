@@ -13,3 +13,8 @@ listed here.
 |---|---|---|
 | `software-engineering` | `git@github.com:cantica-tech/catalyst-software-engineering.git` | `main` |
 | `knowledge-base` | `git@github.com:cantica-tech/catalyst-knowledge-base.git` | `main` |
+
+Every module installs alone or beside any other (INV-30). `knowledge-base`
+(KBM) builds knowledge bases off any project: it is a criterion's only module,
+or it is installed beside the module that already governs the project
+(`catalyst module install`), in either order.

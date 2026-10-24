@@ -281,3 +281,40 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
     report = _cli(capsys, "check")
     assert "0 error(s)" in report and "legacy:" not in report  # catalyst.toml, the criterion in catalyst's home
     assert "software-engineering" not in json.dumps(graph)  # nothing of the other module
+
+
+# --- modules compose (INV-30, fw-STRUCTURE-000018, REQ-000088) ------------------------------
+def _install(capsys, source: Path) -> None:
+    _cli(capsys, "module", "install", str(source), "--kernel", str(KERNEL), "--intent", "a module beside the other")
+
+
+def _both_checked(capsys, order: list[str]) -> None:
+    """Both modules loaded, in install order, and the deployment passes `check` with both in scope."""
+    report = _cli(capsys, "check")
+    assert "0 error(s)" in report and f"modules {', '.join(order)}" in report, report
+    assert [
+        m["id"] for m in json.loads((_criterion(capsys) / "modules" / "modules.json").read_text())["modules"]
+    ] == order
+
+
+def test_another_module_is_installed_beside_the_knowledge_base_module(project, capsys, tmp_path):
+    from test_catalyst_several_modules import notes_module
+
+    _install(capsys, notes_module(tmp_path / "modules"))
+    _both_checked(capsys, ["knowledge-base", "notes-process"])
+    assert {"KB", "KSOURCE", "KBUILD", "NOTE"} <= set(json.loads(_cli(capsys, "graph", "--json"))["types"])
+
+
+def test_the_knowledge_base_module_is_installed_beside_another_module(tmp_path, monkeypatch, capsys):
+    from test_catalyst_several_modules import notes_module
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    app = tmp_path / "app"
+    subprocess.run(["git", "init", "-q", str(app)], check=True)
+    init = ["--project", str(app), "init", "--kernel", str(KERNEL), "--name", "app", "--no-module"]
+    assert main([*init, "--git-username", "ada", "--agent", "claude-code", "--no-runtime"]) == 0
+    monkeypatch.chdir(app)
+    _install(capsys, notes_module(tmp_path / "modules"))  # the module that governs the project
+    _install(capsys, MODULE)  # then the knowledge bases, built off it
+    _both_checked(capsys, ["notes-process", "knowledge-base"])
+    assert {"KB", "KSOURCE", "KBUILD", "NOTE"} <= set(json.loads(_cli(capsys, "graph", "--json"))["types"])
