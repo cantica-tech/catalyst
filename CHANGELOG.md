@@ -6,6 +6,18 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.106.1 — 2026-10-24
+
+No layout change. A deployment migrated with 0.106.0: `catalyst migrate --apply` corrects its roles template.
+
+- Fixed: migration 0.106.0 kept a deployment's roles under ids slugged from their names, so the provider's roles were
+  not recognised (`Admin` under `admin`, the provider's being `catalyst-admin`). A kept role now takes the kernel
+  roles template's id for its name, else its own; a deployment already migrated gets its roles template again with
+  the kernel's ids, as a new version (BUG-000031).
+- Fixed: reading several journal shards, an entry recording a file unchanged (as `catalyst init` records the files it
+  finds) was overtaken by a source producing the same content later, so a moved deployment's journal read out of time
+  order (`time-order` warnings); an entry changing a file twice waited on its own first change (BUG-000032).
+
 ## 0.106.0 — 2026-10-23
 
 A layout change, with a migration (`migrations/0.106.0/users-outside-catalyst.md`) that has judgment steps.
