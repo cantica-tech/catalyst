@@ -156,6 +156,91 @@ def _template_steps(dep: Deployment, kernel: Path | None) -> list[tuple[Step, Pa
 
 
 # --- people out of the criterion (migration 0.106.0, design 29) ---------------------------
+# The kernel roles template's ids, which `catalyst-users roles provision` gives the provider's roles: a kept role is
+# shown under the provider role of the same id (BUG-000031). Held equal to `templates/roles.template.json` by a test,
+# for a migration run without `--kernel`.
+KERNEL_ROLE_IDS = {
+    "Product Owner": "product-owner",
+    "Scrum Master / Delivery Lead": "scrum-master",
+    "Tech Lead / Architect": "tech-lead",
+    "Developer": "developer",
+    "QA / Tester": "qa",
+    "Stakeholder": "stakeholder",
+    "Release Manager": "release-manager",
+    "Admin": "catalyst-admin",
+}
+
+
+def _kernel_role_ids(kernel: Path | None) -> dict[str, str]:
+    import json
+
+    try:
+        roles = json.loads((kernel / "templates" / "roles.template.json").read_text(encoding="utf-8"))["roles"]  # type: ignore[operator]
+        return {str(r["name"]): str(r["id"]) for r in roles if r.get("name") and r.get("id")}
+    except (TypeError, OSError, ValueError, KeyError):
+        return dict(KERNEL_ROLE_IDS)
+
+
+def _role_entry(role: dict, ids: dict[str, str]) -> dict:
+    """A kept role for the display template: the kernel's id for a kernel role, else its own (provider_role, slug)."""
+    from catalyst import provider
+
+    own = role.get("id") or role.get("provider_role")
+    rid = str(own) if own else ids.get(str(role["name"])) or provider.role_id(role)
+    return {
+        "name": role["name"],
+        "id": rid,
+        **{k: v for k, v in role.items() if k not in ("name", "id", "provider_role")},
+    }
+
+
+def _latest_roles_template(folder: Path) -> tuple[int, Path | None]:
+    held = [
+        (int(m.group(1)), f)
+        for f in folder.glob("TEMPLATE-ROLES-v*.json")
+        if (m := re.search(r"-v(\d+)\.json$", f.name))
+    ]
+    return max(held, default=(0, None))
+
+
+def _misnamed_roles(dep: Deployment, ids: dict[str, str]) -> list[dict] | None:
+    """The latest roles template with the kernel's ids where 0.106.0's migration slugged a kernel role's name
+    (BUG-000031), or None when it needs no correction."""
+    import json
+
+    _, latest = _latest_roles_template(dep.root / "IAM" / "roles" / "templates")
+    if latest is None or not (dep.root / "IAM" / "roles" / "roles.retired.json").is_file():
+        return None
+    try:
+        roles = json.loads(latest.read_text(encoding="utf-8")).get("roles") or []
+    except (OSError, ValueError, AttributeError):
+        return None
+    fixed = [
+        {**r, "id": ids[r["name"]]}
+        if isinstance(r, dict) and r.get("name") in ids and r.get("id") != ids[r["name"]]
+        else r
+        for r in roles
+    ]
+    return fixed if fixed != roles else None
+
+
+def _write_roles_template(folder: Path, roles: list[dict], stamp: str, note: str) -> list[Path]:
+    import json
+
+    folder.mkdir(parents=True, exist_ok=True)
+    n = _latest_roles_template(folder)[0] + 1
+    file = folder / f"TEMPLATE-ROLES-v{n}.json"
+    file.write_text(json.dumps({"roles": roles}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    catalog = folder / "templates-role.md"
+    rows = (
+        catalog.read_text(encoding="utf-8")
+        if catalog.is_file()
+        else "# `ROLES` templates — catalog\n\n| Version | File | Timestamp | Notes |\n|---|---|---|---|\n"
+    )
+    catalog.write_text(rows.rstrip("\n") + f"\n| v{n} | `{file.name}` | {stamp} | {note} |\n", encoding="utf-8")
+    return [file, catalog]
+
+
 def _identity_step(dep: Deployment) -> Step | None:
     """What a deployment still holds of people that catalyst-users now holds: a registry to retire, a
     `catalyst.toml` pointer to move into `IAM/identity.json`, the groups templates to add."""
@@ -172,6 +257,8 @@ def _identity_step(dep: Deployment) -> Step | None:
         parts.append("keep its roles as the roles template's next version (display names and ids)")
     if not (iam / "groups" / "templates").is_dir():
         parts.append("add the groups templates")
+    if _misnamed_roles(dep, KERNEL_ROLE_IDS) is not None:
+        parts.append("give the roles template's kernel roles the kernel's ids, as the provider's (BUG-000031)")
     return Step("identity", "IAM", "; ".join(parts), True) if parts else None
 
 
@@ -196,48 +283,19 @@ def _take_identity(dep: Deployment, kernel: Path | None, stamp: str) -> tuple[li
         if toml is not None:
             project_file.write(toml, data)
         done.append(f"wrote IAM/identity.json ({doc['issuer']}); catalyst.toml's identity keys removed")
+    ids = _kernel_role_ids(kernel)
     roles = iam / "roles" / "roles.json"
     if roles.is_file():
         try:
             listed = json.loads(roles.read_text(encoding="utf-8")).get("roles") or []
         except (OSError, ValueError, AttributeError):
             listed = []
-        catalogue = {
-            "roles": [
-                {
-                    "name": r["name"],
-                    "id": provider.role_id(r),
-                    **{k: v for k, v in r.items() if k not in ("name", "id", "provider_role")},
-                }
-                for r in listed
-                if isinstance(r, dict) and r.get("name")
-            ]
-        }
-        folder = iam / "roles" / "templates"
-        folder.mkdir(parents=True, exist_ok=True)
-        held = [
-            int(m.group(1))
-            for f in folder.glob("TEMPLATE-ROLES-v*.json")
-            if (m := re.search(r"-v(\d+)\.json$", f.name))
-        ]
-        n = max(held, default=0) + 1
-        file = folder / f"TEMPLATE-ROLES-v{n}.json"
-        file.write_text(json.dumps(catalogue, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        catalog = folder / "templates-role.md"
-        rows = (
-            catalog.read_text(encoding="utf-8")
-            if catalog.is_file()
-            else "# `ROLES` templates — catalog\n\n| Version | File | Timestamp | Notes |\n|---|---|---|---|\n"
+        kept_roles = [_role_entry(r, ids) for r in listed if isinstance(r, dict) and r.get("name")]
+        written = _write_roles_template(
+            iam / "roles" / "templates", kept_roles, stamp, "The deployment's roles, for display (migration 0.106.0)."
         )
-        catalog.write_text(
-            rows.rstrip("\n")
-            + f"\n| v{n} | `{file.name}` | {stamp} | The deployment's roles, for display (migration 0.106.0). |\n",
-            encoding="utf-8",
-        )
-        touched += [file, catalog]
-        done.append(
-            f"kept the deployment's {len(catalogue['roles'])} role(s) as TEMPLATE-ROLES-v{n}.json (display only)"
-        )
+        touched += written
+        done.append(f"kept the deployment's {len(kept_roles)} role(s) as {written[0].name} (display only)")
     for kept in ("users", "roles"):
         old = iam / kept / f"{kept}.json"
         if old.is_file():
@@ -260,6 +318,13 @@ def _take_identity(dep: Deployment, kernel: Path | None, stamp: str) -> tuple[li
         )
         touched += [groups / "TEMPLATE-GROUPS-v1.json", groups / "templates-group.md", groups / "README.md"]
         done.append("added the groups templates")
+    fixed = _misnamed_roles(dep, ids)
+    if fixed is not None:  # migrated by 0.106.0, which slugged the kernel roles' names (BUG-000031)
+        written = _write_roles_template(
+            iam / "roles" / "templates", fixed, stamp, "The kernel roles under the kernel's ids (BUG-000031)."
+        )
+        touched += written
+        done.append(f"gave the kernel roles the kernel's ids in {written[0].name}")
     return touched, done
 
 
