@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from catalyst.corpus import Artifact, Corpus, is_empty, norm_field, ref_values
+from catalyst.corpus import Artifact, Corpus, is_unset, norm_field, ref_values
 from catalyst.deployment import Deployment
 
 DEFAULT_COLUMNS = ["ID", "Title", "Status"]
@@ -54,7 +54,7 @@ def _split(text: str) -> tuple[list[str], list[str] | None, list[str], list[str]
     return lines, None, [], []
 
 
-def _cell(art: Artifact, column: str, old: str | None) -> str:
+def _cell(art: Artifact, column: str, old: str | None, allowed: dict[str, list[str]] | None = None) -> str:
     key = norm_field(column)
     if key == "id":
         return f"[{art.id}]({art.file.name})"
@@ -63,7 +63,7 @@ def _cell(art: Artifact, column: str, old: str | None) -> str:
     raw = art.get(column)
     if raw is None:
         return old or ""  # no such field: keep what the index held
-    if is_empty(raw):
+    if is_unset(raw, (allowed or {}).get(key)):
         return ""
     values = ref_values(raw) if "`" in raw else [raw.strip()]
     return ", ".join(v.replace("|", "\\|") for v in values)
@@ -81,7 +81,7 @@ def _row_id(row: list[str], id_col: int) -> str | None:
     return m.group(1) if m else None
 
 
-def render(existing: str, title: str, arts: list[Artifact]) -> str:
+def render(existing: str, title: str, arts: list[Artifact], etd=None) -> str:
     if existing:
         before, header, old_rows, after = _split(existing)
     else:
@@ -97,12 +97,13 @@ def render(existing: str, title: str, arts: list[Artifact]) -> str:
         if rid:
             old[rid] = row
     current = {a.id for a in arts}
+    allowed = {norm_field(f.name): f.allowed_values for f in getattr(etd, "fields", []) if f.kind == "enum"}
     entries = [
         (
             a.id,
             "| "
             + " | ".join(
-                _cell(a, c, old.get(a.id, [None] * len(columns))[i] if i < len(old.get(a.id, [])) else None)
+                _cell(a, c, old.get(a.id, [None] * len(columns))[i] if i < len(old.get(a.id, [])) else None, allowed)
                 for i, c in enumerate(columns)
             )
             + " |",
@@ -134,7 +135,7 @@ def regenerate(dep: Deployment, corpus: Corpus, write: bool = True) -> list[Inde
             continue
         index = folder / f"{folder.name}.md"
         old = index.read_text(encoding="utf-8") if index.is_file() else ""
-        new = render(old, etd.plural_name, arts)
+        new = render(old, etd.plural_name, arts, etd)
         if new != old:
             changes.append(IndexChange(index, old, new))
             if write:

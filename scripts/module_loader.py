@@ -456,7 +456,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
                     name=f.get("name", ""),
                     kind=f.get("kind", "text"),
                     required=bool(f.get("required", False)),
-                    allowed_values=f.get("allowed_values", []) or [],
+                    allowed_values=[str(v) for v in f.get("allowed_values") or []],
                     target_type=f.get("target_type"),
                     backref=f.get("backref"),
                     required_when_closed=bool(f.get("required_when_closed", False)),
