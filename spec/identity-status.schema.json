@@ -1,26 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "catalyst identity status",
-  "description": "The deployment's identity provider and whether this user holds tokens for it; reads no network (design 28).",
+  "description": "The provider the deployment points at (IAM/identity.json, design 29) and whether this machine holds a person's tokens for it.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "provider",
     "issuer",
-    "client",
     "logged_in"
   ],
   "properties": {
     "provider": {
-      "type": "string",
-      "enum": [
-        "oidc"
-      ]
-    },
-    "issuer": {
       "type": "string"
     },
-    "client": {
+    "issuer": {
       "type": "string"
     },
     "logged_in": {

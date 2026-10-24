@@ -22,8 +22,9 @@ guide is the judgment it leaves to the agent. Work it from
      `catalyst-<id>` (`framework/modules/catalog.md`); propose one and ask.
      Elsewhere: `--module-dir <dir>`, a checkout at the release matching
      this kernel.
-   - The first user, registered as Admin: `--user` (default `git config
-     user.name`) and `--git-username`, asked.
+   - The catalyst-users provider people sign with: `--identity-issuer
+     <url>` (default: this machine's catalyst-users), asked. The installer
+     logs in first (`catalyst identity login --issuer <url>`).
    - The agent (`--agent <id>`), and optionally where tests live
      (`--test-locations`; on the greenfield path, from the testing
      decision, §3).
@@ -38,7 +39,7 @@ guide is the judgment it leaves to the agent. Work it from
    leave an existing `commit-msg` hook for the user to merge.
 6. **What the module requires.** A document the module requires at
    instantiation that still holds `{{PLACEHOLDER}}` text is filled by the
-   command the module names. More users: `/user add`.
+   command the module names. People and roles: catalyst-users.
 7. **Landing page.** Extend the root `README.md` stub with the project's
    rule and workflow structure, linking each folder's `README.md`.
 8. **First content**, on the path that fits: greenfield (§3) or retrofit

@@ -18,6 +18,8 @@ from catalyst.deployment import Deployment
 BULLET_START = re.compile(r"^- `/([a-z][a-z0-9-]*)")
 # `/name`, `/name <args>` and the colon form `/name: ...` all name a command.
 MENTION = re.compile(r"`/([a-z][a-z0-9-]*)(?=[`\s:])")
+# A paragraph that continues the one before it: indented text, a code fence, a numbered or bulleted list.
+CONTINUES = re.compile(r"^(\s|```|\d+\.\s|[-*]\s)")
 PREAMBLE = (
     "Tier first (Rules-of-Rules.md §6): a chore (no rule's behaviour changes) is one `catalyst journal append "
     "--tier chore` entry with no target; a fix restores a rule (--tier fix); a feature adds or changes behaviour "
@@ -109,7 +111,7 @@ def parse(text: str) -> Section4:
                 s.aliases.setdefault(alias, names[0])
     # A paragraph belongs to the known command its first line names; else it
     # continues the previous command's procedure if it mentions that command
-    # or continues a list or code block; else it is general.
+    # or continues a list or code block (BUG-000029: before any command it names); else it is general.
     known = set(s.bullets) | set(s.aliases)
     owner: str | None = None
     tag: set[str] = set()
@@ -119,13 +121,15 @@ def parse(text: str) -> Section4:
             continue
         first = body.splitlines()[0]
         named = [n for n in _names(first + " ", s.aliases) if n in known]
-        if named:
+        if owner and CONTINUES.match(first):
+            pass  # a list, code block or indented text continues the procedure in progress, whatever it names
+        elif named:
             new_owner, new_tag = s.aliases.get(named[0], named[0]), {n for n in named if n in s.aliases}
             # naming only the command continues the part in progress; a new procedure starts with "When"
             if not (new_owner == owner and not new_tag and tag and not first.startswith("When ")):
                 tag = new_tag
             owner = new_owner
-        elif owner is None or not (f"/{owner}" in body or first.startswith(("  ", "```", "1.", "- ", "* "))):
+        elif owner is None or f"/{owner}" not in body:
             owner = None
         if owner:
             s.procedures.setdefault(owner, []).append(body)

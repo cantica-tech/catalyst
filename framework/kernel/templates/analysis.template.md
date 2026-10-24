@@ -12,7 +12,7 @@
 | **Code state** | the product commit analysed (`HEAD` at `start`); every finding's evidence refers to it |
 | **Opened** | YYYY-MM-DD |
 | **Closed** | YYYY-MM-DD — blank until `Closed` or `Abandoned` |
-| **Signed-off-by** | the registered user who started the analysis |
+| **Signed-off-by** | the signer who started the analysis |
 
 ## Passes
 

@@ -586,19 +586,10 @@ LEVELS = {"none": 0, "propose": 1, "full": 2}
 
 
 def reconciliation_level(dep: Deployment, signer: dict) -> tuple[str, str]:
-    """The signer's reconciliation level — the highest among their roles'
-    `reconciliation` (a role without one counts as `none`) — and the role
-    that grants it."""
-    from catalyst.corpus import roles as deployment_roles
-
-    roles = deployment_roles(dep)  # a workspace member's inherited roles too (R3.1b)
-    by_name = {str(r.get("name")): str(r.get("reconciliation") or "none") for r in roles if isinstance(r, dict)}
-    best = ("none", "")
-    for role in signer.get("roles") or []:
-        level = by_name.get(str(role), "none")
-        if LEVELS.get(level, 0) > LEVELS[best[0]]:
-            best = (level, str(role))
-    return best
+    """The signer's reconciliation level, from catalyst-users: the highest `reconcile:<level>` grant their token
+    carries (fw-IDENTITY-000008), and where it comes from."""
+    level = str(signer.get("reconciliation") or "none")
+    return (level if level in LEVELS else "none"), "catalyst-users grants"
 
 
 def _append_revision(text: str, author: str, note: str, blob: str | None = None) -> str:

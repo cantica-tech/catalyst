@@ -23,7 +23,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from catalyst import compose, proc
+from catalyst import compose, proc, provider
 from catalyst.ids import generate_userid
 from module_loader import load_module
 
@@ -75,6 +75,22 @@ class InitRequest:
     agent: str = "unknown"
     userid: str | None = None  # fixed first userid (reproducible examples); else drawn
     runtime: bool = True  # fill the home criterion's .venv (R3.1a)
+    identity: dict | None = None  # the pointer to catalyst-users (design 29); the tests' static one from `user` if None
+
+
+def static_identity(req: InitRequest) -> dict:
+    """The tests' static pointer, its one person the installer as Admin: refused without the tests' flag."""
+    if os.environ.get(provider.STATIC_FLAG) != "1":
+        raise InitError(
+            "people are catalyst-users' (design 29): pass --identity-issuer <url> and log in first "
+            "(`catalyst identity login --issuer <url>`)"
+        )
+    username = req.git_username or req.user
+    return {
+        "provider": "static",
+        "people": [{"username": username, "name": req.user, "subject": username, "roles": ["catalyst-admin"]}],
+        "roles": [{"id": "catalyst-admin", "name": "Admin", "grants": ["cmd:*", "reconcile:full"]}],
+    }
 
 
 def today() -> str:
@@ -417,7 +433,14 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         root.mkdir(parents=True)
     steps: list[str] = []
 
-    # --- the first user and the composed documents ------------------------
+    # --- who installs: catalyst-users' verified identity (design 29) ---------
+    identity = req.identity or static_identity(req)
+    try:
+        installer = provider.verify(identity, req.git_username or req.user)
+    except provider.ProviderError as exc:
+        raise InitError(str(exc)) from None
+
+    # --- the first signer and the composed documents ------------------------
     userid = req.userid or generate_userid(set())
     if not re.fullmatch(r"[A-Za-z0-9]{8}", userid) or not any(c.isupper() for c in userid):
         raise InitError(f"userid '{userid}' is not 8 letters/digits with an uppercase letter")
@@ -510,8 +533,12 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             f"{len(manifest.entity_types)} entity folder(s), definitions, invariants"
         )
 
-    # --- IAM --------------------------------------------------------------
-    for kind, template in (("users", "users.template.json"), ("roles", "roles.template.json")):
+    # --- IAM: the pointer, the ledger, the display templates (design 29) ---
+    for kind, template in (
+        ("users", "users.template.json"),
+        ("roles", "roles.template.json"),
+        ("groups", "groups.template.json"),
+    ):
         tdir = root / "IAM" / kind / "templates"
         tdir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(kt / template, tdir / f"TEMPLATE-{kind.upper()}-v1.json")
@@ -520,17 +547,29 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             f"# `{kind.upper()}` templates — catalog\n\n| Version | File | Timestamp | Notes |\n"
             f"|---|---|---|---|\n| v1 | `TEMPLATE-{kind.upper()}-v1.json` | {stamp} | Initial version. |\n",
         )
-        _write(tdir / "README.md", f"# `{kind}` templates\n\nSeed shape for `{kind}.json` (INV-20).\n")
+        _write(
+            tdir / "README.md",
+            f"# `{kind}` templates\n\nHow {kind} are shown (fw-IDENTITY-000010): display only, no person, no grant.\n",
+        )
         _write(
             root / "IAM" / kind / "README.md",
-            f"# {kind.title()}\n\nManaged by the `/user-*` and `/role-*` commands only (CODE-OF-CONDUCT.md §2).\n",
+            f"# {kind.title()}\n\nManaged in catalyst-users (`IAM/identity.json`), read-only here (design 29).\n",
         )
-    user = {"name": req.user, "roles": ["Admin"], "registered": stamp, "active": True, "notes": "", "userid": userid}
-    if req.git_username:
-        user["git_username"] = req.git_username
-    _write(root / "IAM" / "users" / "users.json", json.dumps({"users": [user]}, indent=2))
-    shutil.copyfile(kt / "roles.template.json", root / "IAM" / "roles" / "roles.json")
-    steps.append(f"registered {req.user} (userid {userid}) as the first, Admin user (INV-16)")
+    _write(root / provider.POINTER, json.dumps(identity, indent=2))
+    first = {
+        "userid": userid,
+        "iss": installer.issuer,
+        "sub": installer.subject,
+        "username": installer.username,
+        "name": installer.name,
+        "first_signed": stamp,
+    }
+    _write(root / provider.SIGNERS, json.dumps(first, ensure_ascii=False))
+    steps.append(
+        f"pointed the deployment at catalyst-users ({identity.get('provider')}"
+        + (f", {identity['issuer']}" if identity.get("issuer") else "")
+        + f"); {installer.username} (userid {userid}) signs first, in the signers ledger"
+    )
 
     # --- journal, version, docs, CLI --------------------------------------
     (root / "development").mkdir(parents=True, exist_ok=True)  # the journal's shards go here
@@ -670,9 +709,10 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             + [
                 str(root / "CODE-OF-CONDUCT.md"),
                 str(root / "rules" / "Rules-of-Rules.md"),
-                str(root / "IAM" / "users" / "users.json"),
+                str(root / provider.POINTER),
+                str(root / provider.SIGNERS),
             ],
-            actor=req.git_username or req.user,
+            actor=installer.username,
             allow_unchanged=True,
         ),
     )

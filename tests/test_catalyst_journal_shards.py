@@ -60,6 +60,40 @@ def test_shards_merge_in_causal_order_whatever_the_clocks_say(project):
     assert j.last_after(dep)["src/f.py"] == j.git(project, "hash-object", "src/f.py")
 
 
+def test_an_entry_that_depends_on_nothing_keeps_its_place_in_time(project):
+    """A second actor's first entry only creates files: it is ready at once, but must not overtake an earlier entry
+    that waits on its own shard's chain (an old journal out of causal order). Before the fix it jumped to the front,
+    and every later entry was reported out of time order."""
+    dep = load(project)
+
+    def entry(actor: str, ts: str, path: str, before, after) -> str:
+        files = [{"path": path, "before": before, "after": after}]
+        return json.dumps(
+            {
+                "timestamp": ts,
+                "actor": actor,
+                "command": "x",
+                "action": "update",
+                "artifact": "a",
+                "targets": [],
+                "intent": ["i"],
+                "files": files,
+            }
+        )
+
+    shards = dep.root / "development" / "journal"
+    write(
+        shards / "ada@m1" / "2026-10.jsonl",
+        entry("ada", "2026-10-01T10:00:00Z", "src/x.py", "h2", "h3")
+        + "\n"  # waits for h2, which comes next
+        + entry("ada", "2026-10-01T11:00:00Z", "src/x.py", None, "h2")
+        + "\n",
+    )
+    write(shards / "bob@m2" / "2026-10.jsonl", entry("bob", "2026-10-02T09:00:00Z", "src/y.py", None, "y1") + "\n")
+    order = [((e or {}).get("actor"), (e or {}).get("timestamp")[11:13]) for _, e, _ in j.read(dep)]
+    assert order == [("ada", "10"), ("ada", "11"), ("bob", "09")]
+
+
 def test_concurrent_appends_are_serialised(project):
     """Eight processes journal at once: every entry lands whole, the chain of
     the file they all name stays intact."""

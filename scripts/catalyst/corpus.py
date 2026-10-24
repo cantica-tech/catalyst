@@ -207,33 +207,50 @@ def _domains(root: Path) -> set[str]:
 
 
 def local_users(root: Path) -> list[dict]:
-    """The deployment's own registry, `IAM/users/users.json`."""
-    path = root / "IAM" / "users" / "users.json"
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    users = data.get("users", []) if isinstance(data, dict) else []
-    return [u for u in users if isinstance(u, dict)]
+    """The people the deployment registered before catalyst-users (`IAM/users/users.json`, retired as
+    `users.retired.json` by migration 0.106.0): history only, who signed before; none of them signs now."""
+    for name in ("users.retired.json", "users.json"):
+        path = root / "IAM" / "users" / name
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        users = data.get("users", []) if isinstance(data, dict) else []
+        return [{**u, "active": False} for u in users if isinstance(u, dict)]
+    return []
 
 
 def _users(root: Path) -> list[dict]:
-    """Everyone who signs or signed: the registry, then the signers ledger's identities (fw-IDENTITY-000003),
-    each userid once. A ledger signer carries `iss` and `sub`, and no roles: those come from its provider."""
+    """Everyone who signs or signed: the signers ledger's identities (fw-IDENTITY-000003), then the people
+    registered before catalyst-users (history), each userid once. A ledger signer carries `iss` and `sub`, and no
+    roles: those come from catalyst-users."""
     from catalyst import provider
 
-    users = local_users(root)
-    known = {str(u.get("userid")) for u in users}
-    return users + [provider.as_user(e) for e in provider.ledger(root) if str(e["userid"]) not in known]
+    signers = [provider.as_user(e) for e in provider.ledger(root)]
+    known = {str(u.get("userid")) for u in signers}
+    return signers + [u for u in local_users(root) if str(u.get("userid")) not in known]
 
 
 def _roles_at(root: Path) -> list[dict]:
-    try:
-        data = json.loads((root / "IAM" / "roles" / "roles.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    roles = data.get("roles", []) if isinstance(data, dict) else []
-    return [r for r in roles if isinstance(r, dict)]
+    """The deployment's role catalogue: the names (and provider ids) of the latest roles template, which only shapes
+    how roles are shown (fw-IDENTITY-000010); what a role grants is catalyst-users'."""
+    folder = root / "IAM" / "roles" / "templates"
+    found = sorted(
+        (
+            (int(m.group(1)), p)
+            for p in folder.glob("TEMPLATE-ROLES-v*.json")
+            if (m := re.search(r"-v(\d+)\.json$", p.name))
+        ),
+        reverse=True,
+    )
+    for _, path in found:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        roles = data.get("roles", []) if isinstance(data, dict) else []
+        return [r for r in roles if isinstance(r, dict)]
+    return []
 
 
 def _workspace_root(dep: Deployment) -> Path | None:

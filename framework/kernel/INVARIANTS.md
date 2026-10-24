@@ -22,7 +22,7 @@ it. The active module may add up to three laws (`INVARIANTS.module.md`).
 - **L4 — Humans decide, agents do the work.** A conflict, disputed version
   or rejected finding becomes a `RECON-` case for a human; the agent never
   resolves a merge, approves its own work or signs for someone else. Who
-  signs is declared, never guessed.
+  signs is verified, never guessed.
 - **L5 — The criterion lives outside the project.** A project holds
   `catalyst.toml` and nothing else of catalyst. Every agent, tool and machine
   finds the criterion with `catalyst where` and readies it with `catalyst
@@ -32,7 +32,7 @@ it. The active module may add up to three laws (`INVARIANTS.module.md`).
   a deployed definition or superseded template changes only by migration.
 - **L7 — IDs are permanent.** Unique, signed with the creator's `userid`,
   never reused or renamed; a retired thing is retired in place, never
-  deleted. At least one user stays active.
+  deleted. The signers ledger is never rewritten.
 - **L8 — Install, sync and share only when asked**, with the matching
   command; reading catalyst never installs it.
 - **L9 — The kernel knows no module; no module knows an agent.** Modules and
@@ -61,7 +61,7 @@ to the active module keeps a one-line placeholder here
 | INV-7 descriptive naming | L6 | `check` (structure) |
 | INV-8 no orphan rules | L2 | `check` (structure) |
 | INV-10–13 plugins (retired, ADR-022) | — | — |
-| INV-16 one active user, enforced roles | L7, L4 | `check`, `user remove`, every writing verb |
+| INV-16 people from catalyst-users, grants enforced | L7, L4 | `check`, every writing verb |
 | INV-17 journal | L1 | journal, `journal verify`, `unrecorded`, end-of-turn hook |
 | INV-18 shared deployments | L3, L4 | `share`, the criterion's CI gate, `check` integrity |
 | INV-19 project lifecycle (retired) | L3, L5 | `open`, `move`, `share join` |
@@ -163,22 +163,24 @@ to the active module keeps a one-line placeholder here
   never reused.
 - **INV-15** — owned by the active module (`MODULE-SPECIFICATION.md` §6.4);
   never reused.
-- **INV-16 — At least one active user; roles grant commands.**
-  `IAM/users/users.json` and `IAM/roles/roles.json` always exist, and
-  `users.json` must contain **at least one user with `"active": true`** —
-  a hard requirement, not optional-if-empty like an artifact index. Every
-  active-module artifact, rule-linked artifact, and work item carries a
-  `Signed-off-by` field. A writing verb refuses a signer none of whose
-  roles grants its command (a `/command` in the role's `actions`, `*`, or
-  the `Admin` role; owner decision D5), and a deactivated signer;
-  `catalyst.toml` `role_check = "warn"` makes it a warning. Reconciliation
-  (INV-21) and the approval gates of `IAM/gates.json` add their own checks
-  (`Rules-of-Rules.md` §11). `/user remove` never deletes a user's entry;
-  it sets `"active": false`, and refuses if doing so would leave zero active
-  users. With an identity provider (`catalyst.toml` `identity = "oidc"`),
-  the provider's accounts sign: the signer is the verified, logged-in
-  identity, holding the roles whose `provider_role` its provider gives it,
-  and `users.json` keeps who signed before (`CLI.md`, "Identity providers").
+- **INV-16 — People come from catalyst-users; grants decide.** A
+  criterion holds no user or role registry: `IAM/identity.json` points at
+  the deployment's catalyst-users configuration, and `check` reports a
+  missing or broken one (a workspace member may inherit its workspace's).
+  The signer is the identity catalyst-users verifies at each signature —
+  the logged-in person, or, with no one logged in, the machine's system
+  account (the admin its setup named), when its settings point at the same
+  provider. Every active-module artifact, rule-linked artifact, and work
+  item carries a `Signed-off-by` field. A writing verb refuses a signer none
+  of whose **grants** allows its command (`cmd:<command>`, `cmd:*`, the
+  token's roles composed in the provider; a role's name grants nothing), and
+  a disabled one; `catalyst.toml` `role_check = "warn"` makes it a warning.
+  Reconciliation (INV-21) and the approval gates of `IAM/gates.json` add
+  their own checks (`Rules-of-Rules.md` §11). People are added, disabled and
+  granted in catalyst-users, never deleted; `catalyst user` and `catalyst
+  role` refuse. The users, roles and groups templates only shape how people
+  are shown. A retired `users.json` (`users.retired.json`) keeps who signed
+  before.
 - **INV-17 — Append-only, replayable journal.** The journal always
   exists: one shard per actor, machine and month under
   `development/journal/` (`<actor>@<machine>/<YYYY-MM>.jsonl`), plus, in a
@@ -219,8 +221,9 @@ to the active module keeps a one-line placeholder here
   `catalyst criterion protect`) makes them required. A real conflict
   stops the push with nothing pushed; the agent never applies a merge —
   it may record a proposed resolution as a `RECON-` case for a human to
-  accept (INV-21). Identity is self-declared: branch protection and
-  pull-request review are the real controls. `Rules-of-Rules.md` §13.
+  accept (INV-21). A signature is verified where it is made, not where
+  it lands: branch protection and pull-request review are the real
+  controls. `Rules-of-Rules.md` §13.
 - **INV-19 — Project lifecycle commands.** *Retired (0.52.0): it described the pre-home-store model; `catalyst open`, `move` and `share join` replace it, and deleting anything falls under L3.* `/project create <name>`
   installs a fresh deployment: a working copy in agent-owned space (or
   the in-project fallback) plus its `<app-name>.catalyst` pointer.
@@ -245,17 +248,16 @@ to the active module keeps a one-line placeholder here
   relationships are defined by Entity Type Definitions (ETDs) in the active
   module manifest (`MODULE-SPECIFICATION.md`). Domains nest under
   `rules/domains/` (they exist only to group rules). `IAM/users/`, `IAM/roles/`
-  replace bare `development/users.json`/`roles.json`, and carry the same `templates/`
-  treatment as every other type — `TEMPLATE-USERS-vN.json`/
-  `TEMPLATE-ROLES-vN.json` version the registry's seed shape, since each
-  registry is one JSON file (`{"users": [...]}`, `{"roles": [...]}`)
-  rather than one-file-per-instance.
+  and `IAM/groups/` hold no registry (people are catalyst-users', INV-16)
+  but carry the same `templates/` treatment as every other type —
+  `TEMPLATE-USERS-vN.json`, `TEMPLATE-ROLES-vN.json` and
+  `TEMPLATE-GROUPS-vN.json` version how users, roles and groups are shown.
   Work items (epics, stories, tasks) are a module's types when it declares them (ADR-022).
 - **INV-21 — Reconciliation entity for diverging versions.** A
   `RECON-NNNNNN` (`reconciliations/`, top-level, full INV-20 template
   treatment) is the durable record of two entity versions that
   disagree — a conflict that stopped a push (INV-18), a
-  rights-mismatch against `IAM/roles/roles.json`, or a manually opened
+  rights mismatch against the signer's grants, or a manually opened
   one — and of the human decision that settles it. Like `WORKFLOW-`, it is never itself work: no `Targets` rule
   field; its chain runs sideways via an `Entity` field naming the
   disputed artifact. Never file-versioned per round — each round of
@@ -263,9 +265,9 @@ to the active module keeps a one-line placeholder here
   edited in place and journaled like any other artifact (INV-17). Resolved via
   `/reconcile <id> accept|accept-with-edits|reject|propose <text>|close`,
   moving `Status` through `Open`/`Under Review`/`Resolved-*`/`Closed` —
-  who can resolve one is genuinely gated by the actor's role
-  (`reconciliation: full|propose|none` in `IAM/roles/roles.json`), the
-  on top of `rr-META-011`'s command grants:
+  who can resolve one is genuinely gated by the actor's reconciliation
+  level (`full|propose|none`: the highest `reconcile:<level>` grant
+  catalyst-users gives them), on top of `rr-META-011`'s command grants:
   `propose` may only move a case to `Under Review`, `none` is refused
   outright, and only `full` can reach a `Resolved-*` status — see
   `Rules-of-Rules.md` §16. May optionally name a `Workflow` field (a
@@ -291,14 +293,12 @@ to the active module keeps a one-line placeholder here
   same posture as `RECON-`). Other core entities may optionally
   reference one by ID to guide their own process — `RECON-`
   reconciliation is the first (INV-21, `Rules-of-Rules.md` §16/§19).
-- **INV-26 — Signed entity IDs.** Every registered user
-  (`IAM/users/users.json`) carries a `userid`: 8 characters,
-  case-sensitive alphanumeric, containing at least one uppercase
-  letter, drawn cryptographically at `/user add` time and regenerated
-  on collision against every existing `userid` in the registry
-  (`Rules-of-Rules.md` rr-META-011) — or, with an identity provider, at an
-  identity's first signature, in the append-only signers ledger
-  `IAM/signers.jsonl`, keyed by its issuer and subject. From that point on, every rule,
+- **INV-26 — Signed entity IDs.** Every identity that signs carries a
+  `userid`: 8 characters, case-sensitive alphanumeric, containing at least
+  one uppercase letter, drawn cryptographically at its first signature and
+  regenerated on collision, in the append-only signers ledger
+  `IAM/signers.jsonl`, keyed by its issuer and subject (`Rules-of-Rules.md`
+  rr-META-011); a retired `users.json` keeps the userids given before. From that point on, every rule,
   `WORKFLOW-`, and `RECON-` ID, and every ID of an active-module entity
   type (`<PREFIX>-NNNNNN`), carries its creator/signer's `userid` as a
   trailing `-XXXXXXXX` suffix, assigned once at creation and never changed

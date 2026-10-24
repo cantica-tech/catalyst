@@ -167,19 +167,20 @@ template versions the migrations ask for (`CLI.md`).
    - any non-artifact file the active module's meta-rules or invariants
      require (created from the module's `templates/` if missing, and
      refreshed only by the command the module names for it)
-   - `IAM/roles/roles.json` (from `templates/roles.template.json` on
-     first deploy; entries added/changed by `/role add|modify` —
-     never overwritten by synchronization once it exists, same
-     project-owned-state treatment as item 11 above) and
-     `IAM/users/users.json` (from `templates/users.template.json` on
-     first deploy; entries added/updated by
-     `/user add|remove|modify|assign-role` — see `INVARIANTS.md`
-     INV-16). A deployed project that predates this requirement gets both
-     created from their templates on its next sync, not silently skipped
-     — and if that leaves `users.json` with zero active users, prompt to
-     run `/user add` before considering the sync complete (INV-16's hard
-     "at least one active user" requirement applies regardless of how the
-     file came to exist).
+   - `IAM/identity.json`, the pointer to the deployment's catalyst-users
+     configuration (written by `catalyst init` or `catalyst identity
+     configure`), and `IAM/signers.jsonl`, the append-only signers ledger
+     — never overwritten by synchronization once they exist, same
+     project-owned-state treatment as item 11 above (`INVARIANTS.md`
+     INV-16, INV-26). The criterion holds no user or role registry:
+     people, roles and grants are catalyst-users'. `IAM/users/`,
+     `IAM/roles/` and `IAM/groups/` hold only their display templates,
+     with the same `templates/` treatment as every other type (INV-20).
+     A deployed project that predates them gets them through its
+     migration (`0.106.0`), not silently skipped — and if it is left
+     without a pointer, prompt to point it at catalyst-users (`catalyst
+     identity configure --issuer <url>`) before considering the sync
+     complete: nothing can be signed until it is.
    - The journal (`development/journal/`, one shard per actor, machine and
      month; `development/journal.jsonl` in a deployment made before kernel
      0.50 — see `INVARIANTS.md` INV-17). Append-only: a sync appends its own
@@ -302,5 +303,6 @@ changed in the active module has that module's migration instead.
 | `0.92.0` | `0.93.0` | [`0.93.0/roles-grant-commands.md`](migrations/0.93.0/roles-grant-commands.md) | Roles grant commands (decision D5): a writing verb refuses a signer none of whose roles grants its command (`/command` actions, `*`, the `Admin` role); `--as` refuses a deactivated user; `role_check = "warn"` warns instead. The roles template gains grants. Judgment: grant each non-Admin role its commands. |
 | `0.103.0` | `0.104.0` | [`0.104.0/workflow-governance.md`](migrations/0.104.0/workflow-governance.md) | Workflow governance (REQ-000084): conditions on field values in guards (`holds`), gates (`when`) and workflows; a type's `due` date, `overdue` in the inbox; a `WORKFLOW-` that `Governs` a type, its Transitions enforced while `Active`. The workflow template gains `Governs`, `Escalates to` and Transitions (a new template version). |
 | `0.104.0` | `0.105.0` | [`0.105.0/identity-providers.md`](migrations/0.105.0/identity-providers.md) | Identity providers (REQ-000086, design 28): `catalyst.toml` `identity = "oidc"` makes an OIDC provider's accounts sign, verified (`catalyst identity login`); an append-only signers ledger `IAM/signers.jsonl`; roles through `provider_role`; `catalyst serve --identity-issuer` accepts the provider's tokens. `local`, the default, is unchanged. Judgment, optional: map the roles, then configure the provider. |
+| `0.105.2` | `0.106.0` | [`0.106.0/users-outside-catalyst.md`](migrations/0.106.0/users-outside-catalyst.md) | Users, groups and roles outside catalyst (REQ-000087, design 29): `IAM/identity.json` points at catalyst-users; the signer is the identity it verifies (with no one logged in, the machine's system account); grants decide what each may do; `user` and `role` refuse; `local` goes. Mechanical: the pointer from `catalyst.toml`, the roles kept as a display template, `users.json`/`roles.json` retired, the groups templates. Judgment: point a `local` deployment at catalyst-users, provision its roles, import its people. |
 
 <!-- end generated: migrations -->

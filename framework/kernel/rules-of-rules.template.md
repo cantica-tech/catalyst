@@ -109,20 +109,23 @@ distinct seams; its rules carry the full code (`cor-CORE.INGEST-000001-…`).
 Agile work items, retired with the plugin system (ADR-022); a module declares
 them as its own types when a process needs them. Never reused.
 
-## 11. `rr-META-011` Users sign; their roles grant the commands they may run
+## 11. `rr-META-011` Users sign; their grants allow the commands they may run
 
-Every signature names a registered, active user, declared (`--as`) and
-confirmed with the user when more than one could sign — never guessed from
-git configuration (L4). A writing verb refuses a signer none of whose roles
-grants the command its change is for: a role grants each `/command` its
-`actions` name, and everything with `*`, as the `Admin` role does (owner
-decision D5; `role_check = "warn"` in `catalyst.toml` warns instead).
-Reconciliation (§16) and the approval gates a deployment declares in
-`IAM/gates.json` check more: an entity enters a gated state, and a gated
-rule's text passes `check`, only once its current version has the gate's
-approvals from its role, never the author's own; `--force` does not pass a
-gate (`catalyst approve`, `CLI.md`). At least one user stays active; a user
-who leaves is deactivated, never deleted (`catalyst user remove`).
+Every signature names the identity catalyst-users verifies at that moment
+(`IAM/identity.json` points at it): the logged-in person, or, with no one
+logged in, the machine's system account — never one guessed from git
+configuration, and `--as` names only the verified identity (L4). A writing
+verb refuses a signer none of whose **grants** allows the command its change
+is for: `cmd:<command>` grants that command, `cmd:*` every one, as the
+provider composes them into roles and groups (owner decisions D5 and C;
+`role_check = "warn"` in `catalyst.toml` warns instead); a role's name
+grants nothing. Reconciliation (§16) and the approval gates a deployment
+declares in `IAM/gates.json` check more: an entity enters a gated state, and
+a gated rule's text passes `check`, only once its current version has the
+gate's approvals from its role, never the author's own; `--force` does not
+pass a gate (`catalyst approve`, `CLI.md`). People are added, disabled and
+granted in catalyst-users, never deleted; each identity's first signature
+appends its line to the signers ledger, which is never rewritten.
 
 ## 12. `rr-META-012` The journal is transaction-log-grade, not a changelog
 
@@ -145,9 +148,9 @@ request on the shared branch, whose CI runs `catalyst check`, including
 that a merge lost nothing; through a server (`catalyst serve`), the server
 checks each push itself. A conflict stops the push with nothing pushed:
 never apply a merge yourself; propose a resolution as a `RECON-` case
-(§16) for a human to decide (L4). On git, identity is declared, not
-verified: branch protection and review are the real controls; a server
-verifies it by token (`ACCESS-CONTROL.md`).
+(§16) for a human to decide (L4). On git, a signature is verified where
+it is made, not where it lands: branch protection and review are the real
+controls; a server verifies each push by token (`ACCESS-CONTROL.md`).
 
 ## 14. `rr-META-014` Session start, agents and the criterion's place
 
@@ -172,12 +175,13 @@ derived`).
 ## 16. `rr-META-016` Reconciliation of diverging entity versions
 
 When two versions of an entity disagree — a conflict that stopped a push,
-a change outside someone's role, a contested change made outside catalyst —
+a change outside someone's grants, a contested change made outside catalyst —
 open a `RECON-` case naming the entity, both versions and why they differ.
 The agent may propose; only a human decides, with `catalyst reconcile <id>
 accept|accept-with-edits|reject|propose|close`, which enforces the
-signer's `reconciliation` level from `IAM/roles/roles.json`: `full`
-decides, `propose` only proposes, `none` neither. Each round is a new row
+signer's reconciliation level, the highest `reconcile:<level>` grant
+catalyst-users gives them: `full` decides, `propose` only proposes, `none`
+neither. Each round is a new row
 in the case's `## Revisions`; applying an accepted version to the entity is
 ordinary, journaled work; a closed case is final (`definitions/
 reconciliation`). A change offered for review before it lands is a case
@@ -208,8 +212,8 @@ pass it (`CLI.md`, "Workflow governance").
 ## 20. `rr-META-020` Entity IDs carry their signer's userid
 
 Every ID ends with the userid of the user who created it, assigned once and
-never changed (L7). Register a user (`catalyst user add`) before they sign
-anything. The kernel's meta-rule IDs are short in the kernel's copy and
+never changed (L7). An identity's userid is drawn at its first signature,
+in the signers ledger (§11), before the ID it signs is given. The kernel's meta-rule IDs are short in the kernel's copy and
 widened and signed with the installer's userid when the deployment is
 composed.
 

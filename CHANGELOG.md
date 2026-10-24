@@ -6,6 +6,36 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.106.0 — 2026-10-23
+
+A layout change, with a migration (`migrations/0.106.0/users-outside-catalyst.md`) that has judgment steps.
+
+- Changed: people are catalyst-users' (design 29, REQ-000087). A criterion holds no user or role registry:
+  `IAM/identity.json` points at its catalyst-users configuration, and `catalyst check` reports a missing or broken
+  one. `catalyst identity configure --issuer <url>` writes it; `catalyst init` without `--identity-issuer` points at
+  the provider this machine's catalyst-users is set up for. The `local` mode, `catalyst.toml`'s `identity_*` keys and
+  `provider_role` go.
+- Changed: the signer is the identity catalyst-users verifies at each signature; with no one logged in, this
+  machine's system account signs, when its settings point at the same provider, and says so. Each identity's first
+  signature appends its line to the signers ledger.
+- Changed: what someone may do is their grants from the provider (`cmd:<command>`, `cmd:*`, `reconcile:<level>`),
+  never a role's name; `catalyst user …` and `catalyst role …` refuse and say to use catalyst-users. The users, roles
+  and a new groups template only shape how people are shown.
+- Added: the logged-in identity is kept per machine as a read-only snapshot with a hash of its content; an edited
+  one is discarded.
+- Added: `catalyst identity link <retired user>`: a person who signed before keeps their userid, once, only for
+  themselves.
+- Changed: the vendored identity code is `cantica-tech/catalyst-users` 0.4.1 (the provider registry, setup's
+  settings, the system account).
+- Changed: `spec/identity-whoami.schema.json` carries groups, grants and the reconciliation level;
+  `spec/identity-status.schema.json` drops `client`.
+- Fixed: reading several journal shards, an entry that only creates files keeps its place in time instead of
+  overtaking an earlier entry that waits on its own shard's chain, which reported every later entry out of time
+  order (BUG-000030).
+- Fixed: `catalyst spec <command>` keeps a procedure's numbered or bulleted list, code block or indented text with that
+  procedure even when its first line names another command; such a list was printed under the command it named, and
+  the procedure it belonged to came out with no steps (BUG-000029).
+
 ## 0.105.1 — 2026-10-23
 
 No layout change, no migration.

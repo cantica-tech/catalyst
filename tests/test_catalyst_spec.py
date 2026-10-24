@@ -225,3 +225,31 @@ def test_the_catalogue_lists_each_command_and_each_part_once(tmp_path, capsys):
     one = json.loads(capsys.readouterr().out)
     assert schema_check.problems(one, schema_check.load("command-spec")) == []
     assert one["part"] == "bug" and one["text"] == spec(load(p), "create", "bug")
+
+
+LIST_NAMING_ANOTHER = """# R
+
+## 4. Commands
+
+- `/kb-build <KB-id>` — build a database.
+- `/kb-audit [<KB-id>]` — report what is unmarked.
+
+When the user enters `/kb-build <KB-id>`:
+
+1. Refuse unless `/kb-audit` finds nothing unmarked.
+2. Embed each document.
+
+When the user enters `/kb-audit [<KB-id>]`, report what is unmarked.
+
+## 5. Next
+"""
+
+
+def test_a_procedures_list_stays_with_it_though_it_names_another_command(tmp_path):
+    """BUG-000029: a list continuing a procedure is that procedure's, whatever command its first line names."""
+    p = make_project(tmp_path)
+    write(p / ".criterion" / "CODE-OF-CONDUCT.md", LIST_NAMING_ANOTHER)
+    dep = load(p)
+    build, audit = spec(dep, "kb-build"), spec(dep, "kb-audit")
+    assert "1. Refuse unless" in build and "2. Embed each document" in build
+    assert "Refuse unless" not in audit and "report what is unmarked" in audit
