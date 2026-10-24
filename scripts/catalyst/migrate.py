@@ -168,6 +168,20 @@ KERNEL_ROLE_IDS = {
     "Stakeholder": "stakeholder",
     "Release Manager": "release-manager",
     "Admin": "catalyst-admin",
+    "Criterion Admin": "criterion-admin",
+}
+
+
+# Roles the kernel's template gained after a deployment was made, added once to its roles template (migration
+# 0.109.0): never again once any version it holds has had one, so a team that removes it is not overridden.
+ADDED_KERNEL_ROLES = {
+    "criterion-admin": {
+        "name": "Criterion Admin",
+        "id": "criterion-admin",
+        "scope": "criterion",
+        "actions": ["*"],
+        "reconciliation": "full",
+    },
 }
 
 
@@ -224,6 +238,34 @@ def _misnamed_roles(dep: Deployment, ids: dict[str, str]) -> list[dict] | None:
     return fixed if fixed != roles else None
 
 
+def _absent_kernel_roles(dep: Deployment, kernel: Path | None) -> tuple[list[dict], list[dict]]:
+    """The roles of `ADDED_KERNEL_ROLES` that no version of the deployment's roles template has ever held (as the
+    kernel's template has them, else as listed here), and its latest version's roles; nothing without a roles
+    template."""
+    import json
+
+    folder = dep.root / "IAM" / "roles" / "templates"
+    _, latest = _latest_roles_template(folder)
+    if latest is None:
+        return [], []
+    held: set[str] = set()
+    for f in folder.glob("TEMPLATE-ROLES-v*.json"):
+        try:
+            held |= {str(r.get("id")) for r in json.loads(f.read_text(encoding="utf-8")).get("roles") or []}
+        except (OSError, ValueError, AttributeError):
+            continue
+    try:
+        current = json.loads(latest.read_text(encoding="utf-8")).get("roles") or []
+    except (OSError, ValueError, AttributeError):
+        current = []
+    try:
+        shipped = json.loads((kernel / "templates" / "roles.template.json").read_text(encoding="utf-8"))["roles"]  # type: ignore[operator]
+    except (TypeError, OSError, ValueError, KeyError):
+        shipped = list(ADDED_KERNEL_ROLES.values())
+    wanted = {str(r.get("id")): r for r in shipped if str(r.get("id")) in ADDED_KERNEL_ROLES}
+    return [r for rid, r in wanted.items() if rid not in held], list(current)
+
+
 def _write_roles_template(folder: Path, roles: list[dict], stamp: str, note: str) -> list[Path]:
     import json
 
@@ -259,6 +301,10 @@ def _identity_step(dep: Deployment) -> Step | None:
         parts.append("add the groups templates")
     if _misnamed_roles(dep, KERNEL_ROLE_IDS) is not None:
         parts.append("give the roles template's kernel roles the kernel's ids, as the provider's (BUG-000031)")
+    absent, _ = _absent_kernel_roles(dep, None)
+    if absent:
+        names = ", ".join(str(r["name"]) for r in absent)
+        parts.append(f"add the kernel's {names} role to the roles template (migration 0.109.0)")
     return Step("identity", "IAM", "; ".join(parts), True) if parts else None
 
 
@@ -325,6 +371,14 @@ def _take_identity(dep: Deployment, kernel: Path | None, stamp: str) -> tuple[li
         )
         touched += written
         done.append(f"gave the kernel roles the kernel's ids in {written[0].name}")
+    absent, current = _absent_kernel_roles(dep, kernel)
+    if absent:
+        names = ", ".join(str(r["name"]) for r in absent)
+        written = _write_roles_template(
+            iam / "roles" / "templates", current + absent, stamp, f"The kernel's {names} role (migration 0.109.0)."
+        )
+        touched += written
+        done.append(f"added the kernel's {names} role to the roles template as {written[0].name}")
     return touched, done
 
 

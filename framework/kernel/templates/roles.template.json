@@ -47,6 +47,13 @@
       "id": "catalyst-admin",
       "actions": ["*"],
       "reconciliation": "full"
+    },
+    {
+      "name": "Criterion Admin",
+      "id": "criterion-admin",
+      "scope": "criterion",
+      "actions": ["*"],
+      "reconciliation": "full"
     }
   ]
 }
