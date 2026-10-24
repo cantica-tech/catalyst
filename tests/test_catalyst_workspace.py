@@ -48,9 +48,11 @@ def test_init_creates_the_meta_criterion_and_registers_the_members(tmp_path):
     file, a, b = _workspace(tmp_path)
     root, steps = ws.init(file, KERNEL, "Ada Lovelace", "ada")
     assert root == pf.workspace_criterion("platform") and (root / "rules" / "rules.md").is_file()
-    assert json.loads((root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))["users"][0]["roles"] == [
-        "Admin"
-    ]
+    # people are catalyst-users' (design 29): the pointer and the first signer, no users.json
+    pointer = json.loads((root / "IAM" / "identity.json").read_text(encoding="utf-8"))
+    assert pointer["provider"] == "static" and pointer["people"][0]["name"] == "Ada Lovelace"
+    assert json.loads((root / "IAM" / "signers.jsonl").read_text(encoding="utf-8").splitlines()[0])["username"] == "ada"
+    assert not (root / "IAM" / "users" / "users.json").exists()
     for project in (a, b):
         assert pf.read(project / "catalyst.toml")["workspace"] == "platform"
     assert [r["member"] for r in ws.status(file)["folders"]] == [True, True, False]
@@ -58,26 +60,29 @@ def test_init_creates_the_meta_criterion_and_registers_the_members(tmp_path):
         ws.init(file, KERNEL, "Ada Lovelace")
 
 
-def test_a_member_sees_the_workspace_rules_and_users(tmp_path):
+def test_a_member_sees_the_workspace_rules_and_pointer(tmp_path):
+    """A member inherits the workspace's rules, and its pointer to catalyst-users when it has none (design 29)."""
+    from catalyst import provider
+
     file, a, _ = _workspace(tmp_path)
     root, _ = ws.init(file, KERNEL, "Ada Lovelace", "ada")
     (root / "rules" / "ws-shared-rules.md").write_text(
         f"# Shared rules\n\n## Contents\n\n### `{SHARED}` Shared logging\n\n**Status:** ✅\n", encoding="utf-8"
     )
-    users = root / "IAM" / "users" / "users.json"
-    data = json.loads(users.read_text(encoding="utf-8"))
-    data["users"].append(
-        {"name": "Grace Hopper", "git_username": "grace", "roles": ["Admin"], "active": True, "userid": "Gr4ceHop"}
-    )
-    users.write_text(json.dumps(data), encoding="utf-8")
+    from conftest import legacy_signers
+
+    member = pf.home_criterion("app")
+    # the member keeps its signers ledger (who signed its IDs), and points nowhere itself
+    (member / "IAM" / "signers.jsonl").write_text("".join(json.dumps(e) + "\n" for e in legacy_signers(member)))
+    (member / "IAM" / "users" / "users.json").unlink()
     dep = load(a)
+    assert provider.pointer(dep) == json.loads((root / "IAM" / "identity.json").read_text(encoding="utf-8"))
     item = pf.home_criterion("app") / "items" / "ITEM-000001-first-item.md"
     item.write_text(
         item.read_text(encoding="utf-8").replace(f"`br-AUTH-000001-{USERID}`", f"`{SHARED}`"), encoding="utf-8"
     )
     corpus = load_corpus(dep)
     assert SHARED in corpus.rules and corpus.rules[SHARED][0].inherited
-    assert corpus.user("grace") is not None
     assert [f for f in validate(dep, corpus) if f.level == ERROR] == []
 
 
@@ -93,30 +98,29 @@ def test_a_member_inherits_the_workspace_roles_and_cannot_propose_an_inherited_r
     (root / "rules" / "ws-shared-rules.md").write_text(
         f"# Shared rules\n\n## Contents\n\n### `{SHARED}` Shared logging\n\n**Status:** ✅\n", encoding="utf-8"
     )
-    roles_file = root / "IAM" / "roles" / "roles.json"
-    data = json.loads(roles_file.read_text(encoding="utf-8"))
-    data["roles"].append({"name": "Platform Reviewer", "actions": ["review"], "reconciliation": "full"})
-    roles_file.write_text(json.dumps(data), encoding="utf-8")
-    users = root / "IAM" / "users" / "users.json"
-    data = json.loads(users.read_text(encoding="utf-8"))
-    data["users"].append(
-        {
-            "name": "Grace Hopper",
-            "git_username": "grace",
-            "roles": ["Platform Reviewer"],
-            "active": True,
-            "userid": "Gr4ceHop",
-        }
+    # the role catalogue is the roles template, for display (fw-IDENTITY-000010): a member inherits the workspace's
+    template = root / "IAM" / "roles" / "templates" / "TEMPLATE-ROLES-v1.json"
+    data = json.loads(template.read_text(encoding="utf-8"))
+    data["roles"].append(
+        {"name": "Platform Reviewer", "id": "platform-reviewer", "actions": [], "reconciliation": "full"}
     )
-    users.write_text(json.dumps(data), encoding="utf-8")
+    template.write_text(json.dumps(data), encoding="utf-8")
 
     dep = load(a)
     corpus = load_corpus(dep)
     names = [r["name"] for r in roles(dep)]
     assert "Platform Reviewer" in names and len(names) == len(set(names))  # the member's own win on a clash
     assert "Platform Reviewer" in [r["name"] for r in list_items(dep, corpus, "role", [])]
-    grace = corpus.user("grace")
-    assert grace is not None and reconciliation_level(dep, grace) == ("full", "Platform Reviewer")
+    # what a person may do is catalyst-users' grants, not a role's name (fw-IDENTITY-000008)
+    grace = {
+        "name": "Grace Hopper",
+        "git_username": "grace",
+        "roles": ["Platform Reviewer"],
+        "userid": "Gr4ceHop",
+        "grants": ["cmd:*", "reconcile:full"],
+        "reconciliation": "full",
+    }
+    assert reconciliation_level(dep, grace) == ("full", "catalyst-users grants")
     with pytest.raises(proposals.ProposalError, match="inherited from the workspace criterion"):
         proposals.propose(dep, corpus, SHARED, "# changed\n", grace)
 

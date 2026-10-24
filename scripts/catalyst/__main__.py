@@ -83,60 +83,97 @@ def cmd_userid(args) -> int:
 
 
 def cmd_identity(args) -> int:
-    """`catalyst identity` (design 28): the deployment's identity provider, and this user's login with it."""
-    import datetime
+    """`catalyst identity` (design 29): the deployment's pointer to catalyst-users, and this person's login."""
+    from catalyst import journal, provider
 
-    import project_file
-    from catalyst import provider
-    from catalyst.identity.errors import CatalystUsersError
-
-    dep = open_deployment(args)
     sub = args.identity_command
+    if sub != "configure" and getattr(args, "issuer", None):  # before any deployment, e.g. ahead of `catalyst init`
+        doc = {"provider": "keycloak", "issuer": args.issuer.rstrip("/")}
+        if args.client:
+            doc["client"] = args.client
+        return _identity_session(args, sub, doc, None)
+    dep = open_deployment(args)
+    if sub == "link":
+        try:
+            entry = provider.link(dep, args.user, args.as_user)
+        except provider.ProviderError as exc:
+            print(f"catalyst: {exc}", file=sys.stderr)
+            return 1
+        print(f"{entry['username']} signs with userid {entry['userid']}")
+        return 0
     if sub == "configure":
-        if args.provider == provider.OIDC and not args.issuer:
-            raise SystemExit("catalyst: identity configure oidc needs --issuer <the provider's issuer URL>")
-        path = project_file.find(dep.project_root)
-        if path is None:
-            raise SystemExit("catalyst: no catalyst.toml in this project")
-        from catalyst import journal
-        from catalyst.corpus import load_corpus
-        from catalyst.ids import resolve_signer
+        from catalyst.identity.provider import pointer_problems
 
-        try:  # signed under the provider in force before the change
-            signer = resolve_signer(dep, load_corpus(dep), args.as_user, "identity")
+        doc = {"provider": args.provider, "issuer": (args.issuer or "").rstrip("/")}
+        if args.client:
+            doc["client"] = args.client
+        if args.catalyst_client:
+            doc["catalyst_client"] = args.catalyst_client
+        doc = {k: v for k, v in doc.items() if v}
+        found = [p for p in pointer_problems(doc) if args.provider != "static"]
+        if found:
+            raise SystemExit(f"catalyst: {found[0]}")
+        try:  # signed by the identity the new pointer authenticates (the first time) or the current one
+            path = dep.root / provider.POINTER
+            existed = path.is_file()
+            old = path.read_text(encoding="utf-8") if existed else None
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+            try:
+                from catalyst.corpus import load_corpus
+                from catalyst.ids import resolve_signer
+
+                if args.link:  # before the first signature, which would draw a new userid (migration 0.106.0)
+                    try:
+                        provider.link(dep, args.link, args.as_user)
+                    except provider.ProviderError as exc:
+                        raise IdError(str(exc)) from None
+                signer = resolve_signer(dep, load_corpus(dep), args.as_user, "identity")
+            except IdError:
+                if old is None:
+                    path.unlink()
+                else:
+                    path.write_text(old, encoding="utf-8")
+                raise
         except IdError as exc:
             print(f"catalyst: {exc}", file=sys.stderr)
             return 1
-        data = project_file.read(path)
-        for key in ("identity", "identity_issuer", "identity_client"):
-            data.pop(key, None)
-        if args.provider == provider.OIDC:
-            data.update({"identity": provider.OIDC, "identity_issuer": args.issuer.rstrip("/")})
-            if args.client:
-                data["identity_client"] = args.client
-        data["updated"] = datetime.date.today().isoformat()
-        project_file.write(path, data)
         journal.append(
             dep,
             journal.AppendRequest(
                 command="catalyst identity",
-                action="update",
-                artifact="identity provider",
+                action="update" if existed else "create",
+                artifact="identity pointer",
                 targets=[],
-                intent=args.intent or [f"People sign with the {args.provider} identity provider"],
+                intent=args.intent
+                or [f"People are reached through catalyst-users ({args.provider}, {doc.get('issuer', '')})"],
                 files=[str(path)],
                 actor=str(signer.get("git_username") or signer.get("name")),
                 tier="chore",
             ),
         )
-        print(f"identity provider: {args.provider}" + (f" ({args.issuer.rstrip('/')})" if args.issuer else ""))
+        print(f"identity: {args.provider}" + (f" ({doc['issuer']})" if doc.get("issuer") else ""))
         return 0
+    doc = provider.pointer(dep)
+    if doc is None:
+        print(
+            f"catalyst: {provider.POINTER.as_posix()} is missing: `catalyst identity configure --issuer <url>`",
+            file=sys.stderr,
+        )
+        return 1
+    return _identity_session(args, sub, doc, dep)
+
+
+def _identity_session(args, sub: str, doc: dict, dep) -> int:
+    """login, logout, status and whoami against `doc`; with `dep`, whoami is the deployment's signer."""
+    from catalyst import provider
+    from catalyst.identity.errors import CatalystUsersError
+
     try:
-        conf = provider.settings(dep.pointer)
+        backend = provider.facade(doc)
     except provider.ProviderError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
-    session = provider.session(conf)
     try:
         if sub == "login":
 
@@ -144,20 +181,21 @@ def cmd_identity(args) -> int:
                 print(f"Open {code.verification_uri_complete or code.verification_uri}")
                 print(f"and confirm the code {code.user_code}. Waiting…", flush=True)
 
-            session.login(show)
+            provider.discard_snapshot(doc)  # a new login: whoever it is, their snapshot is new (fw-IDENTITY-000009)
+            backend.login(show)
             sub = "whoami"
         if sub == "logout":
-            warning = session.logout()
+            warning = backend.logout()
+            provider.discard_snapshot(doc)
             if warning:
                 print(f"catalyst: warning: {warning}", file=sys.stderr)
-            print(f"logged out of {conf.issuer}")
+            print(f"logged out of {doc.get('issuer')}")
             return 0
         if sub == "status":
-            stored = session.store.load(conf.issuer, conf.client_id)
+            stored = backend.kind == "keycloak" and provider.credentials_path(doc).is_file()
             out = {
-                "provider": provider.OIDC,
-                "issuer": conf.issuer,
-                "client": conf.client_id,
+                "provider": str(doc.get("provider")),
+                "issuer": str(doc.get("issuer") or ""),
                 "logged_in": bool(stored),
             }
             print(json.dumps(out) if args.json else "; ".join(f"{k}: {v}" for k, v in out.items()))
@@ -166,28 +204,41 @@ def cmd_identity(args) -> int:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     try:
-        who = provider.verify(conf)
+        if dep is not None:
+            user = provider.signer(dep, getattr(args, "as_user", None))  # verified now; the snapshot rewritten
+        else:
+            who = provider.verify(doc)
+            user: dict[str, Any] = {
+                "git_username": who.username,
+                "name": who.name,
+                "iss": who.issuer,
+                "sub": who.subject,
+            }
+            user.update({"groups": who.groups, "roles": who.roles, "grants": who.grants})
+            user["reconciliation"] = who.reconciliation
     except provider.ProviderError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
-    entry = provider.find(provider.ledger(dep.root), who.iss, who.sub)
-    from catalyst.ids import _roles
-
     out = {
-        "username": who.username,
-        "name": who.name,
-        "issuer": who.iss,
-        "subject": who.sub,
-        "userid": entry["userid"] if entry else None,
-        "provider_roles": list(who.provider_roles),
-        "roles": provider.roles_for(_roles(dep), who.provider_roles),
+        "username": user["git_username"],
+        "name": user["name"],
+        "issuer": user["iss"],
+        "subject": user["sub"],
+        "userid": user.get("userid") or None,
+        "groups": list(user.get("groups") or []),
+        "roles": list(user.get("roles") or []),
+        "grants": list(user.get("grants") or []),
+        "reconciliation": user.get("reconciliation") or "none",
     }
     if args.json:
         print(json.dumps(out, indent=2))
     else:
-        print(f"{who.username} ({who.name}) at {who.iss}")
-        print(f"  userid  {out['userid'] or '(none yet: given at your first signature)'}")
-        print(f"  roles   {', '.join(out['roles']) or '-'}  (provider: {', '.join(who.provider_roles) or '-'})")
+        print(f"{out['username']} ({out['name']}) at {out['issuer']}")
+        print(f"  userid          {out['userid'] or '(none yet: given at your first signature)'}")
+        print(f"  groups          {', '.join(out['groups']) or '-'}")
+        print(f"  roles           {', '.join(out['roles']) or '-'}")
+        print(f"  grants          {', '.join(out['grants']) or '-'}")
+        print(f"  reconciliation  {out['reconciliation']}")
     return 0
 
 
@@ -640,14 +691,11 @@ def cmd_admin(args) -> int:
             "unfreeze": "freeze",
             "definition": "migrate-definition",
         }.get(args.admin, "")
-        if args.admin == "user":
-            from catalyst import provider
-
-            if provider.is_oidc(dep):
-                raise admin.AdminError(
-                    "people come from this deployment's identity provider: add, disable or change them there "
-                    "(fw-IDENTITY-000002); `catalyst role … --provider-role` maps its roles"
-                )
+        if args.admin in ("user", "role"):
+            raise admin.AdminError(
+                "people and roles are catalyst-users' (design 29): add, disable or change people, and what each "
+                "role grants, there (`catalyst-users users …`, `catalyst-users roles provision`); fw-IDENTITY-000002"
+            )
         signer = resolve_signer(dep, load_corpus(dep), args.as_user, command)
         if args.admin == "user":
             sub_cmd = args.user_command
@@ -1316,7 +1364,7 @@ def cmd_workspace(args) -> int:
             if not user:
                 print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
                 return 2
-            _, steps = ws.init(path, kernel, user, args.git_username)
+            _, steps = ws.init(path, kernel, user, args.git_username, _identity_doc(args))
             for step in steps:
                 print(f"- {step}")
             return 0
@@ -2014,6 +2062,29 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def _identity_doc(args) -> dict | None:
+    """The pointer to catalyst-users that `--identity-issuer` and its companions describe; without them, the provider
+    this machine's catalyst-users is set up for (its connection settings only, never its admin or password command);
+    else None."""
+    if not getattr(args, "identity_issuer", None):
+        from catalyst.identity import config as users_config
+        from catalyst.identity.errors import CatalystUsersError
+
+        try:
+            settings = users_config.read_settings()
+        except CatalystUsersError:
+            return None
+        if settings is None:
+            return None
+        return {"provider": settings["type"], **(settings.get("provider") or {})}
+    doc = {"provider": "keycloak", "issuer": args.identity_issuer.rstrip("/")}
+    if args.identity_client:
+        doc["client"] = args.identity_client
+    if args.catalyst_client:
+        doc["catalyst_client"] = args.catalyst_client
+    return doc
+
+
 def cmd_init(args) -> int:
     from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
     from module_loader import REPO_ROOT
@@ -2059,6 +2130,7 @@ def cmd_init(args) -> int:
                 agent=args.agent,
                 userid=args.userid,
                 runtime=not args.no_runtime,
+                identity=_identity_doc(args),
             )
         )
     except InitError as exc:
@@ -2227,7 +2299,7 @@ _HELP_BY_COMMAND: dict[tuple[str, str], str] = {
     ("definition migrate", "version"): "the definition version to migrate the type's artifacts to",
     ("agent install", "agent"): "the agent to wire, at user level",
     ("agent uninstall", "agent"): "the agent to unwire",
-    ("workspace init", "git_username"): "the first user's git username (default: their name)",
+    ("workspace init", "git_username"): "the installer's username (default: their name)",
     ("analysis record", "which"): "the pass it records, A or B",
     ("analysis reconcile", "file"): "the reconciler's list of findings, every one accounted for",
     ("analysis decide", "finding"): "the reconciled finding's ID, e.g. F1",
@@ -2283,8 +2355,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--module", help="the active process module id (no default: without it, init lists the modules it finds)"
     )
-    p.add_argument("--user", help="the first user's name, who becomes Admin (default: git config user.name)")
-    p.add_argument("--git-username", help="the first user's git username (default: --user)")
+    p.add_argument("--user", help="the installer's name, as catalyst-users knows them (default: git config user.name)")
+    p.add_argument("--git-username", help="the installer's username (default: --user)")
     p.add_argument(
         "--rule-doc",
         action="append",
@@ -2319,6 +2391,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="install the kernel only; `catalyst module install` adds a module later",
     )
     p.add_argument("--userid", help=argparse.SUPPRESS)  # fixed first userid: reproducible examples
+    p.add_argument(
+        "--identity-issuer",
+        help="catalyst-users: the provider's issuer URL people sign through (design 29); log in first with "
+        "`catalyst identity login --issuer <url>`",
+    )
+    p.add_argument("--identity-client", help="its public client with the device grant (default: catalyst-cli)")
+    p.add_argument("--catalyst-client", help="the client whose roles are catalyst grants (default: catalyst)")
     p.set_defaults(func=cmd_init)
 
     p = sub.add_parser("check", help="run every check: structure, chain, journal, indexes")
@@ -2619,9 +2698,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="link")
 
-    p = sub.add_parser("user", help="register, deactivate or change users (IAM/users/users.json)")
+    p = sub.add_parser("user", help="people are catalyst-users' (design 29): these refuse and say where to change them")
     us = p.add_subparsers(dest="user_command", required=True)
-    q = us.add_parser("add", help="register a user with a fresh userid and one role")
+    q = us.add_parser("add", help="refuses: add people in catalyst-users")
     q.add_argument("name")
     q.add_argument("role")
     q.add_argument("--git-username", help="default: the name")
@@ -2629,13 +2708,13 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("remove", help="deactivate a user (never deleted; never the last active one)")
+    q = us.add_parser("remove", help="refuses: disable people in catalyst-users")
     q.add_argument("name")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("modify", help="change one field (not name, registered, userid or roles)")
+    q = us.add_parser("modify", help="refuses: change people in catalyst-users")
     q.add_argument("name")
     q.add_argument("field")
     q.add_argument("value")
@@ -2643,7 +2722,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("assign-role", help="add a role to a user")
+    q = us.add_parser("assign-role", help="refuses: grant roles in catalyst-users")
     q.add_argument("name")
     q.add_argument("role")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
@@ -2651,23 +2730,23 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="user")
 
-    p = sub.add_parser("role", help="add or change roles (IAM/roles/roles.json)")
+    p = sub.add_parser("role", help="roles are catalyst-users' (design 29): these refuse and say where to change them")
     rs = p.add_subparsers(dest="role_command", required=True)
-    q = rs.add_parser("add", help="add a role with its actions and reconciliation level")
+    q = rs.add_parser("add", help="refuses: provision roles in catalyst-users")
     q.add_argument("name")
     q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
     q.add_argument("--reconciliation", choices=["full", "propose", "none"], default="propose")
-    q.add_argument("--provider-role", help="the identity provider's role that grants it (identity = oidc)")
+    q.add_argument("--provider-role", help="no longer used: roles are catalyst-users' (design 29)")
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="role")
-    q = rs.add_parser("modify", help="replace a role's actions, or set its provider role")
+    q = rs.add_parser("modify", help="refuses: change what a role grants in catalyst-users")
     q.add_argument("name")
     q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
     q.add_argument(
         "--provider-role",
-        help='the identity provider\'s role that grants it (identity = oidc; alone, actions are kept; "" removes it)',
+        help="no longer used: roles are catalyst-users' (design 29)",
     )
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
@@ -2858,8 +2937,11 @@ def build_parser() -> argparse.ArgumentParser:
     wss = p.add_subparsers(dest="workspace_command", required=True)
     q = wss.add_parser("init", help="create the meta criterion and make the folders with a catalyst.toml members")
     q.add_argument("file", help="the <name>.code-workspace file")
-    q.add_argument("--user", help="the first user, Admin (default: git config user.name)")
+    q.add_argument("--user", help="the installer's name, as catalyst-users knows them (default: git config user.name)")
     q.add_argument("--git-username")
+    q.add_argument("--identity-issuer", help="catalyst-users: the provider's issuer URL (design 29)")
+    q.add_argument("--identity-client", help="its public client (default: catalyst-cli)")
+    q.add_argument("--catalyst-client", help="the client whose roles are catalyst grants (default: catalyst)")
     q.add_argument("--kernel", type=Path, help="framework/kernel (default: this checkout's)")
     q.set_defaults(func=cmd_workspace)
     q = wss.add_parser("status", help="the workspace's criterion and which folders are members")
@@ -3096,25 +3178,35 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--yes", action="store_true", help="apply it (without: show what would be set)")
     q.set_defaults(func=cmd_criterion)
 
-    p = sub.add_parser("identity", help="the identity provider people sign with, and your login (design 28)")
+    p = sub.add_parser("identity", help="catalyst-users, which people sign through, and your login (design 29)")
     ids_ = p.add_subparsers(dest="identity_command", required=True)
-    q = ids_.add_parser("configure", help="choose the provider: local (users.json) or oidc (writes catalyst.toml)")
-    q.add_argument("provider", choices=("local", "oidc"))
-    q.add_argument("--issuer", help="oidc: the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst`")
-    q.add_argument("--client", help="oidc: the public client with the device grant (default: catalyst-cli)")
+    q = ids_.add_parser("configure", help="point the deployment at catalyst-users (writes IAM/identity.json)")
+    q.add_argument("--provider", default="keycloak", choices=("keycloak", "static"), help="the catalyst-users backend")
+    q.add_argument("--issuer", help="the provider's issuer URL, e.g. `https://id.example.com/realms/catalyst`")
+    q.add_argument("--client", help="the public client with the device grant (default: catalyst-cli)")
+    q.add_argument("--catalyst-client", help="the client whose roles are catalyst grants (default: catalyst)")
+    q.add_argument("--link", help="first keep this retired user's userid as yours (`identity link`), then sign")
     q.add_argument("--as", dest="as_user", help="signer, under the provider in force before the change")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.set_defaults(func=cmd_identity)
     for verb, text in (
         ("login", "log in with a code shown in your browser (the device flow)"),
         ("logout", "revoke your session and delete your tokens"),
-        ("whoami", "who the provider says you are, your userid and your roles here"),
+        ("whoami", "who catalyst-users says you are: userid, groups, roles, grants (verified now)"),
         ("status", "the provider, and whether you are logged in (no network)"),
     ):
         q = ids_.add_parser(verb, help=text)
+        q.add_argument("--issuer", help="a provider's issuer URL, outside any deployment (e.g. before `catalyst init`)")
+        q.add_argument("--client", help="with --issuer: its public client (default: catalyst-cli)")
         if verb != "logout":
             q.add_argument("--json", action="store_true")
+        if verb == "whoami":
+            q.add_argument("--as", dest="as_user", help="the tests' static backend: which declared person")
         q.set_defaults(func=cmd_identity, json=False)
+    q = ids_.add_parser("link", help="keep a retired user's userid as yours, once (migration 0.106.0)")
+    q.add_argument("user", help="the retired user (name, username or userid), who must be you")
+    q.add_argument("--as", dest="as_user", help="the tests' static backend: which declared person")
+    q.set_defaults(func=cmd_identity, json=False)
 
     p = sub.add_parser("userid", help="userid operations")
     uid = p.add_subparsers(dest="userid_command", required=True)

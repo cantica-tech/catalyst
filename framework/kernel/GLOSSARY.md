@@ -92,6 +92,10 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   seen the first pass's reasoning (`ANALYSIS-PLAYBOOK.md`). In an analysis
   it is enforced: two recorded blind passes, a reconciliation that
   accounts for every finding, a human decision on each (`ANALYSIS`).
+- **Grant.** What catalyst-users allows an identity to do, carried in its
+  token: `cmd:<command>` (`cmd:*` every command) and `reconcile:<level>`.
+  The provider composes grants into roles and groups; a role's name grants
+  nothing in catalyst (INV-16, INV-21).
 - **Grounding, grounding type.** An artifact's link down the chain. The
   module's *grounding type* is what its artifacts ground to (the kernel
   rule); each ETD says whether its type grounds directly (`required`),
@@ -151,9 +155,11 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   `rules-of-rules.template.md` plus the module's contribution). Each
   section carries a stable `rr-META-NNN` ID, signed in a deployment
   (`rr-META-0000NN-<userid>`).
-- **Signer, userid.** The registered user an artifact or journal entry is
-  signed by (`Signed-off-by`, `--as`), and that user's 8-character userid,
-  appended to every ID they create (INV-16, INV-26).
+- **Signer, userid.** The identity catalyst-users verifies when an
+  artifact or journal entry is signed (`Signed-off-by`): the person logged
+  in, or the machine's system account. Its 8-character userid, drawn at its
+  first signature and kept in the signers ledger `IAM/signers.jsonl`, is
+  appended to every ID it creates (INV-16, INV-26).
 - **Spec (of a command).** Only the part of `CODE-OF-CONDUCT.md` §4 one
   command needs, printed by `catalyst spec <command>` — the canonical text,
   selected, within a 1,000-word budget (`CLI.md`).
@@ -180,6 +186,6 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   (INV-24).
 - **Working copy.** The deployment's governance record for a project — the
   directory named `.criterion/` holding rules, artifacts, definitions,
-  users, the journal and the vendored CLI. Never part of the product's own
+  the signers ledger, the journal and the vendored CLI. Never part of the product's own
   tree: it lives in agent-owned space (local-only) or in the criterion
   repository (shared) (INV-6).

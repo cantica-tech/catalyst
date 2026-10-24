@@ -74,6 +74,8 @@ API = "/v1"
 WC = ".criterion/"
 LEVELS = {"none": 0, "propose": 1, "full": 2}
 USERS = "IAM/users/users.json"
+RETIRED_USERS = "IAM/users/users.retired.json"
+POINTER = "IAM/identity.json"  # the criterion's pointer to catalyst-users (fw-IDENTITY-000007)
 SIGNERS = "IAM/signers.jsonl"  # the signers ledger of a deployment with an identity provider (fw-IDENTITY-000003)
 ROLES = "IAM/roles/roles.json"
 MAX_BODY = 512 * 1024 * 1024
@@ -458,9 +460,9 @@ class Server(Reads):
         if isinstance(userid, dict):  # a provider's token: the signer is its ledger line (fw-IDENTITY-000005)
             cur = _current(c, SIGNERS)
             pushed = (content(after_of[SIGNERS]),) if SIGNERS in after_of else None
-            user = _provider_user(content(cur) if cur else None, pushed, pre(ROLES), userid, own_only=not importing)
+            user = _provider_user(content(cur) if cur else None, pushed, pre(POINTER), userid, own_only=not importing)
         else:
-            user = _user(pre(USERS), userid)
+            user = _user(pre(USERS) or pre(RETIRED_USERS), userid, pre(SIGNERS))
         entries = []
         for p, before, after in rows:
             if is_journal(p):
@@ -483,8 +485,8 @@ class Server(Reads):
             if not is_journal(p) and before is not None and (p, after) not in journaled:
                 raise ServeError(422, f"{p} changed without a journal entry (`catalyst unrecorded`)")
 
-        roles = _levels(pre(ROLES))
-        level = max((LEVELS.get(roles.get(str(r), "none"), 0) for r in user.get("roles") or []), default=0)
+        # the reconciliation level is catalyst-users' grant (fw-IDENTITY-000008); a `cst_` token's signer has none
+        level = LEVELS.get(str(user.get("reconciliation") or "none"), 0)
         deleted = {p for p, _, after in rows if after is None}
         for p, before, after in rows:
             if not p.endswith(".md"):
@@ -759,13 +761,24 @@ def _json(data: bytes | None, key: str) -> list:
     return [v for v in value if isinstance(v, dict)] if isinstance(value, list) else []
 
 
-def _user(users: bytes | None, userid: str) -> dict:
+def _user(users: bytes | None, userid: str, signers: bytes | None = None) -> dict:
+    """The signer a server token was issued to: a ledger line (fw-IDENTITY-000003) or, for history, a person
+    registered before catalyst-users. Neither holds a grant: a `cst_` token reconciles nothing."""
+    from catalyst import provider
+
+    for line in _lines(signers):
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(entry, dict) and entry.get("userid") == userid:
+            return provider.as_user(entry)
     for user in _json(users, "users"):
         if user.get("userid") == userid:
             if user.get("active") is False:
                 raise ServeError(403, f"{user.get('name')} is deactivated")
-            return user
-    raise ServeError(403, "this token's user is not a registered user of the criterion")
+            return {**user, "roles": [], "reconciliation": "none"}
+    raise ServeError(403, "this token's user is not a signer of the criterion")
 
 
 def _lines(data: bytes | None) -> list[str]:
@@ -773,7 +786,7 @@ def _lines(data: bytes | None) -> list[str]:
 
 
 def _provider_user(
-    server: bytes | None, pushed: tuple[bytes | None] | None, roles: bytes | None, claims: dict, own_only: bool = True
+    server: bytes | None, pushed: tuple[bytes | None] | None, pointer: bytes | None, claims: dict, own_only: bool = True
 ) -> dict:
     """The signer of a push made with a provider's token: the ledger's line for its issuer and subject. A
     push may append ledger lines for its own identity only (`own_only`; the first push, an import, brings
@@ -797,12 +810,17 @@ def _provider_user(
     entry = provider.find(entries, str(claims.get("iss")), str(claims.get("sub")))
     if entry is None:
         raise ServeError(403, f"no line in {SIGNERS} for this identity: sign once with the CLI, then push")
-    held = set((claims.get("realm_access") or {}).get("roles") or ()) | set(claims.get("roles") or ())
-    return provider.as_user(entry, provider.roles_for(_json(roles, "roles"), tuple(sorted(held))))
+    from catalyst.identity.provider import whoami_from_claims
 
-
-def _levels(roles: bytes | None) -> dict[str, str]:
-    return {str(r.get("name")): str(r.get("reconciliation") or "none") for r in _json(roles, "roles")}
+    try:
+        doc = json.loads(pointer or b"{}")
+    except ValueError:
+        doc = {}
+    client = str((doc if isinstance(doc, dict) else {}).get("catalyst_client") or "catalyst")
+    who = whoami_from_claims(claims, str(claims.get("iss")), client)
+    user = provider.as_user(entry, list(who.roles))
+    user.update({"groups": list(who.groups), "grants": list(who.grants), "reconciliation": who.reconciliation})
+    return user
 
 
 # --- HTTP ---------------------------------------------------------------------
@@ -1258,12 +1276,11 @@ class ServeShare:
         from catalyst import provider
 
         token = os.environ.get("CATALYST_TOKEN")
-        if not token and provider.is_oidc(self.dep):  # type: ignore[arg-type]
-            from catalyst.identity.errors import CatalystUsersError
-
+        doc = provider.pointer(self.dep) if not token else None  # type: ignore[arg-type]
+        if doc is not None:
             try:
-                token = provider.session(provider.settings(self.dep.pointer)).access_token()  # type: ignore[attr-defined]
-            except (CatalystUsersError, provider.ProviderError):
+                token = provider.access_token(doc)
+            except provider.ProviderError:
                 token = None
         return Client(self.url, token or token_for(self.url))
 

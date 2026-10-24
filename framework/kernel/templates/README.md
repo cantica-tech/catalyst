@@ -32,19 +32,20 @@ This folder contains the reusable document templates that seed the deployed cata
   Notes, one row per template version. This is where the hard rule's
   "timestamped" requirement is actually satisfied — the template files
   themselves carry no date, this table does.
-- [`roles.template.json`](roles.template.json) — copy to
-  `IAM/roles/roles.json` on first deploy (`INVARIANTS.md` INV-16), filled
-  in with its default agile-role mapping (phrased generically; the active
-  module's own commands can be listed via `/role modify`). JSON, not markdown, because it's
-  managed by `/role add|modify` rather than hand-edited.
-- [`users.template.json`](users.template.json) — copy to
-  `IAM/users/users.json` on first deploy (`INVARIANTS.md` INV-16), empty
-  array. Managed only by
-  `/user add|remove|modify|assign-role|list`
-  — see `Rules-of-Rules.md` §11. **Hard requirement:** deployment isn't
-  complete until `/user add` has registered at least one active user.
-  `IAM/users/` and `IAM/roles/` each get the same `templates/` treatment
-  as every other artifact type (`INVARIANTS.md` INV-20).
+- [`roles.template.json`](roles.template.json) — deployed as
+  `IAM/roles/templates/TEMPLATE-ROLES-v1.json`: the default roles (phrased
+  generically), their names and ids, for display. Their `actions` and
+  `reconciliation` are what `catalyst-users roles provision` writes into
+  the provider once, as each role's `cmd:<command>` and `reconcile:<level>`
+  grants; in the criterion they grant nothing (`INVARIANTS.md` INV-16).
+- [`users.template.json`](users.template.json) and
+  [`groups.template.json`](groups.template.json) — deployed as
+  `IAM/users/templates/TEMPLATE-USERS-v1.json` and
+  `IAM/groups/templates/TEMPLATE-GROUPS-v1.json`: how users and groups are
+  shown. They hold no person and grant nothing: people and groups are
+  catalyst-users' (`Rules-of-Rules.md` §11). `IAM/users/`, `IAM/roles/`
+  and `IAM/groups/` each get the same `templates/` treatment as every other
+  artifact type (`INVARIANTS.md` INV-20).
 - The project file, `catalyst.toml` — the only catalyst file a project
   tracks — has no template: `catalyst init` writes it (`FORMAT.md` §1,
   INV-6); `catalyst share create` adds the sharing fields.

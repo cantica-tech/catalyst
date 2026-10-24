@@ -37,6 +37,8 @@ jobs:
       - name: Install a scratch deployment per module and validate it
         env:
           PYTHONPATH: ${{ github.workspace }}/scripts
+          # a scratch deployment signs through catalyst-users' static backend, which verifies nobody: tests only
+          CATALYST_ALLOW_STATIC_IDENTITY: "1"
         run: |
           set -e
           git config --global user.name "catalyst-ci"

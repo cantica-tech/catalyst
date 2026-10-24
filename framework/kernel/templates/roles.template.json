@@ -2,41 +2,49 @@
   "roles": [
     {
       "name": "Product Owner",
+      "id": "product-owner",
       "actions": ["create the active module's planning and new-work artifacts", "approve/prioritize new work", "/create", "/status", "/adopt", "/journal"],
       "reconciliation": "propose"
     },
     {
       "name": "Scrum Master / Delivery Lead",
+      "id": "scrum-master",
       "actions": ["review the active module's open work", "/status", "/journal"],
       "reconciliation": "propose"
     },
     {
       "name": "Tech Lead / Architect",
+      "id": "tech-lead",
       "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)", "/create", "/status", "/adopt", "/journal", "/freeze", "/migrate-definition", "/run-analysis"],
       "reconciliation": "full"
     },
     {
       "name": "Developer",
+      "id": "developer",
       "actions": ["create the active module's development artifacts (implementation-driven)", "implement the active module's development artifacts", "/create", "/status", "/adopt", "/journal", "/run-analysis"],
       "reconciliation": "propose"
     },
     {
       "name": "QA / Tester",
+      "id": "qa",
       "actions": ["report defects through the active module's development artifacts", "verify a rule's verification coverage", "/create", "/status", "/adopt", "/journal"],
       "reconciliation": "propose"
     },
     {
       "name": "Stakeholder",
+      "id": "stakeholder",
       "actions": ["propose ideas and planning items to the active module"],
       "reconciliation": "none"
     },
     {
       "name": "Release Manager",
+      "id": "release-manager",
       "actions": ["/sync-framework", "/share", "cutting releases"],
       "reconciliation": "full"
     },
     {
       "name": "Admin",
+      "id": "catalyst-admin",
       "actions": ["*"],
       "reconciliation": "full"
     }

@@ -71,22 +71,29 @@ file is the shape alone.
         workflows.md                  # workflows catalog
         [...]
     IAM/
-        users/
+        identity.json                    # the pointer to the deployment's catalyst-users configuration
+        signers.jsonl                    # the signers ledger: one line per identity that has signed, append-only
+        users/                           # no registry: people are catalyst-users'
             templates/
                 README.md
                 templates-user.md        # templates catalog: Version | File | Timestamp | Notes
-                TEMPLATE-USERS-v1.json   # versions the registry's seed shape, not a per-instance doc
+                TEMPLATE-USERS-v1.json   # how users are shown: display only, no person, no grant
                 ...
             README.md
-            users.json                   # users registry ({"users": [...]})
-        roles/
+        roles/                           # no registry: roles and their grants are catalyst-users'
             templates/
                 README.md
                 templates-role.md
-                TEMPLATE-ROLES-v1.json
+                TEMPLATE-ROLES-v1.json   # the roles' names and how they are shown; grants nothing
                 ...
             README.md
-            roles.json                   # roles registry ({"roles": [...]})
+        groups/
+            templates/
+                README.md
+                templates-group.md
+                TEMPLATE-GROUPS-v1.json  # how groups are shown
+                ...
+            README.md
     modules/                             # Process Modules & ETD schemas (MODULE-SPECIFICATION.md)
         <module-id>/
             module.yaml                  # Module manifest

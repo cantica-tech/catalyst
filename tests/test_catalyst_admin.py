@@ -85,14 +85,15 @@ def test_definition_migrate_moves_only_to_an_existing_version(tmp_path):
 
 
 def test_the_cli_runs_them(tmp_path, capsys):
+    """People and roles are catalyst-users' (design 29, fw-IDENTITY-000002): `user` and `role` refuse, and say where
+    to make the change; the other administration verbs still run."""
     project, _, _ = _dep(tmp_path)
     run = lambda *a: main(["--project", str(project), *a])
-    assert run("role", "add", "QA", "--action", "/create-test", "--reconciliation", "none") == 0
-    assert run("user", "add", "Grace Hopper", "QA", "--json") == 0
-    assert json.loads(capsys.readouterr().out.splitlines()[-1])["roles"] == ["QA"]
-    assert run("freeze", "items") == 1  # two active users: who signs?
-    assert "--as" in capsys.readouterr().err
+    for argv in (
+        ("role", "add", "QA", "--action", "/create-test", "--reconciliation", "none"),
+        ("user", "add", "Grace Hopper", "QA", "--json"),
+        ("user", "remove", USER, "--as", USER),
+    ):
+        assert run(*argv) == 1
+        assert "catalyst-users" in capsys.readouterr().err
     assert run("freeze", "items", "--as", USER) == 0
-    assert run("user", "remove", USER, "--as", USER) == 0
-    assert run("user", "remove", "Grace Hopper", "--as", "Grace Hopper") == 1
-    assert "only active user" in capsys.readouterr().err

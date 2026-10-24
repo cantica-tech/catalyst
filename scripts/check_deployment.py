@@ -344,18 +344,29 @@ def check_required_headings(root: Path) -> list[str]:
 
 
 def _known_userids(root: Path) -> set[str]:
-    """Every userid currently registered in IAM/users/users.json, or an
-    empty set if the file is missing/malformed (already reported by
-    check_users_and_roles_exist / check_users_have_userid)."""
-    users_path = root / "IAM" / "users" / "users.json"
-    if not users_path.is_file():
-        return set()
+    """Every userid that may end an ID: the signers ledger's (`IAM/signers.jsonl`, fw-IDENTITY-000003) and the
+    people registered before catalyst-users (`users.retired.json`, or a `users.json` not yet migrated)."""
+    out: set[str] = set()
+    for name in ("users.retired.json", "users.json"):
+        path = root / "IAM" / "users" / name
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        users = data.get("users", []) if isinstance(data, dict) else []
+        out |= {str(u["userid"]) for u in users if isinstance(u, dict) and u.get("userid")}
     try:
-        data = json.loads(users_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return set()
-    users = data.get("users", []) if isinstance(data, dict) else []
-    return {str(u["userid"]) for u in users if isinstance(u, dict) and u.get("userid")}
+        lines = (root / "IAM" / "signers.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    for line in lines:
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(entry, dict) and entry.get("userid"):
+            out.add(str(entry["userid"]))
+    return out
 
 
 def check_rule_id_shape(root: Path) -> list[str]:
@@ -450,37 +461,30 @@ def check_workflows_index_exists(root: Path) -> list[str]:
 
 
 def check_users_and_roles_exist(root: Path) -> list[str]:
-    """INV-16: IAM/users/users.json + IAM/roles/roles.json always exist,
-    and users.json has at least one active user."""
-    errors: list[str] = []
-    users_path = root / "IAM" / "users" / "users.json"
-    roles_path = root / "IAM" / "roles" / "roles.json"
-
-    if not roles_path.is_file():
-        errors.append("INV-16: IAM/roles/roles.json is missing — seed it from templates/roles.template.json")
-
-    if not users_path.is_file():
-        errors.append("INV-16: IAM/users/users.json is missing — seed it from templates/users.template.json")
-        return errors
-
+    """INV-16 (revised for design 29): people are catalyst-users'. `IAM/identity.json`, the pointer to the
+    deployment's catalyst-users configuration, is a JSON object naming a provider when present; `catalyst check`
+    reports a missing one (a workspace member may inherit its workspace's). `users.json` and `roles.json` are no
+    longer required: retired, they are history."""
+    path = root / "IAM" / "identity.json"
+    if not path.is_file():
+        return []
     try:
-        data = json.loads(users_path.read_text(encoding="utf-8"))
+        doc = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        errors.append(f"INV-16: IAM/users/users.json is not valid JSON: {exc}")
-        return errors
-
-    users = data.get("users", []) if isinstance(data, dict) else []
-    if not any(isinstance(u, dict) and u.get("active") for u in users):
-        errors.append("INV-16: IAM/users/users.json has no active user — a project must have at least one (/user add)")
-    return errors
+        return [f"INV-16: IAM/identity.json is not valid JSON: {exc}"]
+    if not isinstance(doc, dict) or not doc.get("provider"):
+        return ["INV-16: IAM/identity.json names no provider (catalyst-users' `provider`)"]
+    return []
 
 
 def check_users_have_userid(root: Path) -> list[str]:
     """INV-26: every registered user has a unique, valid 8-char alphanumeric
     userid (containing at least one uppercase letter)."""
-    users_path = root / "IAM" / "users" / "users.json"
-    if not users_path.is_file():
-        return []  # already reported by check_users_and_roles_exist
+    users_path = next(
+        (p for p in (root / "IAM" / "users" / n for n in ("users.retired.json", "users.json")) if p.is_file()), None
+    )
+    if users_path is None:
+        return []  # no registry: people are catalyst-users' (design 29)
     try:
         data = json.loads(users_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):

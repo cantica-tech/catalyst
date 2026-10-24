@@ -16,7 +16,7 @@ item is checked on its own, which keeps a long install from drifting.
       the dev-environment document)
 - [ ] Project name (`dev-instructions.yaml`, or asked)
 - [ ] Active module chosen with the user; its checkout found
-- [ ] First user's git username confirmed
+- [ ] The catalyst-users provider confirmed, and the installer logged in to it
 
 ## Install (guide §1 steps 4–5)
 

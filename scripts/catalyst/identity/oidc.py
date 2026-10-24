@@ -173,6 +173,25 @@ class OIDCClient:
 
     # --- tokens (id-AUTH-000003) ---------------------------------------------
 
+    # --- the local admin account (id-AUTH-000006, id-PROVIDER-000006) ----------
+
+    def password_grant(self, client_id: str, username: str, password: str, scope: str = "openid") -> Tokens:
+        """Tokens for the local admin account; its password travels only in this request (id-AUTH-000001)."""
+        resp = self.http.request(
+            "POST",
+            self.endpoints.token,
+            form={
+                "grant_type": "password",
+                "client_id": client_id,
+                "username": username,
+                "password": password,
+                "scope": scope,
+            },
+        )
+        if not resp.ok:
+            raise _error(resp)
+        return Tokens.from_response(resp.json(), self.clock())
+
     def refresh(self, tokens: Tokens) -> Tokens:
         if not tokens.refresh_token:
             raise OIDCError("invalid_grant", "no refresh token")

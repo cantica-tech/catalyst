@@ -517,60 +517,6 @@ def test_check_workflows_index_exists_missing_workflows_dir(tmp_path: Path):
     assert any("INV-24" in e for e in errors)
 
 
-def test_check_users_and_roles_exist_missing_users(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "users" / "users.json").unlink()
-    errors = cd.check_users_and_roles_exist(root)
-    assert any("INV-16" in e and "IAM/users/users.json is missing" in e for e in errors)
-    assert not any("roles.json" in e for e in errors)
-
-
-def test_check_users_and_roles_exist_missing_roles(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "roles" / "roles.json").unlink()
-    errors = cd.check_users_and_roles_exist(root)
-    assert any("INV-16" in e and "IAM/roles/roles.json is missing" in e for e in errors)
-    assert not any("users.json is missing" in e for e in errors)
-
-
-def test_check_users_and_roles_exist_missing_both(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "users" / "users.json").unlink()
-    (root / "IAM" / "roles" / "roles.json").unlink()
-    errors = cd.check_users_and_roles_exist(root)
-    assert len(errors) == 2
-
-
-def test_check_users_and_roles_exist_missing_iam_dir(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    shutil.rmtree(root / "IAM")
-    errors = cd.check_users_and_roles_exist(root)
-    assert len(errors) == 2
-
-
-def test_check_users_and_roles_exist_no_active_user(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "users" / "users.json").write_text(
-        json.dumps(
-            {
-                "users": [
-                    {"name": "Ada", "roles": ["Developer"], "registered": "2026-08-23", "active": False, "notes": ""},
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    errors = cd.check_users_and_roles_exist(root)
-    assert any("INV-16" in e and "no active user" in e for e in errors)
-
-
-def test_check_users_and_roles_exist_empty_users_array(tmp_path: Path):
-    root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "users" / "users.json").write_text(json.dumps({"users": []}), encoding="utf-8")
-    errors = cd.check_users_and_roles_exist(root)
-    assert any("no active user" in e for e in errors)
-
-
 def test_check_users_have_userid_missing(tmp_path: Path):
     root = make_valid_deployment(tmp_path)
     (root / "IAM" / "users" / "users.json").write_text(
@@ -696,11 +642,23 @@ def test_check_rule_id_shape_ignores_pure_bullet_list_index(tmp_path: Path):
     assert errors == []
 
 
-def test_check_users_and_roles_exist_invalid_json(tmp_path: Path):
+def test_the_identity_pointer_is_not_required_and_users_json_no_longer_is(tmp_path: Path):
+    """INV-16 revised (design 29): people are catalyst-users'; `catalyst check` reports a missing pointer."""
     root = make_valid_deployment(tmp_path)
-    (root / "IAM" / "users" / "users.json").write_text("{not valid json", encoding="utf-8")
-    errors = cd.check_users_and_roles_exist(root)
-    assert any("not valid JSON" in e for e in errors)
+    for name in ("users/users.json", "roles/roles.json"):
+        (root / "IAM" / name).unlink(missing_ok=True)
+    assert cd.check_users_and_roles_exist(root) == []
+
+
+def test_the_identity_pointer_must_be_json_naming_a_provider(tmp_path: Path):
+    root = make_valid_deployment(tmp_path)
+    pointer = root / "IAM" / "identity.json"
+    pointer.write_text("{not valid json", encoding="utf-8")
+    assert any("INV-16" in e and "not valid JSON" in e for e in cd.check_users_and_roles_exist(root))
+    pointer.write_text(json.dumps({"issuer": "https://id.example.com/realms/r"}), encoding="utf-8")
+    assert any("names no provider" in e for e in cd.check_users_and_roles_exist(root))
+    pointer.write_text(json.dumps({"provider": "keycloak", "url": "https://id.example.com"}), encoding="utf-8")
+    assert cd.check_users_and_roles_exist(root) == []
 
 
 def test_check_journal_exists_missing(tmp_path: Path):

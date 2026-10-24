@@ -88,8 +88,9 @@ def members(workspace_file: Path) -> list[Path]:
     return [f for f in read(workspace_file)[1] if (f / project_file.NAME).is_file()]
 
 
-def _skeleton(root: Path, kernel: Path, user: dict) -> list[Path]:
-    """A kernel-only criterion: rules and domains, users and roles, journal."""
+def _skeleton(root: Path, kernel: Path, identity: dict, first: dict) -> list[Path]:
+    """A kernel-only criterion: rules and domains, the pointer to catalyst-users, its first signer, the display
+    templates, journal (design 29)."""
     written = []
 
     def write(rel: str, text: str) -> None:
@@ -100,9 +101,12 @@ def _skeleton(root: Path, kernel: Path, user: dict) -> list[Path]:
 
     write("rules/rules.md", "# Rules index\n\nRules every member of this workspace shares.\n")
     write("rules/domains/domains.md", "# Domains index\n\n| Code | Document | Defined |\n|---|---|---|\n")
-    write("IAM/users/users.json", json.dumps({"users": [user]}, indent=2) + "\n")
-    roles = kernel / "templates" / "roles.template.json"
-    write("IAM/roles/roles.json", roles.read_text(encoding="utf-8") if roles.is_file() else '{"roles": []}\n')
+    write("IAM/identity.json", json.dumps(identity, indent=2) + "\n")
+    write("IAM/signers.jsonl", json.dumps(first, ensure_ascii=False) + "\n")
+    for kind in ("users", "roles", "groups"):
+        template = kernel / "templates" / f"{kind}.template.json"
+        text = template.read_text(encoding="utf-8") if template.is_file() else json.dumps({kind: []}) + "\n"
+        write(f"IAM/{kind}/templates/TEMPLATE-{kind.upper()}-v1.json", text)
     write(
         "version.txt",
         (kernel.parent.parent / "version.txt").read_text(encoding="utf-8")
@@ -112,13 +116,20 @@ def _skeleton(root: Path, kernel: Path, user: dict) -> list[Path]:
     write(
         "README.md",
         "# Workspace criterion\n\nShared by the workspace's member projects (their "
-        "`catalyst.toml` names it): rules and domains, users and roles. Read-only from a member.\n",
+        "`catalyst.toml` names it): rules and domains, and the pointer to catalyst-users their people sign through. "
+        "Read-only from a member.\n",
     )
     write(".gitignore", "/.venv\n")
     return written
 
 
-def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str | None = None) -> tuple[Path, list[str]]:
+def init(
+    workspace_file: Path,
+    kernel: Path,
+    user_name: str,
+    git_username: str | None = None,
+    identity: dict | None = None,
+) -> tuple[Path, list[str]]:
     name, _ = read(workspace_file)
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name):
         raise WorkspaceError(f"workspace name '{name}' must be letters, digits, '.', '_' or '-'")
@@ -126,17 +137,24 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
     if root.exists() and any(root.iterdir()):
         raise WorkspaceError(f"a workspace criterion named '{name}' already exists ({root})")
     projects = members(workspace_file)
+    from catalyst import provider
+    from catalyst.init import InitError, InitRequest, static_identity
+
+    try:
+        doc = identity or static_identity(InitRequest(Path(), name, None, user_name, kernel, git_username=git_username))
+        who = provider.verify(doc, git_username or user_name)
+    except (InitError, provider.ProviderError) as exc:
+        raise WorkspaceError(str(exc)) from None
     root.mkdir(parents=True, exist_ok=True)
-    user = {
-        "name": user_name,
-        "git_username": git_username or user_name,
-        "roles": ["Admin"],
-        "registered": datetime.date.today().isoformat(),
-        "active": True,
-        "notes": "",
+    first = {
         "userid": generate_userid(set()),
+        "iss": who.issuer,
+        "sub": who.subject,
+        "username": who.username,
+        "name": who.name,
+        "first_signed": datetime.date.today().isoformat(),
     }
-    written = _skeleton(root, kernel, user)
+    written = _skeleton(root, kernel, doc, first)
     _git(root, "init", "-q")
     steps = [f"created the workspace criterion {root}"]
     for project in projects:
@@ -159,10 +177,10 @@ def init(workspace_file: Path, kernel: Path, user_name: str, git_username: str |
             targets=[],
             intent=[
                 f"Create the meta criterion of the VS Code workspace {workspace_file.name}: the rules, domains, "
-                f"users and roles its {len(projects)} member project(s) share."
+                f"pointer to catalyst-users its {len(projects)} member project(s) share."
             ],
             files=[str(p) for p in written],
-            actor=git_username or user_name,
+            actor=who.username,
             allow_unchanged=True,
             tier="chore",
         ),

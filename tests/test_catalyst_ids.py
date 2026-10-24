@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 
 import pytest
 
@@ -64,15 +65,22 @@ def test_signer_resolution(tmp_path):
     project, dep, corpus = setup(tmp_path)
     assert resolve_signer(dep, corpus, "ada")["userid"] == USERID
     assert resolve_signer(dep, corpus)["userid"] == USERID  # the only active user
-    with pytest.raises(IdError, match="not a registered user"):
+    with pytest.raises(IdError, match=r"no verified identity .*no declared person 'mallory'"):
         resolve_signer(dep, corpus, "mallory")
 
 
 def test_signer_is_never_guessed_among_several_users(tmp_path):
-    _, dep, corpus = setup(tmp_path)
-    corpus.users.append({"name": "Bob", "active": True, "userid": "Bb4xR9pQ"})
-    with pytest.raises(IdError, match="pass --as"):
-        resolve_signer(dep, corpus)
+    """With two people the (test-only) static backend names no one: catalyst never picks one (fw-IDENTITY-000002)."""
+    project, dep, _ = setup(tmp_path)
+    users = dep.root / "IAM" / "users" / "users.json"
+    data = json.loads(users.read_text(encoding="utf-8"))
+    data["users"].append(
+        {"name": "Bob", "git_username": "bob", "roles": ["Admin"], "active": True, "userid": "Bb4xR9pQ"}
+    )
+    users.write_text(json.dumps(data), encoding="utf-8")
+    dep = load(project)
+    with pytest.raises(IdError, match="name who is signing"):
+        resolve_signer(dep, load_corpus(dep))
 
 
 def test_signer_without_userid_cannot_allocate(tmp_path):
@@ -184,7 +192,13 @@ def test_parallel_cli_callers_never_get_the_same_id(tmp_path):
     import sys
     from pathlib import Path
 
+    from conftest import persist_bridge
+
     project = make_project(tmp_path, git=True)
+    root = load(project).root
+    persist_bridge(root)  # subprocesses do not see conftest's in-process bridge
+    subprocess.run(["git", "-C", str(root), "add", "IAM"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-qm", "the tests' pointer"], check=True, capture_output=True)
     env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parent.parent / "scripts"))
     procs = [
         subprocess.Popen(

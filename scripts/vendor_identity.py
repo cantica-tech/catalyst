@@ -16,7 +16,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-CORE = ("errors", "config", "http", "oidc", "identity", "credentials", "session")
+CORE = (
+    "errors",
+    "config",
+    "http",
+    "oidc",
+    "identity",
+    "credentials",
+    "session",
+    "admin",
+    "keychain",
+    "provider",
+    "providers/__init__",
+    "providers/keycloak",
+    "providers/static",
+)
 DEST = Path(__file__).resolve().parent / "catalyst" / "identity"
 INIT = '''"""The identity code: catalyst-users' standard-library core, vendored (fw-IDENTITY-000006).
 
@@ -29,7 +43,9 @@ names the release and each file's sha256.
 
 def rewrite(source: str) -> str:
     source = re.sub(r"\bfrom catalyst_users import\b", "from catalyst.identity import", source)
-    return re.sub(r"\bfrom catalyst_users\.", "from catalyst.identity.", source)
+    source = re.sub(r"\bfrom catalyst_users\.", "from catalyst.identity.", source)
+    # the built-in providers' registry names their modules in strings
+    return re.sub(r'"catalyst_users\.providers\.', '"catalyst.identity.providers.', source)
 
 
 def digest(text: str) -> str:
@@ -48,6 +64,7 @@ def main(checkout: str, tag: str) -> int:
             check=True,
         ).stdout
         text = rewrite(source)
+        (DEST / f"{name}.py").parent.mkdir(parents=True, exist_ok=True)
         (DEST / f"{name}.py").write_text(text, encoding="utf-8")
         files[f"{name}.py"] = digest(text)
     (DEST / "__init__.py").write_text(INIT, encoding="utf-8")

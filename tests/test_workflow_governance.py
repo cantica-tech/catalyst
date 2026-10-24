@@ -236,19 +236,19 @@ def _governing(capsys, root: Path, rows: str, escalates: str = "Admin") -> str:
 
 def test_an_active_workflow_governs_its_types_moves(project, capsys):
     root = _root(capsys)
-    _cli(
-        capsys,
-        "role",
-        "add",
-        "Editor",
-        "--action",
-        "/status",
-        "--action",
-        "/create",
-        "--intent",
-        "editors move documents through review",
-    )
-    _cli(capsys, "user", "add", "Bob Editor", "Editor", "--git-username", "bob", "--intent", "an editor")
+    # people and roles are catalyst-users' (design 29): Bob the editor comes from the provider (the tests' static
+    # pointer), the role's display name from the roles template
+    pointer = root / "IAM" / "identity.json"
+    data = json.loads(pointer.read_text(encoding="utf-8"))
+    data["people"].append({"username": "bob", "name": "Bob Editor", "subject": "bob", "roles": ["editor"]})
+    data["roles"].append({"id": "editor", "name": "Editor", "grants": ["cmd:status", "cmd:create"]})
+    pointer.write_text(json.dumps(data), encoding="utf-8")
+    template = root / "IAM" / "roles" / "templates" / "TEMPLATE-ROLES-v1.json"
+    data = json.loads(template.read_text(encoding="utf-8"))
+    data["roles"].append({"name": "Editor", "id": "editor", "actions": [], "reconciliation": "none"})
+    template.write_text(json.dumps(data), encoding="utf-8")
+    _journal(capsys, pointer, "IAM/identity.json", "the provider holds an editor, Bob")
+    _journal(capsys, template, "roles template", "the Editor role is shown by its name")
     wf = _governing(
         capsys,
         root,

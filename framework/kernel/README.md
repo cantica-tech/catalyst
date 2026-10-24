@@ -59,12 +59,12 @@ invariants (`INVARIANTS.module.md`) describe its artifacts; the kernel
 only ever refers to them generically (`INVARIANTS.md` INV-30).
 
 Every artifact the framework creates — active-module artifact or work item
-— carries a `Signed-off-by` field, resolved against
-`IAM/users/users.json` (managed by `/user add|remove|modify|
-assign-role|list`) and `IAM/roles/roles.json` (the role → typical-action
-mapping, `/role add|modify`). A deployment must always have at least
-one active user, and a writing verb refuses a signer whose roles do not
-grant its command — see `Rules-of-Rules.md` §11.
+— carries a `Signed-off-by` field: the identity catalyst-users verifies at
+that signature, recorded once in the signers ledger `IAM/signers.jsonl`.
+People, roles and groups are catalyst-users' (`IAM/identity.json` points at
+the deployment's configuration); the criterion holds no user or role
+registry, and a writing verb refuses a signer none of whose grants allows
+its command — see `Rules-of-Rules.md` §11.
 
 Every artifact-type directory follows the same shape — a versioned,
 catalogued `templates/` subdirectory and its own `README.md`
@@ -97,10 +97,10 @@ own repository — it's never part of what a deployed project carries.
 | [`rules-of-development.template.md`](rules-of-development.template.md) | Generic standards for development artifacts; the active module's document types and commands are inserted from its `code-of-conduct.module.md`. Copy to `<project>/CODE-OF-CONDUCT.md`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | Every term catalyst invents (kernel, module, ETD, working copy, criterion, journal, tiers, ...), in one place. |
 | [`CLI.md`](CLI.md) | Reference for the `catalyst` command line: the mechanical steps (IDs, userids, journal, indexes, chain validation, traced commits, the end-of-turn and commit-msg hooks, usage reports) that procedures call instead of describing. |
-| [`FORMAT.md`](FORMAT.md) | The on-disk format specification (version `1.0-rc`): the pointer, the working copy, entity and index files, rules, domains, users and roles, the journal, and what `catalyst check`/`validate` enforce for each. |
+| [`FORMAT.md`](FORMAT.md) | The on-disk format specification (version `1.0-rc`): the pointer, the working copy, entity and index files, rules, domains, the pointer to catalyst-users and the signers ledger, the journal, and what `catalyst check`/`validate` enforce for each. |
 | [`MODULE-SPECIFICATION.md`](MODULE-SPECIFICATION.md) | Standard specification for Catalyst Process Modules, Module Manifests (`module.yaml`), Entity Type Definitions (`.yaml`), and layout. |
 | [`schemas/`](schemas/) | Machine-readable JSON schemas (`module-manifest.schema.json`, `entity-type-definition.schema.json`) for module and ETD validation. |
-| [`templates/`](templates/) | Generic kernel document templates (rule, domain, reconciliation, workflow, templates catalog, slash-command, Taskfile, roles, users, journal, pointer). The active module ships its own entity templates. |
+| [`templates/`](templates/) | Generic kernel document templates (rule, domain, reconciliation, workflow, templates catalog, slash-command, Taskfile, the users, roles and groups display templates, journal, pointer). The active module ships its own entity templates. |
 | [`SYNCHRONIZE.md`](SYNCHRONIZE.md) | Rules for synchronizing this framework with deployed projects when versions are missing or outdated. |
 | [`version.txt`](../../version.txt) | Current kernel version (at the catalyst repository root). |
 | [`INSTANTIATION-GUIDE.md`](INSTANTIATION-GUIDE.md) | Step-by-step: how to stand this framework up in a new (or existing) project. |

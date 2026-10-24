@@ -30,7 +30,11 @@ def test_zipapp_runs_standalone_with_embedded_kernel_entities(tmp_path):
         "kernel_entities_embedded.py",
         "catalyst/_build.py",
     } <= set(names)
+    from catalyst.deployment import load
+    from conftest import persist_bridge
+
     project = make_project(tmp_path / "p")
+    persist_bridge(load(project).root)  # the zipapp runs in a subprocess: the bridge on disk
     version = run(pyz, "--version", cwd=project)
     assert version.stdout.strip().startswith(f"catalyst {pr.read_kernel_version(REPO)}")
     assert run(pyz, "id", "next", "RECON", cwd=project).stdout.strip() == f"RECON-000001-{USERID}"

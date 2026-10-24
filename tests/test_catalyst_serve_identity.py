@@ -175,24 +175,26 @@ def test_the_first_push_imports_every_signers_line(tmp_path):
         _push(app, app.user_for("tok-carol"), "carol", both, both + _line("sub-eve", "Ev12Ee34", "eve"))
 
 
-def test_a_providers_signer_holds_its_mapped_roles(seeded):
-    roles = json.dumps(ROLES).encode()
-    user = serve._provider_user(_line("sub-carol", "Ca12Rl34", "carol").encode(), None, roles, _claims("sub-carol"))
-    assert (user["userid"], user["git_username"], user["roles"]) == ("Ca12Rl34", "carol", ["Developer"])
+def test_a_providers_signer_holds_its_roles_and_grants(seeded):
+    """The token's roles are the provider's, its grants decide what it may do (design 29, fw-IDENTITY-000008)."""
+    pointer = json.dumps({"provider": "keycloak", "issuer": ISSUER}).encode()
+    claims = _claims("sub-carol", resource_access={"catalyst": {"roles": ["cmd:status", "reconcile:propose"]}})
+    user = serve._provider_user(_line("sub-carol", "Ca12Rl34", "carol").encode(), None, pointer, claims)
+    assert (user["userid"], user["git_username"], user["roles"]) == ("Ca12Rl34", "carol", ["developer"])
+    assert user["grants"] == ["cmd:status", "reconcile:propose"] and user["reconciliation"] == "propose"
 
 
 def test_an_oidc_client_sends_its_provider_token(tmp_path, monkeypatch):
+    """A deployment pointing at catalyst-users sends the provider's token; one without a pointer, the server's own."""
     from types import SimpleNamespace
 
     from catalyst import provider
 
     monkeypatch.delenv("CATALYST_TOKEN", raising=False)
-    dep = SimpleNamespace(
-        root=tmp_path, pointer={"identity": "oidc", "identity_issuer": ISSUER, "share_url": "http://127.0.0.1:1"}
-    )
-    monkeypatch.setattr(provider, "session", lambda conf, transport=None: SimpleNamespace(access_token=lambda: "at-1"))
+    write(tmp_path / "IAM" / "identity.json", json.dumps({"provider": "keycloak", "issuer": ISSUER}))
+    dep = SimpleNamespace(root=tmp_path, pointer={"share_url": "http://127.0.0.1:1"})
+    monkeypatch.setattr(provider, "access_token", lambda doc: "at-1")
     assert serve.ServeShare(dep).client().token == "at-1"
-    write(tmp_path / "x", "")  # a local deployment keeps the server's own token
-    dep.pointer = {"share_url": "http://127.0.0.1:1"}
+    (tmp_path / "IAM" / "identity.json").unlink()  # no pointer: the server's own token
     monkeypatch.setattr(serve, "token_for", lambda url: "cst_mine")
     assert serve.ServeShare(dep).client().token == "cst_mine"

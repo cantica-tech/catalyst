@@ -144,17 +144,16 @@ def run(dep: Deployment) -> Report:
     report.errors += [f"proposal: {p}" for p in proposals.problems(dep, corpus)]
     from catalyst import provider
 
-    if not dep.standalone:
-        report.errors += [f"identity: {p}" for p in provider.problems(dep.pointer)]
+    errors, warnings = provider.problems(dep)
+    report.errors += [f"identity: {p}" for p in errors]
+    report.warnings += [f"identity: {w}" for w in warnings]
     report.errors += [f"identity: {p}" for p in provider.ledger_problems(dep.root)]
     report.errors += [f"identity: {p}" for p in provider.ledger_history_problems(dep)]
-    if provider.is_oidc(dep):
-        from catalyst.ids import _roles
-
-        for name in provider.unmapped_roles(_roles(dep)):
+    for kept in ("users/users.json", "roles/roles.json"):  # migrated (a pointer) but not retired
+        if (dep.root / provider.POINTER).is_file() and (dep.root / "IAM" / kept).is_file():
             report.warnings.append(
-                f"identity: role {name} has no provider_role, so nobody holds it with an identity provider "
-                f"(`catalyst role modify '{name}' --provider-role <role>`)"
+                f"identity: IAM/{kept} is no longer read: people and roles are catalyst-users' "
+                "(`catalyst migrate --apply` retires it; migration 0.106.0)"
             )
     for w in gates.unapproved_rules(dep, corpus):
         report.errors.append(
