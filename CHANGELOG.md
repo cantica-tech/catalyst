@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.108.0 — 2026-10-24
+
+No layout change.
+
+- Added: a criterion's admins (`fw-IDENTITY-000011`). catalyst-users 0.5.0, now vendored, reports the criteria a
+  person administers as a `criterion-admin` (`administers`). In the deployment whose `project_name` that list names,
+  they hold every grant and reconciliation level `full`; elsewhere, administering a criterion grants nothing, and the
+  scope is never read from a grant. `catalyst identity whoami` shows `administers` (REQ-000089).
+
 ## 0.107.0 — 2026-10-24
 
 No layout change; `/sync-framework` brings the deployed `INVARIANTS.md` and `MODULE-SPECIFICATION.md` up to date.
