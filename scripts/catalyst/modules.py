@@ -29,6 +29,10 @@ from module_loader import DEFAULT_TIERS, parse_simple_yaml
 
 RECORD = "modules/modules.json"
 NOT_SHIPPED = ("node_modules", "dist", "catalyst", "__pycache__")
+# A module's repository may itself be a catalyst project (BUG-000034): its project file and a legacy pointer are the
+# repository's, never the module's.
+NOT_SHIPPED_FILES = ("catalyst.toml",)
+NOT_SHIPPED_SUFFIXES = (".catalyst",)
 
 
 class ModuleError(Exception):
@@ -39,12 +43,14 @@ class ModuleError(Exception):
 def shipped_files(src: Path):
     """(file, name in the release) for what a release ships from `src`: no
     hidden files, no node_modules, dist, caches or packaged releases
-    (`catalyst/`)."""
+    (`catalyst/`), and not the repository's own catalyst project file."""
     for file in sorted(src.rglob("*")):
         if not file.is_file():
             continue
         rel = file.relative_to(src)
         if any(p.startswith(".") or p in NOT_SHIPPED for p in rel.parts):
+            continue
+        if len(rel.parts) == 1 and (rel.name in NOT_SHIPPED_FILES or rel.suffix in NOT_SHIPPED_SUFFIXES):
             continue
         yield file, rel.as_posix()
 

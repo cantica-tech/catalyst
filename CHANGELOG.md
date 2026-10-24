@@ -15,6 +15,8 @@ No layout change; `/sync-framework` brings the deployed `INVARIANTS.md` and `MOD
   another. INV-30 now reads "The kernel is module-agnostic, and modules compose"; L9 reads "The kernel knows no
   module; no module knows another module or an agent." CI installs the second production module alone, beside
   another module and with another beside it (REQ-000088).
+- Fixed: a module whose own repository is a catalyst project shipped its `catalyst.toml` (or a legacy pointer) in
+  its release, and every criterion installing it got a copy; neither ships now (BUG-000034).
 
 ## 0.106.1 — 2026-10-24
 
