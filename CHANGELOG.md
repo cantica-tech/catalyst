@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.107.0 — 2026-10-24
+
+No layout change; `/sync-framework` brings the deployed `INVARIANTS.md` and `MODULE-SPECIFICATION.md` up to date.
+
+- Added: modules compose (INV-30, law L9, `fw-STRUCTURE-000018`). Every module works as a deployment's only module
+  and beside any other the composition rules admit, in either install order, and never requires, names or assumes
+  another. INV-30 now reads "The kernel is module-agnostic, and modules compose"; L9 reads "The kernel knows no
+  module; no module knows another module or an agent." CI installs the second production module alone, beside
+  another module and with another beside it (REQ-000088).
+
 ## 0.106.1 — 2026-10-24
 
 No layout change. A deployment migrated with 0.106.0: `catalyst migrate --apply` corrects its roles template.
