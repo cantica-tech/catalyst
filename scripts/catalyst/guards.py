@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from catalyst.corpus import Artifact, Corpus, is_empty, ref_values
+from catalyst.corpus import Artifact, Corpus, is_unset, norm_field, ref_values
 from catalyst.deployment import Deployment
 
 
@@ -43,7 +43,8 @@ def failures(dep: Deployment, corpus: Corpus, art: Artifact, state: str) -> list
     out = []
     for cond, arg in etd.workflow.guards.get(state, []):
         if cond == "nonempty":
-            if is_empty(art.get(arg) or ""):
+            fd = next((f for f in etd.fields if norm_field(f.name) == norm_field(arg)), None)
+            if is_unset(art.get(arg), fd.allowed_values if fd is not None and fd.kind == "enum" else ()):
                 out.append(f"`{arg}` is empty")
         elif cond == "children_closed":
             for token in ref_values(art.get(arg) or ""):
@@ -71,7 +72,7 @@ def failures(dep: Deployment, corpus: Corpus, art: Artifact, state: str) -> list
             if wrong:
                 out.extend(wrong)
             elif not conditions.holds(c, art, etd):
-                out.append(f"`{c}` does not hold (`{c.field}` is {conditions.value_of(art, c.field) or 'empty'})")
+                out.append(f"`{c}` does not hold (`{c.field}` is {conditions.value_of(art, c.field, etd) or 'empty'})")
         else:
             out.append(f"unknown guard `{cond}` (children_closed, nonempty, section_written, holds)")
     return out

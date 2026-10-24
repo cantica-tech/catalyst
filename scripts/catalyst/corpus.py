@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -62,6 +63,17 @@ def norm_field(name: str) -> str:
 def is_empty(raw: str) -> bool:
     text = raw.strip()
     return text.lower() in EMPTY_VALUES or text.startswith("*(none")
+
+
+def is_unset(raw: str | None, allowed: Iterable[str] | None = ()) -> bool:
+    """Whether a field holds no value: empty (`is_empty`), unless the text is one of the values its field allows. A
+    module's enum value (`None`, `N/A`, `-`) is a value, never emptiness (INV-30: the kernel assumes nothing of a
+    module's values)."""
+    if raw is None:
+        return True
+    if not is_empty(raw):
+        return False
+    return raw.strip().strip("`").strip().lower() not in {a.lower() for a in allowed or ()}
 
 
 def ref_values(raw: str) -> list[str]:
