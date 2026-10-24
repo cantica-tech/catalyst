@@ -21,7 +21,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from catalyst.corpus import Artifact, is_empty, norm_field
+from catalyst.corpus import Artifact, is_unset, norm_field
 
 # longest first: "is not" before "is", "not in" before "in"
 TESTS = ("at least", "at most", "not in", "is not", "is set", "is empty", "in", "is")
@@ -99,9 +99,12 @@ def _date(value: str) -> str | None:
     return value if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) else None
 
 
-def value_of(art: Artifact, name: str) -> str:
+def value_of(art: Artifact, name: str, etd=None) -> str:
+    """The field's value, `""` when unset; with the type's definition, an enum value it allows is never unset."""
     raw = art.get(name) or ""
-    return "" if is_empty(raw) else _clean(raw)
+    fd = _field(etd, name) if etd is not None else None
+    allowed = fd.allowed_values if fd is not None and fd.kind == "enum" else ()
+    return "" if is_unset(raw, allowed) else _clean(raw)
 
 
 def _rank(value: str, order: list[str]):
@@ -115,7 +118,7 @@ def _rank(value: str, order: list[str]):
 
 def holds(cond: Condition, art: Artifact, etd) -> bool:
     """Whether `art` meets `cond`. A value the comparison cannot place fails it."""
-    value = value_of(art, cond.field)
+    value = value_of(art, cond.field, etd)
     if cond.test == "is set":
         return bool(value)
     if cond.test == "is empty":

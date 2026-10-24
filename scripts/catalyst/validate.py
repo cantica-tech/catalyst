@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import asdict, dataclass
 
-from catalyst.corpus import STRENGTHS, Artifact, Corpus, is_empty, norm_field, ref_values
+from catalyst.corpus import STRENGTHS, Artifact, Corpus, is_empty, is_unset, norm_field, ref_values
 from catalyst.deployment import Deployment
 from check_deployment import ONE_FILE_RULE_RE, RULE_HEADING_RE
 from module_loader import ETD, FieldDefinition
@@ -170,7 +170,7 @@ class Validator:
             if fd.name == "ID":
                 continue
             raw = art.get(fd.name)
-            if raw is None or is_empty(raw):
+            if raw is None or is_unset(raw, fd.allowed_values if fd.kind == "enum" else ()):
                 if fd.required:
                     self.add(ERROR, "required-field", where, f"required field `{fd.name}` is missing or empty")
                 elif fd.required_when_closed and closed:
