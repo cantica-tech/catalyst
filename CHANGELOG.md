@@ -14,6 +14,9 @@ No layout change. A deployment migrated with 0.106.0: `catalyst migrate --apply`
   not recognised (`Admin` under `admin`, the provider's being `catalyst-admin`). A kept role now takes the kernel
   roles template's id for its name, else its own; a deployment already migrated gets its roles template again with
   the kernel's ids, as a new version (BUG-000031).
+- Fixed: reading several journal shards, an entry recording a file unchanged (as `catalyst init` records the files it
+  finds) was overtaken by a source producing the same content later, so a moved deployment's journal read out of time
+  order (`time-order` warnings); an entry changing a file twice waited on its own first change (BUG-000032).
 
 ## 0.106.0 — 2026-10-23
 

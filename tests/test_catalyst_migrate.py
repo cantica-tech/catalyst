@@ -141,7 +141,7 @@ def test_a_migration_starting_before_the_previous_kernel_still_lists_its_judgmen
 # --- migration 0.106.0: people out of the criterion (design 29) -----------------------------
 def _roles_template(root: Path) -> list[dict]:
     folder = root / "IAM" / "roles" / "templates"
-    n, latest = migrate._latest_roles_template(folder)
+    _, latest = migrate._latest_roles_template(folder)
     assert latest is not None
     return json.loads(latest.read_text(encoding="utf-8"))["roles"]
 
@@ -171,7 +171,7 @@ def _registry(project: Path, roles: list[dict]) -> Path:
 
 def test_the_built_in_kernel_role_ids_are_the_kernel_templates():
     roles = json.loads((KERNEL / "templates" / "roles.template.json").read_text(encoding="utf-8"))["roles"]
-    assert migrate.KERNEL_ROLE_IDS == {r["name"]: r["id"] for r in roles}
+    assert {r["name"]: r["id"] for r in roles} == migrate.KERNEL_ROLE_IDS
 
 
 def test_the_identity_step_keeps_the_kernel_roles_under_the_kernel_ids(tmp_path):

@@ -241,13 +241,22 @@ def read(dep: Deployment) -> list[tuple[str, dict | None, str]]:
             return state[path] == before
         return before is None or not pending[(path, before)]
 
+    def unmet(changes: list[tuple[str, object, object]]) -> set[tuple[str, object]]:
+        """The states an entry waits for; a file it changes twice chains on its own earlier change first."""
+        own: dict[str, object] = {}
+        out = set()
+        for path, before, after in changes:
+            if not (own[path] == before if path in own else fits(path, before)):
+                out.add((path, before))
+            own[path] = after
+        return out
+
     while True:
         ready, waiting = [], []
         for i, rows in enumerate(keyed):
             if heads[i] < len(rows):
                 key, _, changes = rows[heads[i]]
-                ok = all(fits(path, before) for path, before, _ in changes)
-                (ready if ok else waiting).append((key, i))
+                (waiting if unmet(changes) else ready).append((key, i))
         if not ready and not waiting:
             return merged
         first = min(ready + waiting)
@@ -256,13 +265,20 @@ def read(dep: Deployment) -> list[tuple[str, dict | None, str]]:
         else:
             # The earliest entry waits. Another source overtakes it only if that source will produce the state it
             # waits for (causality beats clocks); if only its own later entries do (an old journal out of causal
-            # order), it takes its turn in time, and an unrelated source's later entries stay after it.
+            # order), it takes its turn in time, and an unrelated source's later entries stay after it. A state the
+            # entry produces itself (a file it recorded unchanged) is not waited for from a source producing it later.
             s = first[1]
-            needs = {(p, b) for p, b, _ in keyed[s][heads[s]][2] if not fits(p, b)}
+            when, _, own = keyed[s][heads[s]]
+            needs, made = unmet(own), {(p, a) for p, _, a in own}
             providers = {
                 k
                 for k, rows in enumerate(keyed)
-                if k != s and any((p, a) in needs for _, _, ch in rows[heads[k] :] for p, _, a in ch)
+                if k != s
+                and any(
+                    (p, a) in needs and ((p, a) not in made or t[0] <= when[0])
+                    for t, _, ch in rows[heads[k] :]
+                    for p, _, a in ch
+                )
             }
             helping = [r for r in ready if r[1] in providers]
             _, i = min(helping) if helping else (min(ready) if providers else first)
