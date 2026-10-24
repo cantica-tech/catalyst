@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+
+## 0.110.0 — 2026-10-24
+
+No layout change.
+
+- Fixed: a module's allowed enum value that reads as empty (`none`, `n/a`, `-`, in any case) is a value: `check` no
+  longer reports a required field holding it missing, a `nonempty` guard or an `is set` condition sees it, and its
+  index shows it. A type's allowed values are kept as text when loaded (YAML read `None` as a null) (BUG-000035).
+
 ## 0.109.0 — 2026-10-24
 
 Migration `0.109.0`: `catalyst migrate --apply` adds the kernel's `Criterion Admin` to a deployment's roles template.
