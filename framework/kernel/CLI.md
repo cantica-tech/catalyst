@@ -1569,6 +1569,15 @@ lines for its own identity only (an import, every signer's) and never change
 one. A client sends its provider token when it is logged in, else its
 `share login` token.
 
+`--criterion <name>` names the criterion the database serves, its
+`project_name`: recorded once (a later start with another name is refused;
+one without `--criterion` serves the recorded name) and reported by `GET head`
+(`criterion`). A push's signer who administers that criterion in
+catalyst-users (`administers`, a `criterion-admin`) holds every grant and the
+reconciliation level `full` there (`fw-IDENTITY-000011`). The operator names
+it, never a push: a client's `catalyst.toml` is only its word. Without a
+name, administering a criterion gives nothing on the server.
+
 Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
 adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
 requests get `Access-Control-Allow-Origin` and the preflight for a GET is

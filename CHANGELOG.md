@@ -6,6 +6,17 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.109.0 — 2026-10-24
+
+Migration `0.109.0`: `catalyst migrate --apply` adds the kernel's `Criterion Admin` to a deployment's roles template.
+
+- Added: `catalyst serve --criterion <name>` names the criterion a server's database serves, once (another name is
+  refused; `GET head` reports it). A push's signer who administers it holds every grant and reconciliation `full`
+  there; the operator names it, never a push (`fw-IDENTITY-000005`, REQ-000090).
+- Added: the kernel's roles template shows `Criterion Admin` (`scope: criterion`; it grants nothing by itself), and
+  `catalyst migrate --apply` adds it to a deployment's roles template as its next version, once: a team that removes
+  it keeps it removed (REQ-000091).
+
 ## 0.108.0 — 2026-10-24
 
 No layout change.

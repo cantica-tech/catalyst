@@ -11,8 +11,10 @@ part of Keycloak onboarding for catalyst and each of its criteria. Decided along
 
 | What | Where |
 |---|---|
-| catalyst-users REQ-000009 (rules `id-DIR-000005`, `id-PROVIDER-000008`), STEP-000014 | `cantica-tech/catalyst-users`, unreleased |
-| Kernel REQ-000089 (rule `fw-IDENTITY-000011`), STEP-000113 | `cantica-tech/catalyst`, unreleased |
+| catalyst-users 0.5.0: REQ-000009 (rules `id-DIR-000005`, `id-PROVIDER-000008`), STEP-000014 | `cantica-tech/catalyst-users` |
+| Kernel 0.108.0: REQ-000089 (rule `fw-IDENTITY-000011`), STEP-000113; catalyst-users 0.5.0 vendored | `cantica-tech/catalyst`, `cantica-tech/cantica-tech` |
+| The live realm: a criterion per deployment, the owner appointed to each | the local Keycloak, realm `catalyst` |
+| catalyst-ui: `spec/` and the desktop app at 0.108.0 (development, no UI release) | `cantica-tech/catalyst-ui` |
 
 ## What catalyst-users does now
 
@@ -56,12 +58,25 @@ part of Keycloak onboarding for catalyst and each of its criteria. Decided along
 - The compose Keycloak on port 8080 refuses its documented bootstrap password, so its integration tests cannot run
   there; nothing was run against the `catalyst` realm the deployments sign through.
 
+## How it shipped
+
+- catalyst-users 0.5.0: criterion PR #20, then #13 (main) and #14 (release), every check green, tagged `0.5.0`. The
+  owner's pending onboarding work (the guide, its test, the fixtures, the research moved to `docs/development/`)
+  shipped with it, at their choice.
+- Kernel 0.108.0: another session was releasing 0.107.0 from the same checkout, so the work waited on a branch in a
+  worktree (the revert journaled after that session's `catalyst check` caught it) and landed on top of 0.107.0;
+  criterion PR #140, then #321 and #322, tagged `0.108.0`; the deployment's CLI built from a clean worktree;
+  published to the distribution repository (the module zips repackaged byte-identical).
+- The live realm: `catalyst-users setup --force --criterion …` with the machine's unchanged settings; the system
+  account now administers catalyst, catalyst-ui, catalyst-users and catalyst-users-kb.
+
 ## What's left
 
-- Release catalyst-users (0.5.0), vendor it into catalyst, release the kernel; then the rules turn ✅ and the steps
-  and requirements close.
-- Onboard the live realm: `catalyst-users criteria add <name> --admin <admin>` for catalyst, catalyst-ui,
-  catalyst-users and catalyst-users-kb, then `roles provision`, as the catalyst-admin.
+- `catalyst-users roles provision` (a device login in the browser) would give `criterion-admin` its display name;
+  the role already exists and works without it.
 - `catalyst serve`: a push's signer gets no criterion-admin grant, since the served database does not know its
   `project_name` (REQ-000089's open question).
 - The kernel's roles template could show `Criterion Admin`, which needs a migration.
+- A catalyst-ui release (and the Marketplace) carrying 0.108.0 is a separate decision.
+- The compose Keycloak refuses its documented bootstrap password, so catalyst-users' integration tests cannot run
+  against it locally.
