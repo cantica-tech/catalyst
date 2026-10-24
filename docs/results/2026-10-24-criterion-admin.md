@@ -14,7 +14,8 @@ part of Keycloak onboarding for catalyst and each of its criteria. Decided along
 | catalyst-users 0.5.0: REQ-000009 (rules `id-DIR-000005`, `id-PROVIDER-000008`), STEP-000014 | `cantica-tech/catalyst-users` |
 | Kernel 0.108.0: REQ-000089 (rule `fw-IDENTITY-000011`), STEP-000113; catalyst-users 0.5.0 vendored | `cantica-tech/catalyst`, `cantica-tech/cantica-tech` |
 | The live realm: a criterion per deployment, the owner appointed to each | the local Keycloak, realm `catalyst` |
-| catalyst-ui: `spec/` and the desktop app at 0.108.0 (development, no UI release) | `cantica-tech/catalyst-ui` |
+| Kernel 0.109.0: REQ-000090 (`serve --criterion`), REQ-000091 (the Criterion Admin role, migration 0.109.0) | `cantica-tech/catalyst`, `cantica-tech/cantica-tech` |
+| catalyst-ui: `spec/` and the desktop app at 0.109.0 (development, no UI release) | `cantica-tech/catalyst-ui` |
 
 ## What catalyst-users does now
 
@@ -70,13 +71,26 @@ part of Keycloak onboarding for catalyst and each of its criteria. Decided along
 - The live realm: `catalyst-users setup --force --criterion …` with the machine's unchanged settings; the system
   account now administers catalyst, catalyst-ui, catalyst-users and catalyst-users-kb.
 
+## The follow-up: kernel 0.109.0
+
+The owner asked to continue with what 0.108.0 left.
+
+- **`catalyst serve --criterion <name>`** (REQ-000090): the server records the criterion its database serves, once
+  (another name refused, `GET head` reports it), and a push's signer who administers it holds every grant and
+  `full` there. The operator names it, never a push: a client's `catalyst.toml` is only its word, and a criterion's
+  admin elsewhere could otherwise claim the name.
+- **The Criterion Admin, shown** (REQ-000091): the kernel's roles template lists it (it grants nothing by itself);
+  `catalyst migrate --apply` adds it to a deployment's roles template once, never again if any version held it.
+  catalyst's own deployment is migrated (`TEMPLATE-ROLES-v5`).
+- **The display name in Keycloak**: the owner ran `catalyst-users login` and `roles provision`; `criterion-admin`
+  carries `catalyst.name` "Criterion Admin" and composes no grant.
+- Shipped: criterion PR #142, then #323 and #324 (every check green), tagged `0.109.0`; the distribution repository
+  with knowledge-base 0.5.1 (released meanwhile by another session); catalyst-ui at 0.109.0 on development.
+
 ## What's left
 
-- `catalyst-users roles provision` (a device login in the browser) would give `criterion-admin` its display name;
-  the role already exists and works without it.
-- `catalyst serve`: a push's signer gets no criterion-admin grant, since the served database does not know its
-  `project_name` (REQ-000089's open question).
-- The kernel's roles template could show `Criterion Admin`, which needs a migration.
-- A catalyst-ui release (and the Marketplace) carrying 0.108.0 is a separate decision.
+- A catalyst-ui release (and the Marketplace) carrying 0.109.0 is a separate decision.
+- A deployment shared through `catalyst serve`: restart the server with `--criterion <project_name>` (migration
+  0.109.0's judgment step); none of the current deployments is.
 - The compose Keycloak refuses its documented bootstrap password, so catalyst-users' integration tests cannot run
   against it locally.
