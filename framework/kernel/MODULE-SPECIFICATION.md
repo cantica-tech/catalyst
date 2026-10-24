@@ -28,6 +28,14 @@ modules of one deployment share no entity type, folder, definition,
 namespace, meta-rule ID or command, give a tier id one meaning, and ground on
 the same type (`CLI.md`, `catalyst module install`).
 
+**Modules compose** (`INVARIANTS.md` INV-30). Every module is written to
+work alone and beside any other module those rules admit, in either install
+order: it never requires, names or assumes another module — its entity
+types, ID prefixes, folders, commands or tiers. Its commands, documents and
+checks hold whichever modules sit beside it. A module that serves any
+project, such as one that builds knowledge bases, is added beside the module
+that already governs that project.
+
 ---
 
 ## 2. Module repository layout

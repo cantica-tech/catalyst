@@ -257,3 +257,15 @@ def test_the_install_snapshot_never_enters_git(tmp_path):
     finally:
         for hidden in (".git", ".venv"):
             (tmp_path / hidden / "objects" / "a3").chmod(0o755)
+
+
+def test_a_modules_own_catalyst_project_file_is_never_shipped(tmp_path):
+    """A module's repository may be a catalyst project (BUG-000034): its `catalyst.toml` and a legacy pointer stay
+    the repository's; a file of the same name inside the module's tree is the module's."""
+    mod = tmp_path / "catalyst-kbm"
+    write(mod / "module.yaml", "id: kbm\n")
+    write(mod / "catalyst.toml", 'project_name = "kbm"\n')
+    write(mod / "kbm.catalyst", "{}\n")
+    write(mod / "templates" / "catalyst.toml", "# a template the module ships\n")
+    shipped = [name for _, name in modules.shipped_files(mod)]
+    assert shipped == ["module.yaml", "templates/catalyst.toml"]
