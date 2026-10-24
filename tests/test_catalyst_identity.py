@@ -403,3 +403,32 @@ def test_configure_can_link_before_its_own_signature(deployment, capsys):
     [line] = _ledger(project)
     assert line["userid"] == USERID
     assert journal_entries(project / ".criterion")[-1]["actor"] == "ada"
+
+
+# --- a criterion's admins (fw-IDENTITY-000011) -----------------------------------------------
+def test_a_criterion_admin_holds_every_grant_in_their_criterion(deployment, capsys):
+    project, who = deployment
+    name = load(project).pointer["project_name"]
+    who["now"] = Whoami(ISSUER, "sub-kim", "kim", "Kim Admin", roles=("criterion-admin",), administers=(name,))
+    assert main(["new", "ITEM", "--title", "By the criterion's admin", *FIELDS]) == 0
+    signer = provider.signer(load(project))
+    assert (signer["grants"], signer["reconciliation"], signer["administers"]) == (
+        ["cmd:*", "reconcile:full"],
+        "full",
+        [name],
+    )
+    capsys.readouterr()
+    assert main(["identity", "whoami", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["administers"] == [name] and payload["reconciliation"] == "full"
+    assert schema_check.problems(payload, schema_check.load("identity-whoami")) == []
+
+
+def test_administering_another_criterion_grants_nothing_here(deployment, capsys):
+    project, who = deployment
+    who["now"] = Whoami(ISSUER, "sub-lee", "lee", "Lee Elsewhere", grants=("cmd:status",), administers=("other",))
+    signer = provider.signer(load(project))
+    assert (signer["grants"], signer["reconciliation"], signer["administers"]) == (["cmd:status"], "none", ["other"])
+    assert provider.in_criterion("other", who["now"]) == (["cmd:*", "cmd:status", "reconcile:full"], "full")
+    assert provider.in_criterion(load(project).pointer["project_name"], who["now"]) == (["cmd:status"], "none")
+    assert provider.in_criterion("other", BOB) == (["cmd:approve"], "none")

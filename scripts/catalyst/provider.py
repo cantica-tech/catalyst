@@ -212,6 +212,7 @@ def write_snapshot(doc: dict[str, Any], user: dict[str, Any]) -> Path:
         "roles": list(user.get("roles") or []),
         "grants": list(user.get("grants") or []),
         "reconciliation": user.get("reconciliation") or "none",
+        "administers": list(user.get("administers") or []),
         "verified": datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
     data["hash"] = _digest(data)
@@ -444,7 +445,20 @@ def link(dep: Deployment, retired: str, as_user_name: str | None = None, transpo
     return entry
 
 
-# --- the signer (fw-IDENTITY-000002, 000008) ------------------------------------------------
+# --- the signer (fw-IDENTITY-000002, 000008, 000011) ----------------------------------------
+CRITERION_ADMIN_GRANTS = ("cmd:*", "reconcile:full")
+
+
+def in_criterion(name: str | None, who: Any) -> tuple[list[str], str]:
+    """`who`'s grants and reconciliation level in the deployment `name` (its `project_name`): their own, and every
+    grant where catalyst-users says they administer that criterion (`administers`, fw-IDENTITY-000011). Never read
+    from a grant: one in the token would hold in every criterion."""
+    grants, level = list(who.grants), who.reconciliation
+    if name and name in who.administers:
+        grants, level = sorted({*grants, *CRITERION_ADMIN_GRANTS}), "full"
+    return grants, level
+
+
 def signer(dep: Deployment, as_user_name: str | None = None, transport: Any = None) -> dict:
     """The verified identity signing, as a user record: its roles (display names), groups, grants and
     reconciliation level now. One that has never signed carries `pending` (and no userid) until `enrolled` adds it
@@ -475,7 +489,9 @@ def signer(dep: Deployment, as_user_name: str | None = None, transport: Any = No
     else:
         user = {"name": who.name, "git_username": who.username, "userid": "", "roles": roles, "active": True}
         user.update({"iss": who.issuer, "sub": who.subject, "pending": who})
-    user.update({"groups": list(who.groups), "grants": list(who.grants), "reconciliation": who.reconciliation})
+    grants, level = in_criterion((dep.pointer or {}).get("project_name"), who)
+    user.update({"groups": list(who.groups), "grants": grants, "reconciliation": level})
+    user["administers"] = list(who.administers)
     user["provider_roles"] = list(who.roles)
     write_snapshot(doc, user)
     return user
@@ -487,7 +503,7 @@ def enrolled(dep: Deployment, user: dict) -> dict:
     if who is None:
         return user
     done = {**as_user(enroll(dep, who), list(user.get("roles") or []))}
-    for key in ("groups", "grants", "reconciliation", "provider_roles"):
+    for key in ("groups", "grants", "reconciliation", "administers", "provider_roles"):
         done[key] = user.get(key)
     doc = pointer(dep)
     if doc is not None:
