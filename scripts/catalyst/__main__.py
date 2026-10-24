@@ -216,6 +216,7 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
             }
             user.update({"groups": who.groups, "roles": who.roles, "grants": who.grants})
             user["reconciliation"] = who.reconciliation
+            user["administers"] = list(who.administers)
     except provider.ProviderError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
@@ -229,6 +230,7 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
         "roles": list(user.get("roles") or []),
         "grants": list(user.get("grants") or []),
         "reconciliation": user.get("reconciliation") or "none",
+        "administers": list(user.get("administers") or []),
     }
     if args.json:
         print(json.dumps(out, indent=2))
@@ -239,6 +241,7 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
         print(f"  roles           {', '.join(out['roles']) or '-'}")
         print(f"  grants          {', '.join(out['grants']) or '-'}")
         print(f"  reconciliation  {out['reconciliation']}")
+        print(f"  administers     {', '.join(out['administers']) or '-'}")
     return 0
 
 
