@@ -2052,10 +2052,14 @@ def cmd_serve(args) -> int:
             )
         tokens = serve.ProviderTokens(args.identity_issuer, args.identity_api_client, secret)
     try:
-        server = serve.make_server(db, args.host, args.port or 8765, tuple(args.allow_origin or ()), tokens)
+        server = serve.make_server(
+            db, args.host, args.port or 8765, tuple(args.allow_origin or ()), tokens, args.criterion
+        )
     except serve.ServeError as exc:
         raise SystemExit(f"catalyst: {exc}") from None
-    print(f"catalyst serve: {db} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
+    served = server.RequestHandlerClass.app.criterion  # type: ignore[attr-defined]
+    named = f" (criterion {served})" if served else ""
+    print(f"catalyst serve: {db}{named} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -3126,6 +3130,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--identity-issuer",
         help="also accept this identity provider's access tokens, by introspection (fw-IDENTITY-000005); "
         "the API client's secret is read from CATALYST_IDENTITY_API_SECRET",
+    )
+    p.add_argument(
+        "--criterion",
+        metavar="NAME",
+        help="the criterion this database serves, its project_name: recorded once, another later is refused; a "
+        "pusher who administers it in catalyst-users holds every grant (fw-IDENTITY-000011)",
     )
     p.add_argument(
         "--identity-api-client",

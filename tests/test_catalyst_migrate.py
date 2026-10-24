@@ -147,12 +147,19 @@ def _roles_template(root: Path) -> list[dict]:
 
 
 def _registry(project: Path, roles: list[dict]) -> Path:
-    """The deployment's roles registry, journaled as a real one is, before the migration retires it."""
+    """The deployment's roles registry, journaled as a real one is, before the migration retires it; its roles
+    templates as a deployment made before 0.109.0 holds them (without the kernel's Criterion Admin)."""
     from catalyst import journal
 
     dep = load(project)
     path = dep.root / "IAM" / "roles" / "roles.json"
     path.write_text(json.dumps({"roles": roles}), encoding="utf-8")
+    older = []
+    for held in (dep.root / "IAM" / "roles" / "templates").glob("TEMPLATE-ROLES-v*.json"):
+        doc = json.loads(held.read_text(encoding="utf-8"))
+        doc["roles"] = [r for r in doc["roles"] if r.get("id") not in migrate.ADDED_KERNEL_ROLES]
+        held.write_text(json.dumps(doc), encoding="utf-8")
+        older.append(str(held))
     journal.append(
         dep,
         journal.AppendRequest(
@@ -161,7 +168,7 @@ def _registry(project: Path, roles: list[dict]) -> Path:
             artifact="roles",
             targets=[],
             intent=["the roles"],
-            files=[str(path)],
+            files=[str(path), *older],
             actor="ada",
             tier="chore",
         ),
@@ -192,6 +199,7 @@ def test_the_identity_step_keeps_the_kernel_roles_under_the_kernel_ids(tmp_path)
         "Tech Lead / Architect": "tech-lead",
         "Knowledge Curator": "knowledge-curator",
         "Auditor": "auditors",
+        "Criterion Admin": "criterion-admin",  # the kernel's role added since (migration 0.109.0)
     }
     assert (root / "IAM" / "roles" / "roles.retired.json").is_file()
     assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
@@ -209,4 +217,20 @@ def test_a_roles_template_0_106_0_slugged_is_corrected_once(tmp_path):
     assert step and "kernel's ids" in step[0].detail
     migrate.apply(project, None, "ada", ["the kernel roles under the kernel's ids"], runtime=False)
     assert {r["name"]: r["id"] for r in _roles_template(root)} == {"Admin": "catalyst-admin", "Curator": "curator"}
+    assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
+
+
+def test_the_criterion_admin_role_is_added_once_to_a_roles_template_without_it(tmp_path):
+    """Migration 0.109.0 (REQ-000091): a deployment's roles template gains the kernel's Criterion Admin as its next
+    version; once any version held it, dropping it later is the team's choice and it is not added again."""
+    project = _home(tmp_path)
+    root = _registry(project, [{"name": "Admin", "actions": ["*"]}])
+    folder = root / "IAM" / "roles" / "templates"
+    migrate.apply(project, None, "ada", ["people out of the criterion"], runtime=False)
+    added = [r for r in _roles_template(root) if r["id"] == "criterion-admin"]
+    assert added == [migrate.ADDED_KERNEL_ROLES["criterion-admin"]]
+    assert "Criterion Admin role (migration 0.109.0)" in (folder / "templates-role.md").read_text(encoding="utf-8")
+    n, _ = migrate._latest_roles_template(folder)
+    dropped = [{"name": "Admin", "id": "catalyst-admin", "actions": ["*"]}]
+    (folder / f"TEMPLATE-ROLES-v{n + 1}.json").write_text(json.dumps({"roles": dropped}), encoding="utf-8")
     assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
