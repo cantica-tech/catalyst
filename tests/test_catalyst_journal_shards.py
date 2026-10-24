@@ -94,6 +94,78 @@ def test_an_entry_that_depends_on_nothing_keeps_its_place_in_time(project):
     assert order == [("ada", "10"), ("ada", "11"), ("bob", "09")]
 
 
+def test_an_entry_that_changes_a_file_twice_waits_on_nothing_of_its_own(project):
+    """`catalyst init` writes a file, then rewrites it, in one entry: its second change starts from its first. It
+    must not wait on itself, nor be overtaken by a later entry that happens to restore the same content."""
+    dep = load(project)
+
+    def entry(actor: str, ts: str, files: list) -> str:
+        return json.dumps(
+            {
+                "timestamp": ts,
+                "actor": actor,
+                "command": "x",
+                "action": "update",
+                "artifact": "a",
+                "targets": [],
+                "intent": ["i"],
+                "files": [{"path": p, "before": b, "after": a} for p, b, a in files],
+            }
+        )
+
+    shards = dep.root / "development" / "journal"
+    write(
+        shards / "ada@m1" / "2026-10.jsonl",
+        entry("ada", "2026-10-01T10:00:00Z", [("src/c.md", None, "c1"), ("src/c.md", "c1", "c2")]) + "\n",
+    )
+    write(
+        shards / "bob@m2" / "2026-10.jsonl",
+        entry("bob", "2026-10-02T09:00:00Z", [("src/n.md", None, "n1")])
+        + "\n"
+        + entry("bob", "2026-10-02T10:00:00Z", [("src/c.md", "c2", "c1")])
+        + "\n",
+    )
+    order = [((e or {}).get("actor"), (e or {}).get("timestamp")[5:13]) for _, e, _ in j.read(dep)]
+    assert order == [("ada", "10-01T10"), ("bob", "10-02T09"), ("bob", "10-02T10")]
+
+
+def test_an_entry_that_records_a_file_unchanged_waits_on_nothing_of_its_own(project):
+    """An entry that records a file it found in place (its before is its after) produces that state itself: it does
+    not wait for it, nor let another source that later produces the same content overtake it."""
+    dep = load(project)
+
+    def entry(actor: str, ts: str, files: list) -> str:
+        return json.dumps(
+            {
+                "timestamp": ts,
+                "actor": actor,
+                "command": "x",
+                "action": "update",
+                "artifact": "a",
+                "targets": [],
+                "intent": ["i"],
+                "files": [{"path": p, "before": b, "after": a} for p, b, a in files],
+            }
+        )
+
+    shards = dep.root / "development" / "journal"
+    write(
+        shards / "ada@m1" / "2026-10.jsonl",
+        entry("ada", "2026-10-01T10:00:00Z", [("src/u.md", "u1", "u1"), ("src/n.md", None, "n1")]) + "\n",
+    )
+    write(
+        shards / "bob@m2" / "2026-10.jsonl",
+        entry("bob", "2026-10-02T09:00:00Z", [("src/b.md", None, "b1")])
+        + "\n"
+        + entry("bob", "2026-10-02T10:00:00Z", [("src/u.md", "u1", "u2")])
+        + "\n"
+        + entry("bob", "2026-10-02T11:00:00Z", [("src/u.md", "u2", "u1")])
+        + "\n",
+    )
+    order = [((e or {}).get("actor"), (e or {}).get("timestamp")[5:13]) for _, e, _ in j.read(dep)]
+    assert order == [("ada", "10-01T10"), ("bob", "10-02T09"), ("bob", "10-02T10"), ("bob", "10-02T11")]
+
+
 def test_concurrent_appends_are_serialised(project):
     """Eight processes journal at once: every entry lands whole, the chain of
     the file they all name stays intact."""

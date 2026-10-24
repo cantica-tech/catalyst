@@ -136,3 +136,77 @@ def test_a_migration_starting_before_the_previous_kernel_still_lists_its_judgmen
     p = migrate.plan(project, KERNEL, since="0.103.1")
     sources = {s.source for s in p.steps if s.kind == "judgment"}
     assert "kernel: migrations/0.104.0/workflow-governance.md" in sources
+
+
+# --- migration 0.106.0: people out of the criterion (design 29) -----------------------------
+def _roles_template(root: Path) -> list[dict]:
+    folder = root / "IAM" / "roles" / "templates"
+    _, latest = migrate._latest_roles_template(folder)
+    assert latest is not None
+    return json.loads(latest.read_text(encoding="utf-8"))["roles"]
+
+
+def _registry(project: Path, roles: list[dict]) -> Path:
+    """The deployment's roles registry, journaled as a real one is, before the migration retires it."""
+    from catalyst import journal
+
+    dep = load(project)
+    path = dep.root / "IAM" / "roles" / "roles.json"
+    path.write_text(json.dumps({"roles": roles}), encoding="utf-8")
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="/role",
+            action="update",
+            artifact="roles",
+            targets=[],
+            intent=["the roles"],
+            files=[str(path)],
+            actor="ada",
+            tier="chore",
+        ),
+    )
+    return dep.root
+
+
+def test_the_built_in_kernel_role_ids_are_the_kernel_templates():
+    roles = json.loads((KERNEL / "templates" / "roles.template.json").read_text(encoding="utf-8"))["roles"]
+    assert {r["name"]: r["id"] for r in roles} == migrate.KERNEL_ROLE_IDS
+
+
+def test_the_identity_step_keeps_the_kernel_roles_under_the_kernel_ids(tmp_path):
+    """BUG-000031: a kept role is shown under the provider role of the same id, so a kernel role keeps the kernel's
+    id (as `catalyst-users roles provision` names it), and another role its own or its name's slug."""
+    project = _home(tmp_path)
+    roles = [
+        {"name": "Admin", "actions": ["*"], "reconciliation": "full"},
+        {"name": "Tech Lead / Architect", "actions": [], "reconciliation": "full"},
+        {"name": "Knowledge Curator", "actions": ["/kb-build"], "reconciliation": "propose"},
+        {"name": "Auditor", "provider_role": "auditors", "actions": []},
+    ]
+    root = _registry(project, roles)
+    migrate.apply(project, None, "ada", ["people out of the criterion"], runtime=False)
+    ids = {r["name"]: r["id"] for r in _roles_template(root)}
+    assert ids == {
+        "Admin": "catalyst-admin",
+        "Tech Lead / Architect": "tech-lead",
+        "Knowledge Curator": "knowledge-curator",
+        "Auditor": "auditors",
+    }
+    assert (root / "IAM" / "roles" / "roles.retired.json").is_file()
+    assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
+
+
+def test_a_roles_template_0_106_0_slugged_is_corrected_once(tmp_path):
+    project = _home(tmp_path)
+    root = _registry(project, [{"name": "Admin", "actions": ["*"]}])
+    migrate.apply(project, None, "ada", ["people out of the criterion"], runtime=False)
+    folder = root / "IAM" / "roles" / "templates"
+    n, _ = migrate._latest_roles_template(folder)
+    slugged = [{"name": "Admin", "id": "admin", "actions": ["*"]}, {"name": "Curator", "id": "curator"}]
+    (folder / f"TEMPLATE-ROLES-v{n + 1}.json").write_text(json.dumps({"roles": slugged}), encoding="utf-8")
+    step = [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
+    assert step and "kernel's ids" in step[0].detail
+    migrate.apply(project, None, "ada", ["the kernel roles under the kernel's ids"], runtime=False)
+    assert {r["name"]: r["id"] for r in _roles_template(root)} == {"Admin": "catalyst-admin", "Curator": "curator"}
+    assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
