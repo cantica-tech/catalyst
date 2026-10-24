@@ -22,6 +22,7 @@ import json
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -219,11 +220,17 @@ def write_snapshot(doc: dict[str, Any], user: dict[str, Any]) -> Path:
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     tmp.chmod(0o400)
-    try:
-        tmp.replace(path)
-    except PermissionError:  # Windows will not replace a read-only file
-        path.chmod(0o600)
-        tmp.replace(path)
+    for attempt in range(5):
+        try:
+            if attempt and path.exists():
+                path.chmod(0o600)  # Windows will not replace a read-only file
+            tmp.replace(path)
+            return path
+        except OSError:  # Windows: another process has the snapshot open, or is replacing it
+            time.sleep(0.05 * (attempt + 1))
+    # a parallel signature holds it: that one's snapshot stands, and the next signature rewrites it
+    tmp.chmod(0o600)
+    tmp.unlink(missing_ok=True)
     return path
 
 
