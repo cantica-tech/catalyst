@@ -1,8 +1,9 @@
 # 31 — Who creates, edits and deletes what, and through which workflow (design for the owner, 2026-10-25)
 
-> **Status: proposed.** The owner's request of 2026-10-25; deleting is retiring (the owner's answer, §5); §7 lists what is still to decide. Builds on designs `25`
-> (approval gates), `26` (proposals), `27` (`catalyst try`), `29` (people and grants from catalyst-users) and `30`
-> (visibility, the realm). What a UI shows for it is the UI's own design.
+> **Status: decided (owner, 2026-10-25)**: the request (§1), deleting is retiring (§5), IDs never editable (§2a), and
+> §7's four questions as proposed. Builds on designs `25` (approval gates), `26` (proposals), `27` (`catalyst try`),
+> `29` (people and grants from catalyst-users) and `30` (visibility, the realm). What a UI shows for it is the UI's
+> own design.
 
 ## 1. The request
 
@@ -95,9 +96,9 @@ its workflow).
    deletions.
 4. Tags and tag workflows, with their participants.
 
-## 7. Still to decide
+## 7. Decided (owner, 2026-10-25)
 
-1. **Two tag workflows on one entity** (it carries tags of both): refused by `check` (proposed), or both apply in turn.
-2. **"Linked"**: any reference in or out (proposed), or only references to open entities.
-3. **A criterion with no workflow at all**: a linked entity's change waits for an admin (proposed), or is refused.
-4. **Contributors' types**: the module's default plus grants (proposed), or grants alone.
+1. **Two tag workflows on one entity** (it carries tags of both): `check` refuses it.
+2. **"Linked"**: any reference in or out.
+3. **A criterion with no workflow at all**: a linked entity's change waits for an admin.
+4. **Contributors' types**: the module's default plus grants.
