@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.111.0 — 2026-10-25
+
+No layout change.
+
+- Changed: catalyst-users 0.6.0 vendored. The system account's settings and the logged-in person's credentials live
+  in `users/` in catalyst's home (`~/.catalyst/users`, or `$CATALYST_HOME/users`), so moving catalyst's home moves
+  them too. A `~/.catalyst-users` made before is moved there once, the first time it is used, with a link left in its
+  place so a deployment still on an earlier kernel keeps signing (REQ-000092, `fw-IDENTITY-000002`).
+
 ## 0.110.1 — 2026-10-25
 
 No layout change.
