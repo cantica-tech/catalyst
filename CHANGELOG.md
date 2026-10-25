@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.110.1 — 2026-10-25
+
+No layout change.
+
+- Fixed: `catalyst module upgrade` (or `sync`) run from a deployment's own CLI with `--kernel` a catalyst checkout
+  crashed building the CLI (`No module named 'package_release'`); the checkout now builds it in a subprocess
+  (BUG-000036).
+
 ## 0.110.0 — 2026-10-24
 
 No layout change.

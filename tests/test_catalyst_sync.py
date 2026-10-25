@@ -3,6 +3,8 @@
 import json
 import shutil
 import subprocess
+import sys
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -280,3 +282,15 @@ def test_a_type_the_module_adds_gets_its_folder_and_can_be_created(tmp_path):
     assert root / "notes" / "notes.md" in touched
     assert main(["--project", str(project), "new", "NOTE", "--title", "First note", "--as", "ada"]) == 0
     assert list((root / "notes").glob("NOTE-000001-*.md"))
+
+
+def test_the_cli_is_built_from_a_checkout_when_packaging_is_not_importable(tmp_path, monkeypatch):
+    """Run from a deployment's single-file CLI, `package_release` is not importable: the checkout builds its own CLI
+    in a subprocess (BUG-000036: `catalyst module upgrade … --kernel <checkout>` crashed)."""
+    from types import SimpleNamespace
+
+    from catalyst.sync import Sources
+
+    monkeypatch.setitem(sys.modules, "package_release", None)  # `import package_release` raises ImportError
+    built = Sources._find_cli(SimpleNamespace(kernel=KERNEL, tmp=tmp_path))  # type: ignore[arg-type]
+    assert built == tmp_path / "catalyst.pyz" and zipfile.is_zipfile(built)
