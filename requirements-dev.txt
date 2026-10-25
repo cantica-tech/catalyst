@@ -1,1 +1,2 @@
 pytest>=8
+pycryptodome==3.23.0  # catalyst serve's membership ledger (design 32): the server's host only

@@ -61,6 +61,7 @@ import secrets
 import socketserver
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -181,6 +182,14 @@ class Reads:
     """The read side, over whatever `loaded()` gives: the CLI's own views."""
 
     static: Path | None = None  # a directory of files served beside the API (`serve --local --static`)
+
+    def admit(self, who: str | dict) -> None:
+        """Whether this server lets `who` in beyond its token (design 32): a shared server with a membership
+        ledger fails closed; every other reader admits whoever holds a valid token."""
+        return None
+
+    def members_call(self, who: str | dict, token: str, method: str, body: dict) -> dict:
+        raise ServeError(409, "no membership ledger is open on this server (`catalyst serve members open`)")
 
     def loaded(self) -> tuple:  # (batch, deployment, corpus)
         raise NotImplementedError
@@ -323,7 +332,17 @@ class ProviderTokens:
 
 
 class Server(Reads):
-    def __init__(self, db: Path, provider_tokens: ProviderTokens | None = None, criterion: str | None = None):
+    def __init__(
+        self,
+        db: Path,
+        provider_tokens: ProviderTokens | None = None,
+        criterion: str | None = None,
+        backend: object = None,
+        master: bytes | None = None,
+        members: bool = True,
+    ):
+        """`members=False`: the host's own commands, which open no admission (recovering a key the server cannot
+        read yet, for one)."""
         self.provider_tokens = provider_tokens
         self.db = Path(db)
         self.db.parent.mkdir(parents=True, exist_ok=True)
@@ -334,6 +353,309 @@ class Server(Reads):
         with self._conn() as c:
             c.executescript(SCHEMA)
         self.criterion = self._criterion(criterion)
+        self.admission = None  # design 32: set when a membership ledger is open
+        from catalyst import membership
+
+        if members and membership.Ledger.is_open(self._conn):
+            self.open_membership(backend, master)
+
+    # --- membership (design 32, fw-IDENTITY-000012) ----------------------------------------------------------
+    def open_membership(self, backend: object = None, master: bytes | None = None) -> None:
+        """Admit by the membership ledger from now on: its master key read (the keychain or a key-management
+        service), the provider reached through the system account. A ledger the server cannot read stops it."""
+        from catalyst import membership
+
+        if self.criterion is None:
+            raise ServeError(409, "a membership ledger serves one criterion: start the server with --criterion NAME")
+        try:
+            if master is None:
+                command = membership.env_key_command() or self.meta("members.key_command")
+                if not command:
+                    raise membership.MembershipError("no master key is recorded: `catalyst serve key init`", 409)
+                master = membership.read_master(command)
+            if backend is None:
+                backend = self._system_backend()
+            ledger = membership.Ledger(self._conn, master)
+            ledger.members()  # the whole chain verifies, or the server does not start
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+        self.admission = membership.Admission(ledger, self.criterion, backend)
+
+    def _system_backend(self) -> object:
+        from catalyst import provider
+
+        issuer = self.meta("members.issuer") or (self.provider_tokens.issuer if self.provider_tokens else None)
+        backend = provider.system_backend(issuer) if issuer else None
+        if backend is None:
+            raise ServeError(
+                503,
+                "membership needs this host's catalyst-users system account for the criterion's provider "
+                "(`catalyst-users setup`)",
+            )
+        return backend
+
+    def meta(self, key: str) -> str | None:
+        with self._conn() as c:
+            row = c.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self._conn() as c:
+            c.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
+
+    def admit(self, who: str | dict) -> None:
+        if self.admission is None:
+            return
+        from catalyst import membership
+
+        if not isinstance(who, dict):
+            raise ServeError(403, "this server admits only the identity provider's tokens: its membership is recorded")
+        try:
+            self.admission.admit(membership.username_of(who), membership.is_admin(who, self.criterion))
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+
+    def members_call(self, who: str | dict, token: str, method: str, body: dict) -> dict:
+        """`GET /members` lists the ledger's members; `POST /members` adds, removes or adopts one, at the provider
+        and in the ledger. The Admin and the criterion's admins only."""
+        from catalyst import membership
+
+        if self.admission is None:
+            return super().members_call(who, token, method, body)
+        if not isinstance(who, dict) or not membership.is_admin(who, self.criterion):
+            raise ServeError(403, f"only the Admin and {self.criterion}'s admins manage its members")
+        ledger, backend = self.admission.ledger, self.admission.backend
+        try:
+            if method == "GET":
+                return {"criterion": self.criterion, "members": sorted(ledger.members())}
+            op, member = str(body.get("op") or ""), str(body.get("member") or "").strip()
+            if op not in ("add", "remove", "adopt") or not member:
+                raise ServeError(422, "a members change is {op: add|remove|adopt, member, reason}")
+            entry = membership.record(
+                op, membership.username_of(who), str(body.get("reason") or ""), token, member=member
+            )
+            current = ledger.members()
+            if op in ("add", "adopt") and member in current:
+                raise ServeError(409, f"{member} is already a member of {self.criterion}")
+            if op == "remove" and member not in current:
+                raise ServeError(404, f"{member} is not a member of {self.criterion}")
+            try:
+                if op == "add":
+                    backend.add_member(self.criterion, member, system=True)
+                elif op == "remove":
+                    backend.remove_member(self.criterion, member, system=True)
+                elif not backend.is_member(self.criterion, member, system=True):
+                    raise ServeError(422, f"{member} is not a member at the identity provider: add them instead")
+            except ServeError:
+                raise
+            except Exception as exc:  # the provider's refusal (a person outside the realm), never a secret
+                raise ServeError(422, f"the identity provider refused: {exc}") from None
+            written = ledger.append(entry)
+            self.admission.forget(member)
+            return {"criterion": self.criterion, "op": op, "member": member, "seq": written["seq"]}
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+
+    def fingerprint(self, intent: str = "the membership ledger's daily fingerprint (design 32)") -> dict:
+        """Write the ledgers' heads into the criterion: one line of `IAM/membership.fingerprints.jsonl`, journaled
+        by the server's own batch, signed by the identity that opened the ledger."""
+        from catalyst import journal, membership
+
+        if self.admission is None:
+            raise ServeError(409, "no membership ledger is open on this server")
+        ledger = self.admission.ledger
+        heads = {k: h for k in membership.KINDS if (h := ledger.head(k))}
+        actor = json.loads(self.meta("members.actor") or "{}")
+        name, userid = str(actor.get("name") or ""), str(actor.get("userid") or "")
+        if not name:
+            raise ServeError(409, "the ledger names no actor for its fingerprints")
+        from catalyst import __version__
+
+        with self._write, self._conn() as c:
+            c.execute("BEGIN IMMEDIATE")
+            try:
+
+                def held(path: str) -> tuple[str | None, bytes]:
+                    sha = _current(c, path)
+                    if sha is None or sha in EMPTY:
+                        return sha, b""
+                    return sha, bytes(c.execute("SELECT bytes FROM blobs WHERE sha = ?", (sha,)).fetchone()[0])
+
+                stamp = now()
+                before, old = held(membership.FINGERPRINTS)
+                data = old + membership.fingerprint_line(heads)
+                after = blob_sha(data, len(before) if before else 40)
+                entry = {
+                    "timestamp": stamp,
+                    "actor": name,
+                    "command": "catalyst serve members",
+                    "action": "sync",
+                    "artifact": "membership",
+                    "targets": [],
+                    "intent": [intent],
+                    "files": [{"path": WC + membership.FINGERPRINTS, "before": before, "after": after}],
+                    "writer": f"catalyst/{__version__}",
+                    "tier": "chore",
+                }
+                shard = f"{journal.SHARDS}/{journal.actor_slug(name)}@serve/{stamp[:7]}.jsonl"
+                shard_before, shard_old = held(shard)
+                shard_data = shard_old + (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
+                shard_after = blob_sha(shard_data, len(after))
+                seq = c.execute("SELECT COALESCE(MAX(seq), 0) FROM batches").fetchone()[0] + 1
+                c.execute(
+                    "INSERT INTO batches(seq, userid, time, message) VALUES (?, ?, ?, ?)",
+                    (seq, userid or name, stamp, intent),
+                )
+                for sha, blob in ((after, data), (shard_after, shard_data)):
+                    c.execute("INSERT OR IGNORE INTO blobs(sha, bytes) VALUES (?, ?)", (sha, blob))
+                for path, b, a, blob in (
+                    (membership.FINGERPRINTS, before, after, data),
+                    (shard, shard_before, shard_after, shard_data),
+                ):
+                    c.execute("INSERT INTO changes(seq, path, before, after) VALUES (?, ?, ?, ?)", (seq, path, b, a))
+                    _project(c, seq, path, a, blob)
+            except BaseException:
+                c.execute("ROLLBACK")
+                raise
+            c.execute("COMMIT")
+        with self.changed:
+            self.changed.notify_all()
+        return {"seq": seq, "heads": heads}
+
+    def fingerprint_due(self) -> bool:
+        """No fingerprint written today (UTC) yet."""
+        from catalyst import membership
+
+        with self._conn() as c:
+            sha = _current(c, membership.FINGERPRINTS)
+            row = c.execute("SELECT bytes FROM blobs WHERE sha = ?", (sha,)).fetchone() if sha else None
+        last = membership.last_fingerprint(bytes(row[0]) if row else None)
+        return last is None or last.get("day") != now()[:10]
+
+    def members_check(self) -> list[str]:
+        """What `catalyst serve members check` reports: the chain and signatures, the criterion's fingerprints,
+        and where the provider's group and the ledger disagree."""
+        from catalyst import membership
+
+        if self.admission is None:
+            raise ServeError(409, "no membership ledger is open on this server")
+        ledger = self.admission.ledger
+        findings = []
+        for kind in membership.KINDS:
+            findings += [f"{kind} ledger: {p}" for p in ledger.verify(kind)[1]]
+        with self._conn() as c:
+            sha = _current(c, membership.FINGERPRINTS)
+            row = c.execute("SELECT bytes FROM blobs WHERE sha = ?", (sha,)).fetchone() if sha else None
+        data = bytes(row[0]) if row else b""
+        recorded = [json.loads(line) for line in _lines(data)]
+        last = recorded[-1] if recorded else None
+        if last is None:
+            findings.append("the criterion holds no fingerprint of the ledger")
+        else:
+            seen: dict[str, set[str]] = {}
+            for fp in recorded:
+                for kind, head in (fp.get("heads") or {}).items():
+                    seen.setdefault(kind, set()).add(head)
+            for kind in membership.KINDS:
+                chain = {e["head"] for e in self._heads(kind)}
+                gone = seen.get(kind, set()) - chain
+                if gone:
+                    findings.append(
+                        f"{kind} ledger: {len(gone)} fingerprint(s) in the criterion match no entry: rewritten"
+                    )
+        try:
+            at_provider = set(self.admission.backend.members(self.criterion, system=True))
+        except Exception:
+            findings.append("the identity provider cannot be asked for the criterion's members")
+        else:
+            findings += membership.drift(ledger.members(), at_provider)
+        return findings
+
+    # the host's commands (`catalyst serve key`, `catalyst serve members`), never over HTTP
+    def init_key(self, command: str | None = None) -> str:
+        """A master key for this database (fw-IDENTITY-000013): a key-management service's (`command` prints it),
+        or a new one kept in the OS keychain. Never in the database: only the command that reads it."""
+        from catalyst import membership
+
+        if self.meta("members.key_command"):
+            raise ServeError(409, "this server already has a master key: `catalyst serve key recover` replaces it")
+        try:
+            if command:
+                membership.read_master(command)  # it must already print one
+            else:
+                command = membership.store_master(self.db, secrets.token_bytes(32))
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+        self.set_meta("members.key_command", command)
+        return command
+
+    def open_ledger(
+        self, actor: dict, issuer: str, members: list[str], reason: str, backend: object, master: bytes | None = None
+    ) -> dict:
+        """Open the criterion's membership ledger (design 32 §2.9): its keys, entry 0 adopting the provider's
+        current members, then admission by it, and its first fingerprint."""
+        from catalyst import membership
+
+        if self.criterion is None:
+            raise ServeError(409, "a membership ledger serves one criterion: start the server once with --criterion")
+        try:
+            command = membership.env_key_command() or self.meta("members.key_command")
+            if not command:
+                raise membership.MembershipError("no master key yet: `catalyst serve key init`", 409)
+            master = master or membership.read_master(command)
+            membership.Ledger.create(self._conn, master, command)
+            self.set_meta("members.actor", json.dumps(actor, sort_keys=True))
+            self.set_meta("members.issuer", issuer)
+            ledger = membership.Ledger(self._conn, master)
+            ledger.append(
+                membership.record(
+                    "open",
+                    str(actor.get("name")),
+                    reason,
+                    criterion=self.criterion,
+                    issuer=issuer,
+                    members=sorted(set(members)),
+                )
+            )
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+        self.open_membership(backend, master)
+        return self.fingerprint("the membership ledger opened, its first fingerprint (design 32)")
+
+    def escrow(self, holders: list[str], threshold: int) -> list[dict]:
+        """The master key's break-glass shares (fw-IDENTITY-000013), one per holder."""
+        from catalyst import membership
+
+        try:
+            command = membership.env_key_command() or self.meta("members.key_command")
+            if not command or not membership.Ledger.is_open(self._conn):
+                raise membership.MembershipError("no membership ledger is open on this server", 409)
+            master = membership.read_master(command)
+            membership.Ledger(self._conn, master)  # the key opens this ledger, or no share is made of it
+            shares = membership.split_key(master, holders, threshold)
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+        return [{**sh, "criterion": self.criterion, "created": now()} for sh in shares]
+
+    def break_glass(self, shares: list[dict], by: list[str], reason: str, backend: object = None) -> dict:
+        """Recover the master key from a quorum of shares, record it, and replace the key (every share void)."""
+        from catalyst import membership
+
+        try:
+            master = membership.join_key(shares)
+            ledger = membership.Ledger(self._conn, master)  # the shares are right, or this refuses
+            fresh = secrets.token_bytes(32)
+            command = membership.store_master(self.db, fresh)
+            ledger.rewrap(fresh, command)
+            ledger.append(membership.record("break-glass", ", ".join(by) or "holders", reason, holders=by))
+        except membership.MembershipError as exc:
+            raise ServeError(exc.status, str(exc)) from None
+        self.open_membership(backend, fresh)
+        return self.fingerprint(f"break-glass used by {', '.join(by) or 'holders'}: {reason} (the Admin is told)")
+
+    def _heads(self, kind: str) -> list[dict]:
+        with self._conn() as c:
+            return [{"head": r[0]} for r in c.execute("SELECT head FROM ledger WHERE kind = ?", (kind,)).fetchall()]
 
     def _criterion(self, name: str | None) -> str | None:
         """The criterion this database serves (fw-IDENTITY-000005): named once by the operator (`--criterion`), never
@@ -985,7 +1307,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             userid = self.app.user_for(auth[7:]) if auth.startswith("Bearer ") else None
             if userid is None:
                 raise ServeError(401, "a valid token is required (`catalyst share login`)")
+            self.app.admit(userid)  # design 32: a ledger's server fails closed
             path = url.path.removeprefix(API)
+            if path == "/members" and method in ("GET", "POST"):
+                body = {}
+                if method == "POST":
+                    length = int(self.headers.get("Content-Length") or 0)
+                    if length > 64 * 1024:
+                        raise ServeError(413, "a members change is small")
+                    self._body_read = True
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                return self._send(200, self.app.members_call(userid, auth[7:], method, body))
             if getattr(self.app, "read_only", False) and (
                 path in ("/changes", "/have", "/push") or path.startswith("/blobs/")
             ):
@@ -1095,6 +1427,25 @@ def make_server(
     allowed = frozenset(check_origin(o) for o in origins)
     handler = type("BoundHandler", (Handler,), {"app": Server(db, provider_tokens, criterion), "origins": allowed})
     return _Server((host, port), handler)
+
+
+def start_fingerprints(app: Server, every: float = 3600.0) -> threading.Thread | None:
+    """Once a day (checked every hour), whatever changed, the membership ledger's fingerprint (design 32 §2.4)."""
+    if app.admission is None:
+        return None
+
+    def loop() -> None:
+        while True:
+            try:
+                if app.fingerprint_due():
+                    app.fingerprint()
+            except Exception as exc:  # never the server's end: said, and tried again within the hour
+                print(f"catalyst serve: the membership fingerprint could not be written: {exc}", file=sys.stderr)
+            time.sleep(every)
+
+    thread = threading.Thread(target=loop, name="membership-fingerprints", daemon=True)
+    thread.start()
+    return thread
 
 
 def deployment_origins(project: Path) -> tuple[str, ...]:

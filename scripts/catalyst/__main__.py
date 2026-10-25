@@ -2036,6 +2036,10 @@ def cmd_serve(args) -> int:
     from catalyst import serve
 
     db = Path(args.db) if args.db else serve.default_db()
+    if args.serve_command == "key":
+        return _serve_key(serve, db, args)
+    if args.serve_command == "members":
+        return _serve_members(serve, db, args)
     if args.serve_command == "token":
         app = serve.Server(db)
         if args.action == "list":
@@ -2094,6 +2098,7 @@ def cmd_serve(args) -> int:
     except serve.ServeError as exc:
         raise SystemExit(f"catalyst: {exc}") from None
     served = server.RequestHandlerClass.app.criterion  # type: ignore[attr-defined]
+    serve.start_fingerprints(server.RequestHandlerClass.app)  # type: ignore[attr-defined]
     named = f" (criterion {served})" if served else ""
     print(f"catalyst serve: {db}{named} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
     try:
@@ -2102,6 +2107,156 @@ def cmd_serve(args) -> int:
         pass
     finally:
         server.server_close()
+    return 0
+
+
+def _host_identity(app) -> tuple[dict, str, object]:
+    """The identity running a host command against a server's database: whoever is logged in to the served
+    criterion's provider here, else this host's system account; (actor, issuer, the system account's backend)."""
+    from catalyst import provider, serve as served
+
+    try:
+        _, dep, _ = app.loaded()
+    except served.ServeError as exc:
+        raise SystemExit(f"catalyst: {exc}: push the criterion to this server first") from None
+    doc = provider.pointer(dep)
+    if doc is None or not doc.get("issuer"):
+        raise SystemExit("catalyst: the served criterion has no identity provider (IAM/identity.json)")
+    try:
+        who = provider.verify(doc)
+    except provider.ProviderError as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
+    entry = provider.find(provider.ledger(dep.root), who.issuer, who.subject) or {}
+    actor = {"name": who.username, "userid": str(entry.get("userid") or ""), "grants": list(who.grants)}
+    backend = provider.system_backend(str(doc["issuer"]))
+    if backend is None:
+        raise SystemExit(
+            "catalyst: this host has no catalyst-users system account for that provider (`catalyst-users setup`)"
+        )
+    return actor, str(doc["issuer"]), backend
+
+
+def _serve_key(serve, db: Path, args) -> int:
+    """`catalyst serve key`: the master key (fw-IDENTITY-000013), on the server's host."""
+    import json as _json
+
+    from catalyst import membership
+
+    app = serve.Server(db, members=False)
+    try:
+        if args.action == "init":
+            app.init_key(args.key_command)
+            print(
+                "master key recorded: "
+                + ("read by its command" if args.key_command else "kept in this host's keychain")
+            )
+            return 0
+        if args.action == "escrow":
+            if not args.holder or not args.threshold or not args.out:
+                raise SystemExit("catalyst: serve key escrow needs --holder (repeatable), --threshold and --out")
+            shares = app.escrow(list(args.holder), int(args.threshold))
+            args.out.mkdir(parents=True, exist_ok=True)
+            for share in shares:
+                path = args.out / f"{share['holder']}.share"
+                fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                    _json.dump(share, fh)
+                print(
+                    f"share for {share['holder']}: {path} (give it to them alone; any {args.threshold} recover the key)"
+                )
+            return 0
+        if not args.share:
+            raise SystemExit("catalyst: serve key recover needs --share FILE for each holder present")
+        shares = [_json.loads(p.read_text(encoding="utf-8")) for p in args.share]
+        res = app.break_glass(shares, [str(s.get("holder")) for s in shares], args.reason or "the Admin is unreachable")
+        print(
+            f"master key recovered and replaced (batch {res['seq']}); every share is void: `catalyst serve key escrow` again"
+        )
+        return 0
+    except (serve.ServeError, membership.MembershipError) as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
+
+
+def _serve_members(serve, db: Path, args) -> int:
+    """`catalyst serve members`: open the ledger, check it, or write its fingerprint now (design 32), on the host."""
+    import json as _json
+
+    from catalyst import membership
+
+    if args.action == "open":
+        app = serve.Server(db, members=False)
+        actor, issuer, backend = _host_identity(app)
+        if "cmd:*" not in actor["grants"]:
+            raise SystemExit("catalyst: only the Admin opens a criterion's membership ledger")
+        if not app.criterion:
+            raise SystemExit("catalyst: start this server once with --criterion NAME first")
+        current = sorted(backend.members(app.criterion, system=True))
+        if not args.yes:
+            print(f"opening {app.criterion}'s membership ledger adopts the provider's current members:")
+            for name in current or ["(none)"]:
+                print(f"  {name}")
+            print("re-run with --yes once the Admin agrees")
+            return NEEDS_ASSENT
+        res = app.open_ledger(
+            {"name": actor["name"], "userid": actor["userid"]},
+            issuer,
+            current,
+            args.reason or "the criterion's membership ledger opened",
+            backend,
+        )
+        print(
+            f"{app.criterion}'s membership ledger is open: {len(current)} member(s) adopted; fingerprint batch {res['seq']}"
+        )
+        return 0
+    try:
+        app = serve.Server(db)
+    except serve.ServeError as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
+    if args.action == "fingerprint":
+        res = app.fingerprint()
+        print(f"fingerprint written (batch {res['seq']})")
+        return 0
+    try:
+        findings = app.members_check()
+    except (serve.ServeError, membership.MembershipError) as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
+    if args.json:
+        print(_json.dumps({"criterion": app.criterion, "findings": findings}, indent=2))
+    else:
+        for f in findings:
+            print(f"ERROR   membership: {app.criterion}: {f}")
+        print(f"catalyst serve members check {'FAILED' if findings else 'passed'}: {len(findings)} finding(s)")
+    return 1 if findings else 0
+
+
+def cmd_members(args) -> int:
+    """`catalyst members`: a served criterion's members, through its server (design 32). A criterion shared
+    without a server has admins only (§2.10)."""
+    from catalyst import serve
+
+    dep = open_deployment(args)
+    if (dep.pointer or {}).get("share") != "serve":
+        raise SystemExit(
+            "catalyst: this criterion is not shared through a server, so it has admins only: members need its "
+            "`catalyst serve` (design 32 §2.10)"
+        )
+    client = serve.ServeShare(dep).client()
+    try:
+        if args.action == "list":
+            out = client.call("GET", "/members")
+        else:
+            if not args.member:
+                raise SystemExit(f"catalyst: members {args.action} needs the person's username")
+            out = client.call("POST", "/members", {"op": args.action, "member": args.member, "reason": args.reason})
+    except serve.ServeError as exc:
+        raise SystemExit(f"catalyst: {exc}") from None
+    if args.json:
+        print(json.dumps(out, indent=2))
+    elif args.action == "list":
+        print("\n".join(out.get("members") or []) or "(no members)")
+    else:
+        verb = {"add": "added", "remove": "removed", "adopt": "adopted"}[args.action]
+        print(f"{verb} {out['member']} ({out['criterion']}, ledger entry {out['seq']})")
     return 0
 
 
@@ -3224,7 +3379,33 @@ def build_parser() -> argparse.ArgumentParser:
     q = vs.add_parser("token", help="issue, list or revoke the tokens users sign with")
     q.add_argument("action", choices=("issue", "list", "revoke"))
     q.add_argument("who", nargs="?", help="issue: the user's userid; revoke: the token's number")
+    q = vs.add_parser("key", help="the master key of the membership ledger: init, escrow, recover (fw-IDENTITY-000013)")
+    q.add_argument("action", choices=("init", "escrow", "recover"))
+    q.add_argument(
+        "--key-command",
+        help="init: a command printing the master key (base64), a key-management service's; default: a new key "
+        "in this host's keychain",
+    )
+    q.add_argument("--holder", action="append", default=[], help="escrow: an admin who holds a share (repeatable)")
+    q.add_argument("--threshold", type=int, help="escrow: how many shares recover the key")
+    q.add_argument("--out", type=Path, help="escrow: the directory each holder's share file is written to")
+    q.add_argument("--share", action="append", default=[], type=Path, help="recover: a share file (repeatable)")
+    q.add_argument("--reason", default="", help="recover: why the break-glass copy is used")
+    q = vs.add_parser("members", help="the membership ledger: open, check, fingerprint (fw-IDENTITY-000012)")
+    q.add_argument("action", choices=("open", "check", "fingerprint"))
+    q.add_argument("--reason", default="", help="open: why")
+    q.add_argument("--yes", action="store_true", help="open: the Admin agreed to the members it adopts (INV-4)")
+    q.add_argument("--json", action="store_true", help="machine-readable output")
     p.set_defaults(func=cmd_serve)
+
+    p = sub.add_parser(
+        "members", help="a served criterion's members, through its server: list, add, remove, adopt (design 32)"
+    )
+    p.add_argument("action", choices=("list", "add", "remove", "adopt"))
+    p.add_argument("member", nargs="?", help="add, remove, adopt: the person's username at the identity provider")
+    p.add_argument("--reason", default="", help="why (add, remove, adopt)")
+    p.add_argument("--json", action="store_true", help="machine-readable output")
+    p.set_defaults(func=cmd_members)
 
     p = sub.add_parser("criterion", help="shared deployments on git: submodule, pull requests")
     cs = p.add_subparsers(dest="criterion_command", required=True)

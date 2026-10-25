@@ -1,7 +1,7 @@
 {
   "package": "catalyst-users",
   "repository": "cantica-tech/catalyst-users",
-  "release": "0.6.0",
+  "release": "0.7.0",
   "files": {
     "errors.py": "3572b06e75ffa9192df31b8199f0067c171068b276fbba747d4cdb795f328e27",
     "config.py": "1b191da232d85136f2fbbcd9ea150826af9c6c5f6ca11c251785ec659787f6dd",
@@ -10,12 +10,12 @@
     "identity.py": "219767041bff25aaa844c7a0e59b7f5a0d720ceaa117cc44e80100e7a535942e",
     "credentials.py": "5fb138ed0fce7d5babbe2c4cd5832b1a0d44c4f25f0d3bb67207b2a6554dd6f9",
     "session.py": "b1be870227aa966a02578738d6f1189b399509a661a943de494ee1e5c6b40ec3",
-    "admin.py": "8f1594706848b15f78cfca20b6b954c2bcef6f92243da9443b437b2a62e3f088",
+    "admin.py": "66b69c5555e1a6896656d14165f43867c2115b3137c08b702f04a47097921f7a",
     "keychain.py": "e384b102cdf095a84542cc62d9715bc7f9cca0e0db8972a90685c2e9b15c4a24",
-    "provider.py": "9caa066fb2672e824028f22dd16ebc7917ee1f793ddc2180a6ae3f2abcf40920",
+    "provider.py": "99a002ec4ac1320338579ddb8953cb74a6fd3bec7f458d50f30d0e0502e48423",
     "providers/__init__.py": "bab4ebed0c1e5aa29b89682d86e2479f98d0b46a28ab76651832c475fc97edee",
-    "providers/keycloak.py": "e2c7c584a6ab2e0e3a2aca71651c0d189246bf12d57e3bf831cf806c05ba759d",
-    "providers/static.py": "b36de286ab540d81b09da6101c1093a4e73c9347cea07448321b0314ea650b68",
+    "providers/keycloak.py": "948d29727d2cf1da8394a260fe1b7cc868b99d224c476dbc4a5d34b0764dfbcc",
+    "providers/static.py": "3805262825c4f4d0a9aedd1fa5daa2139549bc23245c45fba6fec448871da3d6",
     "__init__.py": "fe09ba6e26e9f942cebefb04980dd02702da3feadef4af117ef34e0f07f36975"
   }
 }
