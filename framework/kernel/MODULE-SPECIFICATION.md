@@ -148,7 +148,9 @@ generates what the module would otherwise ship (module v3, M3):
   `initial`, `closed`, `guards` (each `section_written`, `nonempty`,
   `children_closed` or `holds: <condition>`), `due` (`<date field>` or
   `<date field> + <n> days`: when an open entity is overdue), `storage: rows`
-  for a type kept as table rows. It reads into the same type a §4 schema gives.
+  for a type kept as table rows, `contributors_create` (default `true`;
+  `false` keeps creating it to admins: design 31, `fw-STRUCTURE-000020`). It
+  reads into the same type a §4 schema gives.
 - **Its template**: the title, the field table `catalyst new` fills (a
   field's `hint`, or `status_hint` for `Status`, is what its cell tells the
   author; otherwise a placeholder for its kind), `Signed-off-by`, then each

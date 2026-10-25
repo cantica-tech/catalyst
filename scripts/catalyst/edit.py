@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -323,6 +324,13 @@ def new(
     etd = etd_named(dep, type_name)
     if etd.naming == "free-form":
         raise EditError(f"{etd.id_prefix} items are table rows, not files: edit them with their module command")
+    from catalyst import permissions
+
+    why = permissions.creation_refusal(dep, signer, etd.id_prefix)
+    if why and permissions.mode(dep) == "warn":
+        print(f'catalyst: warning: {why} (role_check = "warn")', file=sys.stderr)
+    elif why:
+        raise EditError(why)
     given: dict[str, list[str] | str] = {}
     for name, raw in values.items():
         fd = field_def(etd, name)
