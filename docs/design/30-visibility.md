@@ -1,6 +1,6 @@
 # 30 — Visibility: who sees which entities (design for the owner, 2026-10-25)
 
-> **Status: proposed.** Questions 1 to 4 answered by the owner (§2), user groups added by the owner (§4.4); §8 lists
+> **Status: proposed.** Questions 1 to 4 answered by the owner (§2), user groups and their membership added by the owner (§4.4); §8 lists
 > what is still to decide. Builds on
 > designs `25` (approval gates), `28` and `29` (people from catalyst-users) and `19` (`catalyst serve`).
 
@@ -95,6 +95,8 @@ The owner's addition (2026-10-25): an entity can be assigned to a **user group**
 - **What it is**: a proxy for a user profile that is registered nowhere in the people's directory and exists only for
   the length of its assignment. It has an ID (`UG-NNNNNN-<userid>`), its members (registered people), who made it and
   when, and which assignment it serves. It ends when that assignment does (the entity closed, or reassigned).
+- **Members**: members of the project (the criterion) only. The Admin, then a Criterion Admin in their project, may
+  add someone from outside it by override, recorded in the ledger with who granted it.
 - **Responsibility**: every member holds the assignment; the entity is in each member's Mine.
 - **Access**: the group's clearance is the **lowest** of its members' clearances, recomputed whenever a member joins
   or leaves. What the group is assigned is visible to its members only within that clearance.
@@ -149,5 +151,8 @@ ADR lifting the freeze for it (ADR-017).
    what they find by a query)?
 6. **Who makes a user group, and changes its members**: the person assigning the entity (proposed), within the
    rights to assign it; or only a Criterion Admin or the Admin.
-7. **A group of one, or a group whose members all leave**: ends with its last member (proposed), its entity then
+7. **What makes a person a member of a project**: today nothing does (anyone holding a clone, or a token for its
+   server, reads it). Proposed: a project's members are a catalyst-users group per project (`/projects/<name>`),
+   which `catalyst serve` and the visibility rules read; the Admin and its Criterion Admins manage it.
+8. **A group of one, or a group whose members all leave**: ends with its last member (proposed), its entity then
    unassigned.
