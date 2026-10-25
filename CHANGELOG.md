@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.114.0 — 2026-10-25
+
+No layout change.
+
+- Added: `catalyst edit <ID> --field NAME=VALUE --section HEADING=TEXT` changes an entity's plain fields and sections
+  (design 31 phase 3, `fw-STRUCTURE-000021`, REQ-000095). No one edits its `ID`, `Name`, `Filename`, `Signed-off-by`,
+  `Status` or a derived field; references stay `link`'s. An admin's edit is made; anyone else edits only an entity of
+  theirs, directly when it is linked to nothing, else as a proposal an admin decides. `--preview` and `--forewarned`
+  apply; `spec/change.schema.json` gains the optional `proposal`.
+
 ## 0.113.0 — 2026-10-25
 
 No layout change.

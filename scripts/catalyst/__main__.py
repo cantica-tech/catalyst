@@ -587,8 +587,21 @@ def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
     return {"status": "status", "restore": "journal-restore"}.get(args.edit, "create"), ()
 
 
+def _pairs(specs: list[str] | None, option: str) -> dict[str, str]:
+    """`NAME=VALUE` options, as a dict; one without `=` is refused."""
+    from catalyst.edit import EditError
+
+    out: dict[str, str] = {}
+    for spec in specs or []:
+        key, sep, value = spec.partition("=")
+        if not sep:
+            raise EditError(f"{option} '{spec}' is not NAME=VALUE")
+        out[key.strip()] = value.strip()
+    return out
+
+
 def cmd_edit(args) -> int:
-    """Writing verbs (R2 W2): new, rename, restore, status set, link."""
+    """Writing verbs (R2 W2): new, edit, rename, restore, status set, link."""
     from catalyst import edit
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
@@ -653,6 +666,29 @@ def cmd_edit(args) -> int:
                 command=args.cmd or "/status",
                 tier=args.tier,
             )
+        elif args.edit == "edit":
+            fields, sections = _pairs(args.field, "--field"), _pairs(args.section, "--section")
+            for heading, path in _pairs(args.section_file, "--section-file").items():
+                sections[heading] = Path(path).read_text(encoding="utf-8")
+            res = edit.edit(
+                dep,
+                corpus,
+                args.id,
+                fields,
+                sections,
+                signer,
+                args.intent or [],
+                command=args.cmd or "catalyst edit",
+                tier=args.tier,
+            )
+            if getattr(res, "proposal", None):
+                if args.json:
+                    print(
+                        json.dumps({"id": res.id, "proposal": res.proposal, "touched": [str(p) for p in res.touched]})
+                    )
+                else:
+                    print(f"{res.id} is linked: the edit is a proposal, {res.proposal}, waiting for its decision")
+                return 0
         else:
             res = edit.link(
                 dep,
@@ -2669,6 +2705,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="rename")
+
+    p = sub.add_parser(
+        "edit",
+        help="change an entity's fields and sections; never its ID, Name, Filename, Signed-off-by or Status (design 31)",
+    )
+    p.add_argument("id")
+    p.add_argument("--field", action="append", help="NAME=VALUE: a plain field (repeatable; references: `link`)")
+    p.add_argument("--section", action="append", help="HEADING=TEXT: a section's new text (repeatable)")
+    p.add_argument("--section-file", action="append", help="HEADING=FILE: a section's new text from a file")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="edit")
 
     p = sub.add_parser("approve", help="approve an entity's current version under a gate (IAM/gates.json), journaled")
     p.add_argument("id")
