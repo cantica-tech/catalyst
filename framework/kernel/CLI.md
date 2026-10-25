@@ -130,6 +130,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
 | `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--title` |
 | `catalyst rename <id>` | a new title: heading, Name, Filename and file follow; the ID stays | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--title` |
+| `catalyst edit <id>` | change an entity's fields and sections; never its ID, Name, Filename, Signed-off-by or Status (design 31) | `--as`, `--command`, `--field`, `--forewarned`, `--intent`, `--json`, `--preview`, `--section`, `--section-file`, `--tier` |
 | `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--forewarned`, `--gate`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst approvals <id>` | the gates covering an entity: approvals counted and missing | `--json` |
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--to` |
@@ -1117,14 +1118,31 @@ reconciliation case with `Trigger: proposal`.
   catalyst. `catalyst view <case>` gives `proposal`: the entity, its file,
   both blobs, the author and both contents.
 
+### Editing an entity: `edit`
+
+`catalyst edit <ID> [--field NAME=VALUE]… [--section HEADING=TEXT]…
+[--section-file HEADING=FILE]… [--as <user>] [--intent <why>] [--json]`
+(design 31, `fw-STRUCTURE-000021`) changes an entity's plain fields and
+sections, journaled. It never edits `ID` (L7), `Name` or `Filename`
+(`rename`), `Signed-off-by` (the verified signer), `Status` (`status set`
+and its workflow) or a field catalyst derives; a reference field is
+`link`'s, which keeps its back-references. An enum takes only its allowed
+values, and an edit that changes nothing is refused.
+
+An admin's edit is made. Anyone else edits only an entity of theirs (they
+created it, or a person field names them): directly when it is linked to
+nothing; when it cites or is cited by anything, the edit is opened as a
+proposal (`propose`, which needs reconciliation rights) that an admin
+decides, and the entity's file is untouched until then.
+
 ### Trying a change: `try`
 
 `catalyst try [--json] [--keep] <verb> <its arguments…>` (decision T,
 design 27) makes one change on a scratch copy of the criterion and says
 what it would do; nothing in the criterion or the project changes, and the
 journal holds nothing of it. The verb is one of catalyst's writing verbs
-(`status`, `new`, `link`, `rename`, `restore`, `approve`, `reconcile`,
-`propose`), run with its real refusals: a refused change is the answer
+(`status`, `new`, `edit`, `link`, `rename`, `restore`, `approve`,
+`reconcile`, `propose`), run with its real refusals: a refused change is the answer
 (exit `1`, its message said). `catalyst try --proposal <case> --as <user>`
 tries accepting a proposal.
 
@@ -1876,6 +1894,7 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst graph` | `spec/graph.schema.json` |
 | `catalyst new` | `spec/change.schema.json` |
 | `catalyst rename` | `spec/change.schema.json` |
+| `catalyst edit` | `spec/change.schema.json` |
 | `catalyst approve` | `spec/approve.schema.json` |
 | `catalyst approvals` | `spec/approvals.schema.json` |
 | `catalyst restore` | `spec/change.schema.json` |
@@ -2039,6 +2058,17 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst rename` | `<id>` | an entity or rule ID |
 |  | `--title` `TITLE` | the new title; the file is renamed to match |
+|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--intent` `INTENT` | why (repeatable; journaled) |
+|  | `--command` `CMD` | the slash command this runs for, journaled |
+|  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
+|  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
+| `catalyst edit` | `<id>` | an entity or rule ID |
+|  | `--field` `FIELD` | NAME=VALUE: a plain field (repeatable; references: `link`) |
+|  | `--section` `SECTION` | HEADING=TEXT: a section's new text (repeatable) |
+|  | `--section-file` `SECTION_FILE` | HEADING=FILE: a section's new text from a file (repeatable) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |

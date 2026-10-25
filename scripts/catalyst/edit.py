@@ -583,6 +583,143 @@ def link(
     return Result(item_id, art.file, touched)
 
 
+# --- edit ---------------------------------------------------------------
+NEVER_EDITED = ("ID", "Name", "Filename", "Signed-off-by", "Status")
+"""What no one edits (design 31 §2a): the ID (L7), what catalyst derives from the title (`rename`), the verified
+signer, and `Status`, which moves only through `status set` and its workflow."""
+
+
+@dataclass
+class Edited:
+    """An edit's outcome: made (`proposal` None), or opened as a proposal waiting for its decision."""
+
+    id: str
+    file: Path
+    touched: list[Path] = field(default_factory=list)
+    proposal: str | None = None
+
+
+def _set_section(text: str, heading: str, body: str) -> str:
+    match = re.search(rf"^## {re.escape(heading)}[ \t]*$", text, re.M)
+    if not match:
+        raise EditError(f"no `## {heading}` section in the entity")
+    end = text.find("\n## ", match.end())
+    rest = text[end:] if end >= 0 else "\n"
+    return text[: match.start()] + f"## {heading}\n\n{body.strip()}\n" + rest
+
+
+def _derived_fields(dep: Deployment, prefix: str) -> set[str]:
+    from catalyst import derived
+
+    return {norm_field(name) for (target, name) in derived.sources(dep) if target == prefix}
+
+
+def is_linked(dep: Deployment, corpus: Corpus, art: Artifact) -> bool:
+    """Whether the entity cites anything or anything cites it (design 31: "linked" is any reference in or out)."""
+    etd = dep.etds[art.prefix]
+    if any(fd.kind in REF_KINDS and ref_values(art.get(fd.name) or "") for fd in etd.fields):
+        return True
+    for arts in corpus.artifacts.values():
+        for other in arts:
+            if other.id == art.id or other.prefix not in dep.etds:
+                continue
+            for fd in dep.etds[other.prefix].fields:
+                if fd.kind in REF_KINDS and art.id in ref_values(other.get(fd.name) or ""):
+                    return True
+    return False
+
+
+def is_theirs(dep: Deployment, art: Artifact, signer: dict) -> bool:
+    """Whether the signer created the entity (`Signed-off-by`) or a person field of it names them."""
+    names = {str(signer.get(k)).strip().lower() for k in ("name", "git_username", "username") if signer.get(k)}
+    if (art.get("Signed-off-by") or "").strip().lower() in names:
+        return True
+    for fd in dep.etds[art.prefix].fields:
+        if fd.kind in ("user", "user-list"):
+            people = {p.strip().strip("`").lower() for p in (art.get(fd.name) or "").split(",")}
+            if people & names:
+                return True
+    return False
+
+
+def edit(
+    dep: Deployment,
+    corpus: Corpus,
+    item_id: str,
+    fields: dict[str, str],
+    sections: dict[str, str],
+    signer: dict,
+    intent: list[str],
+    command: str = "catalyst edit",
+    tier: str | None = None,
+) -> Edited:
+    """Change an entity's plain fields and sections (design 31 §3, §4.2). An admin's edit is made; anyone else's is
+    made only on an unlinked entity of theirs, and on a linked one is opened as a proposal for an admin to decide
+    (decision 31.3). Reference fields are `link`'s, which keeps their back-references."""
+    from catalyst import permissions
+
+    if not fields and not sections:
+        raise EditError("nothing to edit: give --field NAME=VALUE or --section HEADING=TEXT")
+    art = _artifact(corpus, item_id)
+    etd = dep.etds[art.prefix]
+    derived_names = _derived_fields(dep, art.prefix)
+    text = art.file.read_text(encoding="utf-8")
+    for name, value in fields.items():
+        if norm_field(name) in {norm_field(n) for n in NEVER_EDITED}:
+            raise EditError(f"`{name}` is never edited (design 31 §2a): {_why_not(name)}")
+        fd = field_def(etd, name)
+        if norm_field(fd.name) in derived_names:
+            raise EditError(f"`{fd.name}` is derived from what cites {item_id}: catalyst writes it")
+        if fd.kind in REF_KINDS:
+            raise EditError(f"`{fd.name}` is a reference: `catalyst link` changes it, keeping its back-references")
+        if fd.kind == "enum" and fd.allowed_values and value not in fd.allowed_values:
+            raise EditError(f"`{fd.name}` is one of {', '.join(fd.allowed_values)}; not {value!r}")
+        text = set_or_add_field(text, fd.name, value)
+    for heading, body in sections.items():
+        text = _set_section(text, heading, body)
+    if text == art.file.read_text(encoding="utf-8"):
+        raise EditError(f"{item_id} already reads so: nothing to edit")
+    why = intent or [f"Edit {item_id}: {', '.join([*fields, *(f'## {h}' for h in sections)])}"]
+    if not permissions.is_admin(signer):
+        if not is_theirs(dep, art, signer):
+            raise EditError(
+                f"{signer.get('name')} may not edit {item_id}: it is neither theirs nor assigned to them (design 31)"
+            )
+        if is_linked(dep, corpus, art):
+            from catalyst.proposals import ProposalError, propose
+
+            try:
+                res = propose(dep, corpus, item_id, text, signer, intent=why, tier=tier)
+            except ProposalError as exc:
+                raise EditError(f"{item_id} is linked, so its edit is a proposal, and {exc}") from None
+            return Edited(item_id, art.file, list(res.touched), proposal=res.id)
+    art.file.write_text(text, encoding="utf-8")
+    grounding = ref_values(art.get(etd.grounding_field) or "") if etd.grounding_field else []
+    _finish(
+        dep,
+        command,
+        "update",
+        item_id,
+        grounding,
+        why,
+        [art.file],
+        str(signer.get("git_username") or signer.get("name")),
+        tier,
+    )
+    return Edited(item_id, art.file, [art.file])
+
+
+def _why_not(name: str) -> str:
+    reasons = {
+        "ID": "an ID is permanent (L7)",
+        "Name": "it follows the title: `catalyst rename`",
+        "Filename": "it follows the title: `catalyst rename`",
+        "Signed-off-by": "it is the verified signer",
+        "Status": "it moves through `catalyst status set` and its workflow",
+    }
+    return {norm_field(k): v for k, v in reasons.items()}[norm_field(name)]
+
+
 # --- reconcile ------------------------------------------------------------
 RESOLVING = {
     "accept": "Resolved-Accepted",

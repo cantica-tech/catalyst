@@ -28,7 +28,7 @@ from pathlib import Path
 from catalyst.deployment import Deployment, load_working_copy
 
 # The writing verbs a try may make (design 27 §7.5): the change, never sharing or installing.
-VERBS = ("status", "new", "link", "rename", "restore", "approve", "reconcile", "propose")
+VERBS = ("status", "new", "edit", "link", "rename", "restore", "approve", "reconcile", "propose")
 SKIP = {".git", ".venv", "bin", "__pycache__"}
 
 
