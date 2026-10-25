@@ -128,13 +128,13 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst backlog` | read-only: open work by type and status, missing links, idle rules | `--json` |
 | `catalyst repair derived` | every derived field (another type's back-reference) from its sources, journaled | `--as`, `--json`, `--tier` |
 | `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
-| `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--intent`, `--json`, `--tier`, `--title` |
-| `catalyst rename <id>` | a new title: heading, Name, Filename and file follow; the ID stays | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--title` |
-| `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--gate`, `--intent`, `--json`, `--tier` |
+| `catalyst new <type>` | create an artifact from its type's latest template, signed, indexed, journaled | `--as`, `--command`, `--field`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--title` |
+| `catalyst rename <id>` | a new title: heading, Name, Filename and file follow; the ID stays | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--title` |
+| `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--forewarned`, `--gate`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst approvals <id>` | the gates covering an entity: approvals counted and missing | `--json` |
-| `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--intent`, `--json`, `--tier`, `--to` |
-| `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--intent`, `--json`, `--through`, `--tier` |
-| `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--intent`, `--json`, `--tier` |
+| `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--to` |
+| `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--forewarned`, `--intent`, `--json`, `--preview`, `--through`, `--tier` |
+| `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst user add <name> <role>` | refuses: add people in catalyst-users | `--as`, `--git-username`, `--intent`, `--json` |
 | `catalyst user remove <name>` | refuses: disable people in catalyst-users | `--as`, `--intent`, `--json` |
 | `catalyst user modify <name> <field> <value>` | refuses: change people in catalyst-users | `--as`, `--intent`, `--json` |
@@ -178,9 +178,9 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
 | `catalyst analysis status <id>` | an analysis's phase and what it still needs | `--json` |
 | `catalyst analysis list` | every analysis in brief, newest first | `--json` |
-| `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--from`, `--intent`, `--text` |
+| `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--forewarned`, `--from`, `--intent`, `--preview`, `--text` |
 | `catalyst try <change>` | make one change on a scratch copy of the criterion and say what it would do (nothing is kept) | `--as`, `--json`, `--keep`, `--proposal` |
-| `catalyst propose <id>` | propose a change to an entity or rule document, decided by someone else | `--as`, `--from`, `--intent`, `--json`, `--tier`, `--title` |
+| `catalyst propose <id>` | propose a change to an entity or rule document, decided by someone else | `--as`, `--forewarned`, `--from`, `--intent`, `--json`, `--preview`, `--tier`, `--title` |
 | `catalyst why <item>` | explain a law (L1…), an invariant (INV-n), a meta-rule or an ID | — |
 | `catalyst open` | make the project ready on this machine (join, runtime) and say where it stands | `--agent`, `--fetch`, `--json` |
 | `catalyst share info` | the driver, where the shared copy is, what it can do | `--json` |
@@ -1139,6 +1139,15 @@ it touched, and what it would leave waiting for an approval. The project
 side of `check` is not tried; nothing is shared. Making the change for
 real is running the same verb without `try`.
 
+**`--preview` and `--forewarned`** (design 31, the admins' forewarning):
+every writing verb takes them. `catalyst <verb …> --preview` is `catalyst
+try <verb …>` (its `--json`, the try report). `catalyst <verb …>
+--forewarned` tries the change first, then makes it anyway: when it adds
+`check` findings, its journal entry's intent gains `forewarned: N
+finding(s) added: …`, computed by catalyst, and they are said on stderr. A
+UI runs an admin's write with `--preview`, then with `--forewarned` once
+they confirm.
+
 ### Read-only views: `list`, `view`, `backlog`, `journal show`, `graph`, `impact`, `inbox`
 
 Computed from the working copy and the entity type definitions; none of them
@@ -2026,6 +2035,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst rename` | `<id>` | an entity or rule ID |
 |  | `--title` `TITLE` | the new title; the file is renamed to match |
 |  | `--as` `AS_USER` | signer (name or git_username) |
@@ -2033,12 +2044,16 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst approve` | `<id>` | an entity or rule ID |
 |  | `--gate` `GATE` | the gate's id in IAM/gates.json |
 |  | `--as` `AS_USER` | who approves (name or git_username): never the version's author |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst approvals` | `<id>` | an entity or rule ID |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst restore` | `<id>` | an entity or rule ID |
@@ -2048,6 +2063,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst status set` | `<id>` | an entity or rule ID |
 |  | `<status>` | the state to set, one the type declares |
 |  | `--force` | write a status outside the type's statuses, or past a failing guard (journaled) |
@@ -2057,6 +2074,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst link` | `<id>` | an entity or rule ID |
 |  | `<field>` | the reference field to add to, e.g. Targets |
 |  | `<ids>` … | the IDs it cites |
@@ -2065,6 +2084,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst user add` | `<name>` | the user's name |
 |  | `<role>` | the user's first role |
 |  | `--git-username` `GIT_USERNAME` | default: the name |
@@ -2227,6 +2248,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--from` `FROM_FILE` | a proposal: the content it now proposes (propose) or accepts (accept-with-edits); - reads stdin |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst try` | `--json` | machine-readable output (JSON on stdout) |
 |  | `--keep` | keep the scratch copy, to look inside |
 |  | `--proposal` `PROPOSAL` | try accepting this proposal (`reconcile <case> accept`) |
@@ -2239,6 +2262,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst why` | `<item>` | L3, INV-17, rr-META-012, a rule or artifact ID |
 | `catalyst open` | `--fetch` | fetch the shared copy first |
 |  | `--agent` `AGENT` | record the agent this user works with (catalyst task dispatches to it) |
