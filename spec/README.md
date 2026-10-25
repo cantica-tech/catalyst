@@ -38,6 +38,8 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `role.schema.json` | `catalyst role add --json`, `catalyst role modify --json` | — |
 | `freeze.schema.json` | `catalyst freeze --json`, `catalyst unfreeze --json` | — |
 | `definition-migrate.schema.json` | `catalyst definition migrate --json` | — |
+| `members.schema.json` | `catalyst members <action> --json` | `GET /v1/members`, `POST /v1/members` |
+| `members-check.schema.json` | `catalyst serve members <check> --json` | — (the server's host) |
 | `journal-entry.schema.json` | `catalyst journal append --json`, `catalyst journal adopt --json`, `catalyst journal redact --json` | — |
 | `approve.schema.json` | `catalyst approve <id> --json` | — |
 | `repair-derived.schema.json` | `catalyst repair derived --json` | — |
