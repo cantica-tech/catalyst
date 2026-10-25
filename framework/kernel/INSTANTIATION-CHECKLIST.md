@@ -30,6 +30,7 @@ item is checked on its own, which keeps a long install from drifting.
 ## Content (guide §1 steps 6–8)
 
 - [ ] Placeholders the module requires filled by the command it names
+- [ ] People, roles and landing policy (guide §1 step 6)
 - [ ] Root `README.md` extended with the project's structure
 - [ ] Greenfield: each decision area a domain and its rules, implemented
       and running clean; `{{TEST_LOCATIONS}}` resolved

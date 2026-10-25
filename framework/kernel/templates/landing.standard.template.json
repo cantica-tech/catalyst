@@ -1,0 +1,64 @@
+{
+  "$schema": "https://github.com/cantica-tech/catalyst/framework/kernel/schemas/landing.schema.json",
+  "policy": "standard",
+  "target": {
+    "kind": "git",
+    "branch": "criterion",
+    "credential": "serve-landing"
+  },
+  "rules": [
+    {
+      "id": "server-own",
+      "match": {
+        "change": "server"
+      },
+      "group": "change",
+      "review": "none",
+      "merge": "auto"
+    },
+    {
+      "id": "agent-session",
+      "match": {
+        "via": "agent"
+      },
+      "group": {
+        "by": "session",
+        "idle_minutes": 30
+      },
+      "review": {
+        "where": "catalyst",
+        "approvals": 1,
+        "role": "Criterion Admin"
+      },
+      "merge": "auto"
+    },
+    {
+      "id": "explicit-unlinked",
+      "match": {
+        "via": "person",
+        "change": "unlinked"
+      },
+      "group": "change",
+      "review": "none",
+      "merge": "auto"
+    },
+    {
+      "id": "accepted-proposal",
+      "match": {
+        "change": "proposal-accepted"
+      },
+      "group": "change",
+      "review": "none",
+      "merge": "auto"
+    }
+  ],
+  "default": {
+    "group": "change",
+    "review": {
+      "where": "catalyst",
+      "approvals": 1,
+      "role": "Criterion Admin"
+    },
+    "merge": "auto"
+  }
+}

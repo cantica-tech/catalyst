@@ -483,6 +483,7 @@ development/journal.jsonl            # before 0.50 only: read, never written
 | `files[].before`, `files[].after` | string or null | The file's git blob SHA-1 (40 lowercase hex) before and after; `null` when it did not exist (create) or no longer exists (delete). |
 | `writer` | string | `catalyst/<version>` on every CLI-written entry. |
 | `tier` | string | Optional: one of the active module's tiers (`module.yaml` `tiers:`; by default `chore`, `fix` or `feature`). |
+| `via` | string | Optional (from kernel 0.116.0, on every entry): how the change was made: `agent` (in an agent's session), `person`, or `server` (a server's own entry); fw-STRUCTURE-000022. An earlier entry has none. |
 | `origin` | string | Optional: `manual` on an entry `catalyst journal adopt` wrote for a commit made outside catalyst. |
 | `commit` | string | With `origin`: the adopted product commit's full sha. |
 | `files[].superseded` | bool | Optional, on an adopted entry: the file was journaled again after the commit, so this records history only — excluded from the hash chain, the file's last state and restore. |

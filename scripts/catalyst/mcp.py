@@ -28,7 +28,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 import project_file
-from catalyst import version_string
+from catalyst import journal, version_string
 from catalyst.deployment import DeploymentNotFound, WorkingCopyMissing, load
 from catalyst.spec import SpecError, load_section4, procedure, summary as _summary
 
@@ -281,6 +281,7 @@ class Server:
             done = subprocess.run(
                 [*self.cli(), *args],
                 cwd=project or self.cwd,
+                env={**os.environ, journal.VIA_VARIABLE: "agent"},  # an agent's change (fw-STRUCTURE-000022)
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
