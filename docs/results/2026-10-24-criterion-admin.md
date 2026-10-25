@@ -87,10 +87,27 @@ The owner asked to continue with what 0.108.0 left.
 - Shipped: criterion PR #142, then #323 and #324 (every check green), tagged `0.109.0`; the distribution repository
   with knowledge-base 0.5.1 (released meanwhile by another session); catalyst-ui at 0.109.0 on development.
 
+## Then: UI 0.64.1, the Marketplace, the local Keycloak tests
+
+The owner chose all three remaining items.
+
+- **catalyst-ui 0.64.1** (a patch: the desktop app ships kernel 0.109.0, `spec/` follows it): checked from a clean
+  build (lint, format, typecheck, every package's tests, the Studio bundle), then criterion PR #103, #176 and #177,
+  tagged `0.64.1`; its `.vsix` in the distribution repository.
+- **The Marketplace**: `CanticaTech.catalyst-host-vscode` 0.64.1, listed about six minutes after publishing; the
+  first since 0.51.0 (0.52 to 0.64 had never been published there).
+- **The local Keycloak tests**: the persistent dev Keycloak's master realm has no `admin` (the owner removed it; its
+  admin is `cantica-admin`). A first fix re-created `admin` with compose.yaml's documented password through
+  `kc.sh bootstrap-admin` (Keycloak stopped about 90 seconds, its database backed up first); told the owner had
+  removed it on purpose, it was deleted again. Instead the integration tests take the master admin from the
+  environment (`CATALYST_USERS_IT_ADMIN`, `CATALYST_USERS_IT_ADMIN_PASSWORD_COMMAND`, compose.yaml's admin by
+  default, as CI uses), in catalyst-users `c64e1ec` and `3046956`; with the owner's settings all 153 tests pass
+  locally.
+- **An incident**: inspecting the owner's keychain helper printed the `oliviersteck` password into the session's
+  transcript. The owner changed it in Keycloak and the keychain; signing was refused between the two (about 20
+  minutes, which blocked another session's release) and works again.
+
 ## What's left
 
-- A catalyst-ui release (and the Marketplace) carrying 0.109.0 is a separate decision.
 - A deployment shared through `catalyst serve`: restart the server with `--criterion <project_name>` (migration
   0.109.0's judgment step); none of the current deployments is.
-- The compose Keycloak refuses its documented bootstrap password, so catalyst-users' integration tests cannot run
-  against it locally.
