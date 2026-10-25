@@ -7,9 +7,12 @@ from __future__ import annotations
 import base64
 import json
 import secrets
+import shlex
 import sqlite3
+import sys
 import threading
 import urllib.request
+from pathlib import Path
 
 import pytest
 
@@ -67,9 +70,12 @@ CRIT_ADMIN = _claims("alice", admin_of=CRITERION)
 
 @pytest.fixture
 def key_command(tmp_path):
+    """A key-management service's command printing the key: Python reading a file, on every platform."""
     key = tmp_path / "master.key"
     key.write_text(base64.b64encode(secrets.token_bytes(32)).decode())
-    return f"cat {key}"
+    show = tmp_path / "show_key.py"
+    show.write_text(f"print(open({key.as_posix()!r}).read())\n")
+    return shlex.join([Path(sys.executable).as_posix(), show.as_posix()])
 
 
 @pytest.fixture
@@ -103,7 +109,7 @@ def test_the_ledger_is_encrypted_chained_and_signed(opened):
         meta = dict(c.execute("SELECT key, value FROM meta").fetchall())
     assert b"bob" not in raw and b"ann" not in raw and b"joins" not in raw  # nothing readable at rest
     key = (app.db.parent / "master.key").read_text().strip()
-    assert meta["members.key_command"].startswith("cat ") and key not in json.dumps(meta)  # the key is not stored
+    assert meta["members.key_command"].endswith("show_key.py") and key not in json.dumps(meta)  # the key is not stored
     assert ledger.members() == {"ann", "bob"}
 
 
