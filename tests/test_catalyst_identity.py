@@ -432,3 +432,13 @@ def test_administering_another_criterion_grants_nothing_here(deployment, capsys)
     assert provider.in_criterion("other", who["now"]) == (["cmd:*", "cmd:status", "reconcile:full"], "full")
     assert provider.in_criterion(load(project).pointer["project_name"], who["now"]) == (["cmd:status"], "none")
     assert provider.in_criterion("other", BOB) == (["cmd:approve"], "none")
+
+
+def test_catalyst_users_home_is_in_catalysts(tmp_path, monkeypatch):
+    """catalyst-users 0.6.0 vendored (REQ-000092): moving catalyst's home moves the system account's settings too."""
+    from catalyst.identity import config as users_config
+
+    monkeypatch.delenv("CATALYST_USERS_HOME", raising=False)
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    assert users_config.home() == tmp_path / "home" / "users"
+    assert users_config.settings_file() == tmp_path / "home" / "users" / "IAM" / "settings.json"
