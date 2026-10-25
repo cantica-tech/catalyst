@@ -27,4 +27,4 @@ and the code disagree, the code, `framework/kernel/` and `CHANGELOG.md` are righ
 | [27](27-impact-simulation.md) | Impact simulation: `catalyst try`, one change made on a scratch copy, the findings it adds and clears (decided 2026-10-17) |
 | [28](28-identity-providers.md) | Identity providers: people from an OIDC provider, a signers ledger, roles through `provider_role`, `serve` with the provider's tokens (decided 2026-10-23) |
 | [29](29-users-outside-catalyst.md) | Users, groups and roles outside catalyst: catalyst-users as the facade, `IAM/identity.json`, grants in the token, a per-machine snapshot (decided 2026-10-23) |
-| [30](30-visibility.md) | Visibility: a person sees their own work and its direct links, queries the rest, never above their clearance unless elevated; the server as the read boundary (proposed 2026-10-25) |
+| [30](30-visibility.md) | Visibility: a person sees their own work and its direct links, queries the rest, never above their clearance unless elevated; user groups; the server as the read boundary (proposed 2026-10-25) |
