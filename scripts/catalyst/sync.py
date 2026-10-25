@@ -27,6 +27,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
@@ -187,9 +188,22 @@ class Sources:
             return shipped
         repo = self.kernel.parent.parent
         if (repo / "scripts" / "catalyst" / "__main__.py").is_file():
-            import package_release
-
-            return package_release.build_cli(repo, self.tmp / "catalyst.pyz")
+            out = self.tmp / "catalyst.pyz"
+            try:
+                import package_release
+            except ImportError:  # run from a deployment's single-file CLI: the checkout builds its own (BUG-000036)
+                build = (
+                    "import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); import package_release; "
+                    "package_release.build_cli(Path(sys.argv[2]), Path(sys.argv[3]))"
+                )
+                done = subprocess.run(
+                    [sys.executable, "-c", build, str(repo / "scripts"), str(repo), str(out)],
+                    capture_output=True, text=True, check=False,
+                )  # fmt: skip
+                if done.returncode != 0:
+                    raise SyncError(f"could not build catalyst's CLI from {repo}: {done.stderr.strip()}") from None
+                return out
+            return package_release.build_cli(repo, out)
         return None
 
     def close(self) -> None:
