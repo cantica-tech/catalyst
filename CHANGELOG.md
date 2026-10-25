@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.113.0 — 2026-10-25
+
+No layout change.
+
+- Added: `catalyst new` checks who may create which type (design 31 phase 2, `fw-STRUCTURE-000020`, REQ-000094): an
+  admin (`cmd:*`, or the `Admin` role) creates any type; anyone else creates only a module's type the module leaves
+  open (`contributors_create` in `module.yaml`, true by default), with a `cmd:create` or `create:<TYPE>` grant.
+  `role_check = "warn"` warns instead.
+
 ## 0.112.0 — 2026-10-25
 
 No layout change.
