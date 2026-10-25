@@ -49,6 +49,13 @@ CREATE = "create"
 TYPED_CREATE = "create:"
 
 
+def is_admin(signer: dict) -> bool:
+    """An admin: a `cmd:*` grant (the Admin, a Criterion Admin in their criterion) or the `Admin` role."""
+    return EVERYTHING in {str(g)[4:] for g in signer.get("grants") or [] if str(g).startswith("cmd:")} or ADMIN in (
+        signer.get("roles") or []
+    )
+
+
 def creation_refusal(dep: Deployment, signer: dict, prefix: str) -> str | None:
     """Why the signer may not create an entity of type `prefix`, or None (design 31 §4.1, `fw-STRUCTURE-000020`).
     An admin (`cmd:*`) creates any type. Anyone else creates a module's type only, one its module leaves open to

@@ -33,7 +33,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `validate.schema.json` | `catalyst validate --json` | — |
 | `journal-verify.schema.json` | `catalyst journal verify --json` | — |
 | `report.schema.json` | `catalyst report --json` | — |
-| `change.schema.json` | `catalyst new --json`, `catalyst rename --json`, `catalyst restore --json`, `catalyst status set --json`, `catalyst link --json` | — |
+| `change.schema.json` | `catalyst new --json`, `catalyst edit --json`, `catalyst rename --json`, `catalyst restore --json`, `catalyst status set --json`, `catalyst link --json` | — |
 | `user.schema.json` | `catalyst user add --json`, `catalyst user remove --json`, `catalyst user modify --json`, `catalyst user assign-role --json` | — |
 | `role.schema.json` | `catalyst role add --json`, `catalyst role modify --json` | — |
 | `freeze.schema.json` | `catalyst freeze --json`, `catalyst unfreeze --json` | — |
