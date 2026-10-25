@@ -1,6 +1,6 @@
 # 30 — Visibility: who sees which entities (design for the owner, 2026-10-25)
 
-> **Status: proposed.** Questions 1 to 4 answered by the owner (§2), user groups and their membership added by the owner (§4.4); §8 lists
+> **Status: proposed.** Questions 1 to 5 answered by the owner (§2), user groups and their membership added by the owner (§4.4); §8 lists
 > what is still to decide. Builds on
 > designs `25` (approval gates), `28` and `29` (people from catalyst-users) and `19` (`catalyst serve`).
 
@@ -20,6 +20,7 @@ assigned to them and their rights have been raised for that entity.
 | 2   | What a query says about what it may not show | **Nothing**: no count, no placeholder, no hint                                                                                                                                                                                |
 | 3   | Who raises a person's rights on an entity    | **The Admin** (who can do anything); **a Criterion Admin** (the project's admin, kernel 0.109.0, `fw-IDENTITY-000011`) in their own project; an entity's **owner** only with a Criterion Admin's or the Admin's authorization |
 | 4   | Whether clearance binds admins               | **No**: the Admin sees everything; a Criterion Admin sees everything in their project (read from 3)                                                                                                                           |
+| 5   | Who may have any access at all               | **Only people registered in the catalyst realm**, invited to the project; no exception but the Admin (§4.0)                                                                                                                   |
 
 ## 3. Today
 
@@ -35,7 +36,16 @@ So the design is mostly about **where reading happens**: a restriction a local c
 
 ## 4. The model
 
-For a person `P` in project `X`, an entity `E` is **visible** when all three hold:
+### 4.0 The realm
+
+**No one outside the catalyst realm has access to anything in any project**, the owner's rule (2026-10-25). Everyone
+invited to contribute to a project is registered in the same realm (catalyst-users' provider): no guest, no shared
+link, no anonymous reader, no override bringing in an outsider. The Admin alone is above every rule of this design,
+and is a person of the realm too: catalyst verifies who signs through the realm, so no one else can act at all.
+
+### 4.0.1 Visibility
+
+For a person `P` of the realm, in project `X`, an entity `E` is **visible** when all three hold:
 
 1. **Scope**: `E` belongs to `X`, or to another project and is directly linked to an entity of `X` that `P` may see.
 2. **Clearance**: `E`'s classification is at or below `P`'s clearance, or `P` holds an **elevation** on `E` (§4.3).
@@ -96,7 +106,8 @@ The owner's addition (2026-10-25): an entity can be assigned to a **user group**
   the length of its assignment. It has an ID (`UG-NNNNNN-<userid>`), its members (registered people), who made it and
   when, and which assignment it serves. It ends when that assignment does (the entity closed, or reassigned).
 - **Members**: members of the project (the criterion) only. The Admin, then a Criterion Admin in their project, may
-  add someone from outside it by override, recorded in the ledger with who granted it.
+  add a person of the realm who is not a member of the project, by override, recorded in the ledger with who granted
+  it. Never someone outside the realm (§4.0).
 - **Responsibility**: every member holds the assignment; the entity is in each member's Mine.
 - **Access**: the group's clearance is the **lowest** of its members' clearances, recomputed whenever a member joins
   or leaves. What the group is assigned is visible to its members only within that clearance.
@@ -117,6 +128,9 @@ A clone cannot hide what it holds, so:
   the indexes (an index row names a title), the journal and history (they hold content), `check`'s findings, and the
   reference fields of a visible entity (a link to an absent entity is left out, its ID included).
 - **Writes** through the server are checked the same way: a person cannot cite, edit or link what they cannot see.
+- **Only the realm's tokens** (§4.0): today `catalyst serve token issue <userid>` mints a token for any userid, with
+  nothing checking that a person of the realm holds it. That path goes: the server accepts only the provider's tokens
+  (design `28`), each verified against the realm and the project's membership.
 
 ## 6. What a UI shows
 
@@ -130,7 +144,7 @@ A clone cannot hide what it holds, so:
 
 1. **Classification and clearance**: the kernel field and its levels, `clear:<Level>` grants, `check` and `view`
    aware of them (a person's own CLI already filters what it shows, as a convenience).
-2. **The server as the boundary**: every read of `catalyst serve` filtered (§5); a non-admin's CLI and UI work
+2. **The server as the boundary**: only the realm's tokens; every read of `catalyst serve` filtered (§5); a non-admin's CLI and UI work
    through it; `share join` refused to a non-admin.
 3. **Elevations and user groups**: the two ledgers, granting, the owner's request through a gate, a group's
    clearance kept as its members' lowest.
