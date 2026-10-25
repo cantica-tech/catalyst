@@ -6,6 +6,23 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.115.0 — 2026-10-25
+
+No layout change.
+
+- Added: project membership on the server (design 32, `fw-IDENTITY-000012`, `fw-IDENTITY-000013`, REQ-000097). A
+  `catalyst serve` keeps a membership ledger per criterion in its database, never in the criterion: each entry
+  encrypted, chained and signed. Once it is open (`serve members open`, the Admin adopting the provider's current
+  members), the server fails closed: only the identity provider's tokens, and only the criterion's admins and the
+  people the provider and the ledger both name. `catalyst members list|add|remove|adopt` changes members through the
+  server, admins only; a criterion shared without a server has admins only.
+- Added: once a day the server writes the ledger's head into `IAM/membership.fingerprints.jsonl`, journaled by its
+  own batch; `serve members check` verifies the chain, the signatures, the fingerprints and the provider's drift.
+- Added: `serve key init|escrow|recover`: the master key in the host's keychain or a key-management service, its
+  break-glass copy split among admins, recovery recorded and the key replaced. The cryptography is pycryptodome's,
+  on the server's host only; the CLI stays standard-library only.
+- Changed: catalyst-users 0.7.0 vendored (a criterion's members, its `id-DIR-000006`).
+
 ## 0.114.0 — 2026-10-25
 
 No layout change.

@@ -192,6 +192,9 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst share join <url>` | bring a shared criterion to this machine (a project with catalyst.toml) | — |
 | `catalyst share login <url>` | keep this user's token for a catalyst serve server (in catalyst's home) | `--token` |
 | `catalyst serve token <action> <who>` | issue, list or revoke the tokens users sign with | — |
+| `catalyst serve key <action>` | the master key of the membership ledger: init, escrow, recover (fw-IDENTITY-000013) | `--holder`, `--key-command`, `--out`, `--reason`, `--share`, `--threshold` |
+| `catalyst serve members <action>` | the membership ledger: open, check, fingerprint (fw-IDENTITY-000012) | `--json`, `--reason`, `--yes` |
+| `catalyst members <action> <member>` | a served criterion's members, through its server: list, add, remove, adopt (design 32) | `--json`, `--reason` |
 | `catalyst criterion status` | the working copy against the shared branch | `--fetch` |
 | `catalyst criterion create <url>` | version the working copy for sharing; with a URL, publish it as the .criterion submodule | `--branch`, `--yes` |
 | `catalyst criterion join` | check out a shared deployment in a clone of the product | `--url` |
@@ -1605,6 +1608,46 @@ reconciliation level `full` there (`fw-IDENTITY-000011`). The operator names
 it, never a push: a client's `catalyst.toml` is only its word. Without a
 name, administering a criterion gives nothing on the server.
 
+**Membership** (design 32, `fw-IDENTITY-000012`, `fw-IDENTITY-000013`). Who
+is a member of the served criterion is the identity provider's, asked through
+catalyst-users; the server keeps the record, a ledger in its database and
+never in the criterion: each entry (who was added or removed, by whom, when,
+why) encrypted with the criterion's data key, chained to the one before it by
+its hash, and signed by the server. Once the ledger is open the server **fails
+closed**: it accepts only the provider's tokens, and admits the Admin and the
+criterion's admins, and anyone else only when the provider (asked then, kept
+10 seconds) and the ledger both name them. `GET members` lists them and `POST
+members` (`{op: add|remove|adopt, member, reason}`) changes them, at the
+provider and in the ledger, for admins only. Once a day, whatever changed,
+the server writes the ledger's head into the criterion
+(`IAM/membership.fingerprints.jsonl`, journaled by its own batch, signed by
+whoever opened the ledger), so a rewritten ledger no longer matches what every
+clone holds. The cryptography is pycryptodome's, needed on the server's host
+only.
+
+- `serve key init [--key-command <cmd>]`: the master key, a new one in this
+  host's keychain, or one a key-management service prints (`<cmd>`, or
+  `CATALYST_SERVE_KEY_COMMAND`); never in the database.
+- `serve key escrow --holder <admin> ... --threshold <k> --out <dir>`: the
+  break-glass copy, one share file per holder, any `k` recovering the key.
+- `serve key recover --share <file> ... [--reason <text>]`: recovers the key
+  from a quorum of shares, records it in the ledger and the journal, and
+  replaces the key, every share then void.
+- `serve members open [--yes] [--reason <text>]`: the Admin opens the ledger,
+  adopting the provider's current members once they agree to the list (exit
+  `3` shows it); the first fingerprint follows at once.
+- `serve members check [--json]`: the chain, the signatures, the criterion's
+  fingerprints, and where the provider's group and the ledger disagree; exit
+  `1` on any finding.
+- `serve members fingerprint`: writes one now.
+
+### `catalyst members list|add|remove|adopt [<member>] [--reason <text>]`
+
+A served criterion's members, through its server (design 32): `list` them, or
+`add`, `remove` or `adopt` (a member already at the provider, recorded) one, with
+the reason. The Admin and the criterion's admins only. A criterion not shared
+through `catalyst serve` has admins only: the command refuses there.
+
 Embedding (owner decision B8): `--allow-origin <origin>` (repeatable; `--local`
 adds `catalyst.toml`'s `embed_origins`) lets pages of that origin read: their GET
 requests get `Access-Control-Allow-Origin` and the preflight for a GET is
@@ -1934,6 +1977,8 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst share info` | `spec/share-info.schema.json` |
 | `catalyst share status` | `spec/share-status.schema.json` |
 | `catalyst share push` | `spec/share-push.schema.json` |
+| `catalyst serve members` | `spec/members-check.schema.json` |
+| `catalyst members` | `spec/members.schema.json` |
 | `catalyst identity login` | `spec/identity-whoami.schema.json` |
 | `catalyst identity whoami` | `spec/identity-whoami.schema.json` |
 | `catalyst identity status` | `spec/identity-status.schema.json` |
@@ -2318,6 +2363,21 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--token` `TOKEN` | the token (default: read one line on stdin) |
 | `catalyst serve token` | `<action>` | issue a token, list them, or revoke one (one of `issue`, `list`, `revoke`) |
 |  | `<who>` | issue: the user's userid; revoke: the token's number |
+| `catalyst serve key` | `<action>` | One of `init`, `escrow`, `recover` |
+|  | `--key-command` `KEY_COMMAND` | init: a command printing the master key (base64), a key-management service's; default: a new key in this host's keychain |
+|  | `--holder` `HOLDER` | escrow: an admin who holds a share (repeatable) |
+|  | `--threshold` `THRESHOLD` | escrow: how many shares recover the key |
+|  | `--out` `OUT` | escrow: the directory each holder's share file is written to |
+|  | `--share` `SHARE` | recover: a share file (repeatable) |
+|  | `--reason` `REASON` | recover: why the break-glass copy is used (default ``) |
+| `catalyst serve members` | `<action>` | One of `open`, `check`, `fingerprint` |
+|  | `--reason` `REASON` | open: why (default ``) |
+|  | `--yes` | open: the Admin agreed to the members it adopts (INV-4) |
+|  | `--json` | machine-readable output |
+| `catalyst members` | `<action>` | One of `list`, `add`, `remove`, `adopt` |
+|  | `<member>` | add, remove, adopt: the person's username at the identity provider |
+|  | `--reason` `REASON` | why (add, remove, adopt) (default ``) |
+|  | `--json` | machine-readable output |
 | `catalyst criterion status` | `--fetch` | fetch the shared branch first |
 | `catalyst criterion create` | `<url>` | the criterion repository (empty, or already holding this history); without it the working copy is versioned strictly locally, and push/sync/join ask for it |
 |  | `--branch` `BRANCH` | the shared branch (default: criterion) (default `criterion`) |

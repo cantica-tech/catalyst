@@ -1,7 +1,8 @@
 # 30 — Visibility: who sees which entities (design for the owner, 2026-10-25)
 
-> **Status: proposed.** Questions 1 to 5 answered by the owner (§2), user groups and their membership added by the owner (§4.4); §8 lists
-> what is still to decide. Builds on
+> **Status: decided (owner, 2026-10-25).** Questions 1 to 5 answered by the owner (§2), user groups and their
+> membership added by the owner (§4.4), project membership decided (§4.5, design `32`), §8's questions as proposed.
+> Builds on
 > designs `25` (approval gates), `28` and `29` (people from catalyst-users) and `19` (`catalyst serve`).
 
 ## 1. The request
@@ -113,9 +114,17 @@ The owner's addition (2026-10-25): an entity can be assigned to a **user group**
   or leaves. What the group is assigned is visible to its members only within that clearance.
 - **Override**: the Admin, then a Criterion Admin in their project, may raise the group's access for all its members
   (an elevation naming the group, §4.3).
-- **Where it lives**: in the criterion, an `IAM/user-groups.jsonl` ledger, appended and signed, never rewritten (L7):
-  a group's creation, each member added or removed, its end. A field of kind `user` or `user-list` may cite a `UG-`
-  ID wherever it may cite a person.
+- **Where it lives**: on the server, as project membership does (§4.5, design `32`), never in the criterion: the owner's answer
+  (2026-10-25). The project's user-groups ledger is appended, signed, encrypted and never rewritten (L7): a group's
+  creation, each member added or removed, its end. The criterion holds only its fingerprints. A field of kind `user`
+  or `user-list` may cite a `UG-` ID wherever it may cite a person; the ID alone says nothing of its members.
+
+### 4.5 Project membership
+
+Decided by the owner (2026-10-25), in design [`32`](32-project-membership.md): the provider through catalyst-users
+decides who is a member; each project's ledger is kept encrypted on the server, never in the criterion, which holds
+only daily fingerprints; access needs the provider and the ledger to agree; the Admin holds the master key, with
+break-glass access for the other admins.
 
 ## 5. Where reading happens: the server is the boundary
 
@@ -153,20 +162,15 @@ A clone cannot hide what it holds, so:
 Each phase is a kernel release; phase 1 changes the frozen prose surface (a visibility invariant), which needs an
 ADR lifting the freeze for it (ADR-017).
 
-## 8. Still to decide
+## 8. Decided (owner, 2026-10-25), as proposed
 
-1. **Default classification** of a project, and of the entities that exist before phase 1 (proposed: `Internal`).
-2. **Elevations expire?** (proposed: optional, set by whoever grants it).
-3. **A non-admin's offline work**: none, since they hold no clone (proposed), or a filtered export they cannot
-   push from.
-4. **Rules and domains**: always visible to everyone in the project (proposed), or classified like entities.
-5. **A user group's member above the group's clearance**: does the group's lowest level bind that member on the
-   group's entity (proposed: yes, for what they see through the assignment; their own clearance still applies to
-   what they find by a query)?
-6. **Who makes a user group, and changes its members**: the person assigning the entity (proposed), within the
-   rights to assign it; or only a Criterion Admin or the Admin.
-7. **What makes a person a member of a project**: today nothing does (anyone holding a clone, or a token for its
-   server, reads it). Proposed: a project's members are a catalyst-users group per project (`/projects/<name>`),
-   which `catalyst serve` and the visibility rules read; the Admin and its Criterion Admins manage it.
-8. **A group of one, or a group whose members all leave**: ends with its last member (proposed), its entity then
-   unassigned.
+1. **Default classification** of a project, and of the entities that exist before phase 1: `Internal`.
+2. **Elevations expire** optionally, as set by whoever grants one.
+3. **A non-admin's offline work**: none, since they hold no clone (design `32` §2.10).
+4. **Rules and domains** are always visible to everyone in the project.
+5. **A user group's member above the group's clearance**: the group's lowest level binds them on what they see
+   through the assignment; their own clearance still applies to what they find by a query.
+6. **Who makes a user group, and changes its members**: the person assigning the entity, within the rights to assign
+   it.
+7. **What makes a person a member of a project**: §4.5 and design `32`.
+8. **A group of one, or a group whose members all leave**: it ends with its last member, its entity then unassigned.
