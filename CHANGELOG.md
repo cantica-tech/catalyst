@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.112.0 — 2026-10-25
+
+No layout change.
+
+- Added: every writing verb takes `--preview` (`catalyst try` of the same change) and `--forewarned` (tried first,
+  made anyway, the `check` findings it adds recorded in its journal entry) (design 31 phase 1, `fw-STRUCTURE-000019`,
+  REQ-000093).
+
 ## 0.111.0 — 2026-10-25
 
 No layout change.

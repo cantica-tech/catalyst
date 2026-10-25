@@ -2338,6 +2338,32 @@ def _fill_help(parser: argparse.ArgumentParser, path: str = "") -> None:
                 action.help = known
 
 
+def _offer_preview(parser: argparse.ArgumentParser) -> None:
+    """`--preview` and `--forewarned` on every writing verb's own parser, for `--help` and the documentation; `main`
+    reads them before parsing (`_preview_and_forewarned`)."""
+    from catalyst.trial import VERBS
+
+    def leaves(p: argparse.ArgumentParser):
+        subs = [a for a in p._actions if isinstance(a, argparse._SubParsersAction)]
+        if not subs:
+            yield p
+        for sub in subs:
+            for child in dict.fromkeys(sub.choices.values()):
+                yield from leaves(child)
+
+    top = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    for verb in VERBS:
+        for leaf in leaves(top.choices[verb]):
+            leaf.add_argument(
+                "--preview", action="store_true", help="say what the change would do (its `try`); keep nothing"
+            )
+            leaf.add_argument(
+                "--forewarned",
+                action="store_true",
+                help="try it first, then make it anyway, recording in its journal entry what it adds to `check`",
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
     parser.add_argument("--version", action="version", version=f"catalyst {version_string()}")
@@ -3225,6 +3251,7 @@ def build_parser() -> argparse.ArgumentParser:
     uid = p.add_subparsers(dest="userid_command", required=True)
     q = uid.add_parser("gen", help="draw a new unique userid (INV-26)")
     q.set_defaults(func=cmd_userid)
+    _offer_preview(parser)
     _fill_help(parser)
     return parser
 
@@ -3250,12 +3277,69 @@ def _status_line(args) -> None:
         return
 
 
+_GLOBAL_WITH_VALUE = ("--project", "--working-copy")
+
+
+def _writing_verb(argv: list[str]) -> int | None:
+    """Where a writing verb (`trial.VERBS`) starts in `argv`, after the global options; None if none does."""
+    from catalyst.trial import VERBS
+
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token in _GLOBAL_WITH_VALUE:
+            i += 2
+        elif token.startswith(tuple(f"{o}=" for o in _GLOBAL_WITH_VALUE)):
+            i += 1
+        else:
+            return i if token in VERBS else None
+    return None
+
+
+def _preview_and_forewarned(argv: list[str]) -> tuple[list[str], list[str] | None]:
+    """A writing verb's `--preview` (design 31: `catalyst try` of the same change) and `--forewarned` (the change
+    tried first, its added findings recorded in its journal entry). Returns the arguments to parse, and the change
+    to try first when `--forewarned` is given."""
+    start = _writing_verb(argv)
+    if start is None or not {"--preview", "--forewarned"} & set(argv[start:]):
+        return argv, None
+    head, change = argv[:start], [a for a in argv[start:] if a not in ("--preview", "--forewarned")]
+    if "--preview" in argv[start:]:
+        wants_json = "--json" in change
+        return [*head, "try", *(["--json"] if wants_json else []), *[a for a in change if a != "--json"]], None
+    return [*head, *change], [a for a in change if a != "--json"]
+
+
+def _forewarn(args, change: list[str]) -> bool:
+    """Try the change first; what it would add to `check` goes into its journal entry, and is said. False when the
+    trial itself could not run (its reason said); a refused change goes on, to be refused for real."""
+    from catalyst import trial
+
+    try:
+        report = trial.attempt(open_deployment(args), change)
+    except trial.TryError as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return False
+    added = report["check"]["added"] if report["ok"] else []
+    if not added:
+        return True
+    said = "; ".join(f"{f['level']}: {f['text']}" for f in added)
+    args.intent = [*(getattr(args, "intent", None) or []), f"forewarned: {len(added)} finding(s) added: {said}"]
+    print(f"catalyst: forewarned, made anyway: {len(added)} finding(s) added", file=sys.stderr)
+    for f in added:
+        print(f"  + {f['level']}: {f['text']}", file=sys.stderr)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):  # UTF-8 out, whatever the code page (cp1252), so
         if hasattr(stream, "reconfigure"):  # git and hooks read it back; degrade, never crash
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+    argv, forewarn = _preview_and_forewarned(list(sys.argv[1:] if argv is None else argv))
     args = build_parser().parse_args(argv)
     try:
+        if forewarn is not None and not _forewarn(args, forewarn):
+            return 1
         code = args.func(args)
         _status_line(args)
         return code
