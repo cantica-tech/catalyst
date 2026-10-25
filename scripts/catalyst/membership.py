@@ -121,7 +121,7 @@ def split_key(master: bytes, holders: list[str], threshold: int) -> list[dict]:
         raise MembershipError(f"a threshold of {threshold} needs at least that many holders, and at least 2", 422)
     if len(set(holders)) != len(holders):
         raise MembershipError("a holder is named twice", 422)
-    halves = [shamir.split(threshold, len(holders), master[i : i + 16]) for i in (0, 16)]
+    halves = [shamir.split(threshold, len(holders), master[i : i + 16], ssss=False) for i in (0, 16)]
     return [
         {
             "holder": h,
@@ -141,7 +141,7 @@ def join_key(shares: list[dict]) -> bytes:
     if len({int(s["index"]) for s in shares}) < threshold:
         raise MembershipError(f"{threshold} different holders' shares are needed", 422)
     parts = [(int(s["index"]), _unb64(s["share"])) for s in shares]
-    return b"".join(shamir.combine([(i, raw[o : o + 16]) for i, raw in parts]) for o in (0, 16))
+    return b"".join(shamir.combine([(i, raw[o : o + 16]) for i, raw in parts], ssss=False) for o in (0, 16))
 
 
 # --- the master key ------------------------------------------------------------------------------------------
