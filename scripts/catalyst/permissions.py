@@ -65,7 +65,9 @@ def creation_refusal(dep: Deployment, signer: dict, prefix: str) -> str | None:
     typed = {str(g)[len(TYPED_CREATE) :] for g in signer.get("grants") or [] if str(g).startswith(TYPED_CREATE)}
     if prefix in typed or held & set(required(dep, CREATE) or [CREATE]):
         return None
-    return f"{who} may not create {prefix}: no grant allows it (`cmd:create`, or `create:{prefix}`, from catalyst-users)"
+    return (
+        f"{who} may not create {prefix}: no grant allows it (`cmd:create`, or `create:{prefix}`, from catalyst-users)"
+    )
 
 
 def mode(dep: Deployment) -> str:
