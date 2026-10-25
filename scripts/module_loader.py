@@ -83,6 +83,8 @@ class ETD:
     sections: list[tuple[str, str]] = field(default_factory=list)
     definition: str = ""
     generated: bool = False  # declared in a v3 module.yaml: its template and definition are generated
+    # whether a person who is not an admin may create it (design 31 §4.1): a module's types by default
+    contributors_create: bool = True
 
 
 @dataclass
@@ -435,6 +437,7 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
             etd.sections.append((str(section), ""))
     etd.definition = str(spec.get("definition") or "").strip()
     etd.generated = True
+    etd.contributors_create = spec.get("contributors_create", True) is not False
     return etd
 
 

@@ -45,6 +45,31 @@ def grants(dep: Deployment, signer: dict) -> set[str]:
     return {str(g)[4:] for g in signer.get("grants") or [] if str(g).startswith("cmd:")}
 
 
+CREATE = "create"
+TYPED_CREATE = "create:"
+
+
+def creation_refusal(dep: Deployment, signer: dict, prefix: str) -> str | None:
+    """Why the signer may not create an entity of type `prefix`, or None (design 31 §4.1, `fw-STRUCTURE-000020`).
+    An admin (`cmd:*`) creates any type. Anyone else creates a module's type only, one its module leaves open to
+    contributors (`contributors_create`, true by default), with `cmd:create` (or an alias of it) or `create:<TYPE>`."""
+    held = grants(dep, signer)
+    if EVERYTHING in held or ADMIN in (signer.get("roles") or []):
+        return None
+    who = signer.get("name") or signer.get("git_username") or "the signer"
+    owners = [m for m in dep.installed() if prefix in m.entity_types]
+    if not owners:
+        return f"{who} may not create {prefix}: it is the kernel's, created by an admin only (design 31)"
+    if not owners[-1].entity_types[prefix].contributors_create:
+        return f"{who} may not create {prefix}: module {owners[-1].id} keeps it to admins (contributors_create: false)"
+    typed = {str(g)[len(TYPED_CREATE) :] for g in signer.get("grants") or [] if str(g).startswith(TYPED_CREATE)}
+    if prefix in typed or held & set(required(dep, CREATE) or [CREATE]):
+        return None
+    return (
+        f"{who} may not create {prefix}: no grant allows it (`cmd:create`, or `create:{prefix}`, from catalyst-users)"
+    )
+
+
 def mode(dep: Deployment) -> str:
     """`enforce` (the default) or `warn`, from `catalyst.toml` `role_check`."""
     value = str((dep.pointer or {}).get("role_check") or "enforce").strip().lower()

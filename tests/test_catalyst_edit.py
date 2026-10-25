@@ -56,7 +56,8 @@ def _state(project):
 
 
 def _signer(corpus):
-    return corpus.users[0]
+    """The fixture's Admin as a verified signer: their grants are catalyst-users' (design 29), `cmd:*` for an Admin."""
+    return {**corpus.users[0], "grants": ["cmd:*"]}
 
 
 def test_new_fills_the_latest_template_signs_indexes_and_journals(tmp_path):
