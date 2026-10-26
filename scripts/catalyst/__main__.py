@@ -2182,8 +2182,6 @@ def _host_identity(app) -> tuple[dict, str, object]:
 def _serve_landing(serve, db: Path, args) -> int:
     """`catalyst serve landing`: where the server lands what it accepted, and the landings (design 33,
     fw-STRUCTURE-000024), on the server's host."""
-    from typing import Any
-
     from catalyst import serve_landing
 
     app = serve.Server(db, members=False)
