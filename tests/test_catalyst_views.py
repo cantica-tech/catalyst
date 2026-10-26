@@ -267,3 +267,30 @@ def test_view_gives_a_rule_its_title_status_domain_and_text(tmp_path):
     assert (meta["title"], meta["status"]) == ("Shape", "✅ working. Text.")
     assert meta["text"].startswith("## 15.") and "Text." in meta["text"] and "Next" not in meta["text"]
     assert views.view(dep, corpus, old)["retired"] is True
+
+
+def test_a_table_row_is_listed_with_its_place_and_viewed_from_it(tmp_path):
+    """An item kept as a row (a free-form type) is one `list all` names with its file and line, and one `view`
+    shows, by its full or short ID, as its fields and journal: never 'no artifact' (catalyst-docs' report)."""
+    project = make_project(tmp_path)
+    root = project / ".criterion"
+    mod = root / "modules" / "example-process"
+    write(mod / "schemas" / "row.yaml", ROW_SCHEMA)
+    module = (mod / "module.yaml").read_text(encoding="utf-8")
+    write(mod / "module.yaml", module + "  - id: ROW\n    schema: schemas/row.yaml\n")
+    row = f"ROW-000001-{USERID}"
+    write(
+        root / "rows" / "rows.md",
+        f"# Rows\n\n| ID | Title | Status |\n|---|---|---|\n| `{row}` | First row | Open |\n",
+    )
+    dep = load(project)
+    corpus = load_corpus(dep)
+    listed = [r for r in views.list_items(dep, corpus, "all", []) if r["type"] == "ROW"]
+    assert listed == [{"id": row, "type": "ROW", "file": "rows/rows.md", "line": 5}]
+    for asked in (row, "ROW-000001"):
+        shown = views.view(dep, corpus, asked)
+        assert shown["id"] == row and shown["row"] is True and shown["title"] == "First row"
+        assert shown["status"] == "Open" and shown["file"] == "rows/rows.md" and shown["line"] == 5
+        assert shown["fields"] == {"ID": f"`{row}`", "Title": "First row", "Status": "Open"}
+        assert shown["text"].startswith(f"| `{row}`") and shown["links"] == {} and shown["journal"] == []
+    assert "First row" in views.render_view(views.view(dep, corpus, row))

@@ -264,3 +264,28 @@ def test_a_module_without_a_declaration_falls_back_with_a_warning(tmp_path: Path
     pr.package_modules(root)
     out = capsys.readouterr().out
     assert "example-process declares no kernel_version" in out and ">=0.33.0" in out
+
+
+def test_publishing_refuses_a_kernel_that_is_not_a_tagged_release(tmp_path: Path, monkeypatch, capsys):
+    """`--publish-dir` publishes only a tagged release, from a checkout at its tag: a development checkout whose
+    version is ahead of its last tag would otherwise publish an unreleased kernel (catalyst-docs' report)."""
+    root = make_workspace(tmp_path)
+
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+    git("init", "-q")
+    git("-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "start")
+    assert "has no release tag" in (pr.unreleased_kernel(root) or "")
+    git("tag", "0.33.0")
+    assert pr.unreleased_kernel(root) is None
+    git("-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "after the release")
+    assert "not at the 0.33.0 tag" in (pr.unreleased_kernel(root) or "")
+    monkeypatch.setattr(pr, "ROOT", root)
+    published = []
+    monkeypatch.setattr(pr, "publish_releases", lambda *a, **k: published.append(a))
+    monkeypatch.setattr(pr, "package_modules", lambda *a, **k: [])
+    monkeypatch.setattr(pr, "package_kernel", lambda *a, **k: root)
+    assert pr.main(["--publish-dir", str(tmp_path)]) == 2
+    assert "Refused: this checkout is not at the 0.33.0 tag" in capsys.readouterr().out and not published
+    assert pr.main(["--publish-dir", str(tmp_path), "--unreleased"]) == 0 and published
