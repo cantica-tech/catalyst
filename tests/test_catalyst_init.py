@@ -471,3 +471,42 @@ def test_init_fills_the_criterions_runtime(tmp_path):
     venv = project_file.home_criterion("app") / ".venv"
     assert rt.installed_version(venv) and rt.venv_python(venv).exists()
     assert "/.venv" in (venv.parent / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+def test_init_signs_as_whoever_the_provider_verifies_unless_a_name_is_given(tmp_path, monkeypatch):
+    """BUG-000040: with a provider, `init` asks for no particular person unless `--user`/`--git-username` named one,
+    so a git user.name that differs from the provider's name never refuses the install; the deployment then records
+    the verified identity, not the git name."""
+    from catalyst import init as init_mod
+    from catalyst.identity.provider import Whoami
+
+    asked = []
+    issuer = "https://id.example.com/realms/catalyst"
+
+    def verify(doc, as_user=None, transport=None):
+        asked.append(as_user)
+        return Whoami(issuer=issuer, subject="sub-ada", username="ada", name="Ada Lovelace")
+
+    monkeypatch.setattr(init_mod.provider, "verify", verify)
+    identity = {"provider": "keycloak", "issuer": issuer, "client": "catalyst-cli", "catalyst_client": "catalyst"}
+    req = request(tmp_path, user="Someone Else", git_username="someone", identity=identity, runtime=False, at=None)
+    init(req)
+    assert asked == [None]
+    pointer = (req.project / "catalyst.toml").read_text(encoding="utf-8")
+    assert 'created_by = "Ada Lovelace"' in pointer and "Someone Else" not in pointer
+    (tmp_path / "b").mkdir()
+    other = request(tmp_path / "b", name="app2", identity=identity, runtime=False, at=None, verify_as="ada")
+    init(other)
+    assert asked == [None, "ada"]
+
+
+def test_init_with_its_runtime_installs_the_catalyst_command(tmp_path, monkeypatch):
+    """BUG-000041: filling the criterion's runtime, `init` also installs the launcher, as `catalyst runtime install`
+    does, so a fresh machine has a `catalyst` command (and the commit-msg hook its CLI) right after `init`."""
+    import project_file
+    from catalyst import runtime as rt
+
+    monkeypatch.setattr(rt, "install_into", lambda c, v, pyz: (c / ".venv", True))
+    steps = init(request(tmp_path, at=None, runtime=True))
+    launcher = project_file.home() / "bin" / "catalyst"
+    assert launcher.is_file() and any("installed the catalyst command" in s for s in steps)

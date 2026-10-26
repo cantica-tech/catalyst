@@ -6,6 +6,22 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.117.1 — 2026-10-26
+
+No layout change. Found re-running the beta quickstart, which is rewritten for the current kernel.
+
+- Fixed: `catalyst init` signs as whoever the identity provider verifies (the logged-in person, else this machine's
+  system account) unless `--user` or `--git-username` names someone: a `git config user.name` that differs from the
+  provider's name no longer refuses the install (BUG-000040). The deployment records the verified identity, and a
+  name the system account is not is refused saying so, not "not logged in".
+- Fixed: `catalyst init` installs the `catalyst` command (`$CATALYST_HOME/bin/catalyst`) when it fills the
+  criterion's runtime, as `catalyst runtime install` does (BUG-000041).
+- Fixed: the commit-msg hook runs the criterion's own CLI, found through `catalyst.toml`, when no launcher is
+  installed, and says the message went unchecked when it finds none, instead of letting every commit through
+  silently (BUG-000039). A hook installed before keeps the old script until `catalyst hook install` rewrites it.
+- Changed: `beta/QUICKSTART.md` sets up an identity provider first (catalyst-users and a throwaway Keycloak, in a
+  sandboxed catalyst home), installs into catalyst's home, and creates the bug with `catalyst new`; run end to end.
+
 ## 0.117.0 — 2026-10-26
 
 No layout change; a served criterion's database gains two tables, made on start.

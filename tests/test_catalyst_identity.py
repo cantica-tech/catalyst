@@ -347,7 +347,7 @@ def test_with_no_one_logged_in_the_machines_system_account_signs(capsys):
     assert (who.username, who.subject, who.grants) == ("sysadmin", "sub-sys", ("cmd:*",))
     assert "signing as the system account sysadmin" in capsys.readouterr().err
     assert provider.verify(POINTER, "System", transport).username == "sysadmin"  # --as by its name, too
-    with pytest.raises(provider.ProviderError, match="not logged in"):
+    with pytest.raises(provider.ProviderError, match=r"no verified identity for alice: .* system account is sysadmin"):
         provider.verify(POINTER, "alice", transport)  # --as a person: never the system account for them
 
 

@@ -76,6 +76,9 @@ class InitRequest:
     userid: str | None = None  # fixed first userid (reproducible examples); else drawn
     runtime: bool = True  # fill the home criterion's .venv (R3.1a)
     identity: dict | None = None  # the pointer to catalyst-users (design 29); the tests' static one from `user` if None
+    # who to sign as, when named (`--user`, `--git-username`); None: whoever the provider verifies, so a git
+    # name that differs from the provider's never refuses the install (BUG-000040)
+    verify_as: str | None = None
 
 
 def static_identity(req: InitRequest) -> dict:
@@ -436,7 +439,8 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     # --- who installs: catalyst-users' verified identity (design 29) ---------
     identity = req.identity or static_identity(req)
     try:
-        installer = provider.verify(identity, req.git_username or req.user)
+        static = identity.get("provider") == "static"
+        installer = provider.verify(identity, (req.git_username or req.user) if static else req.verify_as)
     except provider.ProviderError as exc:
         raise InitError(str(exc)) from None
 
@@ -578,7 +582,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         root / "DEPLOYMENT.md",
         f"# Deployment\n\n- Project: `{req.name}`\n- Kernel: {version}\n"
         + (f"- Active module: `{manifest.id}` v{manifest.version}\n" if manifest else "- Active module: none\n")
-        + f"- Installed: {stamp} by {req.user} "
+        + f"- Installed: {stamp} by {installer.name or installer.username} "
         f"with `catalyst init`\n- Shared: no (local-only; `catalyst criterion create <url>` shares it)\n",
     )
     _write(
@@ -610,7 +614,7 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
         "repoed": False,
         "catalyst_repo": None,
         "catalyst_repo_url": None,
-        "created_by": req.user,
+        "created_by": installer.name or installer.username,
         "criterion_branch": None,
         "created": stamp,
         "updated": stamp,
@@ -675,15 +679,17 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
 
         venv, _ = rt.install_into(root, version, root / "bin" / "catalyst.pyz")
         steps.append(f"filled the criterion's runtime {venv} (catalyst {version}, git-ignored)")
+        launcher = rt.install_launcher()  # the `catalyst` command, as `runtime install` leaves it (BUG-000041)
+        steps.append(f"installed the catalyst command {launcher} (put {launcher.parent} on PATH)")
     what = f"kernel {version}, " + (f"module {manifest.id} {manifest.version}" if manifest else "no module")
     _git(root, "init", "-q")
     _git(root, "add", "-A")
     _git(
         root,
         "-c",
-        f"user.name={req.git_username or req.user}",
+        f"user.name={installer.username}",
         "-c",
-        f"user.email={(req.git_username or 'catalyst')}@catalyst.invalid",
+        f"user.email={installer.username}@catalyst.invalid",
         "commit",
         "-q",
         "-m",
