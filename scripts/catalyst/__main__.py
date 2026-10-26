@@ -2422,6 +2422,7 @@ def cmd_init(args) -> int:
                 kernel=kernel,
                 module=args.module_dir,
                 git_username=args.git_username or user,
+                verify_as=args.git_username or args.user,  # named: sign only as them; else whoever is verified
                 rule_docs=docs,
                 test_locations=args.test_locations,
                 at=args.at,
@@ -2675,7 +2676,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_validate)
 
     p = sub.add_parser("init", help="install catalyst into this project (explicit only, INV-2)")
-    p.add_argument("--name", required=True, help="the project name (the pointer is <name>.catalyst)")
+    p.add_argument(
+        "--name",
+        required=True,
+        help="the project's name: catalyst.toml's project_name, its criterion $HOME/.catalyst/projects/<name>/criterion",
+    )
     p.add_argument(
         "--module", help="the active process module id (no default: without it, init lists the modules it finds)"
     )

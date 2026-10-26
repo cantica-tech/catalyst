@@ -135,8 +135,10 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
         except CatalystUsersError as exc:
             raise ProviderError(f"no one is logged in, and the system account cannot sign in: {exc}") from None
         if as_user and as_user.strip().lower() not in {who.username.lower(), who.name.lower(), who.subject.lower()}:
-            raise ProviderError(  # --as names someone else: never the system account for them
-                f"no verified identity: not logged in to {backend.issuer} (`catalyst identity login`)"
+            raise ProviderError(  # it names someone else: never the system account for them (BUG-000040)
+                f"no verified identity for {as_user}: no one is logged in to {backend.issuer}, and this machine's "
+                f"system account is {who.username} ({who.name}); log in as {as_user} (`catalyst identity login`), "
+                "or leave the name out to sign as the system account"
             ) from None
         print(f"catalyst: no one is logged in: signing as the system account {who.username}", file=sys.stderr)
         return who

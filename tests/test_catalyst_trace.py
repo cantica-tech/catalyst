@@ -174,3 +174,33 @@ def test_a_revision_that_is_an_option_is_refused(project, capsys, argv):
     assert main(argv) == 1
     assert not (project / "pwned.txt").exists()
     assert "not a revision" in capsys.readouterr().err
+
+
+def test_the_hook_finds_the_criterions_cli_without_a_launcher(tmp_path, monkeypatch):
+    """A project holding only catalyst.toml, on a machine with no launcher yet (`init --no-runtime`): the hook runs
+    the criterion's own CLI from catalyst's home; with none there, it says the message went unchecked, never silent."""
+    import sys
+
+    repo, home = tmp_path / "app", tmp_path / "home"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    write(repo / "catalyst.toml", 'project_name = "demo"\n')
+    hook = install_hook(repo)
+    msg = repo / "MSG"
+    msg.write_text("Untraced\n", encoding="utf-8")
+    monkeypatch.setenv("CATALYST_HOME", str(home))
+
+    def run() -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(hook), str(msg)], cwd=repo, capture_output=True, text=True, check=False
+        )
+
+    done = run()
+    assert done.returncode == 0 and "commit message not checked: no catalyst CLI" in done.stderr
+    seen = tmp_path / "seen"
+    write(
+        home / "projects" / "demo" / "criterion" / "bin" / "catalyst.pyz",
+        f"import sys\nopen({str(seen)!r}, 'w').write(' '.join(sys.argv[1:]))\nsys.exit(1)\n",
+    )
+    assert run().returncode == 1  # the criterion's CLI checked it, and refused
+    assert "hook commit-msg --route" in seen.read_text(encoding="utf-8")
