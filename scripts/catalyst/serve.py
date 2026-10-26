@@ -496,6 +496,7 @@ class Server(Reads):
                     "files": [{"path": WC + membership.FINGERPRINTS, "before": before, "after": after}],
                     "writer": f"catalyst/{__version__}",
                     "tier": "chore",
+                    "via": "server",
                 }
                 shard = f"{journal.SHARDS}/{journal.actor_slug(name)}@serve/{stamp[:7]}.jsonl"
                 shard_before, shard_old = held(shard)

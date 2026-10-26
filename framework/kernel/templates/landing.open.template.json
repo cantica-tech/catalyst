@@ -1,0 +1,25 @@
+{
+  "$schema": "https://github.com/cantica-tech/catalyst/framework/kernel/schemas/landing.schema.json",
+  "policy": "open",
+  "target": {
+    "kind": "git",
+    "branch": "criterion",
+    "credential": "serve-landing"
+  },
+  "rules": [
+    {
+      "id": "server-own",
+      "match": {
+        "change": "server"
+      },
+      "group": "change",
+      "review": "none",
+      "merge": "auto"
+    }
+  ],
+  "default": {
+    "group": "change",
+    "review": "none",
+    "merge": "auto"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/cantica-tech/catalyst/framework/kernel/schemas/landing.schema.json",
+  "title": "catalyst landing policy",
+  "description": "A criterion's `IAM/landing.json` (design 33, fw-STRUCTURE-000023): how an accepted change reaches the criterion's repository. The first rule whose `match` fits a change decides how it lands; `default` decides when none does. No file means the kernel's `standard` policy. `catalyst check` reports what this schema cannot: an unknown role or type.",
+  "type": "object",
+  "required": ["policy", "target", "rules", "default"],
+  "additionalProperties": false,
+  "$defs": {
+    "group": {
+      "description": "What one pull request carries: each change alone, an agent session's changes, or everything held for a time.",
+      "oneOf": [
+        { "enum": ["change", "session", "window"] },
+        {
+          "type": "object",
+          "required": ["by"],
+          "additionalProperties": false,
+          "properties": { "by": { "const": "change" } }
+        },
+        {
+          "type": "object",
+          "required": ["by"],
+          "additionalProperties": false,
+          "properties": {
+            "by": { "const": "session" },
+            "idle_minutes": { "type": "integer", "minimum": 1, "description": "a session with no change for this long has ended" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["by"],
+          "additionalProperties": false,
+          "properties": { "by": { "const": "window" }, "minutes": { "type": "integer", "minimum": 1 } }
+        }
+      ]
+    },
+    "review": {
+      "description": "Who must approve before merging: none, or approvals from a role, in catalyst's inbox or on the host's pull request.",
+      "oneOf": [
+        { "const": "none" },
+        {
+          "type": "object",
+          "required": ["approvals", "role"],
+          "additionalProperties": false,
+          "properties": {
+            "where": { "enum": ["catalyst", "host"], "default": "catalyst" },
+            "approvals": { "type": "integer", "minimum": 1 },
+            "role": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "merge": {
+      "description": "auto: the server merges once the catalyst check passes and the review holds; admin: an admin merges.",
+      "enum": ["auto", "admin"]
+    }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "policy": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$", "description": "the kernel policy it started from (standard, open, reviewed, host), or the project's own name" },
+    "target": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "git" },
+        "branch": { "type": ["string", "null"], "description": "the shared branch; null: catalyst.toml's criterion_branch" },
+        "credential": { "type": ["string", "null"], "description": "the name of the server's landing credential, never the secret" }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "match", "group", "review", "merge"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,40}$" },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "via": { "enum": ["agent", "person"] },
+              "who": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "roles, any of which the change's signer holds" },
+              "change": { "enum": ["unlinked", "linked", "proposal-accepted", "server"] },
+              "types": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "entity type prefixes" }
+            }
+          },
+          "group": { "$ref": "#/$defs/group" },
+          "review": { "$ref": "#/$defs/review" },
+          "merge": { "$ref": "#/$defs/merge" }
+        }
+      }
+    },
+    "default": {
+      "type": "object",
+      "required": ["group", "review", "merge"],
+      "additionalProperties": false,
+      "properties": {
+        "group": { "$ref": "#/$defs/group" },
+        "review": { "$ref": "#/$defs/review" },
+        "merge": { "$ref": "#/$defs/merge" }
+      }
+    }
+  }
+}

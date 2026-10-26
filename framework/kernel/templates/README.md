@@ -46,6 +46,10 @@ This folder contains the reusable document templates that seed the deployed cata
   catalyst-users' (`Rules-of-Rules.md` §11). `IAM/users/`, `IAM/roles/`
   and `IAM/groups/` each get the same `templates/` treatment as every other
   artifact type (`INVARIANTS.md` INV-20).
+- `landing.<policy>.template.json` (`standard`, `open`, `reviewed`,
+  `host`) — the kernel's landing policies (design 33): `catalyst landing
+  init --policy <policy>` writes one as `IAM/landing.json`, then it is the
+  project's own; without the file, `standard` applies.
 - The project file, `catalyst.toml` — the only catalyst file a project
   tracks — has no template: `catalyst init` writes it (`FORMAT.md` §1,
   INV-6); `catalyst share create` adds the sharing fields.

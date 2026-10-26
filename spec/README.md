@@ -23,6 +23,8 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `approvals.schema.json` | `catalyst approvals <id> --json` | `GET /v1/approvals/<id>` |
 | `identity-whoami.schema.json` | `catalyst identity whoami --json`, `catalyst identity login --json` | — (a user's own login) |
 | `identity-status.schema.json` | `catalyst identity status --json` | — (a user's own login) |
+| `landing-init.schema.json` | `catalyst landing init --json` | — (an admin's choice) |
+| `landing-show.schema.json` | `catalyst landing show --json` | — |
 | `try.schema.json` | `catalyst try <verb …> --json` | — (the host runs it, design 27) |
 | `analyses.schema.json` | `catalyst analysis list --json` | `GET /v1/analyses` |
 | `analysis.schema.json` | `catalyst analysis status <id> --json` | `GET /v1/analyses/<id>` |

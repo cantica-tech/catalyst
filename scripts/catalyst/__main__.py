@@ -530,6 +530,44 @@ def cmd_approve(args) -> int:
     return 0
 
 
+def cmd_landing(args) -> int:
+    """`catalyst landing init|show` (design 33, fw-STRUCTURE-000023): the criterion's landing policy."""
+    from catalyst import landing
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    dep = open_deployment(args)
+    try:
+        if args.landing_command == "init":
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            path = landing.init(dep, args.policy, signer, force=args.force, intent=args.intent)
+            out = {"policy": args.policy, "file": str(path)}
+            print(json.dumps(out) if args.json else f"landing policy {args.policy}: {path}, journaled")
+            return 0
+        data, source = landing.effective(dep)
+    except (IdError, JournalError, landing.LandingError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({"source": source, "policy": data}, indent=2, ensure_ascii=False))
+        return 0
+    print(f"{data.get('policy')}: from {source}")
+    for rule in [*(data.get("rules") or []), {"id": "default", **(data.get("default") or {})}]:
+        if not isinstance(rule, dict):
+            continue
+        match = ", ".join(f"{k}={v}" for k, v in (rule.get("match") or {}).items()) or "anything"
+        review = rule.get("review")
+        said = (
+            f"{review.get('approvals')} approval(s) from {review.get('role')} in {review.get('where', 'catalyst')}"
+            if isinstance(review, dict)
+            else "no review"
+        )
+        group = rule.get("group")
+        group = group.get("by") if isinstance(group, dict) else group
+        print(f"  {rule.get('id')}: {match} -> one pull request per {group}, {said}, merge {rule.get('merge')}")
+    return 0
+
+
 def cmd_approvals(args) -> int:
     """`catalyst approvals <ID>`: each gate covering the entity, what counts and what is missing."""
     from catalyst import gates
@@ -2889,6 +2927,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_approvals)
+
+    p = sub.add_parser("landing", help="how this criterion's changes land in its repository (IAM/landing.json)")
+    ls = p.add_subparsers(dest="landing_command", required=True)
+    q = ls.add_parser("init", help="choose the landing policy: the Admin's assent to the landings it allows")
+    q.add_argument("--policy", default="standard", choices=["standard", "open", "reviewed", "host"])
+    q.add_argument("--force", action="store_true", help="replace an existing IAM/landing.json")
+    q.add_argument("--as", dest="as_user", help="signer (name or git_username): an admin")
+    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_landing)
+    q = ls.add_parser("show", help="read-only: the landing policy in force and where it comes from")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_landing)
 
     p = sub.add_parser("restore", help="write an entity back as it stood at a time: a new journaled change")
     p.add_argument("id")
