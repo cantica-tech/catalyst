@@ -32,7 +32,7 @@ development/journal/ada@k3j9q2/2026-10.jsonl
    "intent": ["Reset links honour the 30-minute expiry again"],
    "files": [{"path": "src/auth/reset.py", "before": "9f2c…", "after": "41ab…"}, …]}
 
-$ python3 .criterion/bin/catalyst.pyz check
+$ catalyst check
 catalyst check passed: 0 error(s), 0 warning(s)
 ```
 
@@ -49,7 +49,7 @@ cases (`RECON-`), workflows (`WORKFLOW-`), users and roles, the
 journal, repoed sync, and entity definitions as a mechanism. The
 active module adds its development-artifact types — their templates,
 definitions, commands, meta-rules, invariants and migrations — and is named
-by the `module` field of the project's `<app-name>.catalyst` pointer. Each
+in the project's `catalyst.toml` (`module`). Each
 production module lives in its own repository, listed in
 `framework/modules/catalog.md`; see that repository for what its artifact
 types are and how they relate. The contract between the two is
@@ -100,15 +100,17 @@ kernel's.
 
 ## Accountability: users, roles, signing
 
-Every artifact carries a `Signed-off-by` field, resolved against a
-registered-user list (`/user add|remove|modify|assign-role`) and a
-role → typical-action mapping (`/role add|modify`, seeded with a default
-agile-role set). A project must always have at least one active user — the
-one hard requirement — but role checks themselves are advisory, not access
-control: catalyst has no way to verify who's actually typing, so a mismatch
-is noted on the artifact, never a block or a confirmation prompt (INV-25).
-The one exception is reconciliation: resolving a `RECON-` case is genuinely
-gated by the role's `reconciliation` level.
+People are not kept in a criterion: they are catalyst-users', a facade to
+any identity provider (Keycloak built in). Each signature is the verified,
+logged-in identity, recorded once in the criterion's signers ledger
+(`IAM/signers.jsonl`, append-only), so every artifact's `Signed-off-by` names
+someone the provider vouched for. What a person may do comes from the
+provider too: their grants decide which commands they run and which types
+they create, their roles set their reconciliation level, and a criterion's
+admins hold every grant in that criterion only. When no one is logged in, a
+machine's system account (set up by catalyst-users) signs, and says so. A
+criterion shared through `catalyst serve` can also record who belongs to it
+and admit only them (`catalyst members`).
 
 ## History: the journal
 
@@ -125,8 +127,9 @@ tree automatically. `/journal` is the read-only query side.
 
 The mechanical steps — allocating IDs, drawing userids, hashing files into
 the journal, regenerating indexes, validating the traceability chain — are
-code, not prose: the `catalyst` command line, vendored into every deployment
-as `.criterion/bin/catalyst.pyz`. Procedures call it and keep only the
+code, not prose: the `catalyst` command line, installed as
+`~/.catalyst/bin/catalyst` and kept in every criterion as `bin/catalyst.pyz`
+at the version it was deployed with. Procedures call it and keep only the
 judgment parts in prose; agents with an end-of-turn hook run
 `catalyst hook stop` so every turn ends on a passing `catalyst check`.
 Commits trace too: a git `commit-msg` hook (`catalyst hook install`) and
