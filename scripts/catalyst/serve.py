@@ -350,8 +350,10 @@ class Server(Reads):
         self._loading = threading.Lock()
         self._loaded: tuple | None = None  # (batch, deployment, corpus) the reads answer from
         self.changed = threading.Condition()  # notified when a batch lands (the events stream)
+        from catalyst import serve_landing
+
         with self._conn() as c:
-            c.executescript(SCHEMA)
+            c.executescript(SCHEMA + serve_landing.TABLES)
         self.criterion = self._criterion(criterion)
         self.admission = None  # design 32: set when a membership ledger is open
         from catalyst import membership
@@ -515,6 +517,9 @@ class Server(Reads):
                 ):
                     c.execute("INSERT INTO changes(seq, path, before, after) VALUES (?, ?, ?, ?)", (seq, path, b, a))
                     _project(c, seq, path, a, blob)
+                from catalyst import serve_landing
+
+                serve_landing.hold(c, seq, {"name": name})  # the server's own batch lands too (design 33)
             except BaseException:
                 c.execute("ROLLBACK")
                 raise
@@ -866,6 +871,9 @@ class Server(Reads):
         for p, before, after in rows:
             c.execute("INSERT INTO changes(seq, path, before, after) VALUES (?, ?, ?, ?)", (seq, p, before, after))
             _project(c, seq, p, after, content(after))
+        from catalyst import serve_landing
+
+        serve_landing.hold(c, seq, user, importing)  # held until it lands (design 33, fw-STRUCTURE-000024)
         return {"seq": seq, "previous": previous, "base": base, "files": len(rows)}
 
     def rebuild(self) -> None:

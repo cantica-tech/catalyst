@@ -8,8 +8,10 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 ## Names that mean more than one thing
 
 - **criterion.** Four related things share the name; the context says which:
-  - **`.criterion`** — the *working copy* directory (see below), and the
-    path `<project root>/.criterion` through which the project reaches it.
+  - **the criterion** — the *working copy* (see below), in catalyst's home
+    (`$HOME/.catalyst/projects/<name>/criterion`, `catalyst where`); the
+    journal and the CLI name a file in it `.criterion/<path>`, a notation,
+    not a directory of the project.
   - **the criterion repository** — the dedicated git repository a *shared*
     deployment publishes its working copy to (`Rules-of-Rules.md` §13).
   - **`catalyst criterion`** — the git sharing driver's own commands
@@ -37,23 +39,27 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   `/adopt` command drives the choice — adopt, reject (revert, with the
   user's assent) or, when contested, a `RECON-` case
   (`CODE-OF-CONDUCT.md` §9).
-- **Agent-owned space.** A per-project data directory the running agent
-  already maintains outside the project's tree, computed per machine from
-  the agent's own conventions and never written into a tracked file. A
-  local-only working copy lives there (INV-6, `BOOTSTRAP.md` §1).
 - **ANALYSIS.** `ANALYSIS-NNNNNN`: the record of one four-eyes analysis of
   existing code (`/run-analysis`, `catalyst analysis`) — its scope, mode
   (`bootstrap` / `incremental`), the commit analysed, its passes (two, or
   one when it is single-pass), the
   reconciled findings (domains, rules, defects) and the user's decision on
   each, in `analyses/` (`ANALYSIS-PLAYBOOK.md`, `CLI.md`).
+- **Catalyst's home.** `$HOME/.catalyst` (`CATALYST_HOME` moves it): each
+  project's criterion (`projects/<name>/criterion`) or workspace's, the
+  `catalyst` command (`bin/`) and catalyst-users' settings (`users/`).
+  Every agent and tool on the machine finds a criterion there, never in the
+  project's tree (L5, INV-6, `BOOTSTRAP.md` §1). It replaced the
+  *agent-owned space* of earlier kernels.
 - **`.catalystignore`.** A committed file in any product directory that
   opts paths out of catalyst: empty, its whole directory; with lines,
   those paths. No deployment governs what it opts out (`FORMAT.md` §11).
-- **`<app-name>.catalyst` (the pointer).** The one small JSON file the
-  product repository tracks at its root: project name, format version,
-  kernel version, active module, agent, sharing fields. It holds no path
-  (INV-6, `FORMAT.md` §1).
+- **`catalyst.toml` (the pointer).** The one small file the product
+  repository tracks at its root, and the only file of catalyst in the
+  project: project name, format version, kernel version, active module,
+  agent, sharing fields. It holds no path, so it is the same on every clone
+  (L5, INV-6, `FORMAT.md` §1). Earlier kernels wrote a JSON
+  `<app-name>.catalyst` instead.
 - **Baseline (`journal_since`).** The pointer field naming the product
   commit after which every commit's changes must be in the journal;
   history before it is not checked for *unrecorded changes*. `catalyst
@@ -118,13 +124,13 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
   versioned by the repository's root `version.txt`. It names no module
   entity (INV-3, INV-30).
 - **Ledger.** The agent's written checklist for a long task, in
-  `.criterion/.ledger/<task>.todo.md`, read before and ticked after each
+  the criterion's `.ledger/<task>.todo.md`, read before and ticked after each
   unit of work, so the procedure is not carried in memory (`BOOTSTRAP.md` §3).
-- **Local-only vs shared (repoed).** A *local-only* deployment's working
-  copy exists on one machine, in agent-owned space. A *shared* one
-  (`repoed: true`) lives in a criterion repository, mounted as the product's
-  `.criterion` git submodule, and changes land through pull requests
-  (INV-18).
+- **Local-only vs shared (repoed).** A *local-only* deployment's criterion
+  exists on one machine, in catalyst's home. A *shared* one (`repoed: true`)
+  is also a criterion repository, cloned into each machine's catalyst home,
+  and its changes land through pull requests (`catalyst criterion push`), or
+  through a `catalyst serve` server (INV-18).
 - **Pin.** Keeping every journaled blob reachable under
   `refs/catalyst/journal`, so `git gc` never prunes the history
   point-in-time restore needs (`catalyst journal pin`, `CLI.md`).
@@ -184,8 +190,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 - **WORKFLOW.** `WORKFLOW-NNNNNN`: a repeatable multi-step procedure other
   entities may reference to guide their process; never itself work
   (INV-24).
-- **Working copy.** The deployment's governance record for a project — the
-  directory named `.criterion/` holding rules, artifacts, definitions,
-  the signers ledger, the journal and the vendored CLI. Never part of the product's own
-  tree: it lives in agent-owned space (local-only) or in the criterion
-  repository (shared) (INV-6).
+- **Working copy.** The deployment's governance record for a project, its
+  criterion: the directory in catalyst's home holding rules, artifacts,
+  definitions, the signers ledger, the journal and the CLI it was deployed
+  with (`bin/catalyst.pyz`). Never part of the product's own tree; a shared
+  one is also published to the criterion repository (L5, INV-6).

@@ -195,6 +195,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst share login <url>` | keep this user's token for a catalyst serve server (in catalyst's home) | `--token` |
 | `catalyst serve token <action> <who>` | issue, list or revoke the tokens users sign with | — |
 | `catalyst serve key <action>` | the master key of the membership ledger: init, escrow, recover (fw-IDENTITY-000013) | `--holder`, `--key-command`, `--out`, `--reason`, `--share`, `--threshold` |
+| `catalyst serve landing <action> <target>` | where the server lands what it accepted: connect, tick, list, retry (fw-STRUCTURE-000024) | `--branch`, `--forge`, `--json`, `--name`, `--token-command`, `--yes` |
 | `catalyst serve members <action>` | the membership ledger: open, check, fingerprint (fw-IDENTITY-000012) | `--json`, `--reason`, `--yes` |
 | `catalyst members <action> <member>` | a served criterion's members, through its server: list, add, remove, adopt (design 32) | `--json`, `--reason` |
 | `catalyst criterion status` | the working copy against the shared branch | `--fetch` |
@@ -1675,6 +1676,35 @@ only.
   `1` on any finding.
 - `serve members fingerprint`: writes one now.
 
+Landing (design 33 phase 2, fw-STRUCTURE-000024): the server holds every batch
+it accepts and lands it in the criterion's repository as the landing policy
+says (`IAM/landing.json`, `catalyst landing show`).
+
+- `serve landing connect <repository> [--forge github|git] [--token-command
+  <cmd>] [--name <credential>] [--branch <branch>] [--yes]`: where the server
+  lands, and the command printing its token (read at each tick, never stored).
+  Without `--yes` it says what it would push where and exits `3`. `--name` is
+  the credential the policy's `target.credential` names (default
+  `serve-landing`).
+- `serve landing tick [--json]`, also run every minute while the server runs
+  once connected: takes in the shared branch (a file whose tip differs from
+  the server's and that no pending landing holds becomes a server batch);
+  matches each held batch to the policy's first rule and groups them
+  (`change`; `session`, once its signer is idle `idle_minutes`; `window`);
+  lands a group as one commit on a topic branch `landing/<signer>/…` (author
+  the server, a `Signed-off-by` per signer), pushed, with a pull request; and
+  follows each open landing. It merges only under `review: none` and `merge:
+  auto`, once the check passes: GitHub's check runs (none registered yet is
+  pending, never a pass), or, with the `git` forge, `catalyst check` on the
+  merge result. Otherwise the landing waits (`waiting-review`,
+  `waiting-admin`, `check-failed`) until it is merged or closed on the host.
+  A file the shared branch changed since a batch is a `conflict`: nothing is
+  pushed, its batches stay held for a human.
+- `serve landing list [--json]`: each landing, its state, batches and pull
+  request, and the batches still held.
+- `serve landing retry <n>`: holds a conflicted, failed or closed landing's
+  batches again, once a human settled the shared branch.
+
 ### `catalyst members list|add|remove|adopt [<member>] [--reason <text>]`
 
 A served criterion's members, through its server (design 32): `list` them, or
@@ -2013,6 +2043,7 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst share info` | `spec/share-info.schema.json` |
 | `catalyst share status` | `spec/share-status.schema.json` |
 | `catalyst share push` | `spec/share-push.schema.json` |
+| `catalyst serve landing` | `spec/serve-landing.schema.json` |
 | `catalyst serve members` | `spec/members-check.schema.json` |
 | `catalyst members` | `spec/members.schema.json` |
 | `catalyst identity login` | `spec/identity-whoami.schema.json` |
@@ -2412,6 +2443,14 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--out` `OUT` | escrow: the directory each holder's share file is written to |
 |  | `--share` `SHARE` | recover: a share file (repeatable) |
 |  | `--reason` `REASON` | recover: why the break-glass copy is used (default ``) |
+| `catalyst serve landing` | `<action>` | One of `connect`, `tick`, `list`, `retry` |
+|  | `<target>` | connect: the criterion repository's URL; retry: the landing's number |
+|  | `--forge` `FORGE` | connect: the repository's host (one of `github`, `git`; default `git`) |
+|  | `--token-command` `TOKEN_COMMAND` | connect: a command printing the push and API token (never stored) |
+|  | `--name` `NAME` | connect: the credential's name, as the policy names it (default `serve-landing`) |
+|  | `--branch` `BRANCH` | connect: the shared branch (default: criterion) (default `criterion`) |
+|  | `--yes` | connect: the user agreed the server pushes there (INV-4) |
+|  | `--json` | machine-readable output |
 | `catalyst serve members` | `<action>` | One of `open`, `check`, `fingerprint` |
 |  | `--reason` `REASON` | open: why (default ``) |
 |  | `--yes` | open: the Admin agreed to the members it adopts (INV-4) |
