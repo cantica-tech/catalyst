@@ -2062,7 +2062,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |---|---|---|
 | `catalyst validate` | `--strict` | treat warnings as errors |
 |  | `--json` | machine-readable output |
-| `catalyst init` | `--name` `NAME` | the project name (the pointer is <name>.catalyst) |
+| `catalyst init` | `--name` `NAME` | the project's name: catalyst.toml's project_name, its criterion $HOME/.catalyst/projects/<name>/criterion |
 |  | `--module` `MODULE` | the active process module id (no default: without it, init lists the modules it finds) |
 |  | `--user` `USER` | the installer's name, as catalyst-users knows them (default: git config user.name) |
 |  | `--git-username` `GIT_USERNAME` | the installer's username (default: --user) |
