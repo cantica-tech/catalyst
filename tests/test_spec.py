@@ -59,6 +59,7 @@ CASES = [
     ("list", ["list", "templates"]),
     ("view", ["view", ITEM]),
     ("view", ["view", RULE]),
+    ("view", ["view", f"ROW-000001-{USERID}"]),
     ("backlog", ["backlog"]),
     ("graph", ["graph"]),
     ("journal", ["journal", "show"]),

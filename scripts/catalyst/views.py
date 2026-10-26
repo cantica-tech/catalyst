@@ -127,7 +127,12 @@ def list_items(
         rows = [r for r in _templates(dep) if template_family is None or r["family"].lower() == template_family.lower()]
     else:
         rows = [_artifact_row(dep, a) for a in corpus.by_prefix.get(canon, [])]
-        rows += [{"id": i, "type": canon} for i in sorted(corpus.row_items.get(canon, ()))]
+        where = {i: (f, n) for i, prefix, f, n, _, _ in _rows(dep, corpus) if prefix == canon}
+        for i in sorted(corpus.row_items.get(canon, ())):
+            row: dict[str, object] = {"id": i, "type": canon}
+            if i in where:  # the table it is a row of: `view` shows it from there
+                row.update({"file": _rel(dep, where[i][0]), "line": where[i][1]})
+            rows.append(row)
     return [r for r in rows if _matches(r, filters)]
 
 
@@ -172,12 +177,16 @@ def resolve(corpus: Corpus, item_id: str) -> str | None:
 
     if item_id in corpus.artifacts:
         return item_id
+    rows = {i for ids in corpus.row_items.values() for i in ids}
+    if item_id in rows:
+        return item_id
     rule = corpus.rule_id(item_id)
     if rule:
         return rule
     key = meta_key(item_id)
     found = sorted(
         {i for i in corpus.artifacts if i.startswith(item_id + "-")}
+        | {i for i in rows if i.startswith(item_id + "-")}
         | {r for r in corpus.rules if r.startswith(item_id + "-") or (key and meta_key(r) == key)}
     )
     if len(found) > 1:
@@ -269,6 +278,21 @@ def view(dep: Deployment, corpus: Corpus, item_id: str) -> dict:
             "strength": rule.strength,
             "links": {},
         }
+    elif (row := next((r for r in _rows(dep, corpus) if r[0] == item_id), None)) is not None:
+        _, prefix, path, line, text, cells = row  # an item kept as a row of a table: shown from its row
+        out = {
+            "id": item_id,
+            "type": prefix,
+            "title": next((cells[h] for h in ("Title", "Name", "Feature", "Item") if cells.get(h)), item_id),
+            "file": _rel(dep, path),
+            "line": line,
+            "row": True,
+            "text": text,
+            "fields": cells,
+            "links": {},
+        }
+        if cells.get("Status"):
+            out["status"] = cells["Status"]
     else:
         raise ViewError(f"no artifact or rule '{item_id}' in this deployment")
     out["linked_from"] = sorted(

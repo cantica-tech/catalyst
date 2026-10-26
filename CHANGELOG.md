@@ -6,6 +6,19 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.116.1 — 2026-10-26
+
+No layout change.
+
+- Fixed: `catalyst view` shows an item kept as a row of a table (a `naming: free-form` type, such as a roadmap's
+  rows), which `catalyst list all` names but `view` refused as "no artifact or rule" (BUG-000037): its table's file
+  and line, the row as written, its cells by column, its title and status, and its journal, marked `"row": true` as
+  `graph` marks it. A short ID finds it. `list` gives each row its file and line. `spec/view.schema.json` and
+  `spec/list.schema.json` describe them.
+- Fixed: `scripts/package_release.py --publish-dir` (`task release:publish`) publishes only a tagged release, from a
+  checkout at its tag: a kernel whose version has no tag, or a checkout past it, is refused, unless `--unreleased`
+  says so (BUG-000038).
+
 ## 0.116.0 — 2026-10-25
 
 A new optional journal field, no layout change; migration `0.116.0/landing.md` asks one judgment step.
