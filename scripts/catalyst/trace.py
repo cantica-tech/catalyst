@@ -60,9 +60,29 @@ def cli_near(rel):
 home = os.environ.get("CATALYST_HOME") or os.path.join(os.path.expanduser("~"), ".catalyst")
 launcher = os.path.join(home, "bin", "catalyst")
 router = os.path.join(top, ROUTER)
+
+
+def criterion_cli():  # the CLI of the criterion catalyst.toml names, in catalyst's home: no launcher yet
+    import re
+
+    try:
+        text = open(os.path.join(top, "catalyst.toml"), encoding="utf-8").read()
+    except OSError:
+        return None
+    name = re.search(r'^project_name\\s*=\\s*"([^"]+)"', text, re.M)
+    for kind in ("projects", "workspaces"):
+        cli = name and os.path.join(home, kind, name.group(1), "criterion", "bin", "catalyst.pyz")
+        if cli and os.path.isfile(cli):
+            return cli
+    return None
+
+
 cli = (launcher if os.path.isfile(launcher) else router if os.path.isfile(router)
-       else next((c for c in map(cli_near, staged + [""]) if c), None))
+       else criterion_cli() or next((c for c in map(cli_near, staged + [""]) if c), None))
 if cli is None:
+    if os.path.isfile(os.path.join(top, "catalyst.toml")):  # governed, but no CLI here: say so, never pass silently
+        print("catalyst: commit message not checked: no catalyst CLI found for this project "
+              "(`catalyst runtime install`, or `catalyst open`)", file=sys.stderr)
     sys.exit(0)
 sys.exit(subprocess.run([sys.executable, cli, "--project", top, "hook", "commit-msg", "--route",
                          os.path.abspath(sys.argv[1])], cwd=top).returncode)
