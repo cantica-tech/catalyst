@@ -15,6 +15,9 @@ No layout change.
   and line, the row as written, its cells by column, its title and status, and its journal, marked `"row": true` as
   `graph` marks it. A short ID finds it. `list` gives each row its file and line. `spec/view.schema.json` and
   `spec/list.schema.json` describe them.
+- Fixed: `scripts/package_release.py --publish-dir` (`task release:publish`) publishes only a tagged release, from a
+  checkout at its tag: a kernel whose version has no tag, or a checkout past it, is refused, unless `--unreleased`
+  says so (BUG-000038).
 
 ## 0.116.0 — 2026-10-25
 

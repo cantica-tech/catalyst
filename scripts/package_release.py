@@ -587,13 +587,40 @@ def publish_releases(root: Path, publish_dir: Path, push: bool = False) -> Path 
     return publish_dir
 
 
+def unreleased_kernel(root: Path) -> str | None:
+    """Why the checkout's kernel is not a release to publish, or None: its version must have a release tag
+    (`<version>` or `v<version>`), and the checkout must be at it (a worktree at the tag)."""
+    version = read_kernel_version(root)
+
+    def rev(ref: str) -> str | None:
+        done = subprocess.run(
+            ["git", "rev-parse", "-q", "--verify", f"{ref}^{{commit}}"], cwd=root, capture_output=True, text=True
+        )
+        return done.stdout.strip() or None if done.returncode == 0 else None
+
+    tagged = next((c for c in (rev(f"refs/tags/{version}"), rev(f"refs/tags/v{version}")) if c), None)
+    if tagged is None:
+        return f"kernel {version} has no release tag: release it first (tag {version}), then publish from the tag"
+    if rev("HEAD") != tagged:
+        return f"this checkout is not at the {version} tag: publish from a worktree at it (`git worktree add <dir> {version}`)"
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--publish-dir", type=Path, help="distribution repository checkout to copy releases into")
     parser.add_argument(
         "--push", action="store_true", help="commit and push the module repositories and the publish directory"
     )
+    parser.add_argument(
+        "--unreleased",
+        action="store_true",
+        help="--publish-dir: publish the checkout's kernel although its version is not a tagged release here",
+    )
     args = parser.parse_args(argv)
+    if args.publish_dir and not args.unreleased and (why := unreleased_kernel(ROOT)):
+        print(f"Refused: {why} (--unreleased publishes it anyway)")
+        return 2
 
     print("Starting release packaging...")
     package_modules(ROOT, args.push)
