@@ -34,11 +34,14 @@ owner decision (C2).
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from catalyst.journal import VIA_VARIABLE
 
 Event = dict[str, object]
 
@@ -202,6 +205,7 @@ def run(
     with popen(
         adapter.argv(prompt),
         cwd=cwd,
+        env={**os.environ, VIA_VARIABLE: "agent"},  # its catalyst calls are an agent's (fw-STRUCTURE-000022)
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

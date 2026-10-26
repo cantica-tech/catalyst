@@ -57,6 +57,9 @@ PIN_REF = "refs/catalyst/journal"
 WC = ".criterion/"
 ACTIONS = ("create", "update", "close", "retire", "status-change", "sync", "redact")
 REQUIRED = ("timestamp", "actor", "command", "action", "artifact", "targets", "intent", "files")
+VIA = ("agent", "person", "server")  # how an entry's change was made (fw-STRUCTURE-000022, design 33 §3)
+VIA_VARIABLE = "CATALYST_VIA"  # says it outright: `catalyst mcp` and `agent run` set it for what they run
+AGENT_VARIABLES = ("AI_AGENT", "CLAUDECODE", "GEMINI_CLI")  # set by an agent for the commands its session runs
 
 
 class JournalError(Exception):
@@ -330,9 +333,20 @@ def journal_lock(dep: Deployment):
     return store_for(dep).lock("journal", stale=LOCK_STALE, error=JournalError)
 
 
+def via(environ=None) -> str:
+    """How the change being journaled is made: `CATALYST_VIA` when it says
+    `agent` or `person`, else `agent` inside an agent's session, else `person`."""
+    env = os.environ if environ is None else environ
+    said = str(env.get(VIA_VARIABLE, "")).strip().lower()
+    if said in ("agent", "person"):
+        return said
+    return "agent" if any(env.get(v) for v in AGENT_VARIABLES) else "person"
+
+
 def write(dep: Deployment, entry: dict) -> str:
     """Append one entry to its shard (call with the journal lock held);
     returns the shard, criterion-relative."""
+    entry.setdefault("via", via())
     rel = shard(entry)
     store_for(dep).append(rel, json.dumps(entry, ensure_ascii=False))
     return rel

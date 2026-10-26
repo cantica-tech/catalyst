@@ -39,7 +39,11 @@ guide is the judgment it leaves to the agent. Work it from
    leave an existing `commit-msg` hook for the user to merge.
 6. **What the module requires.** A document the module requires at
    instantiation that still holds `{{PLACEHOLDER}}` text is filled by the
-   command the module names. People and roles: catalyst-users.
+   command the module names.
+   **People, roles and landing**, together: roles and groups in
+   catalyst-users (`roles provision`, `criteria add`), then the landing
+   policy (design 33): recommend `standard`, run `catalyst landing init
+   --policy <chosen>`; its entry is the Admin's assent.
 7. **Landing page.** Extend the root `README.md` stub with the project's
    rule and workflow structure, linking each folder's `README.md`.
 8. **First content**, on the path that fits: greenfield (§3) or retrofit

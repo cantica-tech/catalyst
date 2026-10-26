@@ -133,6 +133,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst edit <id>` | change an entity's fields and sections; never its ID, Name, Filename, Signed-off-by or Status (design 31) | `--as`, `--command`, `--field`, `--forewarned`, `--intent`, `--json`, `--preview`, `--section`, `--section-file`, `--tier` |
 | `catalyst approve <id>` | approve an entity's current version under a gate (IAM/gates.json), journaled | `--as`, `--forewarned`, `--gate`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst approvals <id>` | the gates covering an entity: approvals counted and missing | `--json` |
+| `catalyst landing init` | choose the landing policy: the Admin's assent to the landings it allows | `--as`, `--force`, `--intent`, `--json`, `--policy` |
+| `catalyst landing show` | read-only: the landing policy in force and where it comes from | `--json` |
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--to` |
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--forewarned`, `--intent`, `--json`, `--preview`, `--through`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
@@ -1068,6 +1070,38 @@ Gates are enforced (`Rules-of-Rules.md` §11):
 - `catalyst inbox` lists what waits (kind `approval`), and
   `GET approvals/<id>` answers `catalyst approvals <id> --json`.
 
+### Landing: `landing init`, `landing show`
+
+How an accepted change reaches the criterion's repository (design 33,
+fw-STRUCTURE-000023): `IAM/landing.json`
+(`framework/kernel/schemas/landing.schema.json`) holds ordered rules, each
+matching a change (`via`, `who`, `change`, `types`) and saying what one pull
+request carries (`group`: `change`, `session`, `window`), who must approve
+it (`review`: `none`, or approvals from a role in catalyst's inbox or on the
+host) and how it merges (`merge`: `auto`, `admin`). The first rule that
+matches decides; `default` decides when none does. Without the file, the
+kernel's `standard` policy applies. Phase 1 declares and checks the policy;
+nothing lands through it yet.
+
+- `catalyst landing init [--policy standard|open|reviewed|host] [--force]
+  [--as <admin>]`: writes the kernel's policy to `IAM/landing.json`,
+  journaled as the Admin's assent (L3) to every landing it allows (decision
+  33.1). An admin's only; an existing file is replaced only with `--force`.
+  Onboarding runs it with the roles (`INSTANTIATION-CHECKLIST.md`).
+- `catalyst landing show [--json]`: the policy in force and where it comes
+  from (`spec/landing-show.schema.json`).
+- `catalyst check` reports a malformed policy, or one naming an unknown role
+  or type, as a `landing:` error, and warns when a criterion shared through a
+  server names no `target.credential`.
+
+Every journal entry also says how its change was made, `via`
+(fw-STRUCTURE-000022): `agent` in an agent's session (`catalyst mcp` and
+`catalyst agent run` set `CATALYST_VIA=agent` for what they run; `AI_AGENT`,
+`CLAUDECODE` or `GEMINI_CLI` in the environment), `person` otherwise, and
+`server` on a server's own entries. `CATALYST_VIA=person` or `=agent` says it
+outright: a UI's host running a verb for the person who clicked sets
+`person`.
+
 ### Workflow governance: conditions, due dates, governing workflows
 
 - **A condition** on an entity's fields is one line: `<Field> is|is not
@@ -1940,6 +1974,8 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst edit` | `spec/change.schema.json` |
 | `catalyst approve` | `spec/approve.schema.json` |
 | `catalyst approvals` | `spec/approvals.schema.json` |
+| `catalyst landing init` | `spec/landing-init.schema.json` |
+| `catalyst landing show` | `spec/landing-show.schema.json` |
 | `catalyst restore` | `spec/change.schema.json` |
 | `catalyst status set` | `spec/change.schema.json` |
 | `catalyst link` | `spec/change.schema.json` |
@@ -2131,6 +2167,12 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst approvals` | `<id>` | an entity or rule ID |
 |  | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst landing init` | `--policy` `POLICY` | One of `standard`, `open`, `reviewed`, `host`; default `standard` |
+|  | `--force` | replace an existing IAM/landing.json |
+|  | `--as` `AS_USER` | signer (name or git_username): an admin |
+|  | `--intent` `INTENT` | why (repeatable; journaled) |
+|  | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst landing show` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst restore` | `<id>` | an entity or rule ID |
 |  | `--to` `TO` | a journal timestamp (ISO; the version after the last entry at or before it), or #N (after its Nth change) |
 |  | `--as` `AS_USER` | signer (name or git_username) |

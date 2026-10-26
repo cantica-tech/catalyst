@@ -132,6 +132,10 @@ def run(dep: Deployment) -> Report:
     from catalyst import gates
 
     report.errors += [f"gates: {p}" for p in gates.problems(dep, corpus)]
+    from catalyst import landing
+
+    report.errors += [f"landing: {p}" for p in landing.problems(dep, corpus)]
+    report.warnings += [f"landing: {w}" for w in landing.warnings(dep)]
     from catalyst import workflows
 
     report.errors += [f"workflow: {p}" for p in workflows.problems(dep, corpus)]

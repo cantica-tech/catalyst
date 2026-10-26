@@ -6,6 +6,20 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.116.0 — 2026-10-25
+
+A new optional journal field, no layout change; migration `0.116.0/landing.md` asks one judgment step.
+
+- Added: every journal entry says how its change was made, `via` (`fw-STRUCTURE-000022`, REQ-000099, design 33):
+  `agent` in an agent's session (`catalyst mcp` and `catalyst agent run` set `CATALYST_VIA=agent`; `AI_AGENT`,
+  `CLAUDECODE`, `GEMINI_CLI`), `person` otherwise, `server` on a server's own entries. `CATALYST_VIA` says it
+  outright. Earlier entries are not rewritten.
+- Added: a criterion declares how its changes land, `IAM/landing.json` (`fw-STRUCTURE-000023`), with its schema and
+  four kernel policies (`standard`, `open`, `reviewed`, `host`); without the file, `standard`. `catalyst landing
+  init` (an admin's) writes one, journaled as the Admin's assent to every landing it allows; `catalyst landing show`
+  says which applies; `catalyst check` validates it. Nothing lands through it yet (design 33's phase 2).
+- Changed: onboarding's step 6 is people, roles and landing, worked together.
+
 ## 0.115.0 — 2026-10-25
 
 No layout change.
