@@ -243,6 +243,34 @@ def migrations(index: Path, deployed: str, target: str, owner: str) -> list[dict
     return out
 
 
+MODULE_RELEASE = re.compile(r"\bModule `(\d+(?:\.\d+)*)`")
+
+
+def module_migrations(
+    index: Path, deployed: str, target: str, old_module: str | None, new_module: str | None
+) -> list[dict]:
+    """A module's migrations for this sync: a row naming the module release it belongs to ("Module `3.3.0`.") is
+    due when the module moves across that release, whatever the kernel versions (BUG-000042); a row naming none,
+    by the kernel versions, as before."""
+    if not index.is_file():
+        return []
+    out = []
+    for line in index.read_text(encoding="utf-8").splitlines():
+        m = MIGRATION_ROW.match(line)
+        if not m:
+            continue
+        release = MODULE_RELEASE.search(m.group(4))
+        if release:
+            due = bool(old_module and new_module) and vt(old_module) < vt(release.group(1)) <= vt(new_module)
+        else:
+            due = vt(m.group(2)) >= vt(deployed) and vt(m.group(3)) <= vt(target)
+        if due:
+            out.append(
+                {"owner": "module", "file": m.group(1), "from": m.group(2), "to": m.group(3), "summary": m.group(4)}
+            )
+    return out
+
+
 def commands_dir(dep: Deployment, override: Path | None) -> Path | None:
     """Where catalyst once wrote command files: --commands-dir, else Claude Code's."""
     if override is not None:
@@ -455,7 +483,12 @@ def plan(dep: Deployment, src: Sources, commands: Path | None) -> Plan:
         )
     p.migrations = migrations(src.kernel / "migrations" / "migrations.md", src.deployed, src.version, "kernel")
     if src.module is not None:
-        p.migrations += migrations(src.module / "migrations" / "migrations.md", src.deployed, src.version, "module")
+        from catalyst import modules
+
+        old = modules.deployed_identity(src.base_module)["version"] if src.base_module else None
+        new = modules.deployed_identity(src.module)["version"]
+        index = src.module / "migrations" / "migrations.md"
+        p.migrations += module_migrations(index, src.deployed, src.version, old, new)
     p.migrations.sort(key=lambda m: (vt(m["to"]), m["owner"] != "kernel"))
     return p
 

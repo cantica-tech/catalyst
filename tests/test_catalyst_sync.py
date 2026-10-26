@@ -151,6 +151,28 @@ def test_migrations_between_the_versions_are_listed_in_order(tmp_path):
     ]
 
 
+def test_a_module_upgrade_lists_the_migrations_of_the_module_releases_it_crosses(tmp_path):
+    """BUG-000042: a module migration belongs to its module release ("Module `3.3.0`."), so moving the module from
+    3.2.0 to 3.4.1 lists 3.3.0's and 3.4.0's however little the kernel moves; a row naming no release keeps the
+    kernel range."""
+    index = tmp_path / "migrations.md"
+    index.write_text(
+        "| [`0.40.0/old.md`](0.40.0/old.md) | `0.39.0` | `0.40.0` | Module `2.2.0`. Old. |\n"
+        "| [`0.83.0/adr.md`](0.83.0/adr.md) | `0.82.0` | `0.83.0` | Module `3.3.0`. Decisions. |\n"
+        "| [`0.87.0/dates.md`](0.87.0/dates.md) | `0.86.0` | `0.87.0` | Module `3.4.0`. Dates. |\n"
+        "| [`0.117.1/plain.md`](0.117.1/plain.md) | `0.117.0` | `0.117.1` | No release named. |\n",
+        encoding="utf-8",
+    )
+    files = [m["file"] for m in sync.module_migrations(index, "0.117.0", "0.117.1", "3.2.0", "3.4.1")]
+    assert files == ["0.83.0/adr.md", "0.87.0/dates.md", "0.117.1/plain.md"]
+    assert [m["file"] for m in sync.module_migrations(index, "0.117.0", "0.117.1", "3.4.1", "3.4.1")] == [
+        "0.117.1/plain.md"
+    ]
+    assert sync.module_migrations(index, "0.117.0", "0.117.1", None, "3.4.1") == [
+        m for m in sync.module_migrations(index, "0.117.0", "0.117.1", None, "3.4.1") if m["file"] == "0.117.1/plain.md"
+    ]
+
+
 def test_the_cli_plans_without_writing(tmp_path, capsys):
     project, deployed = _deployment(tmp_path)
     base = _release(tmp_path, deployed)

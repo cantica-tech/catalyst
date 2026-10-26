@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.117.2 — 2026-10-26
+
+No layout change.
+
+- Fixed: `catalyst sync plan` and `sync apply` list a module's migrations by the module releases the sync crosses: a
+  migration naming its release ("Module `3.3.0`.") is due when the module moves past it, however little the kernel
+  moves; one naming none keeps the kernel range (BUG-000042). A module upgrade (3.2.0 -> 3.4.1) with a small kernel
+  move no longer skips the judgment steps of the module's own migrations.
+
 ## 0.117.1 — 2026-10-26
 
 No layout change. Found re-running the beta quickstart, which is rewritten for the current kernel.
