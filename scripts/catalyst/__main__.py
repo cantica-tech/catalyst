@@ -2078,6 +2078,8 @@ def cmd_serve(args) -> int:
         return _serve_key(serve, db, args)
     if args.serve_command == "members":
         return _serve_members(serve, db, args)
+    if args.serve_command == "landing":
+        return _serve_landing(serve, db, args)
     if args.serve_command == "token":
         app = serve.Server(db)
         if args.action == "list":
@@ -2137,6 +2139,9 @@ def cmd_serve(args) -> int:
         raise SystemExit(f"catalyst: {exc}") from None
     served = server.RequestHandlerClass.app.criterion  # type: ignore[attr-defined]
     serve.start_fingerprints(server.RequestHandlerClass.app)  # type: ignore[attr-defined]
+    from catalyst import serve_landing
+
+    serve_landing.start(server.RequestHandlerClass.app)  # type: ignore[attr-defined]
     named = f" (criterion {served})" if served else ""
     print(f"catalyst serve: {db}{named} on http://{args.host}:{server.server_address[1]} (Ctrl-C stops it)", flush=True)
     try:
@@ -2172,6 +2177,65 @@ def _host_identity(app) -> tuple[dict, str, object]:
             "catalyst: this host has no catalyst-users system account for that provider (`catalyst-users setup`)"
         )
     return actor, str(doc["issuer"]), backend
+
+
+def _serve_landing(serve, db: Path, args) -> int:
+    """`catalyst serve landing`: where the server lands what it accepted, and the landings (design 33,
+    fw-STRUCTURE-000024), on the server's host."""
+    from typing import Any
+
+    from catalyst import serve_landing
+
+    app = serve.Server(db, members=False)
+    out: Any
+    try:
+        if args.action == "connect":
+            if not args.target:
+                raise SystemExit("catalyst: serve landing connect needs the criterion repository's URL")
+            plan = (
+                f"land {db}'s accepted changes in {args.target} (branch {args.branch}, forge {args.forge}, credential "
+                f"{args.name}{', its token read by ' + repr(args.token_command) if args.token_command else ''}), "
+                "as the criterion's landing policy allows"
+            )
+            if not args.yes:
+                print(f"would {plan}\n(re-run with --yes: the server will push to that repository, INV-4)")
+                return 3
+            out = serve_landing.Lander.connect(app, args.target, args.forge, args.token_command, args.name, args.branch)
+            print(json.dumps(out) if args.json else f"connected: {plan}")
+            return 0
+        lander = serve_landing.Lander(app)
+        if args.action == "tick":
+            out = lander.tick()
+        elif args.action == "list":
+            out = lander.list()
+        else:
+            if not args.target or not args.target.isdigit():
+                raise SystemExit("catalyst: serve landing retry needs a landing's number")
+            out = {"retried": int(args.target), "batches": lander.retry(int(args.target))}
+    except (serve_landing.LandingError, serve.ServeError) as exc:
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        return 0
+    if args.action == "list":
+        for row in out:
+            where = f" {row.get('url')}" if row.get("url") else ""
+            print(
+                f"{row.get('id') or '-':>4}  {row['state']:<15} batches {row['batches']}{where}  {row.get('note') or ''}"
+            )
+        return 0
+    if args.action == "retry":
+        print(f"landing {out['retried']}: batches {out['batches']} held again")
+        return 0
+    for key in ("landed", "merged", "waiting", "conflicts"):
+        for row in out.get(key) or []:
+            print(f"{key}: landing {row['id']} {row['state']} {row.get('url') or ''} {row.get('note') or ''}".rstrip())
+    if out.get("taken_in"):
+        print(f"taken in: the shared branch, as batch {out['taken_in']}")
+    for err in out.get("errors") or []:
+        print(f"catalyst: {err}", file=sys.stderr)
+    return 1 if out.get("errors") else 0
 
 
 def _serve_key(serve, db: Path, args) -> int:
@@ -3442,6 +3506,17 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--out", type=Path, help="escrow: the directory each holder's share file is written to")
     q.add_argument("--share", action="append", default=[], type=Path, help="recover: a share file (repeatable)")
     q.add_argument("--reason", default="", help="recover: why the break-glass copy is used")
+    q = vs.add_parser(
+        "landing", help="where the server lands what it accepted: connect, tick, list, retry (fw-STRUCTURE-000024)"
+    )
+    q.add_argument("action", choices=("connect", "tick", "list", "retry"))
+    q.add_argument("target", nargs="?", help="connect: the criterion repository's URL; retry: the landing's number")
+    q.add_argument("--forge", choices=("github", "git"), default="git", help="connect: the repository's host")
+    q.add_argument("--token-command", help="connect: a command printing the push and API token (never stored)")
+    q.add_argument("--name", default="serve-landing", help="connect: the credential's name, as the policy names it")
+    q.add_argument("--branch", default="criterion", help="connect: the shared branch (default: criterion)")
+    q.add_argument("--yes", action="store_true", help="connect: the user agreed the server pushes there (INV-4)")
+    q.add_argument("--json", action="store_true", help="machine-readable output")
     q = vs.add_parser("members", help="the membership ledger: open, check, fingerprint (fw-IDENTITY-000012)")
     q.add_argument("action", choices=("open", "check", "fingerprint"))
     q.add_argument("--reason", default="", help="open: why")

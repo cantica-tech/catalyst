@@ -6,6 +6,21 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.117.0 — 2026-10-26
+
+No layout change; a served criterion's database gains two tables, made on start.
+
+- Added: the server lands what it accepted (`fw-STRUCTURE-000024`, REQ-000101, design 33 phase 2). `catalyst serve`
+  holds every batch it accepts and, once connected (`serve landing connect <repository> [--forge github|git]
+  [--token-command CMD] --yes`), lands it in the criterion's repository as the landing policy says: one commit on a
+  topic branch per group (`change`, `session` once its signer is idle, `window`), author the server, a
+  `Signed-off-by` per signer, pushed with the server's credential, and a pull request. It merges only under `review:
+  none` and `merge: auto` once the check passes (GitHub's check runs, or `catalyst check` on the merge result with the
+  `git` forge); otherwise the landing waits for review or an admin. It takes in what lands on the shared branch
+  otherwise, and a file changed there since a batch stops its landing as a conflict, for a human (`serve landing
+  list`, `retry`). `serve landing tick` runs it once; the server runs it every minute.
+- Changed: INV-18 says a served criterion's non-admins land their changes through its server.
+
 ## 0.116.1 — 2026-10-26
 
 No layout change.

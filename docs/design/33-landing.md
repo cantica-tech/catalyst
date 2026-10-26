@@ -1,6 +1,6 @@
 # 33 — Landing: how a non-admin's change reaches the criterion's repository (design for the owner, 2026-10-25)
 
-> **Status: decided (owner, 2026-10-25), all six of §9 as recommended.** Phase 1 built in kernel 0.116.0 (REQ-000099, §10). Builds on designs `19` (`catalyst serve`), `25`
+> **Status: decided (owner, 2026-10-25), all six of §9 as recommended.** Phase 1 built in kernel 0.116.0 (REQ-000099, §10); phase 2 in 0.117.0 (REQ-000101, §11). Builds on designs `19` (`catalyst serve`), `25`
 > (approval gates), `26` (proposals), `29` (grants from catalyst-users), `30` (the server as the boundary), `31` (who
 > changes what) and `32` (membership, no members without a server). It adds no right: who may change what stays `29`
 > and `31`'s. It decides how an accepted change becomes commits on the criterion repository's shared branch.
@@ -243,3 +243,25 @@ bob is a Developer in `catalyst-users`, not an admin; alice is its Criterion Adm
 - **`check`**: `landing:` errors for the file; a warning only for a criterion shared through a server with no
   `target.credential` (whether it has members is the server's, design 32, so the warning covers every served one).
 - **Onboarding**: step 6 of `INSTANTIATION-GUIDE.md` §1 and its checklist item.
+
+## 11. As built (phase 2, kernel 0.117.0)
+
+- **The rules**: `fw-STRUCTURE-000024` and one sentence of INV-18, not a new invariant (§7): the frozen surface
+  (ADR-017) is unchanged, so no ADR was needed.
+- **Held batches**: the server's database gains `held` (every accepted batch, its signer and roles; the first push,
+  an import, and what the shared branch brought are never landed) and `landings`.
+- **The tick** (`catalyst serve landing tick`, and every minute while the server runs once connected) takes in the
+  shared branch, lands ready groups and follows open landings. Commits are built in a bare workspace beside the
+  database (`read-tree`, `update-index`, `commit-tree`), so the server checks nothing out.
+- **Classification**: `via` from the batch's journal entries (all `server`: the server's; any `agent`: an agent's);
+  `change`: `server`, `proposal-accepted` (an entry with `proposed_by`), `linked` (a rule document, or an entity
+  linked in the server's current files, or a deleted one) or `unlinked`; `types` from the IDs of changed files.
+- **Grouping**: `session` lands once its signer has been idle `idle_minutes`; the Stop hook ending a session is
+  phase 3.
+- **Forges**: `github` (REST: pull requests, check runs, merge; none registered yet is pending, never a pass) and
+  `git` (any remote: `catalyst check` on the merge result, then the server merges). The token comes from a command
+  (`--token-command`) at each tick; minting a GitHub App's installation token is that command's work until phase 4.
+- **Conflicts** stop a landing (`conflict`, its batches kept) and are listed by `serve landing list`; a human settles
+  the shared branch and runs `serve landing retry <n>`. Opening a `RECON-` case for it is phase 3.
+- **Reviews**: a landing whose rule asks for one waits (`waiting-review`); approving it in catalyst's inbox is phase 3,
+  on the host's pull request phase 4. A merge on the host is followed.

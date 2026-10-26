@@ -42,6 +42,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `definition-migrate.schema.json` | `catalyst definition migrate --json` | — |
 | `members.schema.json` | `catalyst members <action> --json` | `GET /v1/members`, `POST /v1/members` |
 | `members-check.schema.json` | `catalyst serve members <check> --json` | — (the server's host) |
+| `serve-landing.schema.json` | `catalyst serve landing <action> --json` | — (the server's host) |
 | `journal-entry.schema.json` | `catalyst journal append --json`, `catalyst journal adopt --json`, `catalyst journal redact --json` | — |
 | `approve.schema.json` | `catalyst approve <id> --json` | — |
 | `repair-derived.schema.json` | `catalyst repair derived --json` | — |

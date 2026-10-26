@@ -224,7 +224,9 @@ to the active module keeps a one-line placeholder here
   it may record a proposed resolution as a `RECON-` case for a human to
   accept (INV-21). A signature is verified where it is made, not where
   it lands: branch protection and pull-request review are the real
-  controls. `Rules-of-Rules.md` §13.
+  controls. A criterion served through `catalyst serve` lands its
+  non-admins' changes through its server, by the landing policy
+  (fw-STRUCTURE-000024). `Rules-of-Rules.md` §13.
 - **INV-19 — Project lifecycle commands.** *Retired (0.52.0): it described the pre-home-store model; `catalyst open`, `move` and `share join` replace it, and deleting anything falls under L3.* `/project create <name>`
   installs a fresh deployment: a working copy in agent-owned space (or
   the in-project fallback) plus its `<app-name>.catalyst` pointer.
