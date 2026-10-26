@@ -35,7 +35,8 @@ two homes made one machine's setup two things to find, back up and sandbox.
 
 ## What's left
 
-- catalyst-users, catalyst-users-kb and catalyst-ui's deployments are still on 0.110.1 and read the old path through
-  the link; syncing them to 0.111.0 makes the link unnecessary. Remove `~/.catalyst-users` only after every
-  deployment (and any other machine's) is on 0.111.0 or later.
-- A catalyst-ui release carrying 0.111.0 is a separate decision.
+- Done since: catalyst-users' and catalyst-ui's deployments at kernel 0.117.0, and catalyst-ui 0.64.2 and 0.65.1
+  carrying 0.111.0 and later ([2026-10-26](2026-10-26-deployments-0117-ui-0651.md)); catalyst-users-kb's repository
+  was deleted.
+- catalyst-kb-engine and catalyst-knowledge-base are still on kernel 0.110.1 and read the old path through the link.
+  Remove `~/.catalyst-users` only after every deployment (and any other machine's) is on 0.111.0 or later.
