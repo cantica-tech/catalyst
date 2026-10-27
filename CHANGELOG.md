@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.117.3 — 2026-10-27
+
+No layout change; `modules/modules.json` gains an optional field.
+
+- Fixed: `catalyst migrate --since` lists the judgment steps of a module's migrations that a module move since then
+  crossed, whatever kernel version they are keyed to (BUG-000043). The criterion's `modules/modules.json` keeps each
+  module's `history`, every version move `{from, to, date, kernel}`, appended by `sync apply`, never rewritten.
+
 ## 0.117.2 — 2026-10-26
 
 No layout change.

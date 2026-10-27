@@ -305,15 +305,24 @@ def needs_record(root: Path, module_id: str) -> bool:
     return entry is None or entry.get("sha256") != tree_hash(tree)
 
 
-def record(root: Path, module_id: str, source: str | None, commit: str | None) -> Path:
+def record(root: Path, module_id: str, source: str | None, commit: str | None, kernel: str | None = None) -> Path:
     """Write (or replace) `module_id`'s entry from its deployed tree. A source
-    that is not known keeps the one already recorded."""
+    that is not known keeps the one already recorded. A version change is kept
+    in the entry's `history` (`from`, `to`, `date`, and the `kernel` the sync
+    moved to), so the module releases a sync crossed stay known (`catalyst
+    migrate --since`); history is appended to, never rewritten."""
     path = root / RECORD
     entries = read_record(root)
     old = next((e for e in entries if e["id"] == module_id), None)
     if source is None and old is not None:
         source, commit = old.get("source"), None
     entry = entry_for(root, module_id, source, commit)
+    history = [h for h in (old or {}).get("history") or [] if isinstance(h, dict)]
+    if old is not None and old.get("version") and old.get("version") != entry["version"]:
+        move = {"from": str(old["version"]), "to": entry["version"], "date": entry["installed"]}
+        history.append({**move, "kernel": kernel} if kernel else move)
+    if history:
+        entry["history"] = history
     # install order is kept: a module's part is composed after those installed before it
     entries = [entry if e["id"] == module_id else e for e in entries] if old is not None else [*entries, entry]
     path.parent.mkdir(parents=True, exist_ok=True)
