@@ -660,7 +660,7 @@ def apply(
         from catalyst import modules
 
         if any(a.kind == "module" for a in p.actions) or modules.needs_record(root, mod.id):
-            touched.append(modules.record(root, mod.id, *modules.source_of(src.module_arg)))
+            touched.append(modules.record(root, mod.id, *modules.source_of(src.module_arg), kernel=src.version))
         for other in dep.installed():  # one installed before the record existed: recorded as it is
             if other.id != mod.id and modules.needs_record(root, other.id):
                 touched.append(modules.record(root, other.id, None, None))

@@ -406,16 +406,29 @@ def _judgment_steps(dep: Deployment, kernel: Path | None, since: str | None, cur
 
     if since is None:
         return []
+    from catalyst import modules
+
     indexes = [(kernel / "migrations" if kernel else None, "kernel")]
     indexes += [(dep.root / "modules" / m.id / "migrations", m.id) for m in dep.installed()]
+    moves = {e["id"]: e.get("history") or [] for e in modules.read_record(dep.root)}
     steps = []
     for folder, owner in indexes:
         if folder is None:
             continue
         top = current if owner == "kernel" else "999.0.0"
+        # a module migration naming its release is due when a move recorded since `since` crossed it (BUG-000042)
+        crossed = {
+            m["file"]
+            for h in moves.get(owner, [])
+            if isinstance(h, dict) and (not h.get("kernel") or _vt(str(h["kernel"])) > _vt(since))
+            for m in sync.module_migrations(folder / "migrations.md", "999.0.0", "0.0.0", h.get("from"), h.get("to"))
+        }
         # a migration applies when its target is past `since`, whatever version it starts from
         for m in sync.migrations(folder / "migrations.md", "0.0.0", top, owner):
-            if _vt(m["to"]) <= _vt(since):
+            if owner != "kernel" and sync.MODULE_RELEASE.search(m["summary"]):
+                if m["file"] not in crossed:
+                    continue
+            elif _vt(m["to"]) <= _vt(since):
                 continue
             doc = folder / m["file"]
             if not doc.is_file():
