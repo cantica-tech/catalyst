@@ -40,10 +40,11 @@ fits, and its wheelhouse is recorded in a committed `wheelhouse.toml` rather tha
 
 ## What's left
 
-- The owner: approve criterion PR #18 (catalyst-kb-engine's) and, from earlier today, catalyst-ui-criterion PR #115
-  and criterion PR #176.
-- Not done: the aarch64 image at 0.12.0, and `scripts/package.sh`; a private Azure DevOps project with a token was not
-  tried (no token here); the earlier the UI 0.66.0 items (seen in VS Code, the Marketplace).
+- Done since: the owner merged criterion PRs #18, #176 and #115; the UI 0.66.0 is on the Marketplace. The bundle
+  `dist/catalyst-kb-container-linux.tar.gz` is built at engine 0.12.0, with the x86_64 image only: the owner chose to
+  skip aarch64 for now, so the 0.11.0 ARM image was removed and an ARM machine builds the image from the `Dockerfile`
+  on its first run.
+- Not done: the aarch64 image at 0.12.0; a private Azure DevOps project with a token (no token here).
 - Signed as the system account: nobody was logged in to the local Keycloak.
 - Every deployment checked here (catalyst-kb-engine, catalyst-knowledge-base) is on kernel 0.117.1: the
   `~/.catalyst-users` link the 0.110.1 ones needed can go once no other machine needs it.
