@@ -44,6 +44,9 @@ fits, and its wheelhouse is recorded in a committed `wheelhouse.toml` rather tha
   `dist/catalyst-kb-container-linux.tar.gz` is built at engine 0.12.0, with the x86_64 image only: the owner chose to
   skip aarch64 for now, so the 0.11.0 ARM image was removed and an ARM machine builds the image from the `Dockerfile`
   on its first run.
+- Done since: catalyst-docs' public site builds with engine 0.12.0 (it pinned 0.8.0): checked locally first, its
+  pages identical to 0.8.0's (285 reference documents, 12 guide pages, publish-check passing); #4 merged, the Pages run
+  built and deployed.
 - Not done: the aarch64 image at 0.12.0; a private Azure DevOps project with a token (no token here).
 - Signed as the system account: nobody was logged in to the local Keycloak.
 - Every deployment checked here (catalyst-kb-engine, catalyst-knowledge-base) is on kernel 0.117.1: the
