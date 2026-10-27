@@ -234,3 +234,36 @@ def test_the_criterion_admin_role_is_added_once_to_a_roles_template_without_it(t
     dropped = [{"name": "Admin", "id": "catalyst-admin", "actions": ["*"]}]
     (folder / f"TEMPLATE-ROLES-v{n + 1}.json").write_text(json.dumps({"roles": dropped}), encoding="utf-8")
     assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
+
+
+def test_a_module_migration_a_recorded_move_crossed_lists_its_judgment_steps(tmp_path):
+    """The record keeps each module move (`history`), so `migrate --since` lists the steps of a module migration
+    keyed to an old kernel version when a move since then crossed its release (BUG-000042); one no move crossed is
+    not listed."""
+    from catalyst import modules
+
+    project = _home(tmp_path)
+    root = load(project).root
+    folder = root / "modules" / "example-process" / "migrations"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "migrations.md").write_text(
+        "| [`0.83.0/adr.md`](0.83.0/adr.md) | `0.82.0` | `0.83.0` | Module `0.3.0`. Decisions. |\n"
+        "| [`0.87.0/dates.md`](0.87.0/dates.md) | `0.86.0` | `0.87.0` | Module `0.9.0`. Dates. |\n",
+        encoding="utf-8",
+    )
+    for name, step in (("0.83.0/adr.md", "offer each decision record"), ("0.87.0/dates.md", "add the dates")):
+        (folder / name).parent.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text(f"# m\n\n## Steps\n\n1. **Judgment, with the user:** {step}.\n", encoding="utf-8")
+    manifest = root / "modules" / "example-process" / "manifest.json"
+    modules.record(root, "example-process", None, None)
+    doc = json.loads(manifest.read_text(encoding="utf-8"))
+    manifest.write_text(json.dumps({**doc, "version": "0.4.0"}), encoding="utf-8")  # the module moved
+    modules.record(root, "example-process", None, None, kernel="0.117.1")
+    (entry,) = [e for e in modules.read_record(root) if e["id"] == "example-process"]
+    assert [(h["from"], h["to"], h["kernel"]) for h in entry["history"]] == [("0.2.0", "0.4.0", "0.117.1")]
+    modules.record(root, "example-process", None, None, kernel="0.117.2")  # no move: history unchanged
+    assert len(modules.read_record(root)[0]["history"]) == 1
+    steps = [s for s in migrate.plan(project, KERNEL, since="0.117.0").steps if s.kind == "judgment"]
+    sources = {s.source for s in steps}
+    assert "example-process: migrations/0.83.0/adr.md" in sources  # 0.3.0, crossed by 0.2.0 -> 0.4.0
+    assert "example-process: migrations/0.87.0/dates.md" not in sources  # 0.9.0, not crossed

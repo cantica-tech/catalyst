@@ -15,6 +15,10 @@ catalyst is in **beta**. Claude Code is the supported and tested agent;
 others can follow `AGENT.md`/`SYSTEM.md` but are untested (see
 [Agents](#agents)).
 
+**Documentation:** <https://cantica-tech.github.io/catalyst-docs/> — the
+guide (what catalyst is, getting started, working day to day and together)
+and a reference of catalyst's public repositories.
+
 ### What it looks like
 
 A fictional project: one rule, one piece of work fixing it, one journal line.
@@ -27,7 +31,7 @@ ITEM-000012-Ab3xR9pQ-reset-link-never-expires.md
   Targets: br-AUTH-000003-Ab3xR9pQ   Status: Done   Signed-off-by: Ada Lovelace
 
 development/journal/ada@k3j9q2/2026-10.jsonl
-  {"command": "/status", "action": "status-change", "tier": "fix",
+  {"command": "/status", "action": "status-change", "tier": "fix", "via": "agent",
    "artifact": "ITEM-000012-Ab3xR9pQ", "targets": ["br-AUTH-000003-Ab3xR9pQ"],
    "intent": ["Reset links honour the 30-minute expiry again"],
    "files": [{"path": "src/auth/reset.py", "before": "9f2c…", "after": "41ab…"}, …]}
@@ -39,39 +43,40 @@ catalyst check passed: 0 error(s), 0 warning(s)
 Months later, `/journal --rule br-AUTH-000003-Ab3xR9pQ` lists every change
 made for that rule, and `/journal restore <timestamp>` rebuilds the tree as
 it stood. The terms used here are defined in the
-[glossary](framework/kernel/GLOSSARY.md).
+[glossary](framework/kernel/GLOSSARY.md); the
+[guide](https://cantica-tech.github.io/catalyst-docs/) explains catalyst
+from the start.
 
 ## Kernel and modules
 
-The framework is the **kernel** plus one **process module** per deployment.
-The kernel is process-agnostic: it owns rules and domains, reconciliation
-cases (`RECON-`), workflows (`WORKFLOW-`), users and roles, the
-journal, repoed sync, and entity definitions as a mechanism. The
-active module adds its development-artifact types — their templates,
+The framework is the **kernel** plus one or more **process modules** per
+deployment. The kernel is process-agnostic: it owns rules and domains,
+reconciliation cases (`RECON-`), workflows (`WORKFLOW-`), signing and
+grants, the journal, sharing and landing, and entity definitions as a
+mechanism. A module adds its development-artifact types — their templates,
 definitions, commands, meta-rules, invariants and migrations — and is named
-in the project's `catalyst.toml` (`module`). Each
+in the project's `catalyst.toml` (`module`). Modules compose (INV-30): each
+works as a deployment's only module and beside any other, in either install
+order, and never names another (`catalyst module install` adds one). Each
 production module lives in its own repository, listed in
 `framework/modules/catalog.md`; see that repository for what its artifact
-types are and how they relate. The contract between the two is
+types are and how they relate. The contract between kernel and module is
 `framework/kernel/MODULE-SPECIFICATION.md`.
 
 ## The core chain
 
-At its center is a four-layer chain, each layer subordinate to the one below it:
+At its center is a three-layer chain, each layer subordinate to the one below it:
 
 ```
-Work items    EPIC ─▶ STORY ─▶ TASK / SPIKE / SPRINT   (agile process layer)
+Dev artifacts    <PREFIX>-NNNNNN-(userid) (a module's)   (rule-linked work)
                         ▼
-Dev artifacts   <PREFIX>-NNNNNN (the active module's)  (rule-linked work)
-                        ▼
-Rules          (prefix)-(DOMAIN)-(NNNNNN)-(userid)      (documented behavior)
+Rules            (prefix)-(DOMAIN)-(NNNNNN)-(userid)     (documented behavior)
                         ▼
 Rules of rules   the meta-rules governing all of the above
 ```
 
-The work-items layer is optional: a module declares work items as its own
-types when its process needs them. Without them, the chain starts one layer
-down: dev artifacts trace straight to a rule.
+A module that needs a planning layer above its dev artifacts declares it as
+its own types; they ground through their children, or a parent's.
 
 The chain's one invariant: **no work happens without a traceable link down to a
 documented rule** — an active-module artifact grounds to the module's
@@ -84,19 +89,21 @@ marked 🗑 with a reason and date, and stays a valid target for the
 dev-artifact that explains why — so any reference to it, in code, tests, or
 tickets, stays resolvable forever.
 
-## Development artifacts: the active module
+## Development artifacts: the modules
 
-Everything between a work item and a rule belongs to the active module: which
+Everything above a rule belongs to the modules: which
 dev-artifact types exist, how they decompose into smaller units of work, how
 they are verified, which ideas sit above the chain before they are ready to
 be measured against a rule, and which day-to-day views summarize them. The
 kernel only fixes the shape every such type shares — a permanent
 `<PREFIX>-NNNNNN` ID, its own folder and index in the working copy, a
 versioned definition, a `Signed-off-by`, and a grounding link down to a
-rule, direct or through a parent artifact — and the commands that work on any of them (`/create`, `/status`,
-`/list`). The module's own commands (listed in its
-`code-of-conduct.module.md` §4) are added to the deployment alongside the
-kernel's.
+rule, direct or through a parent artifact — and the commands that work on
+any of them (`/create`, `/status`, `/list`, and `catalyst edit` for an
+entity's fields and sections). A type's `WORKFLOW-`, once active, decides
+which status moves it may make, by whom and under which conditions. Each
+module's own commands (listed in its `code-of-conduct.module.md` §4) are
+added to the deployment alongside the kernel's.
 
 ## Accountability: users, roles, signing
 
@@ -107,17 +114,22 @@ logged-in identity, recorded once in the criterion's signers ledger
 someone the provider vouched for. What a person may do comes from the
 provider too: their grants decide which commands they run and which types
 they create, their roles set their reconciliation level, and a criterion's
-admins hold every grant in that criterion only. When no one is logged in, a
-machine's system account (set up by catalyst-users) signs, and says so. A
-criterion shared through `catalyst serve` can also record who belongs to it
-and admit only them (`catalyst members`).
+admins hold every grant in that criterion only. Anyone else creates only
+the types a module leaves open to contributors, and edits only their own
+entities — an entity already linked to others as a proposal an admin
+decides. When no one is logged in, a machine's system account (set up by
+catalyst-users) signs, and says so. A criterion shared through
+`catalyst serve` can also record who belongs to it, in a signed,
+encrypted ledger kept by the server, and admit only them
+(`catalyst members`).
 
 ## History: the journal
 
 The journal (`development/journal/`, one shard per actor, machine and month) is an append-only, transaction-log-grade record
 of every rule-linked change — not a changelog. Each entry carries the exact
 git content hash before and after, per touched file, plus the rule(s) it
-served and the actual intent behind it (the goal, not a label). Because the
+served, the actual intent behind it (the goal, not a label), and how it
+was made (`via`: an agent, a person, or a server). Because the
 pointers are exact, `/journal restore <timestamp>` can materialize the tree
 as it stood at any point into a side directory for inspection — a real
 point-in-time reconstruction, never a guess, and never applied to the live
@@ -137,7 +149,10 @@ Commits trace too: a git `commit-msg` hook (`catalyst hook install`) and
 rule ID, or to be marked `chore:`. Changes made by hand, straight into
 git, are caught too: `catalyst unrecorded`, `check` and `trace` report
 every commit whose changes the journal does not record, and `/adopt`
-either records it in the journal or reverts it. See
+either records it in the journal or reverts it. Every writing verb takes
+`--preview`, to see what a change would do before making it, and
+`catalyst migrate` lists (and, with `--apply`, makes) what a deployment
+needs to catch up with its kernel. See
 [`framework/kernel/CLI.md`](framework/kernel/CLI.md); every file the CLI
 reads and writes is specified in
 [`framework/kernel/FORMAT.md`](framework/kernel/FORMAT.md) (format
@@ -159,8 +174,19 @@ and `share create --protect` makes them required. The AI never applies a
 merge: a real conflict stops the push, and a proposed resolution waits as
 a reconciliation case for a human (`catalyst reconcile`). IDs stay unique
 across contributors through their userid suffix, so nobody renumbers.
-Identity is still self-declared; branch protection and review are the
-real controls. See [`framework/kernel/CLI.md`](framework/kernel/CLI.md).
+Signers are verified by the identity provider (above); branch protection
+and review remain the controls on what merges.
+
+A criterion can also be shared through a server, `catalyst serve`: its
+members push their changes to it, and it lands them in the criterion
+repository. How changes land is the criterion's own policy,
+`IAM/landing.json` (`catalyst landing init|show`; without one, the
+`standard` policy): the server groups accepted changes per change, per
+session or per time window, commits each group on a topic branch with a
+`Signed-off-by` per signer, opens a pull request, and merges it itself
+only when the policy says no review is needed and the check passes. A file
+changed on the shared branch since stops its landing for a human. See
+[`framework/kernel/CLI.md`](framework/kernel/CLI.md).
 
 ## Dogfooding
 
@@ -175,7 +201,8 @@ never as something an ordinary deployment carries around.
 ## Extensible through modules
 
 New capability comes as a module: its types, templates, commands and
-rules as data, several modules per deployment (`catalyst module install`).
+rules as data, several modules per deployment (`catalyst module install`),
+each knowing none of the others.
 The plugin system that came before is retired (ADR-022). `catalyst-git`,
 which watches a deployed project and surfaces rule breaks as they happen,
 remains an optional extension in its own repository; catalyst does not
@@ -199,7 +226,9 @@ two paths:
 Either way, the active module decides what the day-to-day view of open work
 looks like; see its repository.
 
-To try catalyst by hand in about fifteen minutes, follow
+The [guide](https://cantica-tech.github.io/catalyst-docs/) walks through
+getting started, day-to-day work, people and signing, working together and
+keeping up to date. To try catalyst by hand in about fifteen minutes, follow
 [`beta/QUICKSTART.md`](beta/QUICKSTART.md). The beta's multi-user trial —
 its protocol and the feedback form — is in [`beta/`](beta/)
 ([`TRIAL.md`](beta/TRIAL.md), [`FEEDBACK.md`](beta/FEEDBACK.md)).
