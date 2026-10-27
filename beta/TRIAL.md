@@ -8,7 +8,8 @@ document is its protocol. It is the evidence behind three roadmap items:
 with zero lost work), **RM-000028** (the on-disk format,
 `framework/kernel/FORMAT.md`, can be declared `1.0`) and **RM-000029** (a
 newcomer's first traced change in under 15 minutes, measured with
-[`QUICKSTART.md`](QUICKSTART.md)).
+[`QUICKSTART.md`](QUICKSTART.md)'s steps 2 to 6: a team's identity provider
+already exists, so its step 1 is not the newcomer's).
 
 ## Goal
 
@@ -23,31 +24,34 @@ Show, on a real project, that a shared deployment:
 
 ## Setup
 
-- **People:** at least **two**, each with their own registered user
-  (`/user add`), working on the same product repository. At least one of
-  them has not used catalyst before and starts with
+- **People:** at least **two**, each a person of the team's identity
+  provider (catalyst-users: `catalyst-users users add`, never a list in the
+  criterion), working on the same product repository. At least one of them
+  has not used catalyst before and starts with
   [`QUICKSTART.md`](QUICKSTART.md).
 - **Duration:** at least **four weeks** of ordinary work, not a
   demonstration: real features, fixes and chores.
 - **Project:** any repository the team really develops. A new one is fine,
   but not a toy.
 - **Install** (one person, once):
-  1. `catalyst init --name <project> --module <module-id> --user <name>
-     --git-username <u> --rule-doc <file>:<prefix> ... --at <dir>`
-     (`framework/kernel/CLI.md`) with `--at` naming a directory outside the
-     project — `criterion create` starts from the symlinked working copy —
-     then write the first rules.
+  1. catalyst-users set up for the team's provider (its
+     `docs/onboarding.md`), the project's criterion added and its admin
+     appointed (`catalyst-users criteria add <project> --admin <u>`); then
+     `catalyst init --name <project> --module <module-id> --rule-doc
+     <file>:<prefix> ...` (`framework/kernel/CLI.md`), which puts the
+     criterion in catalyst's home and `catalyst.toml` in the project, then
+     write the first rules.
   2. Create an empty criterion repository on the hosting service, then
-     `catalyst criterion create <url>` and commit what it staged in the
-     product repository.
+     `catalyst criterion create <url>`, and commit the updated
+     `catalyst.toml` in the product repository.
   3. `catalyst criterion protect --yes` (GitHub), so pull requests and the
      `catalyst` check are required on the shared branch.
   4. Add the `catalyst trace` step to the product repository's CI
-     (`framework/kernel/CLI.md`, `catalyst trace`), checking out the
-     `.criterion` submodule so IDs resolve.
-- **Each participant**, in their own clone: `catalyst criterion join`,
-  `/user add` themselves (through a pull request), and
-  `catalyst hook install`.
+     (`framework/kernel/CLI.md`, `catalyst trace`), cloning the criterion
+     repository into the job's catalyst home so IDs resolve.
+- **Each participant**, in their own clone: `catalyst identity login`
+  (their first signature records them in the signers ledger),
+  `catalyst criterion join`, and `catalyst hook install`.
 - Record the start: the date, the commit it starts from (existing history
   is not checked), and each participant's userid.
 
@@ -108,7 +112,7 @@ weeks):
 | Every commit traced | `catalyst trace <start>..HEAD` on the product repository at the end; the weekly `commits traced` figures | 100% of non-merge commits since the start trace. |
 | Chain intact | `catalyst check` at the end | No errors. |
 | No format change needed | The log's "Format change needed?" column | Every entry *no*. |
-| Newcomer path | `FEEDBACK.md` from each newcomer | The quickstart finished in about 15 minutes, with no step abandoned. |
+| Newcomer path | `FEEDBACK.md` from each newcomer | The quickstart's steps 2 to 6 finished in about 15 minutes, with no step abandoned. |
 
 A failed criterion does not end the trial: fix, log and continue. The
 trial passes only on a run where every criterion holds.
@@ -124,8 +128,8 @@ trial passes only on a run where every criterion holds.
   the format stays `1.0-rc`, and the "no format change" criterion is
   re-run.
 - **RM-000029 — newcomer time:** met when someone outside the project
-  reaches a traced commit with [`QUICKSTART.md`](QUICKSTART.md) in 15
-  minutes or less, as their `FEEDBACK.md` records. A newcomer who needed
+  reaches a traced commit with [`QUICKSTART.md`](QUICKSTART.md)'s steps 2
+  to 6 in 15 minutes or less, as their `FEEDBACK.md` records. A newcomer who needed
   longer is a finding: say which step, fix the kit or the tool, and
   measure again with someone new.
 - The trial log, the weekly reports and the feedback forms are kept with

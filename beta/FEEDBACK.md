@@ -14,7 +14,7 @@ summary.
 - This form covers: `quickstart` / `trial, weeks 1–N`
 - catalyst version (`catalyst --version`):
 - Agent used, if any, and its version:
-- OS, Python version (`python3 --version`), git version:
+- OS, Python version (`python3 --version`), git version, Docker version:
 - Used catalyst before? `no` / `a little` / `yes`
 - Used an AI coding agent before? `no` / `a little` / `daily`
 
@@ -26,12 +26,14 @@ week.
 | Step | Minutes | Finished? (`yes` / `with help` / `gave up`) |
 |---|---|---|
 | 0. Prerequisites (not timed; note it anyway) | | |
-| 1. A fresh repository | | |
-| 2. Install catalyst | | |
-| 3. Document the first rule | | |
-| 4. A traced fix | | |
-| 5. Commit with a traced message, and check | | |
-| **Total (steps 1–5)** | | |
+| 1. An identity provider | | |
+| 2. A fresh repository | | |
+| 3. Install catalyst | | |
+| 4. Document the first rule | | |
+| 5. A traced fix | | |
+| 6. Commit with a traced message, and check | | |
+| **Total (steps 1–6)** | | |
+| **Steps 2–6** (what RM-000029 measures) | | |
 
 ## Where you got stuck
 
