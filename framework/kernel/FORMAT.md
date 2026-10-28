@@ -147,6 +147,7 @@ submodule or a directory), read for one minor.
 | `definitions/<type>.md` | One frozen definition per kernel and module entity type, plus `definitions/README.md` (INV-23). | Structure: one per type. |
 | `modules/<module-id>/` | The whole active module tree, as released. | — |
 | `modules/modules.json` | The record of each installed module: id, version, source, commit, sha256 of its tree, date, and (catalyst >= 0.117.3) its `history`: each version move `{from, to, date, kernel}`, appended, never rewritten. Written by `init` and `sync apply`; read by `catalyst module list\|verify`, `check` and `migrate --since`. | — |
+| `modules/declined.json` | (catalyst >= 0.118.0) The optional module templates a person declined: each `{template, type, file, source, sha256, date, by}`, `sha256` of the seeded text. Written by `catalyst migrate --decline` (and cleared by naming the template in `migrate --apply --template`); read by `migrate`, which stops offering that exact template. | — |
 | `.gitattributes` | Shared deployments: the union-merge block (§8). | — |
 | `.github/workflows/catalyst.yml` | Shared deployments: the criterion repository's CI (`CLI.md`). | — |
 | `.frozen` | Optional: items `/sync-framework` leaves alone (§9). | — |

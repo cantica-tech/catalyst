@@ -93,6 +93,46 @@ def test_a_module_template_is_offered_and_added_only_when_asked(tmp_path):
     assert done == [f"added {step.detail[4:].split(' (optional')[0]}"]
 
 
+def test_a_declined_module_template_is_no_longer_offered_until_the_module_ships_another(tmp_path):
+    project = _home(tmp_path)
+    root = load(project).root
+    tree = root / "modules" / "example-process"
+    template = next(p for p in sorted(tree.rglob("*.template.md")) if "templates" in p.parts)
+    template.write_text(template.read_text(encoding="utf-8") + "\nA row the module adds.\n", encoding="utf-8")
+    (step, *_) = [s for s in migrate.plan(project, None).steps if s.kind == "template"]
+    done = migrate.decline(project, None, "ada", ["the team keeps its own"], {step.type})
+    assert done == [f"declined {step.target}"]
+    assert step.target not in [s.target for s in migrate.plan(project, None).steps]
+    (row,) = [d for d in json.loads((root / migrate.DECLINED).read_text())["templates"] if d["type"] == step.type]
+    assert (row["file"], row["by"]) == (step.target, "ada") and len(row["sha256"]) == 64
+    entry = journal_entries(root)[-1]
+    assert entry["command"] == "catalyst migrate --decline"
+    assert [f["path"].rsplit("/", 1)[-1] for f in entry["files"]] == ["declined.json"]
+    migrate.apply(project, None, "ada", ["all that is offered"], templates={"all"})
+    assert not (root / step.target).exists()  # `all` takes no declined template
+    template.write_text(template.read_text(encoding="utf-8") + "Another row.\n", encoding="utf-8")
+    assert step.target in [s.target for s in migrate.plan(project, None).steps]  # a different one: offered again
+
+
+def test_naming_a_declined_template_adds_it_and_clears_the_decline(tmp_path):
+    project = _home(tmp_path)
+    root = load(project).root
+    tree = root / "modules" / "example-process"
+    template = next(p for p in sorted(tree.rglob("*.template.md")) if "templates" in p.parts)
+    template.write_text(template.read_text(encoding="utf-8") + "\nA row the module adds.\n", encoding="utf-8")
+    (step, *_) = [s for s in migrate.plan(project, None).steps if s.kind == "template"]
+    migrate.decline(project, None, "ada", ["not now"], {step.type})
+    migrate.apply(project, None, "ada", ["wanted after all"], templates={step.type})
+    assert (root / step.target).is_file()
+    assert step.type not in [d["type"] for d in json.loads((root / migrate.DECLINED).read_text())["templates"]]
+
+
+def test_declining_nothing_offered_is_refused(tmp_path):
+    project = _home(tmp_path)
+    with pytest.raises(migrate.MigrateError, match="no optional template step"):
+        migrate.decline(project, None, "ada", [], {"NOPE"})
+
+
 def test_the_judgment_steps_since_a_version_are_listed_with_their_qualifiers_never_taken(tmp_path):
     project = _home(tmp_path)
     p = migrate.plan(project, KERNEL, since="0.92.0")
