@@ -138,6 +138,26 @@ def _add_backrefs(dep: Deployment, corpus: Corpus, fd: FieldDefinition, source_i
     return touched
 
 
+def _drop_backrefs(dep: Deployment, corpus: Corpus, fd: FieldDefinition, source_id: str, ids: list[str]) -> list[Path]:
+    """Stop citing `source_id` in each target's back-reference field; a target gone from the deployment has none."""
+    if not fd.backref:
+        return []
+    touched = []
+    for target_id in ids:
+        arts = corpus.artifacts.get(target_id)
+        if not arts:
+            continue
+        target = arts[0]
+        current = ref_values(target.get(fd.backref) or "")
+        if source_id not in current:
+            continue
+        text = target.file.read_text(encoding="utf-8")
+        rest = [i for i in current if i != source_id]
+        target.file.write_text(set_field(text, fd.backref, _ticked(rest)), encoding="utf-8")
+        touched.append(target.file)
+    return touched
+
+
 def _finish(
     dep: Deployment,
     command: str,
@@ -576,6 +596,50 @@ def link(
         item_id,
         grounding,
         intent or [f"{item_id} `{fd.name}` cites {', '.join(added)}"],
+        touched,
+        str(signer.get("git_username") or signer.get("name")),
+        tier,
+    )
+    return Result(item_id, art.file, touched)
+
+
+def unlink(
+    dep: Deployment,
+    corpus: Corpus,
+    item_id: str,
+    field_name: str,
+    ids: list[str],
+    signer: dict,
+    intent: list[str],
+    command: str = "catalyst unlink",
+    tier: str | None = None,
+) -> Result:
+    """Stop citing `ids` in a reference field, and drop the back-references `link` wrote: the way a citation of a
+    retired or wrong ID leaves an entity (REQ-000103)."""
+    art = _artifact(corpus, item_id)
+    etd = dep.etds[art.prefix]
+    fd = field_def(etd, field_name)
+    if fd.kind not in REF_KINDS:
+        raise EditError(f"`{fd.name}` is not a reference field")
+    if norm_field(fd.name) in _derived_fields(dep, art.prefix):
+        raise EditError(f"`{fd.name}` is derived from what cites {item_id}: unlink it there")
+    current = ref_values(art.get(fd.name) or "")
+    missing = [i for i in ids if i not in current]
+    if missing:
+        raise EditError(f"{item_id} `{fd.name}` does not cite {', '.join(missing)}")
+    rest = [i for i in current if i not in ids]
+    if not rest and fd.required:
+        raise EditError(f"`{fd.name}` is required: `catalyst link` what replaces {', '.join(ids)} first")
+    art.file.write_text(set_field(art.file.read_text(encoding="utf-8"), fd.name, _ticked(rest)), encoding="utf-8")
+    touched = [art.file] + _drop_backrefs(dep, load_corpus(dep), fd, item_id, ids)
+    grounding = ref_values(art.get(etd.grounding_field) or "") if etd.grounding_field else []
+    _finish(
+        dep,
+        command,
+        "update",
+        item_id,
+        grounding,
+        intent or [f"{item_id} `{fd.name}` no longer cites {', '.join(ids)}"],
         touched,
         str(signer.get("git_username") or signer.get("name")),
         tier,

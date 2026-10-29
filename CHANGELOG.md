@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.119.0 — 2026-10-30
+
+No layout change.
+
+- Added: `catalyst unlink <ID> <field> <ID>...` stops citing IDs in a reference field and drops the back-references
+  `catalyst link` wrote, journaled (REQ-000103). A required field keeps at least one ID (`link` its replacement
+  first); a derived field is changed where it is cited from. Before, a citation could be added but not removed.
+
 ## 0.118.1 — 2026-10-29
 
 No layout change.

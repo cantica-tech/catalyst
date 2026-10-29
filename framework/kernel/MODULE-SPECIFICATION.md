@@ -207,7 +207,7 @@ format and live in `framework/kernel/entities/`.
 | `required` | `boolean` | Yes | Whether every instance must carry it. |
 | `allowed_values` | `list[string]` | Conditional | Values for `enum`. |
 | `target_type` | `string` | Conditional | Target entity prefix (or kernel type such as `rule`) for `ref` / `ref-list`. |
-| `backref` | `string` | No | The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand. |
+| `backref` | `string` | No | The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`, `catalyst unlink`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand. |
 | `required_when_closed` | `boolean` | No | For a field that is not `required`: it must be non-empty once the artifact's `Status` is one of the workflow's `closed_states` (e.g. an item may not close without the sub-items recording its work). `catalyst validate` reports a violation as the `closed-incomplete` error (`CLI.md`). Default `false`. |
 | `hint` | `string` | No | What the item template's cell tells the artifact's author, in place of the kind's placeholder (format 3; `catalyst new` writes an optional field it is not given as `*(none yet)*`). |
 
