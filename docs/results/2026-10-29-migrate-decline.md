@@ -41,8 +41,9 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
   `migrate` now has nothing to offer there.
 - **Branches:** `delete_branch_on_merge` is on in the six criteria repositories; after the syncs' merges, each holds
   only its shared branch.
+- **Hooks:** `catalyst hook install` rewrote the pre-0.117.1 commit-msg hooks of catalyst, catalyst-ui and
+  catalyst-users (catalyst-mcp's was current). Each refuses an untraced message and accepts a `chore:` one.
 
 ## What's left
 
-- **Old hooks:** a hook installed before 0.117.1 (catalyst-users' among them) keeps the old script until
-  `catalyst hook install` rewrites it.
+- Nothing from this round.
