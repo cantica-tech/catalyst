@@ -33,11 +33,16 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
 - Three new tests in `tests/test_catalyst_migrate.py`. The whole suite: 896 passed.
 - ruff 0.16.10, pyright 1.1.414 and the standards lint pass on a clean copy; kernel purity passes.
 
+## Then, as the owner asked
+
+- **Synced to 0.118.0:** catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base, from the release
+  zip; no migration in that range; `catalyst check` passes in each (catalyst-ui keeps its 10 older warnings).
+- **catalyst-users:** `catalyst migrate --decline KSOURCE` recorded the KSOURCE v2 template declined on 2026-10-26;
+  `migrate` now has nothing to offer there.
+- **Branches:** `delete_branch_on_merge` is on in the six criteria repositories; after the syncs' merges, each holds
+  only its shared branch.
+
 ## What's left
 
-- **catalyst-users' KSOURCE v2:** still offered until someone runs `catalyst migrate --decline KSOURCE` there, once the
-  deployment is at 0.118.0.
-- **Branches keep piling up:** the criteria repositories do not delete a branch on merge (`delete_branch_on_merge` is
-  off). Turning it on, or `criterion sync` deleting its merged branch, would keep them clean.
 - **Old hooks:** a hook installed before 0.117.1 (catalyst-users' among them) keeps the old script until
   `catalyst hook install` rewrites it.
