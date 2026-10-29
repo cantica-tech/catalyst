@@ -70,6 +70,8 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
   records such a commit as history only (`superseded`) when HEAD no longer holds its result; the catalyst-docs lead
   then adopted `19baa1c` with the fix.
 - catalyst's own deployment is at 0.118.1; `catalyst check` passes with only the 88 pre-CLI journal warnings.
+- catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are synced to 0.118.1 too (2026-10-30;
+  no migration; `catalyst check` passes in each, catalyst-ui with its 10 older warnings).
 
 ## What's left
 
