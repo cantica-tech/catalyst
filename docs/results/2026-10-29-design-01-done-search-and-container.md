@@ -1,6 +1,7 @@
 # Design 01 done; the search's misses; catalyst-kb-container governed
 
 2026-10-29. This round:
+
 - phase 6's live check, which closes catalyst-kb-engine's design 01;
 - the bug that check found;
 - the two points left open after it: the search's misses, and whether catalyst governs catalyst-kb-container.
