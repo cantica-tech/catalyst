@@ -138,6 +138,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst restore <id>` | write an entity back as it stood at a time: a new journaled change | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier`, `--to` |
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--forewarned`, `--intent`, `--json`, `--preview`, `--through`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
+| `catalyst unlink <id> <field> <ids>` | stop citing IDs in a reference field, dropping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst user add <name> <role>` | refuses: add people in catalyst-users | `--as`, `--git-username`, `--intent`, `--json` |
 | `catalyst user remove <name>` | refuses: disable people in catalyst-users | `--as`, `--intent`, `--json` |
 | `catalyst user modify <name> <field> <value>` | refuses: change people in catalyst-users | `--as`, `--intent`, `--json` |
@@ -976,6 +977,10 @@ still made (R4.8).
   Run again, it changes nothing.
 - `catalyst link <ID> <field> <ID>...`: cite IDs in a reference field and,
   when the field declares a back-reference, cite this artifact back.
+- `catalyst unlink <ID> <field> <ID>...`: stop citing IDs in a reference
+  field and drop the back-references `link` wrote. A required field keeps at
+  least one ID: `link` what replaces it first. A derived field is changed
+  where it is cited from.
 - `catalyst restore <ID> --to <timestamp|#N>`: write the entity's file back
   as it stood after the last journal entry at or before the timestamp, or
   after its `N`th change (`#1` is the first; exact when timestamps tie, as
@@ -2009,6 +2014,7 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst restore` | `spec/change.schema.json` |
 | `catalyst status set` | `spec/change.schema.json` |
 | `catalyst link` | `spec/change.schema.json` |
+| `catalyst unlink` | `spec/change.schema.json` |
 | `catalyst user add` | `spec/user.schema.json` |
 | `catalyst user remove` | `spec/user.schema.json` |
 | `catalyst user modify` | `spec/user.schema.json` |
@@ -2227,6 +2233,16 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst link` | `<id>` | an entity or rule ID |
 |  | `<field>` | the reference field to add to, e.g. Targets |
 |  | `<ids>` … | the IDs it cites |
+|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--intent` `INTENT` | why (repeatable; journaled) |
+|  | `--command` `CMD` | the slash command this runs for, journaled |
+|  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
+|  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--preview` | say what the change would do (its `try`); keep nothing |
+|  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
+| `catalyst unlink` | `<id>` | an entity or rule ID |
+|  | `<field>` | the reference field to remove from, e.g. Targets |
+|  | `<ids>` … | the IDs it no longer cites |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |

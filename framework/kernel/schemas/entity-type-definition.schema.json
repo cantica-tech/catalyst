@@ -92,7 +92,7 @@
           },
           "backref": {
             "type": "string",
-            "description": "The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand."
+            "description": "The field on the target that lists this entity back. That field is **derived**: catalyst writes it (`catalyst new`, `catalyst link`, `catalyst unlink`), `catalyst check` reports it as the `derived` error when it disagrees with its sources, and `catalyst repair derived` rewrites it, journaled. Never edit it by hand."
           },
           "required_when_closed": {
             "type": "boolean",

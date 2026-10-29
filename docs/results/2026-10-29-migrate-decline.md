@@ -58,6 +58,21 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
   rebuilt (each runs 0.14.1) and the bundle packaged; pushed to `development`. It embeds through Copilot, so the bug
   never affected it. The old local images (0.11.0 to 0.14.0) are removed.
 
+## Retired-rule citations and an adopted commit (kernel 0.118.1)
+
+- **Records cite the replacing rules:** ADR-000048, ADR-000049, REQ-000086 and TEST-000001 cite
+  `fw-IDENTITY-000007` and `000008` in place of the retired `000001` and `000004` (ADR-000049). `catalyst link` cannot
+  remove a reference, so the four fields were rewritten, journaled, and `catalyst repair derived` confirmed the
+  back-references; the eight retired-target warnings are gone.
+- **BUG-000045 (kernel 0.118.1):** adopting `19baa1c` (the creation of `kernel-purity-fix.md`, whose deletion was
+  adopted on 2026-10-10) joined the file's chain, and every later entry of that journal file was reported out of time
+  order (1,336 warnings). The two entries, never pushed, were removed with the owner's assent. `journal adopt` now
+  records such a commit as history only (`superseded`) when HEAD no longer holds its result; the catalyst-docs lead
+  then adopted `19baa1c` with the fix.
+- catalyst's own deployment is at 0.118.1; `catalyst check` passes with only the 88 pre-CLI journal warnings.
+- catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are synced to 0.118.1 too (2026-10-30;
+  no migration; `catalyst check` passes in each, catalyst-ui with its 10 older warnings).
+
 ## What's left
 
-- Nothing from this round.
+- `catalyst link` has no way to remove a reference: an `unlink` would have made the citation change a command.
