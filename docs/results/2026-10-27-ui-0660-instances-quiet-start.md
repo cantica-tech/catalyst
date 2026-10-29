@@ -37,13 +37,13 @@ remains, the sync offer, when there is one:
 - From a clean build: lint, format, typecheck, every package's tests (2 new for the sync offer's wording), the
   Studio's build; `catalyst check` on the UI's deployment, 0 errors.
 - CI green on #184 and #185; tagged `0.66.0` on release; the `.vsix` published to the distribution repository.
+- On the Marketplace: the owner published 0.66.0 from the release tag (`task publish:vscode-extension`), live after
+  about five minutes.
 - Not tried: the extension in a running VS Code. The tree, the set-up entry and the batched notification were not
   seen on screen.
 
 ## What's left
 
-- The owner: approve criterion PR #115 (the landing policy needs a Criterion Admin's approval); look at 0.66.0 in VS
-  Code; decide whether it goes to the Marketplace (never published without asking).
+- Done since: the owner merged criterion PR #115 and published 0.66.0 to the Marketplace.
+- The owner: look at 0.66.0 in VS Code (nothing here has seen it on screen).
 - Signed as the system account: nobody was logged in to the local Keycloak this session.
-- catalyst-kb-engine and catalyst-knowledge-base are still on kernel 0.110.1, which reads `~/.catalyst-users`: keep
-  the link until they are synced.

@@ -168,7 +168,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
 | `catalyst runtime status` | runtimes, launcher and the criterion's runtime version | `--json` |
 | `catalyst move` | move a legacy deployment into $HOME/.catalyst, or rename a project | `--as`, `--name`, `--no-runtime`, `--to-home` |
-| `catalyst migrate` | what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part | `--apply`, `--as`, `--intent`, `--json`, `--kernel`, `--no-runtime`, `--since`, `--template` |
+| `catalyst migrate` | what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part | `--apply`, `--as`, `--decline`, `--intent`, `--json`, `--kernel`, `--no-runtime`, `--since`, `--template` |
 | `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--user` |
 | `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
 | `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
@@ -2345,6 +2345,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst migrate` | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout, or a kernel release (dir or zip) |
 |  | `--apply` | move a legacy layout and add the templates, journaled |
 |  | `--template` `TYPE` | with --apply: also add this module type's new template (its prefix or template name, or `all`) (repeatable) |
+|  | `--decline` `TYPE` | record that you do not want this module type's new template (its prefix or name, or `all`), journaled; it is no longer offered until the module ships a different one (repeatable) |
 |  | `--since` `VERSION` | list the judgment steps of every migration after this kernel |
 |  | `--no-runtime` | when moving: do not fill the criterion's .venv now |
 |  | `--as` `AS_USER` | signer (name or git_username) |
