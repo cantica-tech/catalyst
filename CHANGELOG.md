@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.118.1 — 2026-10-29
+
+No layout change.
+
+- Fixed: `catalyst journal adopt` records as history only (`superseded`) a commit whose result the journal already went
+  through and HEAD no longer holds, such as the creation of a file whose deletion was adopted first (BUG-000045). Before,
+  it joined the file's chain, and the deletion's entry sorted after it, with a `time-order` warning on every later
+  entry.
+
 ## 0.118.0 — 2026-10-29
 
 No layout change; the criterion may gain `modules/declined.json`.
