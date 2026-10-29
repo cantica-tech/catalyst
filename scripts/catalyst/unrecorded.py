@@ -120,6 +120,12 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     return proc.git(repo, *args)
 
 
+def _at_head(repo: Path, path: str) -> str | None:
+    """`path`'s blob at HEAD (project-relative), None when HEAD holds no such file."""
+    res = _git(repo, "rev-parse", "--verify", "--quiet", f"HEAD:./{path}")
+    return (res.stdout.strip() or None) if res.returncode == 0 else None
+
+
 def recorded(dep: Deployment) -> Journaled:
     j = Journaled()
     for _, entry, _ in journal.read_checked(dep):
@@ -324,7 +330,13 @@ def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
         files = []
         for path, parent, after in missing:
             known, last = journaled.latest(path)
-            if known and last != parent and after in journaled.seen.get(path, set()):
+            # the chain went through the commit's result and moved on — to another state, or back to the parent's
+            # (a file created, then deleted: BUG-000045) while HEAD no longer holds that result
+            if (
+                known
+                and after in journaled.seen.get(path, set())
+                and (last != parent or _at_head(dep.project_root, path) != after)
+            ):
                 files.append({"path": path, "before": parent, "after": after, "superseded": True})
                 continue
             before = last if known else parent

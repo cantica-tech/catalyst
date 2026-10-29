@@ -335,6 +335,20 @@ def test_adopting_an_old_commit_after_newer_journal_work_is_history_only(proj):
     assert j.last_after(load(proj))["f.txt"] != entries[0]["files"][0]["after"]
 
 
+def test_adopting_the_creation_of_a_file_whose_deletion_is_journaled_is_history_only(proj):
+    """BUG-000045: a file made and then removed by hand, the removal adopted first: adopting the creation later must
+    not put it in the chain, or the removal's entry would wait for it in the journal's causal order."""
+    write(proj / "note.md", "a note\n")
+    made = commit_at(proj, T, "chore: a note", "note.md")
+    git(proj, "rm", "-q", "note.md")
+    removed = commit_at(proj, T + 10, "chore: no note")
+    u.adopt(load(proj), [removed], ["removed by hand"])
+    (entry,) = u.adopt(load(proj), [made], ["made by hand"])
+    assert entry["files"][0]["superseded"] is True
+    assert journal_errors(proj) == [] and u.since_baseline(load(proj)) == []
+    assert not [i for i in j.verify(load(proj)) if i.code == "time-order"]
+
+
 def test_a_baseline_missing_from_the_clone_warns_instead_of_crashing(proj, capsys):
     set_pointer(proj, journal_since="1" * 40)
     dep = load(proj)
