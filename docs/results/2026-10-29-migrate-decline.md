@@ -44,6 +44,20 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
 - **Hooks:** `catalyst hook install` rewrote the pre-0.117.1 commit-msg hooks of catalyst, catalyst-ui and
   catalyst-users (catalyst-mcp's was current). Each refuses an untraced message and accepts a `chore:` one.
 
+## catalyst-docs and the container
+
+- **Design 01 is done.** Phase 6's live check, with the catalyst-api secret read from the owner's keychain:
+  - a realm token got `/me` and `/search` (8 passages, an Internal rule among them);
+  - no token, a non-token, a token claiming another realm's issuer, a tampered realm token and an expired one were
+    each refused (401).
+  - No genuine token from another realm was tried (it needs the master admin's password); the owner accepted the
+    check. The catalyst-docs lead completed REQ-000010-7TE7wuaB.
+- **catalyst-kb-engine 0.14.1** (the catalyst-docs lead, BUG-000044-7TE7wuaB): an `ollama:` model defaults to the
+  local server when `OLLAMA_BASE_URL` is unset; found by the live check (`serve`'s search failed with a 500).
+- **catalyst-kb-container at engine 0.14.1**: the version set everywhere, `uv lock`, the wheels fetched, both images
+  rebuilt (each runs 0.14.1) and the bundle packaged; pushed to `development`. It embeds through Copilot, so the bug
+  never affected it. The old local images (0.11.0 to 0.14.0) are removed.
+
 ## What's left
 
 - Nothing from this round.
