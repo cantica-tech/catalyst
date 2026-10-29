@@ -16,12 +16,16 @@ Three kinds of step, in this order:
   person, listed, never taken.
 
 `plan` changes nothing; `apply` takes the layout and template steps,
-journaled, and lists the judgment ones again.
+journaled, and lists the judgment ones again. `decline` records a module
+template the person does not want in `modules/declined.json`, by its text's
+hash: `plan` stops offering that template, and offers the module's next one.
 """
 
 from __future__ import annotations
 
 import datetime
+import hashlib
+import json
 import re
 import shutil
 import tempfile
@@ -37,6 +41,7 @@ from catalyst.deployment import Deployment, load
 TEMPLATE_STEP = re.compile(r"templates/[\w.-]+\.template\.md`? as (?:its|the) next version")
 JUDGMENT = re.compile(r"^\d+\.\s+\*\*Judgment(?:,\s*([^*:]*))?:?\*\*:?\s*(.*)$")
 CATALOG_ROW = re.compile(r"^\| v(\d+) \|")
+DECLINED = "modules/declined.json"
 
 
 class MigrateError(Exception):
@@ -131,12 +136,33 @@ def _wanted(dep: Deployment, kernel: Path | None) -> list[tuple[Path, str, str, 
     return out
 
 
-def _template_steps(dep: Deployment, kernel: Path | None) -> list[tuple[Step, Path, str, str]]:
+def _declined(root: Path) -> list[dict]:
+    path = root / DECLINED
+    if not path.is_file():
+        return []
+    try:
+        return list(json.loads(path.read_text(encoding="utf-8")).get("templates", []))
+    except (ValueError, AttributeError) as exc:
+        raise MigrateError(f"{DECLINED} is not JSON ({exc})") from None
+
+
+def _write_declined(root: Path, rows: list[dict]) -> Path:
+    path = root / DECLINED
+    path.write_text(json.dumps({"templates": rows}, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def _template_steps(dep: Deployment, kernel: Path | None, declined: bool = False) -> list[tuple[Step, Path, str, str]]:
+    """The template steps; a module template the person declined (the same
+    text) only when `declined`."""
     steps = []
     params = compose.deployed_params(dep.root, dep.module.id if dep.module else "")
+    refused = {(d.get("template"), d.get("sha256")) for d in _declined(dep.root)}
     for folder, name, text, where, prefix in _wanted(dep, kernel):
         held = _versions(folder)
         if any(_norm(p.read_text(encoding="utf-8"), params) == _norm(text, params) for p in held.values()):
+            continue
+        if prefix is not None and not declined and (name, _digest(text, params)) in refused:
             continue
         n = max(held, default=0) + 1
         rel = folder.relative_to(dep.root).as_posix()
@@ -153,6 +179,10 @@ def _template_steps(dep: Deployment, kernel: Path | None) -> list[tuple[Step, Pa
             )
         steps.append((step, folder, name, text))
     return steps
+
+
+def _digest(text: str, params: compose.Params | None) -> str:
+    return hashlib.sha256(_norm(text, params).encode("utf-8")).hexdigest()
 
 
 # --- people out of the criterion (migration 0.106.0, design 29) ---------------------------
@@ -514,9 +544,18 @@ def apply(
     dep = load(project)
     touched: list[Path] = []
     stamp = datetime.date.today().isoformat()
-    for step, folder, name, text in _template_steps(dep, kernel):
-        if not (step.auto or "ALL" in chosen or step.type in chosen or name in chosen):
+    named = {(name, step.target) for step, _, name, _ in _template_steps(dep, kernel)}
+    refused = _declined(dep.root)
+    for step, folder, name, text in _template_steps(dep, kernel, declined=True):
+        offered = (name, step.target) in named
+        # `all` takes what is offered; a declined template only when its type or name is named
+        if not (step.auto or ("ALL" in chosen and offered) or step.type in chosen or name in chosen):
             continue
+        if not offered:
+            refused = [d for d in refused if d.get("template") != name]
+            path = _write_declined(dep.root, refused)
+            if path not in touched:
+                touched.append(path)
         n = int(step.target.rsplit("-v", 1)[1].split(".")[0])
         file = folder / f"TEMPLATE-{name}-v{n}.md"
         file.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
@@ -555,6 +594,50 @@ def apply(
             ),
         )
     return before, done
+
+
+def decline(project: Path, kernel: Path | None, actor: str, intent: list[str], templates: set[str]) -> list[str]:
+    """Record the module templates `templates` names (type prefixes or
+    template names, or `all`) as declined, journaled: `plan` stops offering
+    them until the module ships a different one."""
+    chosen = {t.upper() for t in templates}
+    dep = load(project)
+    params = compose.deployed_params(dep.root, dep.module.id if dep.module else "")
+    rows = _declined(dep.root)
+    done: list[str] = []
+    for step, _, name, text in _template_steps(dep, kernel):
+        if step.auto or not ("ALL" in chosen or step.type in chosen or name in chosen):
+            continue
+        rows = [d for d in rows if d.get("template") != name]
+        rows.append(
+            {
+                "template": name,
+                "type": step.type,
+                "file": step.target,
+                "source": step.detail[4:].split(" as ")[0],
+                "sha256": _digest(text, params),
+                "date": datetime.date.today().isoformat(),
+                "by": actor,
+            }
+        )
+        done.append(f"declined {step.target}")
+    if not done:
+        raise MigrateError(f"no optional template step matches {', '.join(sorted(templates))}")
+    path = _write_declined(dep.root, rows)
+    journal.append(
+        dep,
+        journal.AppendRequest(
+            command="catalyst migrate --decline",
+            action="update",
+            artifact=f"kernel {(dep.root / 'version.txt').read_text(encoding='utf-8').strip()}",
+            targets=[],
+            intent=intent or [f"declined the optional module template(s): {', '.join(d[9:] for d in done)}"],
+            files=[str(path)],
+            actor=actor,
+            tier="chore",
+        ),
+    )
+    return done
 
 
 def with_kernel(path: Path | None):

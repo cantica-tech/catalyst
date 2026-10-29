@@ -1371,21 +1371,31 @@ def cmd_migrate(args) -> int:
     kernel = args.kernel
     if kernel is None and (REPO_ROOT / "framework" / "kernel" / "rules-of-rules.template.md").is_file():
         kernel = REPO_ROOT / "framework" / "kernel"
+    if args.decline and args.apply:
+        print("catalyst: --decline and --apply are separate runs", file=sys.stderr)
+        return 1
+
+    def signer_name() -> str:
+        actor = args.as_user
+        if project_file.resolve(project) is not None and actor is None:
+            from catalyst.corpus import load_corpus
+            from catalyst.ids import resolve_signer
+
+            dep = open_deployment(args)
+            signer = resolve_signer(dep, load_corpus(dep), None, "sync-framework")
+            actor = str(signer.get("git_username") or signer.get("name"))
+        return actor or ""
+
     try:
         with migrate.with_kernel(kernel) as kdir:
-            if not args.apply:
+            if args.decline:
+                done = migrate.decline(project, kdir, signer_name(), args.intent or [], set(args.decline))
+                p = migrate.plan(project, kdir, args.since)
+            elif not args.apply:
                 p = migrate.plan(project, kdir, args.since)
                 done: list[str] = []
             else:
-                actor = args.as_user
-                criterion = project_file.resolve(project)
-                if criterion is not None and actor is None:
-                    from catalyst.corpus import load_corpus
-                    from catalyst.ids import resolve_signer
-
-                    dep = open_deployment(args)
-                    signer = resolve_signer(dep, load_corpus(dep), None, "sync-framework")
-                    actor = str(signer.get("git_username") or signer.get("name"))
+                actor = signer_name()
                 p, done = migrate.apply(
                     project,
                     kdir,
@@ -1404,6 +1414,8 @@ def cmd_migrate(args) -> int:
     if kernel is None:
         print("note: no --kernel, so the kernel's templates and migrations are not compared")
     if not p.steps:
+        for d in done:
+            print(f"  done  {d}")
         print(f"nothing to migrate: {p.project} is up to date with kernel {p.kernel or '?'}")
         return 0
     for s in p.steps:
@@ -3282,6 +3294,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="TYPE",
         help="with --apply: also add this module type's new template (its prefix or template name, or `all`)",
+    )
+    p.add_argument(
+        "--decline",
+        action="append",
+        metavar="TYPE",
+        help="record that you do not want this module type's new template (its prefix or name, or `all`), journaled; "
+        "it is no longer offered until the module ships a different one",
     )
     p.add_argument("--since", metavar="VERSION", help="list the judgment steps of every migration after this kernel")
     p.add_argument("--no-runtime", action="store_true", help="when moving: do not fill the criterion's .venv now")

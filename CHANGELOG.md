@@ -6,6 +6,14 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.118.0 — 2026-10-29
+
+No layout change; the criterion may gain `modules/declined.json`.
+
+- Added: `catalyst migrate --decline TYPE` records that you do not want a module type's new template (REQ-000102).
+  `migrate` stops offering that template and offers the module's next, different one again. `--template all` skips a
+  declined template; naming its type or name in `migrate --apply --template` adds it and clears the decline.
+
 ## 0.117.3 — 2026-10-27
 
 No layout change; `modules/modules.json` gains an optional field.
