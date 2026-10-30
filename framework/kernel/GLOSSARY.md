@@ -35,7 +35,8 @@ two ever disagree. Examples use the fictional module entity type `ITEM`
 
 - **Adopt.** Accepting an *unrecorded change* (below) into the journal after
   the fact: `catalyst journal adopt <commit>` writes one entry per commit
-  with `origin: manual`, the commit's sha and its git author as actor. The
+  with `origin: manual` and the commit's sha, signed by the verified identity
+  (the commit's git author kept as `commit_author`). The
   `/adopt` command drives the choice — adopt, reject (revert, with the
   user's assent) or, when contested, a `RECON-` case
   (`CODE-OF-CONDUCT.md` §9).

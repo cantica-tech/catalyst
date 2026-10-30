@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.119.1 — 2026-10-30
+
+No layout change.
+
+- Fixed: `catalyst journal adopt` signs as the verified identity, as every writing verb does (BUG-000044,
+  fw-IDENTITY-000002): `--as` names only that identity, and with no verified identity nothing is adopted. The commit's
+  git author is kept in the entry as `commit_author`, for information. Before, the actor was `--as` taken as given, else
+  the git author, which git takes from the committer's own configuration, so an adopted change could be recorded under
+  anyone's name.
+
 ## 0.119.0 — 2026-10-30
 
 No layout change.
