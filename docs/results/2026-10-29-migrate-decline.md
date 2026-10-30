@@ -73,6 +73,18 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
 - catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are synced to 0.118.1 too (2026-10-30;
   no migration; `catalyst check` passes in each, catalyst-ui with its 10 older warnings).
 
+## `catalyst unlink`, fixtures and the public build (2026-10-30)
+
+- **`catalyst unlink <ID> <field> <ID>...`** (REQ-000103, kernel 0.119.0) stops citing IDs in a reference field and
+  drops the back-references `link` wrote, journaled. It refuses a derived field, an ID the field does not cite, and
+  emptying a required field (`link` the replacement first). Two new tests; the suite, 899 passed; released and
+  published; catalyst's own deployment synced.
+- **Fixtures out of the public reference** (the catalyst-docs lead): only catalyst-ui had them; its `.catalystignore`
+  names its test fixtures. The site's pages and vectors manifests list none.
+- **The public build recorded** (the catalyst-docs lead): catalyst-kb-engine 0.16.0's `record-site` records each
+  manifest the site serves as a `KBUILD-`, Published; catalyst-docs holds KBUILD-000007 (pages) and -000008 (vectors).
+
 ## What's left
 
-- `catalyst link` has no way to remove a reference: an `unlink` would have made the citation change a command.
+- catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are at 0.118.1, until a sync to 0.119.0
+  is asked for.
