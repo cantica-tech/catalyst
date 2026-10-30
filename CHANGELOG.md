@@ -6,6 +6,15 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.119.2 — 2026-10-30
+
+No layout change.
+
+- Fixed: `catalyst share push` never reports "nothing to publish" while the criterion holds changes (BUG-000046,
+  rr-META-000013). When git cannot read the criterion, the push fails and names git's error; when a push commits
+  nothing yet changes are left uncommitted, it fails and names them. Before, both printed "nothing to publish: the
+  criterion matches its shared copy" and exited 0, leaving the work unshared.
+
 ## 0.119.1 — 2026-10-30
 
 No layout change.

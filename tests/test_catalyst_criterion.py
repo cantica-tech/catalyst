@@ -242,6 +242,35 @@ def test_nothing_to_push(world):
     assert push(world, "bob", "no-op").commits == 0
 
 
+def test_a_preview_git_cannot_read_fails_instead_of_showing_nothing(world, monkeypatch):
+    """BUG-000046: an unread criterion is never "nothing to publish"."""
+    (load(world["bob"]).root / "scratch.txt").write_text("x", encoding="utf-8")
+    real = cr.run
+
+    def failing(repo, *args, **kw):
+        if args[:2] == ("rev-parse", "--git-dir"):
+            return subprocess.CompletedProcess(args, 128, "", "fatal: not a git repository")
+        return real(repo, *args, **kw)
+
+    monkeypatch.setattr(cr, "run", failing)
+    with pytest.raises(cr.CriterionError, match="nothing was published"):
+        cr.preview(load(world["bob"]))
+
+
+def test_a_push_that_commits_nothing_with_changes_left_fails(world, monkeypatch):
+    """BUG-000046: changes the push did not see are never reported as a push of nothing."""
+    (load(world["bob"]).root / "scratch.txt").write_text("x", encoding="utf-8")
+    real, calls = cr.dirty, []
+
+    def unseen_first(wc):
+        calls.append(wc)
+        return [] if len(calls) == 1 else real(wc)
+
+    monkeypatch.setattr(cr, "dirty", unseen_first)
+    with pytest.raises(cr.CriterionError, match=r"1 change\(s\) were not committed — nothing was pushed: scratch.txt"):
+        push(world, "bob", "missed")
+
+
 def test_status_and_protection_payload(world):
     st = cr.status(load(world["bob"]), fetch=True)
     assert st.mode == "submodule" and st.branch == "criterion" and st.ahead == 0
