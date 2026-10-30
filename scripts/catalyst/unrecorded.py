@@ -287,10 +287,13 @@ def adopt(
     tier: str | None = None,
     targets: list[str] | None = None,
     artifact: str | None = None,
-    actor: str | None = None,
+    as_user: str | None = None,
 ) -> list[dict]:
     """Record each commit's unrecorded changes as one journal entry, oldest
-    first, the git author as actor unless `actor` is given. A file whose
+    first, signed by the verified identity (`ids.resolve_signer`, as every
+    writing verb: fw-IDENTITY-000002, BUG-000044); `as_user` names only that
+    identity. The commit's git author, self-asserted, is kept as
+    `commit_author`, never as the actor. A file whose
     journal chain has not moved past the commit continues it (`before` its
     last journaled state, else the parent's blob); a file journaled again
     since the commit is recorded as history only (`superseded`, the parent's
@@ -302,20 +305,25 @@ def adopt(
     journal.check_tier(dep, tier, targets=targets or [], artifact=artifact or "")
     if dep.standalone:
         raise journal.JournalError("a standalone working copy has no product history to adopt")
+    from catalyst.corpus import load_corpus
+    from catalyst.ids import resolve_signer
+
+    signer = resolve_signer(dep, load_corpus(dep), as_user, "journal")
+    actor = str(signer.get("git_username") or signer.get("name"))
     with journal.journal_lock(dep):
         return _adopt(dep, revs, intent, tier, targets or [], artifact, actor)
 
 
-def _actor(corpus, author: str) -> str:
-    """The journal's actor for a commit's author: the registered user's
-    `git_username` when the author is one (by name, git username or userid),
-    else the author as git gives it (FORMAT.md: the actor is the signer's
-    `git_username`)."""
+def _author(corpus, author: str) -> str:
+    """A commit's git author as the journal names people: the registered
+    user's `git_username` when the author is one (by name, git username or
+    userid), else the author as git gives it. Information only: the actor is
+    the signer."""
     user = corpus.user(author) if author else None
     return str(user.get("git_username") or user.get("name")) if user else author
 
 
-def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
+def _adopt(dep, revs, intent, tier, targets, artifact, actor: str) -> list[dict]:
     from catalyst.corpus import load_corpus
 
     corpus = load_corpus(dep)
@@ -344,7 +352,8 @@ def _adopt(dep, revs, intent, tier, targets, artifact, actor) -> list[dict]:
             journaled.add(path, before, after)
         entry = {
             "timestamp": journal.now(),
-            "actor": actor or _actor(corpus, c.author),
+            "actor": actor,
+            "commit_author": _author(corpus, c.author),
             "command": "/adopt",
             "action": "update",
             "artifact": artifact or f"commit {c.short}",

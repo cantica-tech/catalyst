@@ -318,9 +318,9 @@ def cmd_journal(args) -> int:
                 tier=args.tier,
                 targets=args.target or [],
                 artifact=args.artifact,
-                actor=args.as_user,
+                as_user=args.as_user,
             )
-        except ValueError as exc:
+        except (ValueError, IdError) as exc:
             print(f"catalyst: {exc}", file=sys.stderr)
             return 1
         for e in entries:
@@ -2878,7 +2878,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--target", action="append", help="a rule/artifact ID this serves (repeatable)")
     q.add_argument("--artifact", help="the artifact ID or a short description (default: commit <sha>)")
     q.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
-    q.add_argument("--as", dest="as_user", help="actor (default: the commit's git author)")
+    q.add_argument("--as", dest="as_user", help="signer: only the logged-in identity (fw-IDENTITY-000002)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
     q = js.add_parser("verify", help="check hash chains, blobs, pins and unjournaled edits")

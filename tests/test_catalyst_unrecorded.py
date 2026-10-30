@@ -9,10 +9,11 @@ import subprocess
 import pytest
 
 import schema_check
-from catalyst import journal as j, unrecorded as u
+from catalyst import journal as j, provider, unrecorded as u
 from catalyst.__main__ import main
 from catalyst.check import run as check_run
 from catalyst.deployment import load
+from catalyst.identity.provider import Whoami
 from catalyst_fixtures import USERID, make_project, write
 
 
@@ -156,8 +157,9 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     assert main(["journal", "adopt", sha[:10], "--intent", "hand-written greeting", "--tier", "chore"]) == 0
     assert "adopted" in capsys.readouterr().out
     entry = [e for _, e, _ in j.read(load(proj)) if e and e.get("origin")][-1]
-    # the registered user's git_username, as every other entry has it (BUG-000017)
+    # signed by the verified identity; the author is the registered user's git_username (BUG-000017, BUG-000044)
     assert entry["origin"] == "manual" and entry["commit"] == sha and entry["actor"] == "ada"
+    assert entry["commit_author"] == "ada"
     assert entry["files"][0]["path"] == "src/app.py" and entry["files"][0]["before"] is None
     assert entry["tier"] == "chore" and entry["command"] == "/adopt"
     dep = load(proj)
@@ -165,6 +167,56 @@ def test_adopt_records_the_commit_with_its_author(proj, capsys):
     assert [i for i in j.verify(dep) if i.level == "error"] == []
     assert main(["journal", "adopt", sha[:10], "--intent", "again"]) == 0
     assert "nothing to adopt" in capsys.readouterr().out
+
+
+ISSUER = "https://id.example.com/realms/catalyst"
+ALICE = Whoami(ISSUER, "sub-alice", "alice", "Alice Developer", roles=("developer",), grants=("cmd:*",))
+
+
+@pytest.fixture
+def signed(proj, monkeypatch):
+    """`proj` pointing at catalyst-users, and a switch for who the provider says is logged in (BUG-000044)."""
+    root = proj / ".criterion"
+    write(root / "IAM" / "identity.json", json.dumps({"provider": "keycloak", "issuer": ISSUER}))
+    roles = {"roles": [{"name": "Developer", "id": "developer", "actions": []}]}
+    write(root / "IAM" / "roles" / "templates" / "TEMPLATE-ROLES-v9.json", json.dumps(roles))
+    who = {"now": ALICE}
+
+    def verify(doc, as_user=None, transport=None):
+        if who["now"] is None:
+            raise provider.ProviderError(f"no verified identity: not logged in to {ISSUER} (`catalyst identity login`)")
+        return who["now"]
+
+    monkeypatch.setattr(provider, "verify", verify)
+    return proj, who
+
+
+def test_adopt_signs_as_the_verified_identity_never_the_git_author(signed, capsys):
+    project, _ = signed
+    write(project / "src" / "theirs.py", "x = 1\n")
+    git(project, "add", "-A")
+    git(project, "-c", "user.name=Mallory", "-c", "user.email=m@x", "commit", "-qm", "chore: by hand")
+    assert main(["journal", "adopt", "HEAD", "--intent", "kept", "--json"]) == 0
+    entry = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert (entry["actor"], entry["commit_author"]) == ("alice", "Mallory")
+    assert schema_check.problems(entry, schema_check.load("journal-entry")) == []
+
+
+def test_adopt_as_someone_else_is_refused_and_adopts_nothing(signed, capsys):
+    project, _ = signed
+    manual_commit(project)
+    assert main(["journal", "adopt", "HEAD", "--intent", "theirs", "--as", "ada"]) == 1
+    assert "you sign only as yourself" in capsys.readouterr().err
+    assert len(u.since_baseline(load(project))) == 1  # still unrecorded
+
+
+def test_adopt_with_no_verified_identity_adopts_nothing(signed, capsys):
+    project, who = signed
+    manual_commit(project)
+    who["now"] = None
+    assert main(["journal", "adopt", "HEAD", "--intent", "offline"]) == 1
+    assert "catalyst identity login" in capsys.readouterr().err
+    assert len(u.since_baseline(load(project))) == 1
 
 
 def test_adopt_prints_the_entry_it_wrote(proj, capsys):
@@ -177,14 +229,15 @@ def test_adopt_prints_the_entry_it_wrote(proj, capsys):
 
 def test_adopt_keeps_an_unregistered_author_and_asks_a_fix_for_its_artifact(proj):
     """BUG-000017: an author who is no registered user is recorded as git
-    gives them; a fix or feature adopted names its artifact, as on append."""
+    gives them, as information; the signer is the actor (BUG-000044). A fix
+    or feature adopted names its artifact, as on append."""
     write(proj / "src" / "other.py", "y = 2\n")
     git(proj, "add", "src/other.py")
     git(proj, "-c", "user.name=Grace Hopper", "-c", "user.email=g@h", "commit", "-qm", "outside edit")
     with pytest.raises(j.JournalError, match="serves an artifact"):
         u.adopt(load(proj), ["HEAD"], ["outside edit"], tier="fix")
     entries = u.adopt(load(proj), ["HEAD"], ["outside edit"], tier="fix", targets=[f"ITEM-000001-{USERID}"])
-    assert entries[0]["actor"] == "Grace Hopper"
+    assert (entries[0]["actor"], entries[0]["commit_author"]) == ("ada", "Grace Hopper")
 
 
 def test_adopt_a_range_in_order_keeps_the_chain(proj):
