@@ -593,8 +593,13 @@ def preview(dep: Deployment, fetch: bool = True) -> Preview:
     remote-tracking refs (`fetch`)."""
     wc, branch = dep.root, shared_branch(dep)
     remote = remote_url(wc)
-    if run(wc, "rev-parse", "--git-dir", check=False).returncode != 0:
-        return Preview(remote, branch, [], [], None)
+    git_dir = run(wc, "rev-parse", "--git-dir", check=False)
+    if git_dir.returncode != 0:
+        # never "nothing to publish": unread, the criterion may hold changes (BUG-000046)
+        raise CriterionError(
+            f"git cannot read the criterion at {wc} — nothing was published: "
+            f"{(git_dir.stderr or git_dir.stdout).strip()}"
+        )
     if fetch and remote:
         run(wc, "fetch", "-q", "--prune", "origin", check=False)
     log = run(wc, "log", "--format=%h %s", "HEAD", "--not", "--remotes=origin", check=False)
@@ -777,6 +782,11 @@ def push(dep: Deployment, signer: dict, message: str, open_pr: bool = True, chec
     else:
         commits = int(out(wc, "rev-list", "--count", "HEAD"))
     if commits == 0:
+        left = dirty(wc)
+        if left:  # nothing committed, yet changes remain: never report a push of nothing (BUG-000046)
+            raise CriterionError(
+                f"{len(left)} change(s) were not committed — nothing was pushed: {', '.join(left[:8])}"
+            )
         return PushResult(topic, 0, None, regenerated)
     # An explicit lease: the remote branch must still be what we built on.
     run(
