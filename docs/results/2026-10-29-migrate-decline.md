@@ -83,8 +83,10 @@ verifiers noted (a finished install ledger, merged pull-request branches on the 
   names its test fixtures. The site's pages and vectors manifests list none.
 - **The public build recorded** (the catalyst-docs lead): catalyst-kb-engine 0.16.0's `record-site` records each
   manifest the site serves as a `KBUILD-`, Published; catalyst-docs holds KBUILD-000007 (pages) and -000008 (vectors).
+- catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are synced to 0.119.0 too (no migration;
+  `catalyst check` passes in each, catalyst-ui with its 10 older warnings). The first attempt was refused: the local
+  Keycloak container had stopped, so nothing could sign; it was restarted and the syncs re-run.
 
 ## What's left
 
-- catalyst-users, catalyst-ui, catalyst-kb-engine and catalyst-knowledge-base are at 0.118.1, until a sync to 0.119.0
-  is asked for.
+- Nothing from this round.
