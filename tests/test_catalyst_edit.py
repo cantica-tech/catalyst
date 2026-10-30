@@ -1,5 +1,6 @@
 """Writing verbs (roadmap R2 W2): new, status set, link — driven by the ETDs."""
 
+import dataclasses
 import datetime
 import json
 
@@ -143,6 +144,46 @@ def test_link_adds_ids_once_and_writes_the_back_reference(tmp_path):
     assert third.id in corpus.artifacts[ITEM][0].get("Subs")
     with pytest.raises(edit.EditError, match="not a reference"):
         edit.link(dep, corpus, ITEM, "Status", ["x"], _signer(corpus), [])
+
+
+def test_unlink_drops_the_ids_and_their_back_references(tmp_path, monkeypatch):
+    project = _project(tmp_path)
+    dep, corpus = _state(project)
+    first = edit.new(dep, corpus, "SUB", "First sub", {"Item": ITEM}, _signer(corpus), [])
+    dep, corpus = _state(project)
+    with pytest.raises(edit.EditError, match="is required"):
+        edit.unlink(dep, corpus, first.id, "Item", [ITEM], _signer(corpus), [])
+    with pytest.raises(edit.EditError, match="does not cite"):
+        edit.unlink(dep, corpus, first.id, "Item", [SUB], _signer(corpus), [])
+    with pytest.raises(edit.EditError, match="not a reference"):
+        edit.unlink(dep, corpus, ITEM, "Status", ["x"], _signer(corpus), [])
+    with pytest.raises(edit.EditError, match="derived"):
+        edit.unlink(dep, corpus, ITEM, "Subs", [first.id], _signer(corpus), [])
+    field_def = edit.field_def  # an optional reference: emptied, and its back-reference dropped
+    monkeypatch.setattr(edit, "field_def", lambda etd, name: dataclasses.replace(field_def(etd, name), required=False))
+    res = edit.unlink(dep, corpus, first.id, "Item", [ITEM], _signer(corpus), [])
+    dep, corpus = _state(project)
+    assert corpus.artifacts[first.id][0].get("Item") == edit.NONE_YET
+    assert first.id not in edit.ref_values(corpus.artifacts[ITEM][0].get("Subs") or "")
+    assert corpus.artifacts[ITEM][0].file in res.touched
+    entry = journal_entries(dep.root)[-1]
+    assert (entry["command"], entry["artifact"]) == ("catalyst unlink", first.id)
+
+
+def test_unlink_keeps_the_other_ids_of_a_list(tmp_path, capsys):
+    project = _project(tmp_path)
+    other = f"br-AUTH-000002-{USERID}"
+    doc = project / ".criterion" / "rules" / "business" / "br-business-rules.md"
+    doc.write_text(
+        doc.read_text("utf-8").replace("## Linked", f"### `{other}` Logout flow\n\n**Status:** ✅\n\n## Linked"),
+        "utf-8",
+    )
+    dep, corpus = _state(project)
+    edit.link(dep, corpus, ITEM, "Targets", [other], _signer(corpus), [])
+    assert main(["--project", str(project), "unlink", ITEM, "Targets", other, "--intent", "cited by mistake"]) == 0
+    assert ITEM in capsys.readouterr().out
+    dep, corpus = _state(project)
+    assert edit.ref_values(corpus.artifacts[ITEM][0].get("Targets")) == [RULE]
 
 
 def test_the_cli_creates_and_reports(tmp_path, capsys):

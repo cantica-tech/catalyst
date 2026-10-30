@@ -639,7 +639,7 @@ def _pairs(specs: list[str] | None, option: str) -> dict[str, str]:
 
 
 def cmd_edit(args) -> int:
-    """Writing verbs (R2 W2): new, edit, rename, restore, status set, link."""
+    """Writing verbs (R2 W2): new, edit, rename, restore, status set, link, unlink."""
     from catalyst import edit
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
@@ -728,7 +728,8 @@ def cmd_edit(args) -> int:
                     print(f"{res.id} is linked: the edit is a proposal, {res.proposal}, waiting for its decision")
                 return 0
         else:
-            res = edit.link(
+            verb = edit.unlink if args.edit == "unlink" else edit.link
+            res = verb(
                 dep,
                 corpus,
                 args.id,
@@ -736,7 +737,7 @@ def cmd_edit(args) -> int:
                 args.ids,
                 signer,
                 args.intent or [],
-                command=args.cmd or "catalyst link",
+                command=args.cmd or f"catalyst {args.edit}",
                 tier=args.tier,
             )
     except (edit.EditError, IdError, JournalError) as exc:
@@ -2602,6 +2603,8 @@ _HELP_BY_COMMAND: dict[tuple[str, str], str] = {
     ("status set", "status"): "the state to set, one the type declares",
     ("link", "field_name"): "the reference field to add to, e.g. Targets",
     ("link", "ids"): "the IDs it cites",
+    ("unlink", "field_name"): "the reference field to remove from, e.g. Targets",
+    ("unlink", "ids"): "the IDs it no longer cites",
     ("user add", "role"): "the user's first role",
     ("user assign-role", "role"): "the role to add",
     ("user modify", "field"): "the field to change",
@@ -3066,6 +3069,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="link")
+
+    p = sub.add_parser("unlink", help="stop citing IDs in a reference field, dropping the back-reference")
+    p.add_argument("id")
+    p.add_argument("field_name", metavar="field")
+    p.add_argument("ids", nargs="+")
+    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
+    p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
+    p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
+    p.add_argument("--json", action="store_true")
+    p.set_defaults(func=cmd_edit, edit="unlink")
 
     p = sub.add_parser("user", help="people are catalyst-users' (design 29): these refuse and say where to change them")
     us = p.add_subparsers(dest="user_command", required=True)
