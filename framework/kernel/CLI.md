@@ -1401,8 +1401,10 @@ the commit continues it: `before` is its last journaled state (else the
 parent's blob). A file journaled again since the commit is recorded as
 history only — `superseded: true`, `before` the parent's blob — so it
 never becomes the file's current state and `journal verify` keeps it out
-of the chain. The actor is the commit's git author
-unless `--as` names one; `--artifact` defaults to `commit <sha>`.
+of the chain. The entry is signed, as every writing verb, by the verified
+identity (`--as` names only that one, fw-IDENTITY-000002); the commit's git
+author, which git takes from the committer's own configuration, is kept as
+`commit_author`, never as the actor. `--artifact` defaults to `commit <sha>`.
 `--intent` is required, as for `append`. Named commits are adopted alone,
 a range commit by commit. Files already recorded are skipped; a commit
 with nothing unrecorded writes nothing. Adopting several commits oldest
@@ -2134,7 +2136,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--target` `TARGET` | a rule/artifact ID this serves (repeatable) |
 |  | `--artifact` `ARTIFACT` | the artifact ID or a short description (default: commit <sha>) |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
-|  | `--as` `AS_USER` | actor (default: the commit's git author) |
+|  | `--as` `AS_USER` | signer: only the logged-in identity (fw-IDENTITY-000002) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst journal verify` | `--strict` | treat warnings as errors |
 |  | `--legacy` | also list warnings on pre-CLI entries |
