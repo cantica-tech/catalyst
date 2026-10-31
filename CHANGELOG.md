@@ -8,8 +8,29 @@ messages.
 
 ## Unreleased
 
-No layout change. `Taskfile.common.yml` changes on the next `/sync-framework` (`CMD_PREFIX`).
+Layout change: `IAM/identity.json` names its provider by its `issuer` (migration 0.120.0, mechanical: `catalyst
+migrate --apply`). `Taskfile.common.yml` changes on the next `/sync-framework` (`CMD_PREFIX`).
 
+- Added: `catalyst identity login --password` (REQ-000107, fw-IDENTITY-000002): a password login through the
+  provider's password client, the password from `--password-command`, else one line of standard input, else asked
+  without echo, never an argument. The identity core is catalyst-users 0.11.0, vendored (fw-IDENTITY-000006).
+- Added: one login for `catalyst-users login` and `catalyst identity login` (REQ-000108): when this machine's
+  catalyst-users is set up for the deployment's provider, same issuer spelling and login client, catalyst keeps its
+  tokens in catalyst-users' credentials file; otherwise in its own file per provider. That file holds one login at a
+  time, and a logout from either tool ends both.
+- Added: `catalyst hook start`, `--quiet` included, says once when no one is logged in and who would sign the
+  session's entries, the system account or nobody (REQ-000109). It reads local files only.
+- Fixed: `IAM/identity.json` has one shape (BUG-000057, fw-IDENTITY-000007, fw-IDENTITY-000003). A pointer naming its
+  provider by `url` and `realm`, as `init` copied it from catalyst-users' settings, is read as its issuer, `check`
+  warns of it and `catalyst migrate --apply` rewrites it; `init` writes the issuer. Tokens and the snapshot are kept
+  per provider as one provider is named (`canonical_issuer`: a loopback host is `localhost`, no trailing `/`), so a
+  login carries across shapes and spellings; a token file kept under the old url shape is no longer read (log in
+  once more). The signers ledger compares issuers the same way: one person signing in at `localhost` and at
+  `127.0.0.1` keeps one line and one userid. No ledger line is rewritten.
+- Fixed: with no one logged in, the system account is found when catalyst-users' settings name the same provider
+  under another spelling (BUG-000058, fw-IDENTITY-000002), and reached at the pointer's spelling.
+- Changed: `catalyst journal verify` names its notes by kind (merged concurrent edits, redactions); a redaction was
+  counted as a merged concurrent edit.
 - Added: `catalyst runtime prune` removes the runtimes under `$CATALYST_HOME/runtimes/` that no criterion in the
   home uses (REQ-000104, rr-META-000014). It keeps the versions the home's criteria carry in their `.venv`, the
   running catalyst's and the newest, and removes the rest and any half-built runtime; without `--yes` it only lists

@@ -213,7 +213,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst criterion integrity` | fail if a merge lost any ID, index row or journal line | `--head`, `--parent` |
 | `catalyst criterion protect` | branch protection for the shared branch (GitHub) | `--yes` |
 | `catalyst identity configure` | point the deployment at catalyst-users (writes IAM/identity.json) | `--as`, `--catalyst-client`, `--client`, `--intent`, `--issuer`, `--link`, `--provider` |
-| `catalyst identity login` | log in with a code shown in your browser (the device flow) | `--client`, `--issuer`, `--json` |
+| `catalyst identity login` | log in with a code shown in your browser (the device flow), or --password | `--client`, `--issuer`, `--json`, `--password`, `--password-command`, `--username` |
 | `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
 | `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
 | `catalyst identity status` | the provider, and whether you are logged in (no network) | `--client`, `--issuer`, `--json` |
@@ -1029,23 +1029,38 @@ Who signs (design 29). A criterion holds no user or role registry:
   [--catalyst-client <id>]` writes the pointer, signed (`--as`) by the
   identity the new pointer verifies, or the one before it, and journaled.
   `check` reports a missing or broken pointer; a workspace member may
-  inherit its workspace's.
+  inherit its workspace's. The pointer names its provider by its `issuer`;
+  one written from catalyst-users' settings (`url` + `realm`) is read the
+  same, `check` warns of it and `catalyst migrate --apply` writes its issuer
+  (migration 0.120.0).
 - `identity login` (the device flow: open the link, confirm the code),
+  `identity login --password [--username <name>] [--password-command
+  <cmd>]` (the password from the command's first line, else one line of
+  standard input, else asked without echo; never an argument),
   `identity logout` (revokes), `identity whoami` (userid, groups, roles and
   grants, verified now), `identity status` (no network). With `--issuer
   <url>` each works outside any deployment, e.g. before `catalyst init`.
-  Tokens are kept owner-only under `$CATALYST_HOME/identity/`, never in a
-  criterion or a project.
+  Tokens are kept owner-only, never in a criterion or a project: in
+  catalyst-users' own credentials file when this machine's catalyst-users is
+  set up for the same provider, spelled the same, with the same login
+  client, so one login serves `catalyst-users login` and `catalyst identity
+  login` (and a logout ends both); else under `$CATALYST_HOME/identity/`,
+  one file per provider and client, the provider named as one provider is
+  (a loopback host is `localhost`, no trailing `/`). catalyst-users' file
+  holds one login at a time.
 - Every writing verb signs as the identity catalyst-users verifies: the
   logged-in person, refreshed and confirmed by the provider, or, with no one
   logged in, this machine's system account (the admin `catalyst-users
-  setup` named), when its settings point at the same provider; catalyst says
-  so on standard error. `--as` names only that identity. With no verified
+  setup` named), when its settings point at the same provider, however its
+  issuer is spelled; catalyst says so on standard error, and `hook start`
+  says so once when a session starts. `--as` names only that identity. With no verified
   identity (not logged in and no system account, the provider unreachable)
   nothing is signed, and the read verbs still work. An identity's first
   signature appends its line to `IAM/signers.jsonl` (`FORMAT.md` §6); its
   userid ends every ID it creates and the journal's `actor` is the ledger's
-  username.
+  username. An identity is its issuer and subject, the issuer compared as
+  one provider is named, so signing in at `localhost` and at `127.0.0.1`
+  is one person with one line; no line is rewritten.
 - The logged-in identity is kept per machine as a read-only snapshot
   (username, name, groups, roles, grants) with a hash of its content,
   rewritten at each signature; an edited one is discarded and its owner
@@ -2147,7 +2162,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--route` | from the repository top: hand the message to each deployment owning a staged file |
 | `catalyst hook install` | `--yes` | the user agreed: write the hook (INV-4) |
 | `catalyst hook start` | `--format` `FORMAT` | plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's (one of `text`, `json`, `cursor`; default `text`) |
-|  | `--quiet` | record the session's baseline (from the hook input) and print nothing: for an agent whose session already carries the laws |
+|  | `--quiet` | record the session's baseline (from the hook input) and print only the warning that no one is logged in: for an agent whose session already carries the laws |
 | `catalyst report` | `--since` `SINCE` | only history from this date/time on (ISO 8601) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst audit` | `--json` | machine-readable output (JSON on stdout) |
@@ -2529,6 +2544,9 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst identity login` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
 |  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
 |  | `--json` | machine-readable output (JSON on stdout) |
+|  | `--password` | log in with your username and password instead: the password from --password-command, else one line of standard input, else asked; never an argument (catalyst-users' id-AUTH-000007) |
+|  | `--username` `USERNAME` | with --password: who logs in (asked on a terminal when not given) |
+|  | `--password-command` `PASSWORD_COMMAND` | with --password: a command printing the password (run without a shell) |
 | `catalyst identity logout` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |
 |  | `--client` `CLIENT` | with --issuer: its public client (default: catalyst-cli) |
 | `catalyst identity whoami` | `--issuer` `ISSUER` | a provider's issuer URL, outside any deployment (e.g. before `catalyst init`) |

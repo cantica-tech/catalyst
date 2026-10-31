@@ -116,10 +116,9 @@ def test_init_points_at_this_machines_catalyst_users_by_default():
             "password_command": "get-password",
         }
     )
-    assert _identity_doc(SimpleNamespace(identity_issuer=None)) == {
+    assert _identity_doc(SimpleNamespace(identity_issuer=None)) == {  # in the pointer's one shape (BUG-000057)
         "provider": "keycloak",
-        "url": "https://id.example.com",
-        "realm": "catalyst",
+        "issuer": "https://id.example.com/realms/catalyst",
         "client": "catalyst-cli",
     }
 
@@ -355,6 +354,167 @@ def test_the_system_account_of_another_provider_never_signs():
     _system_account(realm="other")
     with pytest.raises(provider.ProviderError, match="not logged in"):
         provider.verify(POINTER, None, _keycloak({}, {"sysadmin": "sys-pw"}))
+
+
+def test_the_system_account_is_found_at_another_spelling_of_its_provider(capsys):
+    """BUG-000058: catalyst-users' settings at `localhost`, the pointer at `127.0.0.1/`: one provider, so the system
+    account signs, reached at the pointer's spelling (`system_pointer`)."""
+    from catalyst.identity import config as users_config
+
+    users_config.write_settings(
+        {
+            "type": "keycloak",
+            "username": "sysadmin",
+            "provider": {"url": "http://localhost:8080", "realm": "catalyst"},
+            "password_command": [sys.executable, "-c", "print('sys-pw')"],
+        }
+    )
+    claims = {"sub": "sub-sys", "preferred_username": "sysadmin", "name": "System"}
+    spelled = "http://127.0.0.1:8080/realms/catalyst"
+    system = provider.system_backend(spelled + "/")
+    assert system is not None and system.issuer == spelled
+    assert provider.system_backend("http://localhost:8080/realms/other") is None
+    from catalyst.identity.http import Response
+
+    seen = []
+    keycloak = _keycloak({"at-sysadmin": claims}, {"sysadmin": "sys-pw"})
+    discovery = {k: str(v).replace(ISSUER, spelled) for k, v in DISCOVERY.items()}
+
+    def transport(request, timeout):
+        seen.append(request.url)
+        if request.url.endswith("openid-configuration"):
+            return Response(200, {}, json.dumps(discovery).encode())
+        return keycloak(request, timeout)
+
+    who = provider.verify({"provider": "keycloak", "issuer": spelled}, None, transport)
+    assert who.username == "sysadmin"
+    assert seen and all(url.startswith(spelled) for url in seen)  # the caller's spelling, never the settings'
+
+
+# --- one shape, one login per provider (BUG-000057, REQ-000107, REQ-000108) ---------------------
+def test_both_pointer_shapes_and_loopback_spellings_share_one_login():
+    by_url = {"provider": "keycloak", "url": "http://127.0.0.1:8080/", "realm": "catalyst", "client": "c"}
+    by_issuer = {"provider": "keycloak", "issuer": "http://localhost:8080/realms/catalyst/", "client": "c"}
+    assert provider.normalised(by_url) == {
+        "provider": "keycloak",
+        "issuer": "http://127.0.0.1:8080/realms/catalyst",
+        "client": "c",
+    }
+    assert provider.credentials_path(by_url) == provider.credentials_path(by_issuer)
+    assert provider.credentials_path(by_issuer) != provider.credentials_path({**by_issuer, "client": "other"})
+    assert provider.snapshot_path(by_url) == provider.snapshot_path(by_issuer)
+
+
+def test_check_warns_of_a_pointer_named_by_url_and_realm(tmp_path):
+    project = _project(tmp_path)
+    write(project / ".criterion" / "IAM" / "identity.json", json.dumps({"provider": "keycloak", "url": "http://k"}))
+    errors, warnings = provider.problems(load(project))
+    assert errors == [] and any("catalyst migrate --apply" in w for w in warnings)
+
+
+def test_the_ledger_counts_spellings_of_one_provider_as_one_person(deployment, capsys):
+    """BUG-000057: the person is iss + sub, the issuer compared as one provider is named; the first spelling stays."""
+    project, who = deployment
+    local = "http://localhost:8080/realms/catalyst"
+    who["now"] = Whoami(local, "sub-ada", "ada", "Ada", grants=("cmd:*",))
+    assert main(["new", "ITEM", "--title", "From localhost", *FIELDS]) == 0
+    who["now"] = Whoami("http://127.0.0.1:8080/realms/catalyst/", "sub-ada", "ada", "Ada", grants=("cmd:*",))
+    assert main(["new", "ITEM", "--title", "From 127.0.0.1", *FIELDS]) == 0
+    [line] = _ledger(project)
+    assert line["iss"] == local
+    assert provider.find(_ledger(project), "HTTP://127.0.0.1:8080/realms/catalyst", "sub-ada") == line
+    assert provider.find(_ledger(project), "http://localhost:8080/realms/other", "sub-ada") is None
+    signers = project / ".criterion" / "IAM" / "signers.jsonl"
+    twin = {**line, "iss": "http://127.0.0.1:8080/realms/catalyst"}
+    signers.write_text(signers.read_text(encoding="utf-8") + json.dumps(twin) + "\n", encoding="utf-8")
+    assert provider.ledger_problems(project / ".criterion") == []  # one identity, spelled twice
+
+
+def _with_transport(monkeypatch, transport) -> None:
+    real = provider.facade
+    monkeypatch.setattr(provider, "facade", lambda doc, transport_=None: real(doc, transport))
+
+
+def test_login_with_a_password_from_stdin_or_a_command(monkeypatch, capsys):
+    """REQ-000107 (catalyst-users 0.11.0's id-AUTH-000007): `identity login --password` reads the password from
+    standard input or `--password-command`, never an argument, and logs in through the password client."""
+    import io
+
+    claims = {"sub": "s-alice", "preferred_username": "alice", "name": "Alice"}
+    _with_transport(monkeypatch, _keycloak({"at-alice": claims}, {"alice": "s3cret"}))
+    monkeypatch.setattr("sys.stdin", io.StringIO("s3cret\n"))
+    assert main(["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["username"] == "alice"
+    assert provider.logged_in(POINTER)
+    assert main(["identity", "logout", "--issuer", ISSUER]) == 0
+    assert not provider.logged_in(POINTER)
+    command = f"{sys.executable} -c \"print('s3cret')\""
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    args = ["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice", "--password-command", command]
+    assert main(args) == 0
+    assert "alice (Alice)" in capsys.readouterr().out
+    monkeypatch.setattr("sys.stdin", io.StringIO("wrong\n"))
+    assert main(["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice"]) == 1
+    monkeypatch.setattr("sys.stdin", io.StringIO("s3cret\n"))
+    assert main(["identity", "login", "--issuer", ISSUER, "--password"]) == 1  # no terminal: --username is needed
+    assert "needs --username" in capsys.readouterr().err
+
+
+def test_one_login_serves_catalyst_users_and_catalyst_for_the_same_provider(monkeypatch, capsys):
+    """REQ-000108: catalyst-users set up for the pointer's provider (same spelling, same login client): the kernel
+    keeps its tokens in catalyst-users' credentials file, so either tool's login is the other's. Another provider
+    keeps catalyst's own file."""
+    import io
+
+    from catalyst.identity import config as users_config
+    from catalyst.identity.credentials import CredentialStore
+
+    users_config.write_settings(
+        {"type": "keycloak", "provider": {"url": "https://id.example.com", "realm": "catalyst"}}
+    )
+    shared = users_config.home() / "credentials.json"
+    assert provider.token_store(POINTER) == shared
+    assert provider.token_store({**POINTER, "client": "another-cli"}) == provider.credentials_path(
+        {**POINTER, "client": "another-cli"}
+    )
+    other = {"provider": "keycloak", "issuer": "https://id.example.com/realms/other"}
+    assert provider.token_store(other) == provider.credentials_path(other)
+    claims = {"sub": "s-alice", "preferred_username": "alice", "name": "Alice"}
+    _with_transport(monkeypatch, _keycloak({"at-alice": claims}, {"alice": "s3cret"}))
+    monkeypatch.setattr("sys.stdin", io.StringIO("s3cret\n"))
+    assert main(["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice"]) == 0
+    assert CredentialStore(shared).load(ISSUER, "catalyst-admin-cli") is not None  # catalyst-users reads this login
+    assert not provider.credentials_path(POINTER).exists()
+    capsys.readouterr()
+    assert main(["identity", "status", "--issuer", ISSUER, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["logged_in"] is True
+
+
+def test_the_session_start_says_once_who_signs_when_no_one_is_logged_in(deployment, monkeypatch, capsys):
+    """REQ-000109: `hook start` (even `--quiet`) says when no one is logged in, and who would sign: the system
+    account, or nobody. Nothing when someone is."""
+    import io
+    import time
+
+    from catalyst.identity.credentials import CredentialStore
+    from catalyst.identity.oidc import Tokens
+
+    project, _ = deployment
+
+    def start(*extra: str) -> str:
+        monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+        capsys.readouterr()
+        assert main(["--project", str(project), "hook", "start", *extra]) == 0
+        return capsys.readouterr().out
+
+    assert "no system account can sign" in start("--quiet")
+    _system_account()
+    out = start("--quiet")
+    assert "signed by the system account sysadmin" in out and out.count("no one is logged in") == 1
+    assert "signed by the system account sysadmin" in start()
+    CredentialStore(provider.token_store(POINTER)).save(ISSUER, "catalyst-cli", Tokens("at", "rt", time.time() + 300))
+    assert start("--quiet") == ""
+    assert "no one is logged in" not in start()
 
 
 def test_the_zipapp_stays_standard_library_only():

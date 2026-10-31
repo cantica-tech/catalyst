@@ -164,10 +164,37 @@ def cmd_identity(args) -> int:
     return _identity_session(args, sub, doc, dep)
 
 
+def _login_credentials(args) -> tuple[str, str]:
+    """`identity login --password`'s username and password (catalyst-users' id-AUTH-000007): the password from
+    `--password-command` (its first line), else one line of standard input when it is not a terminal, else asked
+    without echo; never an argument, never shown."""
+    import getpass
+
+    from catalyst.identity.errors import CatalystUsersError
+    from catalyst.identity.provider import secret_from_command
+
+    username = (args.username or "").strip()
+    if not username:
+        if not sys.stdin.isatty():
+            raise CatalystUsersError("login --password needs --username when standard input is not a terminal")
+        username = input("Username: ").strip()
+    if args.password_command:
+        password = secret_from_command(args.password_command, "the password command")
+    elif not sys.stdin.isatty():
+        password = sys.stdin.readline().rstrip("\r\n")
+    else:
+        password = getpass.getpass("Password: ")
+    if not username or not password:
+        raise CatalystUsersError("login --password needs a username and a password")
+    return username, password
+
+
 def _identity_session(args, sub: str, doc: dict, dep) -> int:
     """login, logout, status and whoami against `doc`; with `dep`, whoami is the deployment's signer."""
     from catalyst import provider
     from catalyst.identity.errors import CatalystUsersError
+
+    doc = provider.normalised(doc)
 
     try:
         backend = provider.facade(doc)
@@ -181,22 +208,26 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
                 print(f"Open {code.verification_uri_complete or code.verification_uri}")
                 print(f"and confirm the code {code.user_code}. Waiting…", flush=True)
 
-            provider.discard_snapshot(doc)  # a new login: whoever it is, their snapshot is new (fw-IDENTITY-000009)
-            backend.login(show)
+            if getattr(args, "password", False):  # read before the snapshot goes: a refused input changes nothing
+                username, password = _login_credentials(args)
+                provider.discard_snapshot(doc)  # a new login: whoever it is, their snapshot is new (fw-IDENTITY-000009)
+                backend.login_password(username, password)
+            else:
+                provider.discard_snapshot(doc)
+                backend.login(show)
             sub = "whoami"
         if sub == "logout":
             warning = backend.logout()
             provider.discard_snapshot(doc)
             if warning:
                 print(f"catalyst: warning: {warning}", file=sys.stderr)
-            print(f"logged out of {doc.get('issuer')}")
+            print(f"logged out of {provider.issuer_of(doc)}")
             return 0
         if sub == "status":
-            stored = backend.kind == "keycloak" and provider.credentials_path(doc).is_file()
             out = {
                 "provider": str(doc.get("provider")),
-                "issuer": str(doc.get("issuer") or ""),
-                "logged_in": bool(stored),
+                "issuer": provider.issuer_of(doc),
+                "logged_in": provider.logged_in(doc),
             }
             print(json.dumps(out) if args.json else "; ".join(f"{k}: {v}" for k, v in out.items()))
             return 0
@@ -243,6 +274,15 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
         print(f"  reconciliation  {out['reconciliation']}")
         print(f"  administers     {', '.join(out['administers']) or '-'}")
     return 0
+
+
+def _note_kinds(notes) -> str:
+    """What journal verify's notes are, by kind: merged concurrent edits, redactions."""
+    names = {"concurrent-edit": "merged concurrent edit(s)", "redacted": "redaction(s)"}
+    counts: dict[str, int] = {}
+    for n in notes:
+        counts[n.code] = counts.get(n.code, 0) + 1
+    return ", ".join(f"{k} {names.get(code, code)}" for code, k in counts.items())
 
 
 def cmd_journal(args) -> int:
@@ -351,7 +391,7 @@ def cmd_journal(args) -> int:
             print(
                 f"catalyst journal verify {'FAILED' if failing else 'passed'}: "
                 f"{len(errors)} error(s), {len(issues) - len(errors)} warning(s)"
-                + (f", {len(notes)} note(s) (merged concurrent edits)" if notes else "")
+                + (f", {len(notes)} note(s) ({_note_kinds(notes)})" if notes else "")
             )
         return 1 if failing else 0
     if args.journal_command == "restore":
@@ -2460,7 +2500,9 @@ def _identity_doc(args) -> dict | None:
             return None
         if settings is None:
             return None
-        return {"provider": settings["type"], **(settings.get("provider") or {})}
+        from catalyst.provider import normalised
+
+        return normalised({"provider": settings["type"], **(settings.get("provider") or {})})
     doc = {"provider": "keycloak", "issuer": args.identity_issuer.rstrip("/")}
     if args.identity_client:
         doc["client"] = args.identity_client
@@ -2557,15 +2599,21 @@ def cmd_hook_start(args) -> int:
         report = open_project(project, act=False).render()
     except Exception as exc:  # a session must start whatever happens here
         report = f"catalyst: could not read the project's state ({exc})"
+    warning = None
     try:
         dep = open_deployment(args)
     except (WorkingCopyMissing, DeploymentNotFound):
         text = report
     else:
+        from catalyst import provider
         from catalyst.check import record_baseline, run, session_of
         from catalyst.laws import session_brief
 
-        text = "\n".join([report, session_brief(dep.root)])
+        try:  # once per session: who signs when no one is logged in (REQ-000109)
+            warning = provider.nobody_logged_in(dep)
+        except Exception:  # a session must start whatever happens here
+            warning = None
+        text = "\n".join([report, *([warning] if warning else []), session_brief(dep.root)])
         session = session_of(data)
         if session is not None:  # ADR-002: the Stop hook blocks on what this session breaks
             try:
@@ -2573,7 +2621,9 @@ def cmd_hook_start(args) -> int:
             except Exception as exc:  # a session must start whatever happens here
                 print(f"catalyst: no baseline recorded for this session ({exc})", file=sys.stderr)
     if args.quiet:
-        return 0
+        if not warning:
+            return 0
+        text = warning  # quiet keeps only what the session must know (REQ-000109)
     if args.format == "text":
         print(text)
     elif args.format == "cursor":
@@ -2864,8 +2914,8 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument(
         "--quiet",
         action="store_true",
-        help="record the session's baseline (from the hook input) and print nothing: for an agent "
-        "whose session already carries the laws",
+        help="record the session's baseline (from the hook input) and print only the warning that no one is "
+        "logged in: for an agent whose session already carries the laws",
     )
     q.set_defaults(func=cmd_hook_start)
 
@@ -3778,7 +3828,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.set_defaults(func=cmd_identity)
     for verb, text in (
-        ("login", "log in with a code shown in your browser (the device flow)"),
+        ("login", "log in with a code shown in your browser (the device flow), or --password"),
         ("logout", "revoke your session and delete your tokens"),
         ("whoami", "who catalyst-users says you are: userid, groups, roles, grants (verified now)"),
         ("status", "the provider, and whether you are logged in (no network)"),
@@ -3790,6 +3840,17 @@ def build_parser() -> argparse.ArgumentParser:
             q.add_argument("--json", action="store_true")
         if verb == "whoami":
             q.add_argument("--as", dest="as_user", help="the tests' static backend: which declared person")
+        if verb == "login":
+            q.add_argument(
+                "--password",
+                action="store_true",
+                help="log in with your username and password instead: the password from --password-command, else "
+                "one line of standard input, else asked; never an argument (catalyst-users' id-AUTH-000007)",
+            )
+            q.add_argument("--username", help="with --password: who logs in (asked on a terminal when not given)")
+            q.add_argument(
+                "--password-command", help="with --password: a command printing the password (run without a shell)"
+            )
         q.set_defaults(func=cmd_identity, json=False)
     q = ids_.add_parser("link", help="keep a retired user's userid as yours, once (migration 0.106.0)")
     q.add_argument("user", help="the retired user (name, username or userid), who must be you")
