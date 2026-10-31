@@ -70,17 +70,22 @@ also accepted after `serve`).
 
 | Code | Meaning |
 |---|---|
-| `0` | Success. |
-| `1` | Failure: a check found errors (or warnings under `--strict`), an argument was rejected, or a git operation failed. The reason is printed. |
-| `2` | No deployment found at or above the current directory (or `--working-copy` names no working copy). |
-| `3` | Not done for lack of the user's assent (INV-4): a command that publishes or writes outside the criterion (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`, `criterion protect`, `hook install`, `serve landing connect`, `serve members open`) printed what it would do; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead. |
+| `0` | Success. Also: `check`, `hook stop` and `hook commit-msg` outside any project (below); `hook stop` when it does not block; `hook start`, `inbox`, `report` and `criterion status` always. |
+| `1` | Failure: a check found errors (or warnings under `--strict`), an argument was refused, the signer was refused, or a git operation failed. The reason is on stderr. |
+| `2` | No deployment at or above the directory (`where`, `open` and every command that needs one), or `--working-copy` names none or is given to a command that finds the project itself. **Also** a usage error: argparse's (an unknown option, a missing argument, a bad choice) and a few the commands find themselves — `init` with neither or both of `--module`/`--no-module`, no reachable `--kernel` or no user name; `module install\|upgrade` without a reachable kernel; `workspace init` without a user name; `id next --count 0`; an `agent run` that cannot start (unknown command, no adapter, the agent's CLI not on `PATH`). And `hook stop` when it blocks (Claude Code's protocol: exit `2` with the reason on stderr). Read stderr to tell them apart. |
+| `3` | Not done for lack of the user's assent (INV-4): a command that publishes or writes outside the criterion (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`, `criterion protect`, `hook install`, `serve landing connect`, `serve members open`) printed what it would do; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead (a "no" also exits `3`). |
+
+Other codes: `catalyst task` returns Task's own exit code, and `agent run`
+returns `1` when the agent reports failure or was denied a tool. Splitting
+code `2` into "no deployment" and "usage" would break callers that test for
+it, so it stays as it is until format `1.0` decides.
 
 The deployment is found by walking up from the current directory to the
 nearest `catalyst.toml`, so any directory inside the project works. Run
 from inside a criterion itself (outside any project), give `--project` or
 `--working-copy`: the CLI never guesses the project.
 
-Outside any catalyst project (no `*.catalyst` pointer), `catalyst check`,
+Outside any catalyst project (no `catalyst.toml`), `catalyst check`,
 `catalyst hook stop` and `catalyst hook commit-msg` exit `0`, so a fresh
 clone or a CI runner is not failed. A project whose pointer exists but whose working copy
 is unreachable fails: `check` exits `1`, `hook stop` exits `2`.
@@ -105,7 +110,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | Command | What it does | Options |
 |---|---|---|
 | `catalyst validate` | validate the traceability chain against the ETDs | `--json`, `--strict` |
-| `catalyst init` | install catalyst into this project (explicit only, INV-2) | `--agent`, `--at`, `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--module`, `--module-dir`, `--name`, `--no-module`, `--no-runtime`, `--rule-doc`, `--test-locations`, `--user` |
+| `catalyst init` | install catalyst into this project (explicit only, INV-2) | `--agent`, `--at`, `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--module`, `--module-dir`, `--name`, `--no-module`, `--no-runtime`, `--rule-doc`, `--test-locations`, `--user`, `--userid` |
 | `catalyst check` | run every check: structure, chain, journal, indexes | `--json`, `--strict` |
 | `catalyst hook stop` | end-of-turn hook: block the stop with the failures | `--format`, `--strict` |
 | `catalyst hook commit-msg <message_file>` | git commit-msg hook: the message must trace to the chain | `--route` |
@@ -143,12 +148,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst status set <id> <status>` | set Status, checked against the type's statuses and transitions | `--as`, `--command`, `--force`, `--forewarned`, `--intent`, `--json`, `--preview`, `--through`, `--tier` |
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst unlink <id> <field> <ids>` | stop citing IDs in a reference field, dropping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
-| `catalyst user add <name> <role>` | refuses: add people in catalyst-users | `--as`, `--git-username`, `--intent`, `--json` |
-| `catalyst user remove <name>` | refuses: disable people in catalyst-users | `--as`, `--intent`, `--json` |
-| `catalyst user modify <name> <field> <value>` | refuses: change people in catalyst-users | `--as`, `--intent`, `--json` |
-| `catalyst user assign-role <name> <role>` | refuses: grant roles in catalyst-users | `--as`, `--intent`, `--json` |
-| `catalyst role add <name>` | refuses: provision roles in catalyst-users | `--action`, `--as`, `--intent`, `--json`, `--provider-role`, `--reconciliation` |
-| `catalyst role modify <name>` | refuses: change what a role grants in catalyst-users | `--action`, `--as`, `--intent`, `--json`, `--provider-role` |
+| `catalyst user <rest>` | people are catalyst-users' (design 29): refuses and says where to change them | — |
+| `catalyst role <rest>` | roles are catalyst-users' (design 29): refuses and says where to change them | — |
 | `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
 | `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
 | `catalyst definition list` | each deployed definition: its slug, version and description | `--json` |
@@ -160,7 +161,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst module list` | each installed module: id, version, source, commit, hash (no network) | `--json` |
 | `catalyst module install <source>` | install a module into a deployment that has none (seeded as init does) | `--as`, `--intent`, `--json`, `--kernel` |
 | `catalyst module available <id>` | the releases at the module's recorded repository (the network) | `--json` |
-| `catalyst module upgrade <id> <source>` | move the installed module to another release, through `sync plan\|apply` | `--as`, `--base-kernel`, `--intent`, `--json`, `--kernel`, `--plan` |
+| `catalyst module upgrade <id> <source>` | move the installed module to another release, through `sync plan\|apply` | `--as`, `--base-kernel`, `--cli`, `--commands-dir`, `--intent`, `--json`, `--kernel`, `--plan` |
 | `catalyst module verify <id>` | recompute each module's hash and compare it with the record (exit 1 on a difference) | `--json` |
 | `catalyst where` | the project's criterion: the home store, or a legacy working copy | `--json` |
 | `catalyst agent install <agent>` | add catalyst to the agent's user-level configuration | — |
@@ -236,7 +237,8 @@ request (INV-2); nothing runs it on load. It is the mechanical half of
 an install; the agent decides its inputs and does the judgment steps after
 it (`INSTANTIATION-GUIDE.md` §1).
 
-- `--name` names the project; the pointer is `<name>.catalyst`.
+- `--name` names the project: `catalyst.toml`'s `project_name`, and its
+  criterion's directory in catalyst's home.
 - `--module` is the active module's id; there is no default. Without it,
   `init` installs nothing and lists the modules it finds in sibling
   checkouts named `catalyst-<id>` (next to the project or to catalyst);
@@ -584,9 +586,9 @@ cost (`spec/runs.schema.json`).
 
 ### What a deployment governs
 
-A deployment — the directory holding its `*.catalyst` pointer — governs
-the files under it, except those under a nested directory with a pointer
-of its own (another deployment, isolated: the inner one wins) and those a
+A deployment — the directory holding its `catalyst.toml` (or a legacy
+`*.catalyst` pointer) — governs the files under it, except those under a
+nested directory with a project file of its own (another deployment, isolated: the inner one wins) and those a
 `.catalystignore` opts out (`FORMAT.md` §11). An empty `.catalystignore`
 (blank lines and `#` comments aside) opts its directory and everything
 below out of catalyst; one with lines opts out those paths, relative to
@@ -754,7 +756,8 @@ With `--working-copy` there is no product repository: commits are `0`.
 - `where` names the project file (`catalyst.toml`, or a legacy
   `<name>.catalyst`) and the criterion it resolves to:
   `$CATALYST_HOME/projects/<name>/criterion` (`CATALYST_HOME` defaults to
-  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `1` when none is found.
+  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `2` when no project
+  file is found (as `open`), `1` when its criterion is missing.
 - `runtime install` builds this version's runtime once per machine in
   `$CATALYST_HOME/runtimes/<version>/` (uv `--relocatable` when uv is
   installed, else Python's `venv`; `catalyst.pyz` sits in its site-packages),
@@ -1359,8 +1362,14 @@ retired or deleted number is never reused) and `<userid>` is the signer's (INV-2
 `WORKFLOW`, or a module type such as the fictional `ITEM`; an unknown
 prefix fails and lists the known ones.
 
-The command allocates nothing: two calls before the file is written
-print the same ID. Create the file, then allocate the next one.
+The command reserves what it prints: each call takes the next number
+under the ID lock (`<criterion>/.git/catalyst/ids.json`), so two calls —
+or two parallel callers — never print the same ID, and a number printed
+but never used stays a gap (IDs are never reused, INV-26). `--count <n>`
+reserves `n` consecutive IDs at once. Allocate only what you will create;
+`catalyst new` allocates and writes in one step. An identity's first call
+also appends its line to the signers ledger. Whether a non-reserving
+look at the next number is wanted is an open decision.
 
 The number is unique per type and signer, not across contributors: two
 contributors of a shared deployment allocating concurrently can draw the
@@ -1836,7 +1845,9 @@ product repository.
 
 #### `catalyst criterion create [<url>] [--branch <name>]`
 
-Turns a local-only deployment into a shared one. `<url>` is the
+For a criterion in the home store, `create <url>` is as above (and
+`catalyst share create` is the verb to use). What follows is the legacy
+submodule model. Turns a local-only deployment into a shared one. `<url>` is the
 criterion repository: empty, or already holding this working copy's
 history on `<name>` (default `criterion`).
 
@@ -1876,7 +1887,9 @@ service, beforehand.
 
 #### `catalyst criterion join [--url <url>]`
 
-In a fresh clone of the product repository: initialises the `.criterion`
+For a criterion in the home store, `join` clones it as above (`catalyst
+open` does it for you). The legacy submodule model: in a fresh clone of
+the product repository, initialises the `.criterion`
 submodule and checks out the shared branch, so the working copy is on a
 branch rather than a detached gitlink. Prints the checked-out commit.
 
@@ -1893,7 +1906,8 @@ that.
 
 #### `catalyst criterion status [--fetch]`
 
-Prints the mode (`submodule` or `local`), the remote, the shared branch,
+Prints the mode (`home` for a criterion in catalyst's home, `submodule`
+or `local` for a legacy one), the remote, the shared branch,
 the current branch, the count of uncommitted changes and, when the
 remote has the shared branch, how far the working copy is ahead of and
 behind it. `--fetch` fetches first. Always exits `0`.
@@ -2061,12 +2075,6 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst status set` | `spec/change.schema.json` |
 | `catalyst link` | `spec/change.schema.json` |
 | `catalyst unlink` | `spec/change.schema.json` |
-| `catalyst user add` | `spec/user.schema.json` |
-| `catalyst user remove` | `spec/user.schema.json` |
-| `catalyst user modify` | `spec/user.schema.json` |
-| `catalyst user assign-role` | `spec/user.schema.json` |
-| `catalyst role add` | `spec/role.schema.json` |
-| `catalyst role modify` | `spec/role.schema.json` |
 | `catalyst freeze` | `spec/freeze.schema.json` |
 | `catalyst unfreeze` | `spec/freeze.schema.json` |
 | `catalyst definition list` | `spec/definitions.schema.json` |
@@ -2127,6 +2135,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout or release (default: this checkout's, else the kernel this catalyst carries) |
 |  | `--module-dir` `MODULE_DIR` | the module's directory (default: searched) |
 |  | `--no-module` | install the kernel only; `catalyst module install` adds a module later |
+|  | `--userid` `USERID` | the first userid, fixed (reproducible examples and tests); default: drawn |
 |  | `--identity-issuer` `IDENTITY_ISSUER` | catalyst-users: the provider's issuer URL people sign through (design 29); log in first with `catalyst identity login --issuer <url>` |
 |  | `--identity-client` `IDENTITY_CLIENT` | its public client with the device grant (default: catalyst-cli) |
 |  | `--catalyst-client` `CATALYST_CLIENT` | the client whose roles are catalyst grants (default: catalyst) |
@@ -2162,17 +2171,17 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | the commands, or one command's spec, as JSON |
 | `catalyst id next` | `<prefix>` | entity type prefix, e.g. RECON or a module's type |
 |  | `--count` `COUNT` | that many consecutive IDs, one per line (default `1`) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst id next-rule` | `<doc_prefix>` | the rule document's prefix, e.g. br |
 |  | `<domain>` | a registered DOMAIN code |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst journal append` | `--command` `CMD` | the catalyst command, e.g. /status |
-|  | `--action` `ACTION` | create\|update\|close\|retire\|status-change\|sync |
+|  | `--action` `ACTION` | create\|update\|close\|retire\|status-change\|sync\|redact (journal.ACTIONS) |
 |  | `--artifact` `ARTIFACT` | the artifact ID or a short description |
 |  | `--target` `TARGET` | a rule/artifact ID this serves (repeatable) |
 |  | `--intent` `INTENT` | the goal of the change (repeatable) |
 |  | `--file` `FILE` | a touched file (repeatable) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--allow-unchanged` | journal a file that has not changed since its last entry |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares (default: chore, fix, feature; a chore needs no artifact) |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2196,7 +2205,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst journal redact` | `<blob>` … | a git blob the journal names (40 hex characters) |
 |  | `--intent` `INTENT` | why (repeatable; required) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--tier` `TIER` | the change's ceremony tier (default: the module's tier with no artifact) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst journal pin` | `--share` | also merge with and push the remote's pins (working copy and product repository) |
@@ -2207,14 +2216,14 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst view` | `<id>` … | an artifact or rule ID; several print each view in turn (with --json, one JSON array) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst backlog` | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst repair derived` | `--as` `AS_USER` | signer (name or git_username) |
+| `catalyst repair derived` | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--tier` `TIER` | the change's ceremony tier (default: the module's tier with no artifact) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst graph` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst new` | `<type>` | an entity type (prefix, name or folder) |
 |  | `--title` `TITLE` | the artifact's title; its file name is made from it |
 |  | `--field` `NAME=VALUE` | a field value; references as comma-separated IDs (repeatable) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2223,7 +2232,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst rename` | `<id>` | an entity or rule ID |
 |  | `--title` `TITLE` | the new title; the file is renamed to match |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2234,7 +2243,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--field` `FIELD` | NAME=VALUE: a plain field (repeatable; references: `link`) |
 |  | `--section` `SECTION` | HEADING=TEXT: a section's new text (repeatable) |
 |  | `--section-file` `SECTION_FILE` | HEADING=FILE: a section's new text from a file (repeatable) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2243,7 +2252,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst approve` | `<id>` | an entity or rule ID |
 |  | `--gate` `GATE` | the gate's id in IAM/gates.json |
-|  | `--as` `AS_USER` | who approves (name or git_username): never the version's author |
+|  | `--as` `AS_USER` | you, as logged in: never another person, never the version's author |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2253,13 +2262,13 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst landing init` | `--policy` `POLICY` | One of `standard`, `open`, `reviewed`, `host`; default `standard` |
 |  | `--force` | replace an existing IAM/landing.json |
-|  | `--as` `AS_USER` | signer (name or git_username): an admin |
+|  | `--as` `AS_USER` | you, as logged in (an admin): never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst landing show` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst restore` | `<id>` | an entity or rule ID |
 |  | `--to` `TO` | a journal timestamp (ISO; the version after the last entry at or before it), or #N (after its Nth change) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2270,7 +2279,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `<status>` | the state to set, one the type declares |
 |  | `--force` | write a status outside the type's statuses, or past a failing guard (journaled) |
 |  | `--through` | reach a later status through the states between, each transition and guard checked; one journal entry |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2280,7 +2289,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst link` | `<id>` | an entity or rule ID |
 |  | `<field>` | the reference field to add to, e.g. Targets |
 |  | `<ids>` … | the IDs it cites |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
@@ -2290,60 +2299,28 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst unlink` | `<id>` | an entity or rule ID |
 |  | `<field>` | the reference field to remove from, e.g. Targets |
 |  | `<ids>` … | the IDs it no longer cites |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--command` `CMD` | the slash command this runs for, journaled |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
 |  | `--preview` | say what the change would do (its `try`); keep nothing |
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
-| `catalyst user add` | `<name>` | the user's name |
-|  | `<role>` | the user's first role |
-|  | `--git-username` `GIT_USERNAME` | default: the name |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst user remove` | `<name>` | the user's name |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst user modify` | `<name>` | the user's name |
-|  | `<field>` | the field to change |
-|  | `<value>` | its new value |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst user assign-role` | `<name>` | the user's name |
-|  | `<role>` | the role to add |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst role add` | `<name>` | the role's name |
-|  | `--action` `ACTION` | an action the role may take (repeatable) |
-|  | `--reconciliation` `RECONCILIATION` | what the role may do with a reconciliation case: decide it, propose, or nothing (one of `full`, `propose`, `none`; default `propose`) |
-|  | `--provider-role` `PROVIDER_ROLE` | no longer used: roles are catalyst-users' (design 29) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst role modify` | `<name>` | the role's name |
-|  | `--action` `ACTION` | an action the role may take (repeatable) |
-|  | `--provider-role` `PROVIDER_ROLE` | no longer used: roles are catalyst-users' (design 29) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
-|  | `--intent` `INTENT` | why (repeatable; journaled) |
-|  | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst user` | `<rest>` … | anything: the refusal is the same |
+| `catalyst role` | `<rest>` … | anything: the refusal is the same |
 | `catalyst freeze` | `<item>` | an artifact ID, entity type, template name or working-copy path |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst unfreeze` | `<item>` | an artifact ID, entity type, template name or working-copy path |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst definition list` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst definition migrate` | `<entity>` | the entity type's definitions folder name, e.g. role |
 |  | `<version>` | the definition version to migrate the type's artifacts to |
 |  | `--kernel` `KERNEL` | framework/kernel of the catalyst release (default: this checkout's) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst sync plan` | `--kernel` `KERNEL` | the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip |
@@ -2351,7 +2328,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--base-kernel` `BASE_KERNEL` | the kernel the deployment was composed from (default: found next to the zip, or the git tag) |
 |  | `--cli` `CLI` | the catalyst.pyz to vendor (default: the release's, or built) |
 |  | `--commands-dir` `COMMANDS_DIR` | where an older catalyst wrote the project's command files, to retire them (default: .claude/commands) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst sync apply` | `--kernel` `KERNEL` | the target kernel: framework/kernel of a catalyst checkout, or a kernel-vX.Y.Z.zip |
@@ -2359,7 +2336,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--base-kernel` `BASE_KERNEL` | the kernel the deployment was composed from (default: found next to the zip, or the git tag) |
 |  | `--cli` `CLI` | the catalyst.pyz to vendor (default: the release's, or built) |
 |  | `--commands-dir` `COMMANDS_DIR` | where an older catalyst wrote the project's command files, to retire them (default: .claude/commands) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst inbox` | `--json` | machine-readable output (JSON on stdout) |
@@ -2371,7 +2348,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst module list` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module install` | `<source>` | the module: its directory, release zip, or git URL[@ref] |
 |  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at (default: this checkout's, else the kernel this catalyst carries) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module available` | `<id>` | the installed module |
@@ -2380,8 +2357,10 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `<source>` | directory, release zip or git URL[@ref] (default: the recorded URL) |
 |  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at (default: this checkout's, else the kernel this catalyst carries) |
 |  | `--base-kernel` `BASE_KERNEL` | the kernel the deployment was composed from (default: --kernel) |
+|  | `--cli` `CLI` | the catalyst.pyz to vendor (default: the release's, or built) |
+|  | `--commands-dir` `COMMANDS_DIR` | where an older catalyst wrote the project's command files, to retire them (default: .claude/commands) |
 |  | `--plan` | list what would change, write nothing |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module verify` | `<id>` | one module (default: all) |
@@ -2406,14 +2385,14 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst move` | `--to-home` | symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion |
 |  | `--name` `NAME` | rename a home-store project |
 |  | `--no-runtime` | do not fill the criterion's .venv now |
-|  | `--as` `AS_USER` | actor recorded in the journal |
+|  | `--as` `AS_USER` | you, as logged in, recorded in the journal (fw-IDENTITY-000002) |
 | `catalyst migrate` | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout, or a kernel release (dir or zip) |
 |  | `--apply` | move a legacy layout and add the templates, journaled |
 |  | `--template` `TYPE` | with --apply: also add this module type's new template (its prefix or template name, or `all`) (repeatable) |
 |  | `--decline` `TYPE` | record that you do not want this module type's new template (its prefix or name, or `all`), journaled; it is no longer offered until the module ships a different one (repeatable) |
 |  | `--since` `VERSION` | list the judgment steps of every migration after this kernel |
 |  | `--no-runtime` | when moving: do not fill the criterion's .venv now |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst workspace init` | `<file>` | the <name>.code-workspace file |
@@ -2431,28 +2410,28 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--mode` `MODE` | bootstrap: no rules yet; incremental: find what the rules miss (default) (one of `bootstrap`, `incremental`; default `incremental`) |
 |  | `--name` `NAME` | a short name for the record |
 |  | `--passes` `PASSES` | independent passes: 2, four-eyes (default), or 1; the deployment's default is catalyst.toml's analysis_passes (one of `1`, `2`) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis record` | `<id>` | an entity or rule ID |
 |  | `--pass` `WHICH` | the pass it records, A or B (one of `A`, `B`, `a`, `b`) |
 |  | `<file>` | the pass's findings file |
 |  | `--replace` | replace a pass recorded by mistake |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis diff` | `<id>` | an entity or rule ID |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis reconcile` | `<id>` | an entity or rule ID |
 |  | `<file>` | the reconciler's list of findings, every one accounted for |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis decide` | `<id>` | an entity or rule ID |
 |  | `<finding>` | the reconciled finding's ID, e.g. F1 |
 |  | `<verdict>` | accept the finding, or reject it (one of `accept`, `reject`) |
 |  | `--artifact` `ARTIFACT` | the domain code, rule ID or artifact ID an accepted finding became |
 |  | `--reason` `REASON` | why |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis close` | `<id>` | an entity or rule ID |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis abandon` | `<id>` | an entity or rule ID |
 |  | `--reason` `REASON` | why the analysis is abandoned |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 | `catalyst analysis status` | `<id>` | an entity or rule ID |
 |  | `--json` | the full report: passes, diff, findings and decisions |
 | `catalyst analysis list` | `--json` | machine-readable output (JSON on stdout) |
@@ -2460,19 +2439,19 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `<verb>` | what to do with the case (one of `accept`, `accept-with-edits`, `reject`, `propose`, `close`) |
 |  | `--text` `TEXT` | propose: the proposed resolution (a new Revisions row) |
 |  | `--from` `FROM_FILE` | a proposal: the content it now proposes (propose) or accepts (accept-with-edits); - reads stdin |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--preview` | say what the change would do (its `try`); keep nothing |
 |  | `--forewarned` | try it first, then make it anyway, recording in its journal entry what it adds to `check` |
 | `catalyst try` | `--json` | machine-readable output (JSON on stdout) |
 |  | `--keep` | keep the scratch copy, to look inside |
 |  | `--proposal` `PROPOSAL` | try accepting this proposal (`reconcile <case> accept`) |
-|  | `--as` `AS_USER` | with --proposal: who accepts it (name or git_username) |
+|  | `--as` `AS_USER` | with --proposal: you, as logged in, accepting it (fw-IDENTITY-000002) |
 |  | `<change>` … | the verb and its arguments, e.g. status set REQ-000004 Done |
 | `catalyst propose` | `<id>` | the entity, or a rule (its document is what is proposed) |
 |  | `--from` `FROM_FILE` | the proposed content of its file; - reads stdin |
 |  | `--title` `TITLE` | the case's title (default: Proposed change to <ID>) |
-|  | `--as` `AS_USER` | who proposes (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in, proposing (fw-IDENTITY-000002) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--tier` `TIER` | the change's ceremony tier, one the active module declares |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2487,13 +2466,13 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst share pull` | — | — |
 | `catalyst share push` | `-m`, `--message` `MESSAGE` | what the change is (commit message, pull request title) |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--no-pr` | git: push the branch without opening a pull request |
 |  | `--yes` | the user agreed to publish what the preview shows (INV-4) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst share create` | `<url>` | the criterion repository (empty, or holding this history), or a server's URL |
 |  | `--driver` `DRIVER` | git (default) or a catalyst serve server (one of `git`, `serve`; default `git`) |
-|  | `--as` `AS_USER` | serve: the signer of the journal entry (name or git_username) |
+|  | `--as` `AS_USER` | serve: you, as logged in, signing the journal entry (fw-IDENTITY-000002) |
 |  | `--branch` `BRANCH` | the shared branch (default: criterion) (default `criterion`) |
 |  | `--protect` | also require pull requests and the check (GitHub) |
 |  | `--yes` | the user agreed to publish (INV-4) |
@@ -2531,7 +2510,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--yes` | with a URL: the user agreed to publish (INV-4) |
 | `catalyst criterion join` | `--url` `URL` | the criterion repository, when the product has no .criterion submodule yet |
 | `catalyst criterion push` | `-m`, `--message` `MESSAGE` | commit message / pull request title |
-|  | `--as` `AS_USER` | signer (name or git_username) |
+|  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
 |  | `--no-pr` | push the branch without opening a pull request |
 |  | `--url` `URL` | the criterion repository, when the deployment is still local only |
 |  | `--yes` | the user agreed to publish what the preview shows (INV-4) |

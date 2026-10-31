@@ -785,8 +785,18 @@ def cmd_edit(args) -> int:
     return 0
 
 
+def cmd_people(args) -> int:
+    """`user …` / `role …`: people and roles are catalyst-users' (design 29), changed there; this only says so."""
+    print(
+        "catalyst: people and roles are catalyst-users' (design 29): add, disable or change people, and what each "
+        "role grants, there (`catalyst-users users …`, `catalyst-users roles provision`); fw-IDENTITY-000007",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def cmd_admin(args) -> int:
-    """Administration verbs (R2 W3): users, roles, freeze/unfreeze, definitions."""
+    """Administration verbs (R2 W3): freeze/unfreeze, definitions."""
     from catalyst import admin
     from catalyst.corpus import load_corpus
     from catalyst.ids import resolve_signer
@@ -795,37 +805,9 @@ def cmd_admin(args) -> int:
     dep = open_deployment(args)
     intent = args.intent or []
     try:
-        command = {
-            "user": f"user-{getattr(args, 'user_command', '')}",
-            "role": f"role-{getattr(args, 'role_command', '')}",
-            "freeze": "freeze",
-            "unfreeze": "freeze",
-            "definition": "migrate-definition",
-        }.get(args.admin, "")
-        if args.admin in ("user", "role"):
-            raise admin.AdminError(
-                "people and roles are catalyst-users' (design 29): add, disable or change people, and what each "
-                "role grants, there (`catalyst-users users …`, `catalyst-users roles provision`); fw-IDENTITY-000002"
-            )
+        command = {"freeze": "freeze", "unfreeze": "freeze", "definition": "migrate-definition"}.get(args.admin, "")
         signer = resolve_signer(dep, load_corpus(dep), args.as_user, command)
-        if args.admin == "user":
-            sub_cmd = args.user_command
-            if sub_cmd == "add":
-                out = admin.user_add(dep, args.name, args.role, signer, intent, git_username=args.git_username)
-            elif sub_cmd == "remove":
-                out = admin.user_remove(dep, args.name, signer, intent)
-            elif sub_cmd == "modify":
-                out = admin.user_modify(dep, args.name, args.field, args.value, signer, intent)
-            else:
-                out = admin.user_assign_role(dep, args.name, args.role, signer, intent)
-        elif args.admin == "role":
-            if args.role_command == "add":
-                out = admin.role_add(
-                    dep, args.name, args.action or [], signer, intent, args.reconciliation, args.provider_role
-                )
-            else:
-                out = admin.role_modify(dep, args.name, args.action, signer, intent, args.provider_role)
-        elif args.admin in ("freeze", "unfreeze"):
+        if args.admin in ("freeze", "unfreeze"):
             out = {
                 "frozen" if args.admin == "freeze" else "unfrozen": admin.freeze(
                     dep, args.item, signer, intent, unfreeze=args.admin == "unfreeze"
@@ -1052,9 +1034,9 @@ def cmd_where(args) -> int:
 
     start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
     project = project_file.find_up(start)
-    if project is None:
+    if project is None:  # no deployment: 2, as `open` and every command that needs one
         print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
-        return 1
+        return 2
     data = project_file.read_dir(project)
     name = project_file.project_name(data)
     criterion = project_file.resolve(project)
@@ -2705,11 +2687,6 @@ _HELP_BY_COMMAND: dict[tuple[str, str], str] = {
     ("link", "ids"): "the IDs it cites",
     ("unlink", "field_name"): "the reference field to remove from, e.g. Targets",
     ("unlink", "ids"): "the IDs it no longer cites",
-    ("user add", "role"): "the user's first role",
-    ("user assign-role", "role"): "the role to add",
-    ("user modify", "field"): "the field to change",
-    ("user modify", "value"): "its new value",
-    ("role add", "reconciliation"): "what the role may do with a reconciliation case: decide it, propose, or nothing",
     ("definition migrate", "version"): "the definition version to migrate the type's artifacts to",
     ("agent install", "agent"): "the agent to wire, at user level",
     ("agent uninstall", "agent"): "the agent to unwire",
@@ -2727,7 +2704,7 @@ _HELP_BY_COMMAND: dict[tuple[str, str], str] = {
 }
 _HELP_BY_NAME = {
     "json": "machine-readable output (JSON on stdout)",
-    "as_user": "signer (name or git_username)",
+    "as_user": "you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
     "id": "an entity or rule ID",
 }
 
@@ -2772,7 +2749,7 @@ def _offer_preview(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="catalyst", description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(prog="catalyst", description=" ".join((__doc__ or "").split()))
     parser.add_argument("--version", action="version", version=f"catalyst {version_string()}")
     parser.add_argument(
         "--project", type=Path, default=None, help="a directory inside the project (default: current directory)"
@@ -2837,7 +2814,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="install the kernel only; `catalyst module install` adds a module later",
     )
-    p.add_argument("--userid", help=argparse.SUPPRESS)  # fixed first userid: reproducible examples
+    p.add_argument("--userid", help="the first userid, fixed (reproducible examples and tests); default: drawn")
     p.add_argument(
         "--identity-issuer",
         help="catalyst-users: the provider's issuer URL people sign through (design 29); log in first with "
@@ -2953,24 +2930,38 @@ def build_parser() -> argparse.ArgumentParser:
     q = ids.add_parser("next", help="next <PREFIX>-NNNNNN-<userid> for an entity type")
     q.add_argument("prefix", help="entity type prefix, e.g. RECON or a module's type")
     q.add_argument("--count", type=int, default=1, help="that many consecutive IDs, one per line")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.set_defaults(func=cmd_id)
     q = ids.add_parser("next-rule", help="next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID")
     q.add_argument("doc_prefix", help="the rule document's prefix, e.g. br")
     q.add_argument("domain", help="a registered DOMAIN code")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.set_defaults(func=cmd_id)
 
     p = sub.add_parser("journal", help="append to, verify, restore from or pin the journal")
     js = p.add_subparsers(dest="journal_command", required=True)
     q = js.add_parser("append", help="append one entry with real hashes and time")
     q.add_argument("--command", dest="cmd", required=True, help="the catalyst command, e.g. /status")
-    q.add_argument("--action", required=True, help="create|update|close|retire|status-change|sync")
+    q.add_argument(
+        "--action", required=True, help="create|update|close|retire|status-change|sync|redact (journal.ACTIONS)"
+    )
     q.add_argument("--artifact", required=True, help="the artifact ID or a short description")
     q.add_argument("--target", action="append", help="a rule/artifact ID this serves (repeatable)")
     q.add_argument("--intent", action="append", help="the goal of the change (repeatable)")
     q.add_argument("--file", action="append", help="a touched file (repeatable)")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--allow-unchanged", action="store_true")
     q.add_argument(
         "--tier",
@@ -3016,7 +3007,11 @@ def build_parser() -> argparse.ArgumentParser:
     q = js.add_parser("redact", help="redact journaled content: a tombstone entry, the blobs out of the pins")
     q.add_argument("blobs", nargs="+", metavar="blob", help="a git blob the journal names (40 hex characters)")
     q.add_argument("--intent", action="append", help="why (repeatable; required)")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--tier", help="the change's ceremony tier (default: the module's tier with no artifact)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_journal)
@@ -3057,7 +3052,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("repair", help="rewrite what catalyst derives when it disagrees with its sources")
     rs = p.add_subparsers(dest="repair_command", required=True)
     q = rs.add_parser("derived", help="every derived field (another type's back-reference) from its sources, journaled")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--tier", help="the change's ceremony tier (default: the module's tier with no artifact)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_repair)
@@ -3075,7 +3074,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME=VALUE",
         help="a field value; references as comma-separated IDs (repeatable)",
     )
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3085,7 +3088,11 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("rename", help="a new title: heading, Name, Filename and file follow; the ID stays")
     p.add_argument("id")
     p.add_argument("--title", required=True)
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3100,7 +3107,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--field", action="append", help="NAME=VALUE: a plain field (repeatable; references: `link`)")
     p.add_argument("--section", action="append", help="HEADING=TEXT: a section's new text (repeatable)")
     p.add_argument("--section-file", action="append", help="HEADING=FILE: a section's new text from a file")
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3110,7 +3121,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("approve", help="approve an entity's current version under a gate (IAM/gates.json), journaled")
     p.add_argument("id")
     p.add_argument("--gate", required=True, help="the gate's id in IAM/gates.json")
-    p.add_argument("--as", dest="as_user", help="who approves (name or git_username): never the version's author")
+    p.add_argument("--as", dest="as_user", help="you, as logged in: never another person, never the version's author")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
@@ -3126,7 +3137,9 @@ def build_parser() -> argparse.ArgumentParser:
     q = ls.add_parser("init", help="choose the landing policy: the Admin's assent to the landings it allows")
     q.add_argument("--policy", default="standard", choices=["standard", "open", "reviewed", "host"])
     q.add_argument("--force", action="store_true", help="replace an existing IAM/landing.json")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username): an admin")
+    q.add_argument(
+        "--as", dest="as_user", help="you, as logged in (an admin): never another person (fw-IDENTITY-000002)"
+    )
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_landing)
@@ -3141,7 +3154,11 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="a journal timestamp (ISO; the version after the last entry at or before it), or #N (after its Nth change)",
     )
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3163,7 +3180,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="reach a later status through the states between, each transition and guard checked; one journal entry",
     )
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     q.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3174,7 +3195,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("field_name", metavar="field")
     p.add_argument("ids", nargs="+")
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
@@ -3185,67 +3210,22 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("field_name", metavar="field")
     p.add_argument("ids", nargs="+")
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--command", dest="cmd", help="the slash command this runs for, journaled")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_edit, edit="unlink")
 
-    p = sub.add_parser("user", help="people are catalyst-users' (design 29): these refuse and say where to change them")
-    us = p.add_subparsers(dest="user_command", required=True)
-    q = us.add_parser("add", help="refuses: add people in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("role")
-    q.add_argument("--git-username", help="default: the name")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("remove", help="refuses: disable people in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("modify", help="refuses: change people in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("field")
-    q.add_argument("value")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="user")
-    q = us.add_parser("assign-role", help="refuses: grant roles in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("role")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="user")
-
-    p = sub.add_parser("role", help="roles are catalyst-users' (design 29): these refuse and say where to change them")
-    rs = p.add_subparsers(dest="role_command", required=True)
-    q = rs.add_parser("add", help="refuses: provision roles in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
-    q.add_argument("--reconciliation", choices=["full", "propose", "none"], default="propose")
-    q.add_argument("--provider-role", help="no longer used: roles are catalyst-users' (design 29)")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="role")
-    q = rs.add_parser("modify", help="refuses: change what a role grants in catalyst-users")
-    q.add_argument("name")
-    q.add_argument("--action", action="append", help="an action the role may take (repeatable)")
-    q.add_argument(
-        "--provider-role",
-        help="no longer used: roles are catalyst-users' (design 29)",
-    )
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
-    q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
-    q.add_argument("--json", action="store_true")
-    q.set_defaults(func=cmd_admin, admin="role")
+    # people and roles are catalyst-users' (design 29, fw-IDENTITY-000007): these only say where to change them
+    for verb, what in (("user", "people"), ("role", "roles")):
+        p = sub.add_parser(verb, help=f"{what} are catalyst-users' (design 29): refuses and says where to change them")
+        p.add_argument("rest", nargs=argparse.REMAINDER, help="anything: the refusal is the same")
+        p.set_defaults(func=cmd_people)
 
     for verb, text in (
         ("freeze", "protect an item from /sync-framework (.frozen)"),
@@ -3253,7 +3233,11 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         p = sub.add_parser(verb, help=text)
         p.add_argument("item", help="an artifact ID, entity type, template name or working-copy path")
-        p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+        p.add_argument(
+            "--as",
+            dest="as_user",
+            help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+        )
         p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         p.add_argument("--json", action="store_true")
         p.set_defaults(func=cmd_admin, admin=verb)
@@ -3267,7 +3251,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("entity", help="the entity type's definitions folder name, e.g. role")
     q.add_argument("version", type=int)
     q.add_argument("--kernel", type=Path, help="framework/kernel of the catalyst release (default: this checkout's)")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_admin, admin="definition")
@@ -3298,7 +3286,11 @@ def build_parser() -> argparse.ArgumentParser:
             help="where an older catalyst wrote the project's command files, "
             "to retire them (default: .claude/commands)",
         )
-        q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+        q.add_argument(
+            "--as",
+            dest="as_user",
+            help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+        )
         q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
         q.add_argument("--json", action="store_true")
         q.set_defaults(func=cmd_sync)
@@ -3329,7 +3321,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="framework/kernel of the release this deployment is at (default: this checkout's, else the kernel "
         "this catalyst carries)",
     )
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_module)
@@ -3347,10 +3343,18 @@ def build_parser() -> argparse.ArgumentParser:
         "this catalyst carries)",
     )
     q.add_argument("--base-kernel", type=Path, help="the kernel the deployment was composed from (default: --kernel)")
-    q.add_argument("--cli", type=Path, help=argparse.SUPPRESS)
-    q.add_argument("--commands-dir", type=Path, help=argparse.SUPPRESS)
+    q.add_argument("--cli", type=Path, help="the catalyst.pyz to vendor (default: the release's, or built)")
+    q.add_argument(
+        "--commands-dir",
+        type=Path,
+        help="where an older catalyst wrote the project's command files, to retire them (default: .claude/commands)",
+    )
     q.add_argument("--plan", action="store_true", help="list what would change, write nothing")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_module)
@@ -3420,7 +3424,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     mg.add_argument("--name", help="rename a home-store project")
     p.add_argument("--no-runtime", action="store_true", help="do not fill the criterion's .venv now")
-    p.add_argument("--as", dest="as_user", help="actor recorded in the journal")
+    p.add_argument("--as", dest="as_user", help="you, as logged in, recorded in the journal (fw-IDENTITY-000002)")
     p.set_defaults(func=cmd_move)
 
     p = sub.add_parser(
@@ -3446,7 +3450,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--since", metavar="VERSION", help="list the judgment steps of every migration after this kernel")
     p.add_argument("--no-runtime", action="store_true", help="when moving: do not fill the criterion's .venv now")
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--json", action="store_true", help="machine-readable output (JSON on stdout)")
     p.set_defaults(func=cmd_migrate)
@@ -3492,7 +3500,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="independent passes: 2, four-eyes (default), or 1; the deployment's default is catalyst.toml's "
         "analysis_passes",
     )
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("record", help="store one independent pass's findings (JSON)")
     q.add_argument("id")
@@ -3544,7 +3556,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="from_file",
         help="a proposal: the content it now proposes (propose) or accepts (accept-with-edits); - reads stdin",
     )
-    p.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    p.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.set_defaults(func=cmd_reconcile)
 
@@ -3554,7 +3570,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.add_argument("--keep", action="store_true", help="keep the scratch copy, to look inside")
     p.add_argument("--proposal", help="try accepting this proposal (`reconcile <case> accept`)")
-    p.add_argument("--as", dest="as_user", help="with --proposal: who accepts it (name or git_username)")
+    p.add_argument("--as", dest="as_user", help="with --proposal: you, as logged in, accepting it (fw-IDENTITY-000002)")
     p.add_argument(
         "change", nargs=argparse.REMAINDER, help="the verb and its arguments, e.g. status set REQ-000004 Done"
     )
@@ -3564,7 +3580,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id", help="the entity, or a rule (its document is what is proposed)")
     p.add_argument("--from", dest="from_file", required=True, help="the proposed content of its file; - reads stdin")
     p.add_argument("--title", help="the case's title (default: Proposed change to <ID>)")
-    p.add_argument("--as", dest="as_user", help="who proposes (name or git_username)")
+    p.add_argument("--as", dest="as_user", help="you, as logged in, proposing (fw-IDENTITY-000002)")
     p.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     p.add_argument("--tier", help="the change's ceremony tier, one the active module declares")
     p.add_argument("--json", action="store_true")
@@ -3593,7 +3609,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_share)
     q = ss.add_parser("push", help="publish this criterion's changes (git: a topic branch and a pull request)")
     q.add_argument("-m", "--message", required=True, help="what the change is (commit message, pull request title)")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--no-pr", action="store_true", help="git: push the branch without opening a pull request")
     q.add_argument("--yes", action="store_true", help="the user agreed to publish what the preview shows (INV-4)")
     q.add_argument("--json", action="store_true")
@@ -3601,7 +3621,9 @@ def build_parser() -> argparse.ArgumentParser:
     q = ss.add_parser("create", help="publish a local-only criterion for the first time (git, or a server)")
     q.add_argument("url", help="the criterion repository (empty, or holding this history), or a server's URL")
     q.add_argument("--driver", choices=("git", "serve"), default="git", help="git (default) or a catalyst serve server")
-    q.add_argument("--as", dest="as_user", help="serve: the signer of the journal entry (name or git_username)")
+    q.add_argument(
+        "--as", dest="as_user", help="serve: you, as logged in, signing the journal entry (fw-IDENTITY-000002)"
+    )
     q.add_argument("--branch", default="criterion", help="the shared branch (default: criterion)")
     q.add_argument("--protect", action="store_true", help="also require pull requests and the check (GitHub)")
     q.add_argument("--yes", action="store_true", help="the user agreed to publish (INV-4)")
@@ -3721,7 +3743,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_criterion)
     q = cs.add_parser("push", help="commit, rebase, check, push a topic branch, open a pull request")
     q.add_argument("-m", "--message", required=True, help="commit message / pull request title")
-    q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
+    q.add_argument(
+        "--as",
+        dest="as_user",
+        help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
+    )
     q.add_argument("--no-pr", action="store_true", help="push the branch without opening a pull request")
     q.add_argument("--url", help="the criterion repository, when the deployment is still local only")
     q.add_argument("--yes", action="store_true", help="the user agreed to publish what the preview shows (INV-4)")
