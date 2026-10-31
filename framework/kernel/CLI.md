@@ -60,7 +60,11 @@ as in its CI. The module is the single one under `<dir>/modules/`
 (kernel-only if there is none or several), project files are out of
 scope, and journal paths outside the working copy are not checked.
 `check`, `validate`, `index`, `journal verify` and `criterion integrity`
-work this way.
+work this way. The commands that find the project themselves — `where`,
+`open`, `mcp`, `task`, `runtime`, `move`, `migrate`, `init`, `serve`,
+`workspace`, `hook start` — refuse it (exit `2`) rather than ignore it.
+`--project <dir>` reaches every command, `serve --local` included (it is
+also accepted after `serve`).
 
 ### Exit codes
 

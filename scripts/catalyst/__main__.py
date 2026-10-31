@@ -3623,7 +3623,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="serve this project's own criterion read-only, on 127.0.0.1, for a client on this machine",
     )
-    p.add_argument("--project", help="--local: the project (default: the current directory)")
+    # the global --project, also accepted after `serve`; never overwritten by a default of its own
+    p.add_argument("--project", default=argparse.SUPPRESS, help="--local: the project (default: the current directory)")
     p.add_argument(
         "--allow-origin",
         action="append",
@@ -3853,12 +3854,44 @@ def _forewarn(args, change: list[str]) -> bool:
     return True
 
 
+# Commands that find the project themselves: `--working-copy`, which names a criterion, means nothing to them.
+_PROJECT_ONLY = (
+    "cmd_where",
+    "cmd_open",
+    "cmd_mcp",
+    "cmd_task",
+    "cmd_runtime",
+    "cmd_move",
+    "cmd_migrate",
+    "cmd_init",
+    "cmd_serve",
+    "cmd_workspace",
+    "cmd_hook_start",
+)
+
+
+def _working_copy_refused(args) -> bool:
+    """`--working-copy` given to a command that would ignore it: said, never silently ignored (exit 2)."""
+    func = getattr(args, "func", None)
+    if not getattr(args, "working_copy", None) or getattr(func, "__name__", "") not in _PROJECT_ONLY:
+        return False
+    name = func.__name__.removeprefix("cmd_").replace("_", " ")
+    print(
+        f"catalyst: {name} works on a project, not a working copy: give --project (or run it from the project) "
+        "instead of --working-copy",
+        file=sys.stderr,
+    )
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):  # UTF-8 out, whatever the code page (cp1252), so
         if hasattr(stream, "reconfigure"):  # git and hooks read it back; degrade, never crash
             stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     argv, forewarn = _preview_and_forewarned(list(sys.argv[1:] if argv is None else argv))
     args = build_parser().parse_args(argv)
+    if _working_copy_refused(args):
+        return 2
     try:
         if forewarn is not None and not _forewarn(args, forewarn):
             return 1
