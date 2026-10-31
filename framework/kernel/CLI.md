@@ -69,7 +69,7 @@ work this way.
 | `0` | Success. |
 | `1` | Failure: a check found errors (or warnings under `--strict`), an argument was rejected, or a git operation failed. The reason is printed. |
 | `2` | No deployment found at or above the current directory (or `--working-copy` names no working copy). |
-| `3` | Not done for lack of the user's assent (INV-4): a command that publishes (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`) printed what it would publish; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead. |
+| `3` | Not done for lack of the user's assent (INV-4): a command that publishes or writes outside the criterion (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`, `criterion protect`, `hook install`, `serve landing connect`, `serve members open`) printed what it would do; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead. |
 
 The deployment is found by walking up from the current directory to the
 nearest `catalyst.toml`, so any directory inside the project works. Run
@@ -105,7 +105,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst check` | run every check: structure, chain, journal, indexes | `--json`, `--strict` |
 | `catalyst hook stop` | end-of-turn hook: block the stop with the failures | `--format`, `--strict` |
 | `catalyst hook commit-msg <message_file>` | git commit-msg hook: the message must trace to the chain | `--route` |
-| `catalyst hook install` | install the commit-msg hook in the project's git repository | — |
+| `catalyst hook install` | install the commit-msg hook in the project's git repository (previews; --yes writes) | `--yes` |
 | `catalyst hook start` | session-start hook: print the invariants, record the session's baseline | `--format`, `--quiet` |
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
 | `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
@@ -628,18 +628,22 @@ a warning on stderr during the beta, a refusal (exit `1`) from format
 commit afterwards (`catalyst journal adopt HEAD`). No `journal_since` in
 the pointer: not checked.
 
-### `catalyst hook install`
+### `catalyst hook install [--yes]`
 
 Writes the `commit-msg` hook above, executable, into the project
 repository's `hooks/commit-msg` under its git directory
 (`.git/hooks/commit-msg`) — one hook for every deployment the repository
-holds. The hook, a short Python script, runs the installing deployment's
-vendored CLI (its path from the repository top is written into the hook;
-the nearest vendored CLI to a staged file when that one is gone) with
-`hook commit-msg --route`, so it follows every re-vendored CLI. It refuses (exit `1`) when a
-`commit-msg` hook already exists that catalyst did not write — merge the
-two by hand — and rewrites its own. It writes into `.git/`, so it runs
-only with the user's assent; it is offered after install
+holds. The hook, a short Python script, runs catalyst's launcher
+(`$CATALYST_HOME/bin/catalyst`, which runs the project's own runtime) with
+`hook commit-msg --route`; without the launcher it falls back to the path
+written into the hook — the launcher's for a criterion in catalyst's home,
+a legacy deployment's vendored `.criterion/bin/catalyst.pyz` (from the
+repository top) otherwise — then to the criterion's or the nearest
+vendored CLI. It refuses (exit `1`) when a `commit-msg` hook already
+exists that catalyst did not write — merge the two by hand — and rewrites
+its own. It writes into `.git/`, so it runs only with the user's assent:
+without `--yes` it prints the hook it would write and exits `3` (INV-4; on
+a terminal it asks). It is offered after install
 (`INSTANTIATION-GUIDE.md`). A repository that sets `core.hooksPath` must
 call the hook from there.
 
@@ -1595,7 +1599,10 @@ remote, or a project file naming its repository, uses `git`, any other
 - `create <url> [--branch <name>] [--protect] [--yes]`: publish a local-only
   criterion for the first time (git: `criterion create <url>`); `--protect`
   also makes pull requests and the `catalyst` check required on the shared
-  branch (GitHub, `criterion protect --yes`). Needs `--yes` (INV-4).
+  branch (GitHub, `criterion protect --yes`). Needs `--yes` (INV-4); its
+  preview says that `catalyst.toml` records the repository and is staged in
+  the project, not committed. Its journal entries are signed by the verified
+  identity, whose grants must allow `share`.
   `create <url> --driver serve --as <user> --yes` shares it through a
   `catalyst serve` server instead: `catalyst.toml` gets `share = "serve"`
   and `share_url` (journaled, staged, not committed), then every file is
@@ -1967,7 +1974,8 @@ required (with no minimum number of approving reviews — raise it on the
 host to require review), the `catalyst` status check required (strict:
 up to date with the branch), no force-push, no deletion. Repository
 administrators keep their override. Without `--yes`, prints the API call it
-would make and changes nothing; with `--yes`, applies it with `gh api`.
+would make, changes nothing and exits `3` (INV-4; on a terminal it asks);
+with `--yes`, applies it with `gh api`.
 Fails for a non-GitHub remote: on another host, set the equivalent by
 hand. Protection is what makes the gates real — without it, anyone with
 write access can push to the shared branch directly.
@@ -2124,7 +2132,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--format` `FORMAT` | how to block: exit 2 + stderr (Claude Code), decision JSON (Codex, Copilot), Gemini CLI's, Cursor's follow-up message (one of `exit2`, `json`, `gemini`, `cursor`; default `exit2`) |
 | `catalyst hook commit-msg` | `<message_file>` | the file git passes the hook, holding the commit message |
 |  | `--route` | from the repository top: hand the message to each deployment owning a staged file |
-| `catalyst hook install` | — | — |
+| `catalyst hook install` | `--yes` | the user agreed: write the hook (INV-4) |
 | `catalyst hook start` | `--format` `FORMAT` | plain text (Claude Code), additionalContext JSON (Codex, Copilot, Gemini), Cursor's (one of `text`, `json`, `cursor`; default `text`) |
 |  | `--quiet` | record the session's baseline (from the hook input) and print nothing: for an agent whose session already carries the laws |
 | `catalyst report` | `--since` `SINCE` | only history from this date/time on (ISO 8601) |

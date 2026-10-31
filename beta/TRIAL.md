@@ -56,7 +56,8 @@ Show, on a real project, that a shared deployment:
   ledger), then `catalyst open`, which clones the shared criterion into
   `$HOME/.catalyst/projects/<project>/criterion` and fills its runtime
   (`catalyst where` shows where it is), and `catalyst hook install` (the
-  commit-msg hook, in the clone's `.git/`). `catalyst agent install <agent>`
+  commit-msg hook, in the clone's `.git/`: it shows what it would write and
+  asks, or exits `3` until re-run with `--yes`). `catalyst agent install <agent>`
   wires their agent, once per machine.
 - Record the start: the date, the commit it starts from (existing history
   is not checked), and each participant's userid.

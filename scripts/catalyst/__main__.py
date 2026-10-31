@@ -1747,10 +1747,21 @@ def cmd_hook(args) -> int:
             return 1
         return 0
     if args.hook_command == "install":
-        from catalyst.trace import install_hook
+        from catalyst import criterion as cr, trace
+        from project_file import home
 
+        dep = open_deployment(args)
+        # a home deployment's commits are checked through the launcher; a legacy one through its vendored CLI
+        router = str(home() / "bin" / "catalyst") if cr.in_home(dep) else None
         try:
-            print(f"installed {install_hook(open_deployment(args).project_root)}")
+            hook = trace.hook_path(dep.project_root)
+            what = (
+                f"would write {hook}: the commit-msg hook (every commit cites an artifact or rule ID, or is "
+                f"`chore:`), run through {router or '.criterion/bin/catalyst.pyz'}; nothing else changes"
+            )
+            if not _assented(args, what, "Install the hook?", "writing into the repository's .git"):
+                return NEEDS_ASSENT
+            print(f"installed {trace.install_hook(dep.project_root, router)}")
         except ValueError as exc:
             print(f"catalyst: {exc}", file=sys.stderr)
             return 1
@@ -1788,18 +1799,18 @@ def _hook_project(args, data: dict):
 NEEDS_ASSENT = 3  # exit code: nothing done, the user's assent is needed (INV-4)
 
 
-def _assented(args, what: str) -> bool:
+def _assented(args, what: str, ask: str = "Publish?", act: str = "publishing") -> bool:
     """INV-4: never push without the user's assent. `--yes` carries it; an
     interactive terminal asks; anywhere else (an agent, CI) the preview is
     printed and nothing happens — the agent shows it to the user and re-runs
-    with --yes once they agree."""
+    with --yes once they agree. `ask` and `act` name what is asked for."""
     if getattr(args, "yes", False):
         return True
     print(what)
     if sys.stdin.isatty():
-        return input("Publish? [y/N] ").strip().lower() in ("y", "yes")
+        return input(f"{ask} [y/N] ").strip().lower() in ("y", "yes")
     print(
-        "catalyst: publishing needs the user's assent (INV-4): show them the above, then re-run with --yes",
+        f"catalyst: {act} needs the user's assent (INV-4): show them the above, then re-run with --yes",
         file=sys.stderr,
     )
     return False
@@ -2051,7 +2062,9 @@ def cmd_criterion(args) -> int:
             print(f"ERROR   {p}")
         print(f"catalyst criterion integrity {'FAILED' if problems else 'passed'}: {len(problems)} missing")
         return 1 if problems else 0
-    print(cr.protect(dep, apply=args.yes))
+    if not _assented(args, cr.protect(dep, apply=False), "Protect the shared branch?", "branch protection"):
+        return NEEDS_ASSENT
+    print(cr.protect(dep, apply=True))
     return 0
 
 
@@ -2078,7 +2091,12 @@ def cmd_share(args) -> int:
         return 0
     dep = open_deployment(args)
     if args.share_command == "create":
-        where = args.url if args.driver == "serve" else f"{args.url} (shared branch {args.branch})"
+        where = (
+            args.url
+            if args.driver == "serve"
+            else f"{args.url} (shared branch {args.branch}); catalyst.toml records it and is staged in the project, "
+            "not committed"
+        )
         if not _assented(args, f"publish this criterion to {where}"):
             return NEEDS_ASSENT
         from catalyst.corpus import load_corpus
@@ -2854,7 +2872,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="from the repository top: hand the message to each deployment owning a staged file",
     )
     q.set_defaults(func=cmd_hook)
-    q = hk.add_parser("install", help="install the commit-msg hook in the project's git repository")
+    q = hk.add_parser(
+        "install", help="install the commit-msg hook in the project's git repository (previews; --yes writes)"
+    )
+    q.add_argument("--yes", action="store_true", help="the user agreed: write the hook (INV-4)")
     q.set_defaults(func=cmd_hook)
     q = hk.add_parser("start", help="session-start hook: print the invariants, record the session's baseline")
     q.add_argument(

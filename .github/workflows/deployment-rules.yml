@@ -31,7 +31,8 @@ jobs:
             git clone --depth=1 -b "$branch" "$url" "$RUNNER_TEMP/modules/$id"
           done
       # A clean checkout has no criterion (it lives in catalyst's home), so the
-      # checks run against a deployment installed from this checkout's kernel
+      # checks run against a deployment installed, in a scratch catalyst home,
+      # from this checkout's kernel
       # and each catalogued module, with --require: finding nothing to check
       # fails the job instead of skipping.
       - name: Install a scratch deployment per module and validate it
@@ -50,9 +51,12 @@ jobs:
             mkdir -p "$proj"
             git -C "$proj" init -q
             git -C "$proj" commit -q --allow-empty -m "scratch project"
+            # the home layout, as every deployment: the criterion goes to $CATALYST_HOME/projects/ci/criterion,
+            # one scratch home per module
+            export CATALYST_HOME="$RUNNER_TEMP/deployments/$id/home"
             (cd "$proj" && python3 -m catalyst init --kernel "$GITHUB_WORKSPACE/framework/kernel" \
               --name ci --module "$id" --module-dir "$dir" --user "CI" --git-username catalyst-ci \
-              --at "$RUNNER_TEMP/deployments/$id/wc" --agent claude-code)
+              --agent claude-code)
             echo "::group::$id"
             (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_deployment.py" --require)
             (cd "$proj" && python3 "$GITHUB_WORKSPACE/scripts/check_command_parity.py" --require)
