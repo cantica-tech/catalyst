@@ -1256,6 +1256,7 @@ def cmd_agent_runs(args) -> int:
 
 
 AGENT_BINARIES = {"claude-code": "claude"}  # an agent id whose CLI binary has another name
+AGENT_COMMAND_PREFIXES = {"claude-code": "/catalyst:"}  # how an agent names a command in a prompt (else `/`)
 
 
 def cmd_task(args) -> int:
@@ -1279,15 +1280,20 @@ def cmd_task(args) -> int:
         return 1
     agent = project_file.agent_of(project_file.read_dir(project))
     agent_cmd = os.environ.get("AGENT_CMD") or f"{AGENT_BINARIES.get(agent, agent)} -p"
+    # Claude Code serves the commands as the `catalyst mcp` server's prompts, `/catalyst:<name>` (BUG-000047)
+    prefix = os.environ.get("CMD_PREFIX") or AGENT_COMMAND_PREFIXES.get(agent, "/")
     rest = args.task_args[1:] if args.task_args[:1] == ["--"] else args.task_args
     command = [binary, "-t", str(taskfile)]
-    command += [args.name, f"AGENT_CMD={agent_cmd}", *(["--", *rest] if rest else [])] if args.name else ["--list"]
+    if args.name:
+        command += [args.name, f"AGENT_CMD={agent_cmd}", f"CMD_PREFIX={prefix}", *(["--", *rest] if rest else [])]
+    else:
+        command += ["--list"]
     return subprocess.run(command, cwd=project, check=False).returncode
 
 
 def cmd_runtime(args) -> int:
-    """`runtime install|status` (R3.1a): the per-version runtime, the
-    launcher, and the project's criterion .venv."""
+    """`runtime install|status|prune` (R3.1a, REQ-000104): the per-version
+    runtime, the launcher, and the project's criterion .venv."""
     import tempfile
 
     import project_file

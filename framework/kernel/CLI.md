@@ -756,7 +756,10 @@ project's root; with no name, lists them. catalyst never creates, includes
 or edits a project's own `Taskfile.yml`. `AGENT_CMD` (the agent's
 non-interactive command) comes from `catalyst.toml`'s `agent` —
 `claude-code` runs `claude -p` — unless the `AGENT_CMD` environment
-variable is set. Exit: Task's own, or `1` without a criterion or Task.
+variable is set. The prompt names the command the way the agent serves it
+(`CMD_PREFIX`): `/catalyst:<name>`, the `catalyst mcp` server's prompt, for
+`claude-code`, `/<name>` for the others, unless `CMD_PREFIX` is set.
+Exit: Task's own, or `1` without a criterion or Task.
 
 ### `catalyst workspace init|status <name>.code-workspace`
 
