@@ -14,8 +14,34 @@ includes:
     taskfile: '{{.STANDARDS_DIR | default "../standards"}}/Taskfile.standards.yml'
     optional: true
     flatten: true
+    excludes: [lint, format, typecheck] # this repository's own wrappers below say so when the checkout is missing
 
 tasks:
+  lint:
+    desc: "Lint with the cantica-tech standards (Ruff, Markdown, YAML, workflows), as CI's Standards job"
+    preconditions: &standards
+      # Without the standards checkout the include above is skipped (optional): stop and say so, rather than
+      # pass having checked nothing while CI's Standards job checks Python, Markdown, YAML and workflows.
+      - sh: test -f "${STANDARDS_DIR:-../standards}/Taskfile.standards.yml"
+        msg: >-
+          The cantica-tech standards are not checked out at {{.STANDARDS_DIR | default "../standards"}}, so this task
+          cannot run the checks CI's Standards job runs. Clone git@github.com:cantica-tech/standards.git next to
+          this repository, or set STANDARDS_DIR to its checkout.
+    cmds:
+      - task: standards:lint
+
+  format:
+    desc: "Format the code with the cantica-tech standards"
+    preconditions: *standards
+    cmds:
+      - task: standards:format
+
+  typecheck:
+    desc: "Type-check with the cantica-tech standards (pyright)"
+    preconditions: *standards
+    cmds:
+      - task: standards:typecheck
+
   install:
     desc: "Install Python test dependencies into the active environment"
     cmds:
