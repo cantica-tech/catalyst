@@ -1,7 +1,7 @@
 # ADR-019: A module's own meta-rule and invariant namespace
 
 **Date:** 2026-10-11  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000043-yCNjAMXO`  
 **Author:** Olivier Steck (owner)  
 **Affected scope:** kernel, SE module
 

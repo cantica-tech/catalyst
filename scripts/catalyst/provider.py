@@ -61,15 +61,35 @@ def read_pointer(root: Path) -> dict[str, Any] | None:
     return doc if isinstance(doc, dict) else None
 
 
-def pointer(dep: Deployment) -> dict[str, Any] | None:
-    """The deployment's pointer, else its workspace's (a member inherits it, R3.1b)."""
-    own = read_pointer(dep.root)
-    if own is not None:
-        return own
-    from catalyst.corpus import _workspace_root
+def issuer_of(doc: dict[str, Any]) -> str:
+    """The provider's issuer, whichever shape the pointer has: `issuer`, else catalyst-users' settings shape
+    (`url` + `realm`, as `catalyst-users setup` writes it), without a trailing `/` (BUG-000057)."""
+    if doc.get("issuer"):
+        return str(doc["issuer"]).strip().rstrip("/")
+    if doc.get("url"):
+        return f"{str(doc['url']).strip().rstrip('/')}/realms/{doc.get('realm') or 'catalyst'}"
+    return ""
 
-    root = _workspace_root(dep)
-    return read_pointer(root) if root is not None else None
+
+def normalised(doc: dict[str, Any]) -> dict[str, Any]:
+    """The pointer in its one shape (fw-IDENTITY-000007, BUG-000057): the provider named by its `issuer`, never by
+    `url` + `realm`; every other key kept."""
+    if doc.get("provider") == "static" or not (doc.get("issuer") or doc.get("url")):
+        return dict(doc)
+    out = {"provider": doc.get("provider"), "issuer": issuer_of(doc)}
+    out.update({k: v for k, v in doc.items() if k not in ("provider", "issuer", "url", "realm")})
+    return out
+
+
+def pointer(dep: Deployment) -> dict[str, Any] | None:
+    """The deployment's pointer, else its workspace's (a member inherits it, R3.1b), in its one shape."""
+    own = read_pointer(dep.root)
+    if own is None:
+        from catalyst.corpus import _workspace_root
+
+        root = _workspace_root(dep)
+        own = read_pointer(root) if root is not None else None
+    return normalised(own) if own is not None else None
 
 
 def problems(dep: Deployment) -> tuple[list[str], list[str]]:
@@ -88,15 +108,68 @@ def problems(dep: Deployment) -> tuple[list[str], list[str]]:
     found = pointer_problems(doc)
     if doc.get("provider") == "static":
         return [], [f"{POINTER.as_posix()}: the static provider verifies nobody (catalyst's tests only)"]
-    return [f"{POINTER.as_posix()}: {p}" for p in found], []
+    own = read_pointer(dep.root) or {}
+    shape = (
+        [f"{POINTER.as_posix()} names the provider by url and realm: `catalyst migrate --apply` writes its issuer"]
+        if own.get("url") and not own.get("issuer") and own.get("provider") != "static"
+        else []
+    )
+    return [f"{POINTER.as_posix()}: {p}" for p in found], shape
 
 
 def credentials_path(doc: dict[str, Any]) -> Path:
-    """Owner-only tokens in catalyst's home, one file per issuer and client; never in a criterion."""
+    """Owner-only tokens in catalyst's home, one file per provider and client; never in a criterion. The provider is
+    its issuer as one provider is named (`canonical_issuer`), whichever shape or spelling the pointer has
+    (BUG-000057)."""
     import project_file
+    from catalyst.identity.config import canonical_issuer
 
-    key = hashlib.sha256(f"{doc.get('issuer', '')}\n{doc.get('client') or DEFAULT_CLIENT}".encode()).hexdigest()[:16]
+    issuer = canonical_issuer(issuer_of(doc)) if issuer_of(doc) else ""
+    key = hashlib.sha256(f"{issuer}\n{doc.get('client') or DEFAULT_CLIENT}".encode()).hexdigest()[:16]
     return project_file.home() / "identity" / f"{key}.json"
+
+
+def shared_store(doc: dict[str, Any]) -> Path | None:
+    """catalyst-users' own credentials file (`config.home()/credentials.json`), when this machine's catalyst-users is
+    set up for the pointer's provider, spelled the same, with the same login client: one login then serves
+    `catalyst-users login` and `catalyst identity login` (REQ-000108). None otherwise: the kernel keeps its own file
+    per provider (`credentials_path`). That file holds one login at a time."""
+    from catalyst.identity import config as users_config
+    from catalyst.identity.errors import CatalystUsersError
+    from catalyst.identity.provider import from_pointer
+
+    if doc.get("provider") != "keycloak" or not issuer_of(doc):
+        return None
+    try:
+        settings = users_config.read_settings()
+        if settings is None or settings.get("type") != "keycloak":
+            return None
+        theirs = from_pointer(users_config.settings_pointer(settings))
+    except CatalystUsersError:
+        return None
+    if str(theirs.issuer).rstrip("/") != issuer_of(doc):  # tokens are minted for one spelling of the host
+        return None
+    if str(getattr(theirs, "client", DEFAULT_CLIENT)) != str(doc.get("client") or DEFAULT_CLIENT):
+        return None
+    return users_config.home() / "credentials.json"
+
+
+def token_store(doc: dict[str, Any]) -> Path:
+    """Where the pointer's login keeps its tokens: catalyst-users' own when it is set up for the same provider
+    (REQ-000108), else catalyst's own file for that provider."""
+    return shared_store(doc) or credentials_path(doc)
+
+
+def logged_in(doc: dict[str, Any]) -> bool:
+    """Whether tokens for the pointer's provider are stored on this machine (no network: they may have expired)."""
+    from catalyst.identity.credentials import CredentialStore
+    from catalyst.identity.providers.keycloak import DEFAULT_PASSWORD_CLIENT
+
+    if doc.get("provider") != "keycloak":
+        return False
+    store, issuer = CredentialStore(token_store(doc)), issuer_of(doc)
+    clients = {str(doc.get("client") or DEFAULT_CLIENT), str(doc.get("password_client") or DEFAULT_PASSWORD_CLIENT)}
+    return any(store.load(issuer, client) is not None for client in clients)
 
 
 def facade(doc: dict[str, Any], transport: Any = None):
@@ -104,8 +177,9 @@ def facade(doc: dict[str, Any], transport: Any = None):
     from catalyst.identity.errors import CatalystUsersError
     from catalyst.identity.provider import from_pointer
 
+    doc = normalised(doc)
     try:
-        return from_pointer(doc, store=credentials_path(doc), transport=transport)
+        return from_pointer(doc, store=token_store(doc), transport=transport)
     except CatalystUsersError as exc:
         raise ProviderError(str(exc)) from None
 
@@ -148,19 +222,41 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
 
 def system_backend(issuer: str, transport: Any = None):
     """This machine's system account (design 29 §3.4a, catalyst-users 0.4.0): the admin catalyst-users' setup named
-    in `IAM/settings.json`, when those settings point at the same issuer; else None."""
+    in `IAM/settings.json`, when those settings point at the same provider, however its issuer is spelled
+    (`system_pointer`, BUG-000058); else None. It is reached at `issuer`'s spelling, so its tokens are that
+    spelling's."""
     from catalyst.identity import config as users_config
     from catalyst.identity.errors import CatalystUsersError
     from catalyst.identity.provider import from_pointer
 
     try:
-        settings = users_config.read_settings()
-        if settings is None or not settings.get("username") or not settings.get("password_command"):
-            return None
-        system = from_pointer(users_config.settings_pointer(settings), transport=transport)
+        doc = users_config.system_pointer(issuer)
+        return from_pointer(doc, transport=transport) if doc else None
     except CatalystUsersError:
         return None
-    return system if str(system.issuer).rstrip("/") == str(issuer).rstrip("/") else None
+
+
+def nobody_logged_in(dep: Deployment) -> str | None:
+    """What a session start says when no one is logged in to the deployment's provider (REQ-000109): who would sign
+    its entries instead, the system account or nobody. None when someone is, or the provider is not Keycloak. Reads
+    only local files, never the network: stored tokens may have expired."""
+    from catalyst.identity import config as users_config
+    from catalyst.identity.errors import CatalystUsersError
+
+    doc = pointer(dep)
+    if doc is None or doc.get("provider") != "keycloak" or logged_in(doc):
+        return None
+    issuer = issuer_of(doc)
+    try:
+        system = users_config.system_pointer(issuer)
+    except CatalystUsersError:
+        system = None
+    if system is not None:
+        return (
+            f"catalyst: no one is logged in to {issuer}: this session's entries will be signed by the system "
+            f"account {system.get('username')}; `catalyst identity login` to sign as yourself"
+        )
+    return f"catalyst: no one is logged in to {issuer}, and no system account can sign: `catalyst identity login`"
 
 
 def access_token(doc: dict[str, Any]) -> str | None:
@@ -280,6 +376,8 @@ def ledger(root: Path) -> list[dict]:
 
 def ledger_problems(root: Path) -> list[str]:
     """Malformed lines and userids used twice, for `check`."""
+    from catalyst.identity.config import canonical_issuer
+
     path = root / SIGNERS
     if not path.is_file():
         return []
@@ -296,8 +394,9 @@ def ledger_problems(root: Path) -> list[str]:
         if missing:
             found.append(f"{SIGNERS.as_posix()}:{number}: missing {', '.join(missing)}")
             continue
-        other = seen.setdefault(entry["userid"], (entry["iss"], entry["sub"]))
-        if other != (entry["iss"], entry["sub"]):
+        person = (canonical_issuer(str(entry["iss"])), entry["sub"])  # one provider, however spelled (BUG-000057)
+        other = seen.setdefault(entry["userid"], person)
+        if other != person:
             found.append(f"{SIGNERS.as_posix()}:{number}: userid {entry['userid']} names two identities")
     return found
 
@@ -337,7 +436,16 @@ def as_user(entry: dict, roles: list[str] | None = None) -> dict:
 
 
 def find(entries: list[dict], iss: str, sub: str) -> dict | None:
-    return next((e for e in entries if e.get("iss") == iss and e.get("sub") == sub), None)
+    """The ledger line of the identity `iss` + `sub`. Issuers are compared as one provider is named
+    (`canonical_issuer`): `http://localhost:8080/realms/x` and `http://127.0.0.1:8080/realms/x/` are one Keycloak, so
+    one person keeps one line and one userid whichever spelling they signed in at (BUG-000057). Lines are never
+    rewritten: the first spelling stays in the ledger."""
+    from catalyst.identity.config import canonical_issuer
+
+    wanted = canonical_issuer(str(iss))
+    return next(
+        (e for e in entries if e.get("sub") == sub and canonical_issuer(str(e.get("iss") or "")) == wanted), None
+    )
 
 
 def enroll(dep: Deployment, who) -> dict:

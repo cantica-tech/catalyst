@@ -307,3 +307,25 @@ def test_a_module_migration_a_recorded_move_crossed_lists_its_judgment_steps(tmp
     sources = {s.source for s in steps}
     assert "example-process: migrations/0.83.0/adr.md" in sources  # 0.3.0, crossed by 0.2.0 -> 0.4.0
     assert "example-process: migrations/0.87.0/dates.md" not in sources  # 0.9.0, not crossed
+
+
+def test_an_identity_pointer_named_by_url_and_realm_gets_its_issuer_once(tmp_path):
+    """Migration 0.120.0 (BUG-000057): `IAM/identity.json` names its provider by its issuer; one written from
+    catalyst-users' settings (`url` + `realm`) is rewritten with it, every other key kept, journaled, once."""
+    project = _home(tmp_path)
+    root = load(project).root
+    pointer = root / "IAM" / "identity.json"
+    pointer.parent.mkdir(parents=True, exist_ok=True)
+    old = {"provider": "keycloak", "url": "http://localhost:8080/", "realm": "team", "password_client": "pw-cli"}
+    pointer.write_text(json.dumps(old), encoding="utf-8")
+    step = [s for s in migrate.plan(project, None).steps if s.kind == "identity"]
+    assert step and "by its issuer" in step[0].detail
+    _, done = migrate.apply(project, None, "ada", ["one shape for the pointer"], runtime=False)
+    assert json.loads(pointer.read_text(encoding="utf-8")) == {
+        "provider": "keycloak",
+        "issuer": "http://localhost:8080/realms/team",
+        "password_client": "pw-cli",
+    }
+    assert any("by its issuer" in d for d in done)
+    assert any(f["path"].endswith("IAM/identity.json") for f in journal_entries(root)[-1]["files"])
+    assert not [s for s in migrate.plan(project, None).steps if s.kind == "identity"]

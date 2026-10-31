@@ -1,7 +1,7 @@
 # ADR-012: Catalyst is the framework; kernel is the rule engine
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Accepted (owner, 2026-10-18); as recorded in catalyst's criterion, `ADR-000036-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** infra
 

@@ -41,7 +41,7 @@ import sys
 git = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True, encoding="utf-8").stdout
 top = git("rev-parse", "--show-toplevel").strip()
 staged = [p for p in git("-C", top, "diff", "--cached", "--name-only", "-z").split("\\0") if p]
-ROUTER = "{router}"  # the CLI that installed this hook, relative to the repository top
+ROUTER = "{router}"  # the launcher, or a legacy vendored CLI relative to the repository top
 
 
 def cli_near(rel):
@@ -210,7 +210,9 @@ def trace(
     return checked, failures
 
 
-def install_hook(project_root: Path) -> Path:
+def hook_path(project_root: Path) -> Path:
+    """The commit-msg hook `install_hook` writes; refused when it is not a git repository, or the hook there is
+    someone else's."""
     git_dir = subprocess.run(
         ["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir"],
         capture_output=True,
@@ -222,11 +224,24 @@ def install_hook(project_root: Path) -> Path:
     hook = Path(git_dir.stdout.strip()) / "hooks" / "commit-msg"
     if hook.exists() and "catalyst hook install" not in hook.read_text(encoding="utf-8", errors="ignore"):
         raise ValueError(f"{hook} exists and was not written by catalyst — merge it by hand")
-    prefix = subprocess.run(
-        ["git", "-C", str(project_root), "rev-parse", "--show-prefix"], capture_output=True, text=True, encoding="utf-8"
-    ).stdout.strip()
+    return hook
+
+
+def install_hook(project_root: Path, router: str | None = None) -> Path:
+    """Write the commit-msg hook. `router` is the CLI it falls back to: the launcher's path for a deployment whose
+    criterion is in catalyst's home; by default a legacy deployment's vendored `.criterion/bin/catalyst.pyz`,
+    relative to the repository top."""
+    hook = hook_path(project_root)
+    if router is None:
+        prefix = subprocess.run(
+            ["git", "-C", str(project_root), "rev-parse", "--show-prefix"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        ).stdout.strip()
+        router = f"{prefix}.criterion/bin/catalyst.pyz"
     hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text(HOOK.replace("{router}", f"{prefix}.criterion/bin/catalyst.pyz"), encoding="utf-8")
+    hook.write_text(HOOK.replace("{router}", Path(router).as_posix()), encoding="utf-8")
     hook.chmod(0o755)
     return hook
 

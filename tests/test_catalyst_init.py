@@ -510,3 +510,32 @@ def test_init_with_its_runtime_installs_the_catalyst_command(tmp_path, monkeypat
     steps = init(request(tmp_path, at=None, runtime=True))
     launcher = project_file.home() / "bin" / "catalyst"
     assert launcher.is_file() and any("installed the catalyst command" in s for s in steps)
+
+
+def test_init_labels_the_runtime_as_open_does(tmp_path, monkeypatch):
+    """BUG-000055: `init` fills the criterion's runtime under the vendored CLI's own label (`X.Y.Z+g<sha>` for a
+    development build), as `catalyst open` does, so one build never fills two runtimes."""
+    from catalyst import runtime as rt
+
+    labels = []
+    monkeypatch.setattr(rt, "pyz_version", lambda pyz: "9.9.9+gabcdef123456")
+    monkeypatch.setattr(rt, "install_into", lambda c, v, pyz: (labels.append(v), (c / ".venv", True))[1])
+    steps = init(request(tmp_path, at=None, runtime=True))
+    assert labels == ["9.9.9+gabcdef123456"] and any("catalyst 9.9.9+gabcdef123456" in s for s in steps)
+
+
+def test_init_journals_before_its_first_commit_with_new_files_new(tmp_path):
+    """BUG-000056 (rr-META-000012): the install entry is in the criterion's first commit, nothing is left
+    untracked, and each installed file is recorded as new (no `before`), not as before == after."""
+    import subprocess
+
+    import project_file
+    from catalyst_fixtures import journal_entries
+
+    req = request(tmp_path, at=None, runtime=False)
+    init(req)
+    root = project_file.home_criterion(req.name)
+    status = subprocess.run(["git", "-C", str(root), "status", "--porcelain"], capture_output=True, text=True)
+    assert status.stdout.strip() == ""
+    [entry] = [e for e in journal_entries(root) if e["command"] == "catalyst init"]
+    assert entry["files"] and all(f["before"] is None and f["after"] for f in entry["files"])

@@ -1,7 +1,7 @@
 # ADR-009: Existing deployments remain LEGACY; new deployments use locator
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Rejected (owner, 2026-10-18); as recorded in catalyst's criterion, `ADR-000033-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

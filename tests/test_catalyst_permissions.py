@@ -23,6 +23,8 @@ COC = """# Rules of Development
 - `/status` — change a status.
 - `/user` (`/user-add`, `/user-remove`) — the users.
 - `/journal` (`/journal-restore`) — the journal.
+- `/reconcile` — reconciliation cases.
+- `/share` — sharing the criterion.
 
 When the user enters `/status`, run `catalyst status set`.
 
@@ -100,4 +102,43 @@ def test_warn_mode_writes_and_says_why(team, capsys):
     data["role_check"] = "warn"
     pointer.write_text(json.dumps(data), encoding="utf-8")
     assert main(["new", "SUB", "--title", "A sub", "--as", "bob", "--field", f"Item={ITEM}"]) == 0
+    assert "may not run /create" in capsys.readouterr().err
+
+
+# BUG-000050 (rr-META-000011): every writing verb checks the grant of the command its change is for.
+VERBS = [
+    (["id", "next", "ITEM"], "create"),
+    (["rename", ITEM, "--title", "Renamed"], "create"),
+    (["edit", ITEM, "--field", "Domain=AUTH"], "create"),
+    (["link", ITEM, "Targets", ITEM], "create"),
+    (["unlink", ITEM, "Targets", ITEM], "create"),
+    (["repair", "derived"], "create"),
+    (["approve", ITEM, "--gate", "any"], "status"),
+    (["landing", "init", "--policy", "open"], "share"),
+    (["propose", ITEM, "--from", "-"], "reconcile"),
+    (["reconcile", "RECON-000001-x", "close"], "reconcile"),
+]
+
+
+@pytest.mark.parametrize(("argv", "command"), VERBS, ids=[" ".join(v[0][:2]) for v in VERBS])
+def test_each_writing_verb_needs_its_commands_grant(team, capsys, argv, command):
+    assert main([*argv, "--as", "cy"]) == 1
+    assert f"may not run /{command}" in capsys.readouterr().err
+
+
+def test_a_verb_of_the_deployments_own_is_checked_by_its_name(team, capsys):
+    coc = team / ".criterion" / "CODE-OF-CONDUCT.md"
+    coc.write_text(
+        coc.read_text(encoding="utf-8").replace("## 5. Next", "- `/link` — cite IDs.\n\n## 5. Next"), encoding="utf-8"
+    )
+    assert main(["link", ITEM, "Targets", ITEM, "--as", "cy"]) == 1
+    assert "may not run /link" in capsys.readouterr().err
+
+
+def test_warn_mode_lets_an_ungranted_verb_through_with_a_warning(team, capsys):
+    pointer = team / "app.catalyst"
+    data = json.loads(pointer.read_text(encoding="utf-8"))
+    data["role_check"] = "warn"
+    pointer.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["id", "next", "ITEM", "--as", "cy"]) == 0
     assert "may not run /create" in capsys.readouterr().err

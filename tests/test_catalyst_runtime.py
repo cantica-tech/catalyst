@@ -1,5 +1,6 @@
 """Per-criterion runtime and launcher (roadmap R3.1a)."""
 
+import json
 import os
 import shutil
 import subprocess
@@ -145,3 +146,47 @@ def test_newest_runtime_is_by_version_then_build_time_never_by_build_hash(tmp_pa
         env=env,
     )
     assert out.returncode == 0 and out.stdout.startswith("catalyst "), out.stderr
+
+
+def _fake_runtime(version: str, mtime: float) -> Path:
+    path = rt.runtimes() / version
+    path.mkdir(parents=True)
+    (path / rt.MARKER).write_text(version + "\n", encoding="utf-8")
+    (path / "payload").write_bytes(b"x" * 1000)
+    os.utime(path, (mtime, mtime))
+    return path
+
+
+def test_prune_lists_then_removes_only_what_no_criterion_uses(tmp_path, monkeypatch, capsys):
+    """REQ-000104: a runtime stays while a criterion's .venv carries it, it runs, or it is the newest."""
+    import schema_check
+    from catalyst.__main__ import main
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+
+    for i, version in enumerate(["0.1.0", "0.2.0", "0.2.0+gabc", "0.3.0", "0.4.0", "0.9.0"]):
+        _fake_runtime(version, 1000 + i)
+    (rt.runtimes() / ".0.5.0.building").mkdir()
+    for kind, name, version in [("projects", "a", "0.2.0"), ("projects", "b", "0.2.0"), ("workspaces", "w", "0.3.0")]:
+        venv = project_file.home() / kind / name / "criterion" / ".venv"
+        venv.mkdir(parents=True)
+        (venv / rt.MARKER).write_text(version + "\n", encoding="utf-8")
+    dry = rt.prune("0.4.0")
+    assert [k["version"] for k in dry["kept"]] == ["0.2.0", "0.3.0", "0.4.0", "0.9.0"]
+    assert dry["kept"][0]["why"] == "used by projects/a, projects/b" and dry["kept"][-1]["why"] == "newest"
+    assert sorted(r["version"] for r in dry["removed"]) == [".0.5.0.building", "0.1.0", "0.2.0+gabc"]
+    assert dry["bytes"] >= 2000 and not dry["applied"]
+    assert schema_check.problems(dry, schema_check.load("runtime-prune")) == []
+    assert (rt.runtimes() / "0.1.0").is_dir()  # a dry run removes nothing
+
+    assert main(["runtime", "prune"]) == 0
+    out = capsys.readouterr().out
+    assert "remove  0.1.0" in out and "re-run with --yes" in out and (rt.runtimes() / "0.1.0").is_dir()
+    monkeypatch.setattr("catalyst.version_string", lambda: "0.4.0")  # the running catalyst's own runtime stays
+    assert main(["runtime", "prune", "--yes", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["applied"] and len(payload["removed"]) == 3
+    left = sorted(p.name for p in rt.runtimes().iterdir())
+    assert "0.1.0" not in left and "0.2.0+gabc" not in left and ".0.5.0.building" not in left
+    assert set(left) == {"0.2.0", "0.3.0", "0.4.0", "0.9.0"}
+    assert main(["runtime", "prune"]) == 0 and "nothing to prune" in capsys.readouterr().out

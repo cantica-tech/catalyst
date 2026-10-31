@@ -1,7 +1,7 @@
 # ADR-002: Session-scoped stop hook (block only session edits)
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000026-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

@@ -1,7 +1,7 @@
 # ADR-010: `catalyst.toml` locates the criterion in `$HOME/.catalyst`
 
 **Date:** 2026-10-07 (revised 2026-10-08)  
-**Status:** Accepted (owner, 2026-10-08)  
+**Status:** Accepted (owner, 2026-10-08); as recorded in catalyst's criterion, `ADR-000034-yCNjAMXO`  
 **Author:** Olivier Steck (owner)  
 **Affected scope:** kernel
 
