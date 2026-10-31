@@ -1305,6 +1305,23 @@ def cmd_runtime(args) -> int:
     criterion = project_file.resolve(project) if project else None
     name = project_file.project_name(project_file.read_dir(project)) if project else None
     home_store = criterion is not None and name is not None and criterion == project_file.home_criterion(name)
+    if args.runtime_command == "prune":  # REQ-000104: runtimes are a build cache; criteria run their .venv
+        out = rt.prune(version, apply=args.yes)
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        for item in out["kept"]:
+            print(f"keep    {item['version']}  ({item['why']})")
+        for item in out["removed"]:
+            print(f"{'removed' if args.yes else 'remove '} {item['version']}  ({item['bytes'] / 1e6:.1f} MB)")
+        n, mb = len(out["removed"]), out["bytes"] / 1e6
+        if not n:
+            print("nothing to prune: every runtime is in use")
+        elif args.yes:
+            print(f"{n} runtime(s) removed, {mb:.1f} MB freed")
+        else:
+            print(f"{n} runtime(s), {mb:.1f} MB, would be removed: re-run with --yes to remove them")
+        return 0
     if args.runtime_command == "status":
         out = {
             "version": version,
@@ -3286,6 +3303,13 @@ def build_parser() -> argparse.ArgumentParser:
     q = rs.add_parser("install", help="build this version's runtime, install the launcher, fill the criterion's .venv")
     q.set_defaults(func=cmd_runtime)
     q = rs.add_parser("status", help="runtimes, launcher and the criterion's runtime version")
+    q.add_argument("--json", action="store_true")
+    q.set_defaults(func=cmd_runtime)
+    q = rs.add_parser(
+        "prune",
+        help="remove the runtimes no criterion in catalyst's home uses (a dry run without --yes)",
+    )
+    q.add_argument("--yes", action="store_true", help="remove them; without it, only list them")
     q.add_argument("--json", action="store_true")
     q.set_defaults(func=cmd_runtime)
 

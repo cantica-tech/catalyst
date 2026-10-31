@@ -168,6 +168,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst task <name> <task_args>` | run a criterion task (Taskfile.common.yml) from the project's root | — |
 | `catalyst runtime install` | build this version's runtime, install the launcher, fill the criterion's .venv | — |
 | `catalyst runtime status` | runtimes, launcher and the criterion's runtime version | `--json` |
+| `catalyst runtime prune` | remove the runtimes no criterion in catalyst's home uses (a dry run without --yes) | `--json`, `--yes` |
 | `catalyst move` | move a legacy deployment into $HOME/.catalyst, or rename a project | `--as`, `--name`, `--no-runtime`, `--to-home` |
 | `catalyst migrate` | what this deployment is behind on (legacy layout, templates, judgment steps); --apply takes the mechanical part | `--apply`, `--as`, `--decline`, `--intent`, `--json`, `--kernel`, `--no-runtime`, `--since`, `--template` |
 | `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--user` |
@@ -737,7 +738,7 @@ side of a trial:
 `adopted_commits`). Exits `0`.
 With `--working-copy` there is no product repository: commits are `0`.
 
-### `catalyst where`, `catalyst runtime install|status`
+### `catalyst where`, `catalyst runtime install|status|prune`
 
 - `where` names the project file (`catalyst.toml`, or a legacy
   `<name>.catalyst`) and the criterion it resolves to:
@@ -750,6 +751,13 @@ With `--working-copy` there is no product repository: commits are `0`.
   and copies the runtime into the criterion's `.venv` (git-ignored). The
   launcher runs the `.venv` of the project it is called from — no activation
   — or a legacy deployment's vendored CLI. `runtime status` reports all three.
+- `runtime prune [--yes] [--json]` removes the runtimes no criterion in the
+  home uses: a runtime is a build cache, since each criterion runs its own
+  `.venv` copy. It keeps a version whose `.venv` a criterion under
+  `$CATALYST_HOME/projects/` or `workspaces/` carries, the running
+  catalyst's and the newest (the launcher's outside any project), and
+  removes the others and any half-built `.<version>.building`. Without
+  `--yes` it only lists them and the space they take; exit `0` either way.
 
 ### `catalyst task [<name> [-- <arguments>]]`
 
@@ -2047,6 +2055,7 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst agent run` | `spec/run-event.schema.json` |
 | `catalyst agent runs` | `spec/runs.schema.json` |
 | `catalyst runtime status` | `spec/runtime-status.schema.json` |
+| `catalyst runtime prune` | `spec/runtime-prune.schema.json` |
 | `catalyst migrate` | `spec/migrate.schema.json` |
 | `catalyst workspace status` | `spec/workspace-status.schema.json` |
 | `catalyst analysis status` | `spec/analysis.schema.json` |
@@ -2362,6 +2371,8 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `<task_args>` … | -- <arguments> for the command |
 | `catalyst runtime install` | — | — |
 | `catalyst runtime status` | `--json` | machine-readable output (JSON on stdout) |
+| `catalyst runtime prune` | `--yes` | remove them; without it, only list them |
+|  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst move` | `--to-home` | symlink, in-project directory or submodule -> $CATALYST_HOME/projects/<name>/criterion |
 |  | `--name` `NAME` | rename a home-store project |
 |  | `--no-runtime` | do not fill the criterion's .venv now |

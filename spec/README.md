@@ -53,6 +53,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `module-install.schema.json` | `catalyst module install <source> --json` | — |
 | `where.schema.json` | `catalyst where --json` | — |
 | `agent-status.schema.json` | `catalyst agent status --json` | — |
+| `runtime-prune.schema.json` | `catalyst runtime prune --json` | — |
 | `runtime-status.schema.json` | `catalyst runtime status --json` | — |
 | `workspace-status.schema.json` | `catalyst workspace status <file> --json` | — |
 | `propose.schema.json` | `catalyst propose <id> --from <file> --json` | — |
