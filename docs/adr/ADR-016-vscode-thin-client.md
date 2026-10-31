@@ -1,7 +1,7 @@
 # ADR-016: VS Code thin client (R6) uses server protocol (R3.9)
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Accepted (owner, 2026-10-18); as recorded in catalyst's criterion, `ADR-000040-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** infra
 

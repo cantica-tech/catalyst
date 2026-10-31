@@ -1,5 +1,10 @@
 # ADR Parking Lot (R2–R7 and Beyond)
 
+> **Historical.** This list was written on 2026-10-07 and is no longer maintained. Its numbers are placeholders, not
+> ADR numbers: several (ADR-015 to ADR-022) were later given to other decisions in this directory. Since 2026-10-18
+> every decision is an `ADR-` entity in catalyst's criterion (`decisions/`); read those, and record a new one with
+> `/create adr`.
+
 This document lists architecture decisions expected to emerge in future phases (R2–R7) and post-1.0 evolution. Decisions here are anticipated based on the roadmap but are not yet formally documented.
 
 ## R2: Framework CLI Verbs (W1–W5)

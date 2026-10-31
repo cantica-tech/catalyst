@@ -1,7 +1,7 @@
 # ADR-001: One file per rule document, not per rule ID
 
 **Date:** 2026-10-07  
-**Status:** Accepted  
+**Status:** Superseded by `ADR-000047-yCNjAMXO` (a rule is a heading in a rule document or its own file listed by one); as recorded in catalyst's criterion, `ADR-000025-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** kernel
 

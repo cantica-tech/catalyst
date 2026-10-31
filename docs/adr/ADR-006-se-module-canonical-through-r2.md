@@ -1,7 +1,7 @@
 # ADR-006: SE module as canonical process plugin (through R2)
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Accepted (owner, 2026-10-18); as recorded in catalyst's criterion, `ADR-000030-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** SE module
 

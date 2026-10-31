@@ -1,7 +1,7 @@
 # ADR-017: Prose feature freeze until the R2 verbs exist
 
 **Date:** 2026-10-08  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000041-yCNjAMXO`  
 **Author:** Olivier Steck (owner)  
 **Affected scope:** kernel
 
