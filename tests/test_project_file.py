@@ -91,10 +91,10 @@ def test_where_reports_the_home_store_or_a_legacy_working_copy(tmp_path, capsys)
     assert main(["--project", str(project), "where"]) == 1
 
 
-def test_where_outside_a_project_exits_2_as_open_does(tmp_path, monkeypatch, capsys):
-    """BUG-000054: no deployment is exit 2 for `where` as for `open` (CLI.md, Exit codes)."""
+def test_where_outside_a_project_exits_4_as_open_does(tmp_path, monkeypatch, capsys):
+    """BUG-000054, REQ-000110: no deployment is exit 4 for `where` as for `open` (CLI.md, Exit codes)."""
     from catalyst.__main__ import main
 
     monkeypatch.chdir(tmp_path)
-    assert main(["where"]) == 2
-    assert main(["open"]) == 2
+    assert main(["where"]) == 4
+    assert main(["open"]) == 4

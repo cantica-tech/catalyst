@@ -73,12 +73,29 @@ def identity(module_dir: Path) -> dict:
         "version": version or "1.0.0",
         "description": str(data.get("description") or ""),
         "kernel_version": str(data["kernel_version"]) if data.get("kernel_version") else None,
+        "entry": ui_entry(module_dir, data.get("entry")),
     }
 
 
+DEFAULT_UI_ENTRY = "ui/index.js"
+
+
+def ui_entry(module_dir: Path, declared: object = None) -> str | None:
+    """The module's built UI bundle, as a release names it in `entry`: the path
+    `module.yaml` declares (`entry`), else `ui/index.js`, only when that file
+    is there to ship; None when the module ships no bundle (sources alone are
+    not one)."""
+    rel = str(declared).strip() if isinstance(declared, str) and declared.strip() else DEFAULT_UI_ENTRY
+    parts = Path(rel).parts
+    if Path(rel).is_absolute() or ".." in parts or any(p.startswith(".") or p in NOT_SHIPPED for p in parts):
+        return None  # outside the module, or a path a release does not ship
+    return rel if (module_dir / rel).is_file() else None
+
+
 def manifest_of(info: dict, requires: str) -> dict:
-    """The `manifest.json` a release of the module carries."""
-    return {
+    """The `manifest.json` a release of the module carries; `entry` only when
+    the module ships a built UI bundle (`ui_entry`)."""
+    manifest = {
         "id": info["id"],
         "name": info["name"],
         "version": info["version"],
@@ -87,8 +104,10 @@ def manifest_of(info: dict, requires: str) -> dict:
         # Legacy name of kernelVersion. Host UIs that predate kernelVersion
         # only read this field and skip manifests without it.
         "frameworkVersion": requires,
-        "entry": "ui/index.js",
     }
+    if info.get("entry"):
+        manifest["entry"] = info["entry"]
+    return manifest
 
 
 def release_tree(src: Path, out: Path, kernel_version: str) -> Path:

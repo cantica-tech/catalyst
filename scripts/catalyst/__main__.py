@@ -21,6 +21,10 @@ from catalyst.ids import IdError
 from catalyst.journal import JournalError, check_tier as journal_check_tier
 from catalyst.store import ShareError
 
+# Exit codes (CLI.md "Exit codes", fw-STRUCTURE-000025): 0 success, 1 failure, then these.
+EXIT_USAGE = 2  # a usage error: argparse's, or an argument a command refuses itself (and a blocking `hook stop`)
+EXIT_NO_DEPLOYMENT = 4  # no deployment at or above the directory, its criterion unreachable, or no working copy
+
 
 def open_deployment(args):
     if getattr(args, "working_copy", None):
@@ -60,15 +64,26 @@ def cmd_id(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     signer = resolve_signer(dep, corpus, args.as_user, _verb_command(dep, "id"))
-    # reserved under the ID lock: parallel callers never get the same ID
+    # reserved under the ID lock: parallel callers never get the same ID; --peek reserves nothing (REQ-000111)
+    peek = bool(getattr(args, "peek", False))
     if args.id_command == "next":
         if args.count < 1:
             print("catalyst: --count must be at least 1", file=sys.stderr)
-            return 2
-        for _ in range(args.count):  # consecutive IDs, each reserved: a batch of rows, never guessed
-            print(next_entity_id(dep, corpus, args.prefix, signer, reserve=True))
+            return EXIT_USAGE
+        if peek and args.count != 1:
+            print("catalyst: --peek shows one ID (--count reserves a batch)", file=sys.stderr)
+            return EXIT_USAGE
+        # consecutive IDs, each reserved: a batch of rows, never guessed
+        found = [
+            next_entity_id(dep, corpus, args.prefix, signer, reserve=not peek, peek=peek) for _ in range(args.count)
+        ]
     else:
-        print(next_rule_id(dep, corpus, args.doc_prefix, args.domain, signer, reserve=True))
+        found = [next_rule_id(dep, corpus, args.doc_prefix, args.domain, signer, reserve=not peek, peek=peek)]
+    if args.json:
+        print(json.dumps({"ids": found, "reserved": not peek}, indent=2))
+    else:
+        for item in found:
+            print(f"{item}  (not reserved)" if peek else item)
     return 0
 
 
@@ -946,7 +961,7 @@ def cmd_module(args) -> int:
                 not (args.kernel / "rules-of-rules.template.md").is_file() and args.kernel.suffix != ".zip"
             ):
                 print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
-                return 2
+                return EXIT_USAGE
             return _module_command(args, dep)
     return _module_command(args, dep)
 
@@ -1074,9 +1089,9 @@ def cmd_where(args) -> int:
 
     start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
     project = project_file.find_up(start)
-    if project is None:  # no deployment: 2, as `open` and every command that needs one
+    if project is None:  # no deployment: 4, as `open` and every command that needs one
         print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
-        return 2
+        return EXIT_NO_DEPLOYMENT
     data = project_file.read_dir(project)
     name = project_file.project_name(data)
     criterion = project_file.resolve(project)
@@ -1218,7 +1233,7 @@ def cmd_open(args) -> int:
     project = project_file.find_up(start)
     if project is None:
         print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
-        return 2
+        return EXIT_NO_DEPLOYMENT
     o = open_project(project, act=True, fetch=args.fetch, agent=args.agent)
     print(json.dumps(o.as_dict(), indent=2) if args.json else o.render())
     return 0 if o.ready else 1
@@ -1258,8 +1273,9 @@ def cmd_agent(args) -> int:
 def cmd_agent_run(args) -> int:
     """`agent run <command> [args]` (R5.5): the command's procedure sent to the
     project's agent from the project's root; its events streamed, then what
-    it cost. Exit 0 when the agent says it succeeded, 1 when not, 2 when it
-    could not start."""
+    it cost. Exit 0 when the agent says it succeeded, 1 when not or when it
+    could not start (no adapter, its CLI not on PATH), 2 for a command §4
+    does not have (a usage error)."""
     import project_file
     from catalyst import run as runs
     from catalyst.spec import SpecError, load_section4, procedure
@@ -1272,11 +1288,16 @@ def cmd_agent_run(args) -> int:
         args.json = True
     arguments = " ".join(rest)
     try:
-        prompt = procedure(load_section4(dep), args.command, arguments, dep.project_root)
+        section4 = load_section4(dep)
         adapter = runs.adapter_for(agent)
-    except (SpecError, runs.RunError) as exc:
+    except (SpecError, runs.RunError) as exc:  # the deployment or this machine: a failure
         print(f"catalyst: {exc}", file=sys.stderr)
-        return 2
+        return 1
+    try:
+        prompt = procedure(section4, args.command, arguments, dep.project_root)
+    except SpecError as exc:  # a command §4 does not have: usage
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return EXIT_USAGE
 
     def show(event: dict) -> None:
         if args.json:
@@ -1335,9 +1356,15 @@ def cmd_task(args) -> int:
 
     start = Path(os.path.abspath(args.project)) if args.project else logical_cwd()
     project = project_file.find_up(start)
-    criterion = project_file.resolve(project) if project else None
-    taskfile = criterion / "Taskfile.common.yml" if criterion else None
-    if taskfile is None or not taskfile.is_file():
+    if project is None:
+        print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
+        return EXIT_NO_DEPLOYMENT
+    criterion = project_file.resolve(project)
+    if criterion is None:
+        print(f"catalyst: {project}'s criterion is not reachable (`catalyst open`)", file=sys.stderr)
+        return EXIT_NO_DEPLOYMENT
+    taskfile = criterion / "Taskfile.common.yml"
+    if not taskfile.is_file():
         print(f"catalyst: no criterion Taskfile.common.yml for {start}", file=sys.stderr)
         return 1
     binary = shutil.which("task")
@@ -1431,7 +1458,7 @@ def cmd_move(args) -> int:
     project = project_file.find_up(start)
     if project is None:
         print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
-        return 1
+        return EXIT_NO_DEPLOYMENT
     try:
         if args.name:
             _, steps = move.rename(project, args.name, actor=args.as_user)
@@ -1457,7 +1484,7 @@ def cmd_migrate(args) -> int:
     project = project_file.find_up(start)
     if project is None:
         print(f"catalyst: no catalyst.toml (or legacy *.catalyst pointer) at or above {start}", file=sys.stderr)
-        return 1
+        return EXIT_NO_DEPLOYMENT
     kernel = args.kernel
     if kernel is None and (REPO_ROOT / "framework" / "kernel" / "rules-of-rules.template.md").is_file():
         kernel = REPO_ROOT / "framework" / "kernel"
@@ -1542,7 +1569,7 @@ def cmd_workspace(args) -> int:
             user = args.user or git_user_name(path.parent)
             if not user:
                 print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
-                return 2
+                return EXIT_USAGE
             _, steps = ws.init(path, kernel, user, args.git_username, _identity_doc(args))
             for step in steps:
                 print(f"- {step}")
@@ -2521,7 +2548,7 @@ def cmd_init(args) -> int:
         kernel = args.kernel or default_kernel(Path(tmp))
         if kernel is None or not (kernel / "rules-of-rules.template.md").is_file():
             print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
-            return 2
+            return EXIT_USAGE
         return _init(args, kernel)
 
 
@@ -2531,7 +2558,7 @@ def _init(args, kernel: Path) -> int:
     project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
     if args.module and args.no_module:
         print("catalyst: --module and --no-module exclude each other", file=sys.stderr)
-        return 2
+        return EXIT_USAGE
     if not args.module and not args.no_module:  # never chosen for the user: list what is here
         found = local_modules(project)
         listing = "; ".join(f"{m} ({d})" for m, d in found.items()) or "none next to the project or catalyst"
@@ -2540,11 +2567,11 @@ def _init(args, kernel: Path) -> int:
             f"later with `catalyst module install`. Found: {listing}",
             file=sys.stderr,
         )
-        return 2
+        return EXIT_USAGE
     user = args.user or git_user_name(project)
     if not user:
         print("catalyst: pass --user <name> (git config user.name is not set)", file=sys.stderr)
-        return 2
+        return EXIT_USAGE
     docs = []
     for spec in args.rule_doc or []:
         doc, _, prefix = spec.partition(":")
@@ -2985,6 +3012,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="as_user",
         help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
     )
+    q.add_argument("--peek", action="store_true", help="show the next ID without reserving it (it may be taken)")
+    q.add_argument("--json", action="store_true", help="machine-readable output (JSON on stdout)")
     q.set_defaults(func=cmd_id)
     q = ids.add_parser("next-rule", help="next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID")
     q.add_argument("doc_prefix", help="the rule document's prefix, e.g. br")
@@ -2994,6 +3023,8 @@ def build_parser() -> argparse.ArgumentParser:
         dest="as_user",
         help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
     )
+    q.add_argument("--peek", action="store_true", help="show the next ID without reserving it (it may be taken)")
+    q.add_argument("--json", action="store_true", help="machine-readable output (JSON on stdout)")
     q.set_defaults(func=cmd_id)
 
     p = sub.add_parser("journal", help="append to, verify, restore from or pin the journal")
@@ -3958,7 +3989,7 @@ _PROJECT_ONLY = (
 
 
 def _working_copy_refused(args) -> bool:
-    """`--working-copy` given to a command that would ignore it: said, never silently ignored (exit 2)."""
+    """`--working-copy` given to a command that would ignore it: said, never silently ignored (a usage error)."""
     func = getattr(args, "func", None)
     if not getattr(args, "working_copy", None) or getattr(func, "__name__", "") not in _PROJECT_ONLY:
         return False
@@ -3978,7 +4009,7 @@ def main(argv: list[str] | None = None) -> int:
     argv, forewarn = _preview_and_forewarned(list(sys.argv[1:] if argv is None else argv))
     args = build_parser().parse_args(argv)
     if _working_copy_refused(args):
-        return 2
+        return EXIT_USAGE
     try:
         if forewarn is not None and not _forewarn(args, forewarn):
             return 1
@@ -3988,9 +4019,9 @@ def main(argv: list[str] | None = None) -> int:
     except (IdError, JournalError, CriterionError, AnalysisError, ShareError) as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
-    except DeploymentNotFound as exc:
+    except DeploymentNotFound as exc:  # WorkingCopyMissing too: no deployment to work on
         print(f"catalyst: {exc}", file=sys.stderr)
-        return 2
+        return EXIT_NO_DEPLOYMENT
     except OSError as exc:  # e.g. git missing, unreadable file
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1

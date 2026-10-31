@@ -58,7 +58,7 @@ def test_zipapp_propagates_exit_codes(tmp_path):
         encoding="utf-8",
     )
     assert hook.returncode == 2 and "signer" in hook.stderr
-    assert run(pyz, "--project", str(tmp_path / "nowhere"), "validate", cwd=project).returncode == 2
+    assert run(pyz, "--project", str(tmp_path / "nowhere"), "validate", cwd=project).returncode == 4
 
 
 def _git(root: Path, *args: str) -> str:

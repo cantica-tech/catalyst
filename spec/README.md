@@ -38,6 +38,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `change.schema.json` | `catalyst new --json`, `catalyst edit --json`, `catalyst rename --json`, `catalyst restore --json`, `catalyst status set --json`, `catalyst link --json`, `catalyst unlink --json` | — |
 | `freeze.schema.json` | `catalyst freeze --json`, `catalyst unfreeze --json` | — |
 | `definition-migrate.schema.json` | `catalyst definition migrate --json` | — |
+| `id-next.schema.json` | `catalyst id next --json`, `catalyst id next-rule --json` (`--peek`: `reserved` is false) | — |
 | `members.schema.json` | `catalyst members <action> --json` | `GET /v1/members`, `POST /v1/members` |
 | `members-check.schema.json` | `catalyst serve members <check> --json` | — (the server's host) |
 | `serve-landing.schema.json` | `catalyst serve landing <action> --json` | — (the server's host) |

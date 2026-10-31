@@ -6,6 +6,26 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.121.0 — 2026-10-31
+
+Exit-code change for callers of the CLI (migration 0.121.0: nothing mechanical for a deployment).
+
+- Changed: no deployment exits `4` (REQ-000110, fw-STRUCTURE-000025, new). No `catalyst.toml` at or above the
+  directory or `--project`, a criterion that is not reachable, or `--working-copy` naming no working copy exited `2`,
+  the code of a usage error and of a blocking `hook stop`; `move`, `migrate` and `task` exited `1`. `2` is now a usage
+  error only (argparse's and the arguments a command refuses itself) and a blocking `hook stop`. `agent run` with no
+  adapter for the agent or its CLI not on `PATH` exits `1`; an unknown command stays `2`. `check` and the hooks outside
+  a project still exit `0`. A caller that tested `2` for "no deployment" tests `4`.
+- Added: `catalyst id next --peek` and `id next-rule --peek` print the next ID without reserving it, with a
+  "(not reserved)" note (REQ-000111, rr-META-000006): `ids.json` is only read and the ID lock is not taken. `--json`
+  prints `{"ids": [...], "reserved": ...}` (`spec/id-next.schema.json`). Reserving stays the default.
+- Changed: `scripts/package_release.py` writes nothing into a module repository (REQ-000112, fw-STRUCTURE-000016): a
+  module release is staged in this checkout's ignored `catalyst/modules/` and copied only into `--publish-dir`, the
+  distribution repository, and `--push` commits and pushes that directory alone. Publishing refuses a module checkout
+  that is not at its version's tag, as it did the kernel's, unless `--unreleased`; `--module <id>` packages and
+  publishes only the modules named, `--no-kernel` leaves the kernel out. A release manifest's `entry` names the
+  module's built UI bundle (`module.yaml`'s `entry`, else `ui/index.js`) only when the release ships it.
+
 ## 0.120.0 — 2026-10-31
 
 Layout change: `IAM/identity.json` names its provider by its `issuer` (migration 0.120.0, mechanical: `catalyst

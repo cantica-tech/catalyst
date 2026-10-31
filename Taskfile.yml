@@ -88,7 +88,7 @@ tasks:
       - python3 -m catalyst {{.CLI_ARGS}}
 
   release:
-    desc: "Package the kernel and modules into versioned zipped archives with manifests (no commit, no push)"
+    desc: "Package the kernel and modules into versioned zipped archives with manifests under catalyst/ (no commit, no push)"
     cmds:
       - python3 scripts/package_release.py
       - task: check:command-parity
@@ -96,8 +96,8 @@ tasks:
       - task: test
 
   release:publish:
-    desc: "Package, copy releases into PUBLISH_DIR (a distribution repository checkout), then commit and push the module repositories and PUBLISH_DIR"
+    desc: "Package the tagged kernel and modules (each checkout at its version's tag), copy the releases into PUBLISH_DIR (a distribution repository checkout, their only home), then commit and push PUBLISH_DIR; nothing goes into a module repository. task release:publish PUBLISH_DIR=<dir> -- [--module <id>] [--no-kernel]"
     requires:
       vars: [PUBLISH_DIR]
     cmds:
-      - python3 scripts/package_release.py --publish-dir "{{.PUBLISH_DIR}}" --push
+      - python3 scripts/package_release.py --publish-dir "{{.PUBLISH_DIR}}" --push {{.CLI_ARGS}}

@@ -100,14 +100,20 @@ def highest_number(dep: Deployment, corpus: Corpus, prefix: str) -> int:
     return max(numbers)
 
 
-def next_entity_id(dep: Deployment, corpus: Corpus, prefix: str, signer: dict, reserve: bool = False) -> str:
+def next_entity_id(
+    dep: Deployment, corpus: Corpus, prefix: str, signer: dict, reserve: bool = False, peek: bool = False
+) -> str:
     """The next ID of an entity type. With `reserve`, the number is handed
     out once under the working copy's ID lock, so parallel callers (several
-    sub-agents in one session) never get the same one."""
+    sub-agents in one session) never get the same one. With `peek`, the ID a
+    reserve would hand out now, numbers already reserved counted; nothing is
+    written and no lock is taken (REQ-000111)."""
     if prefix not in dep.etds:
         known = ", ".join(sorted(dep.etds))
         raise IdError(f"unknown entity type '{prefix}' (known: {known})")
     userid = _signer_userid(signer)
+    if peek:
+        return f"{prefix}-{_peek(dep, prefix, highest_number(dep, corpus, prefix)):06d}-{userid}"
     if not reserve:
         return f"{prefix}-{highest_number(dep, corpus, prefix) + 1:06d}-{userid}"
     with id_lock(dep):
@@ -135,14 +141,22 @@ def highest_rule_number(dep: Deployment, corpus: Corpus, domain: str) -> int:
 
 
 def next_rule_id(
-    dep: Deployment, corpus: Corpus, doc_prefix: str, domain: str, signer: dict, reserve: bool = False
+    dep: Deployment,
+    corpus: Corpus,
+    doc_prefix: str,
+    domain: str,
+    signer: dict,
+    reserve: bool = False,
+    peek: bool = False,
 ) -> str:
     """The next rule ID in `domain` (numbers are unique within the DOMAIN,
-    never reused). `reserve` as for next_entity_id."""
+    never reused). `reserve` and `peek` as for next_entity_id."""
     meta = {"META"} | {m.namespace for m in dep.installed() if m.namespace}
     if domain not in corpus.domains and domain not in meta:
         raise IdError(f"domain '{domain}' is not registered in rules/domains/domains.md")
     userid = _signer_userid(signer)
+    if peek:
+        return f"{doc_prefix}-{domain}-{_peek(dep, f'rule:{domain}', highest_rule_number(dep, corpus, domain)):06d}-{userid}"
     if not reserve:
         return f"{doc_prefix}-{domain}-{highest_rule_number(dep, corpus, domain) + 1:06d}-{userid}"
     with id_lock(dep):
@@ -161,16 +175,25 @@ def id_lock(dep: Deployment, wait: float = lock.WAIT, stale: float = lock.STALE)
     return lock.held(dep.root, "ids", wait=wait, stale=stale, error=IdError)
 
 
+def _reserved(dep: Deployment) -> dict:
+    """What has been handed out, per key (ids.json); empty when unreadable."""
+    try:
+        reserved = json.loads((state_dir(dep) / "ids.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return reserved if isinstance(reserved, dict) else {}
+
+
+def _peek(dep: Deployment, key: str, highest_seen: int) -> int:
+    """The number `_reserve` would hand out for `key` now; records nothing."""
+    return max(highest_seen, int(_reserved(dep).get(key, 0) or 0)) + 1
+
+
 def _reserve(dep: Deployment, key: str, highest_seen: int) -> int:
     """One above everything seen or already handed out for `key`; records it.
     Call with the ID lock held."""
     store = state_dir(dep) / "ids.json"
-    try:
-        reserved = json.loads(store.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        reserved = {}
-    if not isinstance(reserved, dict):
-        reserved = {}
+    reserved = _reserved(dep)
     number = max(highest_seen, int(reserved.get(key, 0) or 0)) + 1
     reserved[key] = number
     tmp = store.with_name(f"ids.{os.getpid()}.tmp")
