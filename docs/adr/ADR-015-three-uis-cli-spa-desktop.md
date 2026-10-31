@@ -1,7 +1,7 @@
 # ADR-015: Catalyst has three UIs: CLI (kernel), SPA (R6), desktop (R6)
 
 **Date:** 2026-10-07  
-**Status:** Pending (awaiting owner decision)  
+**Status:** Accepted (owner, 2026-10-18); as recorded in catalyst's criterion, `ADR-000039-yCNjAMXO`  
 **Author:** Catalyst Team  
 **Affected scope:** infra
 

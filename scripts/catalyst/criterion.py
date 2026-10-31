@@ -856,14 +856,20 @@ def open_pull_request(wc: Path, base: str, head: str, title: str) -> tuple[str |
 
 # --- create / join ----------------------------------------------
 def create(
-    dep: Deployment, url: str | None = None, branch: str = DEFAULT_BRANCH, ci_template: str | None = None
+    dep: Deployment,
+    url: str | None = None,
+    branch: str = DEFAULT_BRANCH,
+    ci_template: str | None = None,
+    signer: dict | None = None,
 ) -> list[str]:
     """Version a local-only working copy for sharing and, given `url`,
     publish it there and make it the product repository's `.criterion`
     submodule. Without a URL the deployment stays strictly local: the first
     `push`, `sync` or `join` asks for one. Stages the product changes; the
-    caller commits them."""
+    caller commits them. Its journal entries are signed by `signer`, else by
+    the verified identity (fw-IDENTITY-000002)."""
     project, wc = dep.project_root, dep.root
+    _actor(dep, signer)
     check_branch(branch)
     if url is not None:
         check_url(url)
@@ -891,9 +897,28 @@ def create(
     return notes + _publish(dep, url, branch)
 
 
-def _actor(dep: Deployment) -> str:
-    user = next((u for u in _users(dep) if u.get("active", True)), {})
-    return str(user.get("git_username") or user.get("name") or "catalyst")
+_ACTORS: dict[str, str] = {}
+
+
+def _actor(dep: Deployment, signer: dict | None = None) -> str:
+    """Who signs this criterion's sharing entries: the verified identity, as
+    for every writing verb (fw-IDENTITY-000002), never a name read from the
+    users file or a fixed "catalyst". `signer` is the one the CLI resolved
+    (with its grant check); otherwise it is resolved here, once per
+    criterion."""
+    key = str(dep.root)
+    if signer is not None:
+        _ACTORS[key] = str(signer.get("git_username") or signer.get("name"))
+    if key not in _ACTORS:
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import IdError, resolve_signer
+
+        try:
+            who = resolve_signer(dep, load_corpus(dep))
+        except IdError as exc:
+            raise CriterionError(f"no verified signer for the criterion's journal entries: {exc}") from None
+        _ACTORS[key] = str(who.get("git_username") or who.get("name"))
+    return _ACTORS[key]
 
 
 def _prepare(dep: Deployment, url: str | None, branch: str, ci_template: str | None) -> list[str]:
@@ -1214,14 +1239,6 @@ def join_home(project_root: Path, url: str | None = None, runtime: bool = True) 
     return out(target, "rev-parse", "--short", "HEAD")
 
 
-def _users(dep: Deployment) -> list[dict]:
-    try:
-        data = json.loads((dep.root / "IAM" / "users" / "users.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    return [u for u in data.get("users", []) if isinstance(u, dict)]
-
-
 def _add_submodule(project_root: Path, url: str) -> None:
     """Add an existing criterion repository as the product's `.criterion`
     submodule, on the pointer's shared branch (staged, not committed)."""
@@ -1243,12 +1260,13 @@ def _add_submodule(project_root: Path, url: str) -> None:
     _record_shared(project_root, url, branch)
 
 
-def join(project_root: Path, url: str | None = None, runtime: bool = True) -> str:
+def join(project_root: Path, url: str | None = None, runtime: bool = True, signer: dict | None = None) -> str:
     """Check out the shared working copy in a clone of the product
     repository. A product with no `.criterion` submodule yet needs the
     criterion repository's URL: a local working copy on this machine is
     published there (as `create <url>`); otherwise the repository is added
-    as the submodule."""
+    as the submodule. Its journal entry is signed by `signer`, else by the
+    verified identity (fw-IDENTITY-000002)."""
     added = False
     if url is not None:
         check_url(url)
@@ -1314,7 +1332,7 @@ def join(project_root: Path, url: str | None = None, runtime: bool = True) -> st
                     for p in (project_file.find(project_root).name, ".gitmodules", ".gitignore")
                     if (project_root / p).is_file()
                 ],
-                actor=_actor(shared),
+                actor=_actor(shared, signer),
                 allow_unchanged=True,
             ),
         )

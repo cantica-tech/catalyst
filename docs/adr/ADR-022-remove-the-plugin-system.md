@@ -1,7 +1,7 @@
 # ADR-022: Remove the plugin system from the kernel (R4.7)
 
 **Date:** 2026-10-16  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000046-yCNjAMXO`  
 **Author:** Olivier Steck (owner: "reviewed recommendations: apply all", 2026-10-16)  
 **Affected scope:** kernel
 

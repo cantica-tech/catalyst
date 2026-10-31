@@ -94,13 +94,17 @@ file is the shape alone.
                 TEMPLATE-GROUPS-v1.json  # how groups are shown
                 ...
             README.md
-    modules/                             # Process Modules & ETD schemas (MODULE-SPECIFICATION.md)
+    modules/                             # the active process module, as deployed (MODULE-SPECIFICATION.md)
         <module-id>/
-            module.yaml                  # Module manifest
-            schemas/                     # ETD schema definitions (.yaml)
+            module.yaml                  # Module manifest: its entity types (ETDs), commands, tiers
+            manifest.json                # the release's manifest: version, required kernel
+            definitions/                 # its entity types' definitions, versioned (migrate-definition)
             templates/                   # Document markdown templates
-            commands/                    # Module slash commands (.md)
-            skills/                      # Agent skills exported by module
+            migrations/                  # its migrations, applied by /sync-framework
+            code-of-conduct.module.md    # its §4 commands, composed into CODE-OF-CONDUCT.md
+            rules-of-rules.module.md     # its rules of rules, composed into Rules-of-Rules.md
+            INVARIANTS.module.md         # its laws
+            ui/                          # what a client shows of its types, when the module ships it
     development/
         <folder>/                        # active-module entity types whose ETD stores them under development/
             templates/ ...               # same shape as a top-level <folder>/

@@ -45,6 +45,14 @@ def test_task_dispatches_from_the_project_root(tmp_path, monkeypatch, capfd):
     (project / "sub").mkdir()
     monkeypatch.chdir(project / "sub")
     assert main(["task", "user", "--", "list", "--active-only"]) == 0
-    assert "/user list --active-only" in capfd.readouterr().out
+    # claude-code serves the commands as the catalyst MCP server's prompts (BUG-000047)
+    assert "/catalyst:user list --active-only" in capfd.readouterr().out
+    monkeypatch.setattr(pf, "agent_of", lambda data: "codex")
+    assert main(["task", "user", "--", "list"]) == 0
+    out = capfd.readouterr().out
+    assert "/user list" in out and "/catalyst:" not in out
+    monkeypatch.setenv("CMD_PREFIX", "/x:")
+    assert main(["task", "user", "--", "list"]) == 0
+    assert "/x:user list" in capfd.readouterr().out
     assert main(["task"]) == 0 and "user" in capfd.readouterr().out
     assert sorted(p.name for p in project.iterdir() if p.name.lower().startswith("taskfile")) == []

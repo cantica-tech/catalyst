@@ -92,12 +92,13 @@ def test_a_file_that_is_not_plain_json_is_never_rewritten(home, capsys):
 
 def test_the_claude_code_plugin_runs_what_the_installer_writes(home):
     plugin = _json(PLUGIN)
-    assert plugin["mcpServers"]["catalyst"]["args"] == ["mcp"]
+    launcher = '"${CATALYST_HOME:-$HOME/.catalyst}/bin/catalyst"'  # CATALYST_HOME honoured (BUG-000048)
+    assert plugin["mcpServers"]["catalyst"] == {"command": "sh", "args": ["-c", f"exec {launcher} mcp"]}
     stop = plugin["hooks"]["Stop"][0]["hooks"][0]["command"]
-    assert stop.endswith('/.catalyst/bin/catalyst" hook stop')
+    assert stop == f"{launcher} hook stop"
     assert agents.changes("claude-code")[0].value[0]["hooks"][0]["command"].endswith("hook stop")
     start = plugin["hooks"]["SessionStart"][0]["hooks"][0]["command"]
-    assert start.endswith('/.catalyst/bin/catalyst" hook start --quiet')
+    assert start == f"{launcher} hook start --quiet"
     session_start = agents.changes("claude-code")[1].value
     assert isinstance(session_start, list) and session_start[0]["hooks"][0]["command"].endswith("hook start --quiet")
 
@@ -109,3 +110,20 @@ def test_status_prints_each_agents_parts(home, capsys):
     assert {r["agent"] for r in rows} == set(agents.AGENTS)
     assert [r["installed"] for r in rows if r["agent"] == "codex"] == [True]
     assert schema_check.problems(rows, schema_check.load("agent-status")) == []
+
+
+def test_codex_gets_both_hooks_where_codex_home_says(home, tmp_path, monkeypatch):
+    """BUG-000048: a session-start hook as Claude Code has, in $CODEX_HOME/hooks.json beside config.toml."""
+    agents.run("codex", install=True)
+    hooks = _json(home / ".codex" / "hooks.json")["hooks"]
+    assert hooks["Stop"][0]["hooks"][0]["command"].endswith("hook stop --format json")
+    assert hooks["SessionStart"][0]["hooks"][0]["command"].endswith("hook start --quiet")
+    agents.run("codex", install=False)
+    codex = tmp_path / "codex-home"
+    monkeypatch.setenv("CODEX_HOME", str(codex))
+    agents.run("codex", install=True)
+    assert set(_json(codex / "hooks.json")["hooks"]) == {"Stop", "SessionStart"}
+    assert "[mcp_servers.catalyst]" in (codex / "config.toml").read_text(encoding="utf-8")
+    assert [r["installed"] for r in agents.status() if r["agent"] == "codex"] == [True]
+    agents.run("codex", install=False)
+    assert not _json(codex / "hooks.json").get("hooks")

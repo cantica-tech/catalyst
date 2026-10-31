@@ -20,13 +20,17 @@
 #        catalyst task user -- add olivier admin
 #
 # Agent-generic dispatch: `AGENT_CMD` is the agent's non-interactive
-# command. `catalyst task` passes it from `catalyst.toml`'s "agent" field;
-# set it yourself (`AGENT_CMD="<bin> -p"`) when calling `task` directly.
+# command, and `CMD_PREFIX` what precedes a command's name in its prompt:
+# `/catalyst:` where the commands are the `catalyst mcp` server's prompts
+# (Claude Code), `/` elsewhere. `catalyst task` passes both from
+# `catalyst.toml`'s "agent" field; set them yourself
+# (`AGENT_CMD="<bin> -p" CMD_PREFIX=/`) when calling `task` directly.
 
 version: "3"
 
 vars:
   AGENT_CMD: '{{.AGENT_CMD | default "claude -p"}}'
+  CMD_PREFIX: '{{.CMD_PREFIX | default "/catalyst:"}}'
 
 tasks:
   # Not a slash command: a direct pass-through to the catalyst CLI

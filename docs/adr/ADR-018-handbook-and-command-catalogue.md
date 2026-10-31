@@ -1,7 +1,7 @@
 # ADR-018: The handbook, the command catalogue, and the commands they drop
 
 **Date:** 2026-10-10  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000042-yCNjAMXO`  
 **Author:** Olivier Steck (owner)  
 **Affected scope:** kernel, SE module
 

@@ -1,68 +1,25 @@
-"""Administration verbs (roadmap R2 W3): users, roles, freeze/unfreeze and
-definition migration.
+"""Administration verbs (roadmap R2 W3): freeze/unfreeze and definition
+migration.
 
-The mechanical half of `/user-*`, `/role-*`, `/freeze` and
-`/migrate-definition`: the refusals those procedures list, the write, and
-one journal entry. Users are never deleted (signatures must stay
-resolvable), a userid is always drawn (INV-26), the last active user is never
-removed, and a deployed definition moves only to a version that exists
-(INV-23).
+The mechanical half of `/freeze` and `/migrate-definition`: the refusals
+those procedures list, the write, and one journal entry. A deployed
+definition moves only to a version that exists (INV-23). People and roles
+are catalyst-users' (design 29): `catalyst user` and `catalyst role` only
+say so.
 """
 
 from __future__ import annotations
 
-import datetime
-import json
 import re
 from pathlib import Path
 
 from catalyst import journal
 from catalyst.corpus import Corpus, load_corpus
 from catalyst.deployment import Deployment
-from catalyst.ids import generate_userid
-
-RECONCILIATION_LEVELS = ("full", "propose", "none")
-USERS = Path("IAM") / "users" / "users.json"
-ROLES = Path("IAM") / "roles" / "roles.json"
-IDENTITY_FIELDS = {"name", "registered", "userid"}
 
 
 class AdminError(Exception):
     pass
-
-
-# --- json files -----------------------------------------------------------
-def _latest_template(folder: Path, stem: str) -> Path | None:
-    found = [
-        (int(m.group(1)), p)
-        for p in folder.glob(f"TEMPLATE-{stem}-v*.json")
-        if (m := re.search(r"-v(\d+)\.json$", p.name))
-    ]
-    return max(found)[1] if found else None
-
-
-def _load(dep: Deployment, rel: Path, key: str, created: list[Path]) -> dict:
-    path = dep.root / rel
-    if not path.is_file():
-        template = _latest_template(path.parent / "templates", key.upper())
-        data = json.loads(template.read_text(encoding="utf-8")) if template else {}
-        data.setdefault(key, [])
-        _save(path, data)
-        created.append(path)
-    data = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(data.get(key), list):
-        raise AdminError(f"{rel.as_posix()} has no `{key}` list")
-    return data
-
-
-def _save(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-
-def _find(items: list[dict], name: str, keys=("name",)) -> dict | None:
-    wanted = name.strip().lower()
-    return next((i for i in items if any(str(i.get(k, "")).lower() == wanted for k in keys)), None)
 
 
 def _journal(
@@ -81,189 +38,6 @@ def _journal(
             tier="chore",
         ),
     )
-
-
-def _role_names(dep: Deployment, created: list[Path]) -> list[str]:
-    return [str(r.get("name")) for r in _load(dep, ROLES, "roles", created)["roles"]]
-
-
-# --- users ----------------------------------------------------------------
-def user_add(
-    dep: Deployment,
-    name: str,
-    role: str,
-    signer: dict,
-    intent: list[str],
-    git_username: str | None = None,
-    today: datetime.date | None = None,
-) -> dict:
-    created: list[Path] = []
-    data = _load(dep, USERS, "users", created)
-    if _find(data["users"], name, ("name", "git_username")):
-        raise AdminError(f"'{name}' is already registered — use `user modify` or `user assign-role`")
-    roles = _role_names(dep, created)
-    if role not in roles:
-        raise AdminError(f"no role '{role}' (roles: {', '.join(roles)}) — `role add` it first")
-    user = {
-        "name": name,
-        "git_username": git_username or name,
-        "roles": [role],
-        "registered": (today or datetime.date.today()).isoformat(),
-        "active": True,
-        "notes": "",
-        "userid": generate_userid({str(u.get("userid")) for u in data["users"]}),
-    }
-    data["users"].append(user)
-    _save(dep.root / USERS, data)
-    _journal(
-        dep,
-        "/user-add",
-        "create",
-        f"user {name}",
-        intent or [f"Register {name} as {role}"],
-        [*created, dep.root / USERS],
-        signer,
-    )
-    return user
-
-
-def _existing_user(dep: Deployment, name: str) -> tuple[dict, dict]:
-    data = _load(dep, USERS, "users", [])
-    user = _find(data["users"], name, ("name", "git_username", "userid"))
-    if user is None:
-        raise AdminError(f"'{name}' is not registered — `user add` first")
-    return data, user
-
-
-def user_remove(dep: Deployment, name: str, signer: dict, intent: list[str]) -> dict:
-    data, user = _existing_user(dep, name)
-    if not user.get("active", True):
-        raise AdminError(f"'{user['name']}' is already inactive")
-    if sum(1 for u in data["users"] if u.get("active", True)) == 1:
-        raise AdminError(f"'{user['name']}' is the only active user — `user add` a replacement first (INV-16)")
-    user["active"] = False  # never deleted: signatures stay resolvable
-    _save(dep.root / USERS, data)
-    _journal(
-        dep,
-        "/user-remove",
-        "update",
-        f"user {user['name']}",
-        intent or [f"Deactivate {user['name']}"],
-        [dep.root / USERS],
-        signer,
-    )
-    return user
-
-
-def user_modify(dep: Deployment, name: str, field: str, value: str, signer: dict, intent: list[str]) -> dict:
-    data, user = _existing_user(dep, name)
-    if field == "roles":
-        raise AdminError("roles change through `user assign-role`")
-    if field in IDENTITY_FIELDS:
-        raise AdminError(f"`{field}` is an identity field, never edited in place")
-    if field == "active":
-        if value.lower() in ("false", "no", "0"):
-            raise AdminError("deactivate with `user remove` (it keeps one active user)")
-        new: object = True
-    else:
-        new = value
-    user[field] = new
-    _save(dep.root / USERS, data)
-    _journal(
-        dep,
-        "/user-modify",
-        "update",
-        f"user {user['name']}",
-        intent or [f"{user['name']}: {field} = {value}"],
-        [dep.root / USERS],
-        signer,
-    )
-    return user
-
-
-def user_assign_role(dep: Deployment, name: str, role: str, signer: dict, intent: list[str]) -> dict:
-    data, user = _existing_user(dep, name)
-    roles = _role_names(dep, [])
-    if role not in roles:
-        raise AdminError(f"no role '{role}' (roles: {', '.join(roles)}) — `role add` it first")
-    if role in user.get("roles", []):
-        raise AdminError(f"'{user['name']}' already has role '{role}'")
-    user.setdefault("roles", []).append(role)
-    _save(dep.root / USERS, data)
-    _journal(
-        dep,
-        "/user-assign-role",
-        "update",
-        f"user {user['name']}",
-        intent or [f"{user['name']} gains role {role}"],
-        [dep.root / USERS],
-        signer,
-    )
-    return user
-
-
-# --- roles ----------------------------------------------------------------
-def role_add(
-    dep: Deployment,
-    role: str,
-    actions: list[str],
-    signer: dict,
-    intent: list[str],
-    reconciliation: str = "propose",
-    provider_role: str | None = None,
-) -> dict:
-    if reconciliation not in RECONCILIATION_LEVELS:
-        raise AdminError(f"reconciliation is one of {', '.join(RECONCILIATION_LEVELS)}")
-    created: list[Path] = []
-    data = _load(dep, ROLES, "roles", created)
-    if _find(data["roles"], role):
-        raise AdminError(f"role '{role}' exists — use `role modify`")
-    entry = {"name": role, "actions": actions, "reconciliation": reconciliation}
-    if provider_role:
-        entry["provider_role"] = provider_role  # the identity provider's role that grants it (fw-IDENTITY-000004)
-    data["roles"].append(entry)
-    _save(dep.root / ROLES, data)
-    _journal(
-        dep, "/role-add", "create", f"role {role}", intent or [f"Add role {role}"], [*created, dep.root / ROLES], signer
-    )
-    return entry
-
-
-def role_modify(
-    dep: Deployment,
-    role: str,
-    actions: list[str] | None,
-    signer: dict,
-    intent: list[str],
-    provider_role: str | None = None,
-) -> dict:
-    """Replace a role's actions; with `provider_role` alone, set only the identity provider's role that grants
-    it (`""` removes it)."""
-    data = _load(dep, ROLES, "roles", [])
-    entry = _find(data["roles"], role)
-    if entry is None:
-        raise AdminError(f"no role '{role}' — use `role add`")
-    if actions is not None or provider_role is None:
-        entry["actions"] = actions or []  # signatures already recorded are not touched
-    if provider_role is not None:
-        if provider_role:
-            entry["provider_role"] = provider_role
-        else:
-            entry.pop("provider_role", None)
-    _save(dep.root / ROLES, data)
-    _journal(
-        dep,
-        "/role-modify",
-        "update",
-        f"role {role}",
-        intent
-        or [
-            f"Role {role}: {'actions replaced' if actions is not None or provider_role is None else 'provider role set'}"
-        ],
-        [dep.root / ROLES],
-        signer,
-    )
-    return entry
 
 
 # --- freeze ---------------------------------------------------------------
