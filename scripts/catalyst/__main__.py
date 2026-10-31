@@ -59,7 +59,7 @@ def cmd_id(args) -> int:
 
     dep = open_deployment(args)
     corpus = load_corpus(dep)
-    signer = resolve_signer(dep, corpus, args.as_user)
+    signer = resolve_signer(dep, corpus, args.as_user, _verb_command(dep, "id"))
     # reserved under the ID lock: parallel callers never get the same ID
     if args.id_command == "next":
         if args.count < 1:
@@ -491,7 +491,7 @@ def cmd_repair(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     try:
-        signer = resolve_signer(dep, corpus, args.as_user)
+        signer = resolve_signer(dep, corpus, args.as_user, _verb_command(dep, "repair"))
         chore = next((t.id for t in tiers.tiers_for(dep) if not t.needs_artifact), None)
         changed = derived.repair(dep, corpus, signer, args.tier or chore)
     except (IdError, JournalError, ValueError) as exc:
@@ -523,7 +523,7 @@ def cmd_approve(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     try:
-        signer = resolve_signer(dep, corpus, args.as_user)
+        signer = resolve_signer(dep, corpus, args.as_user, _verb_command(dep, "approve"))
         entry = gates.approve(dep, corpus, args.id, args.gate, signer, args.intent or [], args.tier)
         left = gates.left_after(dep, load_corpus(dep), entry)
     except (IdError, JournalError, gates.GateError, ViewError) as exc:
@@ -548,7 +548,7 @@ def cmd_landing(args) -> int:
     dep = open_deployment(args)
     try:
         if args.landing_command == "init":
-            signer = resolve_signer(dep, load_corpus(dep), args.as_user)
+            signer = resolve_signer(dep, load_corpus(dep), args.as_user, _verb_command(dep, "landing"))
             path = landing.init(dep, args.policy, signer, force=args.force, intent=args.intent)
             out = {"policy": args.policy, "file": str(path)}
             print(json.dumps(out) if args.json else f"landing policy {args.policy}: {path}, journaled")
@@ -620,6 +620,28 @@ def _warn_thin(intent: list[str]) -> None:
         )
 
 
+# The command a writing verb's change is for (rr-META-000011), when the deployment's §4 has no command of the verb's
+# own name: the one whose work the verb does. `role_check = "warn"` warns instead of refusing, as for every verb.
+_VERB_COMMANDS = {
+    "id": "create",
+    "rename": "create",
+    "edit": "create",
+    "link": "create",
+    "unlink": "create",
+    "repair": "create",
+    "approve": "status",
+    "landing": "share",
+}
+
+
+def _verb_command(dep, verb: str) -> str:
+    """The command whose grant `verb` needs: a §4 command of its own name when the deployment composes one, else
+    the command it serves (`_VERB_COMMANDS`)."""
+    from catalyst import permissions
+
+    return verb if permissions.required(dep, verb) else _VERB_COMMANDS.get(verb, verb)
+
+
 def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
     """The command a writing verb's change is for, and the aliases that also grant it (D5)."""
     if args.edit == "new":
@@ -631,6 +653,8 @@ def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
             return "create", ()
         names = {etd.id_prefix.lower(), etd.name.lower().replace(" ", "-")}
         return "create", tuple(sorted(f"create-{n}" for n in names))
+    if args.edit in ("rename", "edit", "link", "unlink"):
+        return _verb_command(dep, args.edit), ()
     return {"status": "status", "restore": "journal-restore"}.get(args.edit, "create"), ()
 
 
@@ -1076,7 +1100,7 @@ def cmd_reconcile(args) -> int:
             corpus,
             args.case,
             args.verb,
-            resolve_signer(dep, corpus, args.as_user),
+            resolve_signer(dep, corpus, args.as_user, "reconcile"),
             args.text or "",
             args.intent or [],
             content,
@@ -1105,7 +1129,7 @@ def cmd_propose(args) -> int:
     dep = open_deployment(args)
     corpus = load_corpus(dep)
     try:
-        signer = resolve_signer(dep, corpus, args.as_user)
+        signer = resolve_signer(dep, corpus, args.as_user, "reconcile")
         res = proposals.propose(
             dep, corpus, args.id, _read_from(args.from_file), signer, args.title, args.intent or [], args.tier
         )

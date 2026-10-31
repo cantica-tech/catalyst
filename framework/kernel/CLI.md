@@ -1044,6 +1044,17 @@ Who signs (design 29). A criterion holds no user or role registry:
   `cmd:*`, and `reconcile:<level>` for `catalyst reconcile`; a role's name
   grants nothing. An approval records the signer's roles, and its gate
   counts it with them.
+- Every writing verb checks the grant of the command its change is for:
+  `new` `create` (or a `create-<type>` alias), `status set` `status`,
+  `restore` `journal-restore`, `journal append` its `--command`, `propose`
+  and `reconcile` `reconcile` (and the reconciliation level), `share` and
+  `criterion` `share`, `sync`, `module` `sync-framework`. `id next|next-rule`,
+  `rename`, `edit`, `link`, `unlink`, `repair derived`, `approve` and
+  `landing init` check the deployment's §4 command of their own name when
+  it has one, else the command they serve: `create` for the first six,
+  `status` for `approve`, `share` for `landing init`. A command the
+  deployment's §4 does not have is not checked; `role_check = "warn"` in
+  `catalyst.toml` warns instead of refusing.
 - `user …` and `role …` refuse: people and roles are managed in
   catalyst-users. The users, roles and groups templates
   (`IAM/{users,roles,groups}/templates/`) only shape how people are shown.
