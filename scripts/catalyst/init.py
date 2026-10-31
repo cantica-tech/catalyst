@@ -678,24 +678,16 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
     if home_store and req.runtime:
         from catalyst import runtime as rt
 
-        venv, _ = rt.install_into(root, version, root / "bin" / "catalyst.pyz")
-        steps.append(f"filled the criterion's runtime {venv} (catalyst {version}, git-ignored)")
+        pyz = root / "bin" / "catalyst.pyz"
+        label = rt.pyz_version(pyz)  # the vendored CLI's own label, as `catalyst open` names it: one runtime
+        venv, _ = rt.install_into(root, label, pyz)
+        steps.append(f"filled the criterion's runtime {venv} (catalyst {label}, git-ignored)")
         launcher = rt.install_launcher()  # the `catalyst` command, as `runtime install` leaves it (BUG-000041)
         steps.append(f"installed the catalyst command {launcher} (put {launcher.parent} on PATH)")
     what = f"kernel {version}, " + (f"module {manifest.id} {manifest.version}" if manifest else "no module")
     _git(root, "init", "-q")
-    _git(root, "add", "-A")
-    _git(
-        root,
-        "-c",
-        f"user.name={installer.username}",
-        "-c",
-        f"user.email={installer.username}@catalyst.invalid",
-        "commit",
-        "-q",
-        "-m",
-        f"catalyst init: {req.name} ({what})",
-    )
+    # journaled before the first commit, so the commit holds the entry and every installed file is recorded as
+    # new (no "before"): the working copy has no HEAD yet, and the project commits nothing of catalyst
     from catalyst import journal
     from catalyst.deployment import load
 
@@ -722,6 +714,18 @@ def _install(req: InitRequest, created: list[Path]) -> list[str]:
             actor=installer.username,
             allow_unchanged=True,
         ),
+    )
+    _git(root, "add", "-A")
+    _git(
+        root,
+        "-c",
+        f"user.name={installer.username}",
+        "-c",
+        f"user.email={installer.username}@catalyst.invalid",
+        "commit",
+        "-q",
+        "-m",
+        f"catalyst init: {req.name} ({what})",
     )
     steps.append("initialised the working copy's git history and journaled the install")
     if _is_repo(project):

@@ -31,22 +31,7 @@ def _release(tmp: Path, version: str, kernel: Path = KERNEL) -> Path:
 def _deployment(tmp_path):
     req = request(tmp_path)
     init(req)
-    subprocess.run(["git", "-C", str(req.project / ".criterion"), "add", "-A"], check=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(req.project / ".criterion"),
-            "-c",
-            "user.name=t",
-            "-c",
-            "user.email=t@t",
-            "commit",
-            "-qm",
-            "init",
-        ],
-        check=True,
-    )
+    # init commits its journal entry with everything else: nothing is left to commit (BUG-000056)
     deployed = (req.project / ".criterion" / "version.txt").read_text(encoding="utf-8").strip()
     pointer = next(req.project.glob("*.catalyst"))
     data = json.loads(pointer.read_text(encoding="utf-8"))
