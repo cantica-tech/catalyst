@@ -42,30 +42,39 @@ Show, on a real project, that a shared deployment:
      criterion in catalyst's home and `catalyst.toml` in the project, then
      write the first rules.
   2. Create an empty criterion repository on the hosting service, then
-     `catalyst criterion create <url>`, and commit the updated
-     `catalyst.toml` in the product repository.
-  3. `catalyst criterion protect --yes` (GitHub), so pull requests and the
-     `catalyst` check are required on the shared branch.
-  4. Add the `catalyst trace` step to the product repository's CI
-     (`framework/kernel/CLI.md`, `catalyst trace`), cloning the criterion
-     repository into the job's catalyst home so IDs resolve.
-- **Each participant**, in their own clone: `catalyst identity login`
-  (their first signature records them in the signers ledger),
-  `catalyst criterion join`, and `catalyst hook install`.
+     `catalyst share create <url> --protect`: it prints what it would
+     publish and exits `3`; once the team agrees, re-run it with `--yes`.
+     It pushes the criterion (it stays in catalyst's home, never in the
+     product), records the repository in `catalyst.toml`, and, on GitHub,
+     makes pull requests and the `catalyst` check required on the shared
+     branch. Commit the updated `catalyst.toml` in the product repository.
+  3. Add the `catalyst trace` step to the product repository's CI
+     (`framework/kernel/CLI.md`, `catalyst trace`, "Product CI"), cloning
+     the criterion repository into the job's catalyst home so IDs resolve.
+- **Each participant**, in their own clone of the product: `catalyst
+  identity login` (their first signature records them in the signers
+  ledger), then `catalyst open`, which clones the shared criterion into
+  `$HOME/.catalyst/projects/<project>/criterion` and fills its runtime
+  (`catalyst where` shows where it is), and `catalyst hook install` (the
+  commit-msg hook, in the clone's `.git/`). `catalyst agent install <agent>`
+  wires their agent, once per machine.
 - Record the start: the date, the commit it starts from (existing history
   is not checked), and each participant's userid.
 
 ## During the trial
 
 - Work normally through the agent: pick the tier, open the artifacts the
-  tier needs, journal, land working-copy changes with
-  `catalyst criterion push`, and commit product changes with traced
-  messages.
+  tier needs, journal, publish the criterion's changes with
+  `catalyst share push -m <message>` (it shows what would leave and exits
+  `3`; `--yes` once the person agrees: a topic branch and a pull request),
+  bring in the others' with `catalyst share pull`, and commit product
+  changes with traced messages.
 - **Never bypass the checks** (`--no-verify`, merging a red pull request,
   editing the journal by hand). If one gets in the way, that is a finding:
   log it, then do what the check asks.
-- **Weekly**, one person runs, from the product repository with the
-  submodule synced (`catalyst criterion sync`):
+- **Weekly**, one person runs, from the product repository, after
+  bringing the criterion up to date (`catalyst share pull`;
+  `catalyst share status` says how far it is from the shared copy):
 
   ```sh
   catalyst report --since <trial start date>
@@ -108,7 +117,7 @@ weeks):
 
 | Criterion | Evidence | Pass |
 |---|---|---|
-| Zero lost work (integrity) | `catalyst criterion integrity` green on every merged pull request of the shared branch; the log's "Lost work?" column | No `blocker` for lost work; no integrity failure left unexplained. |
+| Zero lost work (integrity) | The `catalyst` check (which runs `catalyst check`, including that a merge lost nothing) green on every merged pull request of the shared criterion branch; the log's "Lost work?" column | No `blocker` for lost work; no integrity failure left unexplained. |
 | Every commit traced | `catalyst trace <start>..HEAD` on the product repository at the end; the weekly `commits traced` figures | 100% of non-merge commits since the start trace. |
 | Chain intact | `catalyst check` at the end | No errors. |
 | No format change needed | The log's "Format change needed?" column | Every entry *no*. |
@@ -122,7 +131,7 @@ trial passes only on a run where every criterion holds.
 - **RM-000026 — multi-user operation:** closed by a passing trial: no lost
   work, every commit traced, the chain intact, with two or more people for
   four weeks or more.
-- **RM-000028 — format 1.0:** the format is declared `1.0` (the pointer's
+- **RM-000028 — format 1.0:** the format is declared `1.0` (`catalyst.toml`'s
   `format`, `FORMAT.md`, `SUPPORTED_FORMATS`) only when the trial also
   needed no format change. If it did, the change ships with a migration,
   the format stays `1.0-rc`, and the "no format change" criterion is
