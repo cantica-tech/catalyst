@@ -6,6 +6,61 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+No layout change. `Taskfile.common.yml` changes on the next `/sync-framework` (`CMD_PREFIX`).
+
+- Added: `catalyst runtime prune` removes the runtimes under `$CATALYST_HOME/runtimes/` that no criterion in the
+  home uses (REQ-000104, rr-META-000014). It keeps the versions the home's criteria carry in their `.venv`, the
+  running catalyst's and the newest, and removes the rest and any half-built runtime; without `--yes` it only lists
+  them and the space they take. `--json` is described by `spec/runtime-prune.schema.json`.
+- Added: `catalyst view` takes several IDs and reads them in one process (REQ-000105). With `--json` it prints one
+  JSON array of the single views, in the order given; without it, each view in turn. An ID that does not resolve
+  fails the whole call (exit 1, naming it) with nothing on stdout. One ID prints as before.
+- Added: `catalyst init` runs from the installed launcher with no catalyst checkout and no release `catalyst.pyz`
+  (REQ-000106). Every `catalyst.pyz` now carries its `framework/kernel`. With no `--kernel`, `init` and
+  `module install|upgrade` use the checkout's kernel, else the bundled one. `init` vendors the `catalyst.pyz` it runs
+  from, including a runtime's.
+- Fixed: `catalyst task` names each command the way the agent serves it (BUG-000047, rr-META-000014):
+  `/catalyst:<name>`, the `catalyst mcp` server's prompt, for Claude Code, `/<name>` for other agents, through the
+  Taskfile's new `CMD_PREFIX` (set it to override).
+- Fixed: `catalyst agent install codex` writes a session-start hook (`catalyst hook start --quiet`) beside the Stop
+  hook, both in `$CODEX_HOME/hooks.json` (else `~/.codex`) (BUG-000048, rr-META-000014). The Claude Code plugin runs
+  the launcher in `$CATALYST_HOME/bin` (default `~/.catalyst/bin`).
+- Fixed: `catalyst share create` (both drivers) and `criterion create|join` sign their journal entries as the
+  verified identity, with `share create`'s `share` grant checked (BUG-000049, fw-IDENTITY-000002). Before, the git
+  driver signed as the users file's first person, else the fixed actor `catalyst`.
+- Fixed: every writing verb checks the grant of the command its change is for (BUG-000050, rr-META-000011).
+  `id next|next-rule`, `approve`, `propose`, `reconcile`, `repair derived` and `landing init` checked none, and
+  `rename`, `edit`, `link`, `unlink` were checked as `create`. Each now needs its own §4 command's grant when the
+  deployment composes one, else the command it serves (`create`; `status` for `approve`; `share` for
+  `landing init`; `reconcile` for `propose` and `reconcile`). `role_check = "warn"` still warns.
+- Fixed: `catalyst criterion protect` and `catalyst hook install` wait for the user's assent: without `--yes` they
+  print what they would do and exit `3` (a terminal asks) (BUG-000051, fw-BEHAVIOR-000004). `share create`'s preview
+  says `catalyst.toml` is staged in the project. Before, `protect` exited `0` and `hook install` wrote into `.git/`
+  unasked.
+- Fixed: `catalyst hook install` writes the launcher as the hook's fallback CLI for a criterion in catalyst's home,
+  not a `.criterion/bin/catalyst.pyz` it does not have; the kernel's CI installs its scratch deployments into a
+  scratch catalyst home instead of `init --at` (BUG-000052, rr-META-000014).
+- Fixed: `catalyst --project X serve --local` serves X (`serve`'s own `--project` no longer overwrites the global
+  one), and the commands that find the project themselves refuse `--working-copy` with exit `2` instead of
+  ignoring it (BUG-000053, rr-META-000014).
+- Fixed: the help and `CLI.md` say what the CLI does (BUG-000054, rr-META-000002, fw-IDENTITY-000007): the real
+  exit-code contract (`2` is no deployment or a usage error), `id next` reserving each number, `--as` naming only the
+  verified identity, `journal append --action redact`, `init --userid` and `module upgrade --cli|--commands-dir`
+  documented, the whole top-level description, the home layout instead of the `.catalyst` pointer and submodule
+  model. `catalyst where` exits `2` without a project, as `open`. `user …` and `role …` take anything and refuse,
+  pointing to catalyst-users; their options, the code behind them and `spec/user|role.schema.json` are gone.
+- Fixed: `catalyst init` fills the criterion's runtime under the vendored CLI's own label, as `open` does, so one
+  build no longer fills two runtimes (BUG-000055, rr-META-000014).
+- Fixed: `catalyst init` journals the install before its first commit: the entry is committed with the criterion
+  and every installed file is recorded as new (BUG-000056, rr-META-000012). Before, the journal was left untracked
+  and each file was recorded with before == after.
+- Chores: CI's second-module fixture at its current release; `.standards/` at v0.1.2; `task lint`, `format` and
+  `typecheck` stop with a message when the standards checkout is missing; `docs/adr` statuses follow the
+  criterion's decisions, `PARKING.md` marked historical, the roadmap's R6 row and the feature register re-derived,
+  `beta/TRIAL.md` on the current verbs; `ARTIFACT-LAYOUT.md` shows a deployed module's tree.
+
 ## 0.119.2 — 2026-10-30
 
 No layout change.
