@@ -128,7 +128,9 @@ def test_each_writing_verb_needs_its_commands_grant(team, capsys, argv, command)
 
 def test_a_verb_of_the_deployments_own_is_checked_by_its_name(team, capsys):
     coc = team / ".criterion" / "CODE-OF-CONDUCT.md"
-    coc.write_text(coc.read_text(encoding="utf-8").replace("## 5. Next", "- `/link` — cite IDs.\n\n## 5. Next"))
+    coc.write_text(
+        coc.read_text(encoding="utf-8").replace("## 5. Next", "- `/link` — cite IDs.\n\n## 5. Next"), encoding="utf-8"
+    )
     assert main(["link", ITEM, "Targets", ITEM, "--as", "cy"]) == 1
     assert "may not run /link" in capsys.readouterr().err
 
