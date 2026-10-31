@@ -148,8 +148,9 @@ template versions the migrations ask for (`CLI.md`).
    - read the module's `INVARIANTS.module.md` together with the kernel's
      `INVARIANTS.md` (§6.4);
    - recompose `Taskfile.common.yml` from
-     `templates/Taskfile.common.template.yml` plus the module's
-     `Taskfile.module.yml` tasks (§6.5);
+     `templates/Taskfile.common.template.yml`, one task per command of the
+     composed §4 (§6.5: a module ships no task; a `Taskfile.module.yml` is
+     not read);
    - apply the module's migrations with the kernel's, in version order
      (item 10 of the slash-command behavior above, §6.6).
    Composition is additive: module content never replaces kernel content,
@@ -227,10 +228,10 @@ template versions the migrations ask for (`CLI.md`).
      conflict (never deleted), and catalyst's hooks leave the project's
      `.claude/settings.json` (its other settings kept). For
      `Taskfile.common.yml` (in the criterion, not the project tree —
-     INV-6) against `templates/Taskfile.common.template.yml` plus
-     the module's `Taskfile.module.yml`: add any task missing relative to
-     §4, refresh a task's `desc`/dispatched command only if this kernel or
-     module version changed that command's §4 spec.
+     INV-6) against `templates/Taskfile.common.template.yml` and the
+     composed §4 (a module ships no task, §6.5): add any task missing
+     relative to §4, refresh a task's `desc`/dispatched command only if this
+     kernel or module version changed that command's §4 spec.
      The project's own `Taskfile.yml`, if it has one, is never read or
      written by a sync: catalyst never touches it.
 8. Update the deployed framework's `version.txt` to the latest released
