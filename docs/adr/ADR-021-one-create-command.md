@@ -1,7 +1,7 @@
 # ADR-021: One `/create <type>`, a command with parts; meta-tags dropped (R2)
 
 **Date:** 2026-10-15  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000045-yCNjAMXO`  
 **Author:** Olivier Steck (owner: "let's finish R2", 2026-10-15; decision B4, 2026-10-08)  
 **Affected scope:** kernel, SE module
 

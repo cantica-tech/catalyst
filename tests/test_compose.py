@@ -41,5 +41,6 @@ def test_the_taskfile_has_one_task_per_section_4_command(tmp_path):
     commands = list(spec.parse(compose.code_of_conduct(KERNEL, mod, _params())).bullets)
     tasks = re.findall(r"^  ([a-z-]+):\n", text, re.M)
     assert tasks == [*commands, "catalyst"] and "digest" in tasks and "stale-task" not in tasks
-    assert 'desc: "summarise the notes"' in text and '"/digest {{.CLI_ARGS}}"' in text
+    assert 'desc: "summarise the notes"' in text and '"{{.CMD_PREFIX}}digest {{.CLI_ARGS}}"' in text
+    assert "CMD_PREFIX: '{{.CMD_PREFIX | default \"/catalyst:\"}}'" in text  # Claude Code's prompt names (BUG-000047)
     assert command_names(mod) == {"create-note", "digest", "digest-all"}  # a part brings its alias, not /create

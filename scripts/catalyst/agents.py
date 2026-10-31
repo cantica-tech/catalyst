@@ -122,8 +122,11 @@ def changes(agent: str) -> list[Change]:
             ),
         ]
     if agent == "codex":  # the MCP server is a TOML table in config.toml (see _codex_toml)
+        hooks = codex_home() / "hooks.json"
         return [
-            Change(home / ".codex" / "hooks.json", ("hooks", "Stop"), [_hook(_cmd("hook", "stop", "--format", "json"))])
+            Change(hooks, ("hooks", "Stop"), [_hook(_cmd("hook", "stop", "--format", "json"))]),
+            # the session's baseline (ADR-002); the MCP server already carries the laws, so it prints nothing
+            Change(hooks, ("hooks", "SessionStart"), [_hook(_cmd("hook", "start", "--quiet"))]),
         ]
     if agent == "gemini":
         return [
@@ -198,8 +201,13 @@ def _present(change: Change) -> bool:
 
 
 # --- Codex: a TOML table in config.toml ------------------------------------------
+def codex_home() -> Path:
+    """Codex's configuration directory: `$CODEX_HOME`, else `~/.codex` (both of its files live there)."""
+    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+
+
 def _codex_toml() -> Path:
-    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "config.toml"
+    return codex_home() / "config.toml"
 
 
 CODEX_TABLE = re.compile(r"^\[mcp_servers\.catalyst\]\n(?:(?!\[).*\n?)*", re.M)

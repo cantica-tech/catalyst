@@ -11,7 +11,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `history.schema.json` | `catalyst journal show --artifact <id> --content --json` | `GET /v1/history/<id>` |
 | `inbox.schema.json` | `catalyst inbox --json` | `GET /v1/inbox` |
 | `list.schema.json` | `catalyst list <type> --json` | `GET /v1/list?type=<type>` |
-| `view.schema.json` | `catalyst view <id> --json` | `GET /v1/view/<id>` |
+| `view.schema.json` | `catalyst view <id> --json` (several IDs: a JSON array of these) | `GET /v1/view/<id>` |
 | `backlog.schema.json` | `catalyst backlog --json` | `GET /v1/backlog` |
 | `graph.schema.json` | `catalyst graph --json` | `GET /v1/graph` |
 | `journal.schema.json` | `catalyst journal show --json` | `GET /v1/journal` |
@@ -36,8 +36,6 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `journal-verify.schema.json` | `catalyst journal verify --json` | — |
 | `report.schema.json` | `catalyst report --json` | — |
 | `change.schema.json` | `catalyst new --json`, `catalyst edit --json`, `catalyst rename --json`, `catalyst restore --json`, `catalyst status set --json`, `catalyst link --json`, `catalyst unlink --json` | — |
-| `user.schema.json` | `catalyst user add --json`, `catalyst user remove --json`, `catalyst user modify --json`, `catalyst user assign-role --json` | — |
-| `role.schema.json` | `catalyst role add --json`, `catalyst role modify --json` | — |
 | `freeze.schema.json` | `catalyst freeze --json`, `catalyst unfreeze --json` | — |
 | `definition-migrate.schema.json` | `catalyst definition migrate --json` | — |
 | `members.schema.json` | `catalyst members <action> --json` | `GET /v1/members`, `POST /v1/members` |
@@ -53,6 +51,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `module-install.schema.json` | `catalyst module install <source> --json` | — |
 | `where.schema.json` | `catalyst where --json` | — |
 | `agent-status.schema.json` | `catalyst agent status --json` | — |
+| `runtime-prune.schema.json` | `catalyst runtime prune --json` | — |
 | `runtime-status.schema.json` | `catalyst runtime status --json` | — |
 | `workspace-status.schema.json` | `catalyst workspace status <file> --json` | — |
 | `propose.schema.json` | `catalyst propose <id> --from <file> --json` | — |

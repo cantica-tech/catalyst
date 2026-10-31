@@ -254,13 +254,14 @@ def access_control(kernel: Path, p: Params) -> str:
 
 def _task(name: str, bullets: list[str]) -> str:
     """A §4 command's task: its name, the first sentence of its bullet, and
-    the dispatch to the slash command."""
+    the dispatch to the command, under the name the agent serves it by
+    (`CMD_PREFIX`: `/catalyst:` for the MCP server's prompts, else `/`)."""
     first = " ".join(line.strip() for line in bullets[0].splitlines())
     text = first.split("—", 1)[1].strip() if "—" in first else first.lstrip("- ")
     desc = re.split(r"(?<=\.)\s|:\s(?=`)", text, maxsplit=1)[0].rstrip(".")
     desc = desc if len(desc) <= 110 else desc[:107].rstrip() + "..."
     desc = desc.replace("\\", "\\\\").replace('"', '\\"')
-    return f'  {name}:\n    desc: "{desc}"\n    cmds:\n      - \'{{{{.AGENT_CMD}}}} "/{name} {{{{.CLI_ARGS}}}}"\'\n'
+    return f'  {name}:\n    desc: "{desc}"\n    cmds:\n      - \'{{{{.AGENT_CMD}}}} "{{{{.CMD_PREFIX}}}}{name} {{{{.CLI_ARGS}}}}"\'\n'
 
 
 def taskfile(kernel: Path, module: Modules, p: Params) -> str:

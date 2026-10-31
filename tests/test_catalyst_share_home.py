@@ -53,6 +53,36 @@ def test_create_publishes_the_home_criterion_without_a_submodule(shared):
     assert cr.status(load(ada)).mode == "home"
 
 
+def test_create_signs_its_entries_as_the_verified_identity(tmp_path, monkeypatch):
+    """BUG-000049 (fw-IDENTITY-000002): sharing journals as the verified signer, never the users file's first person
+    or a fixed "catalyst"."""
+    from catalyst import ids
+    from catalyst_fixtures import journal_entries
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    ada = make_project(tmp_path / "ada", git=True)
+    move.to_home(ada, runtime=False)
+    monkeypatch.setattr(ids, "resolve_signer", lambda *_a, **_k: {"name": "Verified", "git_username": "verified"})
+    cr.create(load(ada), None, "criterion", cr.CI_TEMPLATE)
+    entries = [e for e in journal_entries(pf.home_criterion("app")) if e["command"] == "catalyst criterion create"]
+    assert entries and {e["actor"] for e in entries} == {"verified"}
+
+
+def test_create_without_a_verified_identity_journals_nothing(tmp_path, monkeypatch):
+    from catalyst import ids
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    ada = make_project(tmp_path / "ada", git=True)
+    move.to_home(ada, runtime=False)
+
+    def nobody(*_a, **_k):
+        raise ids.IdError("no verified identity")
+
+    monkeypatch.setattr(ids, "resolve_signer", nobody)
+    with pytest.raises(cr.CriterionError, match="no verified signer"):
+        cr.create(load(ada), None, "criterion", cr.CI_TEMPLATE)
+
+
 def test_a_collaborator_joins_by_cloning_into_their_own_home(shared, monkeypatch):
     monkeypatch.setenv("CATALYST_HOME", str(shared["bob_home"]))
     head = cr.join_home(shared["bob"], runtime=False)
@@ -119,3 +149,48 @@ def test_the_commit_msg_hook_checks_a_home_store_project_with_its_own_runtime(tm
         env=env,
     )
     assert ok.returncode == 0, ok.stderr
+
+
+def test_hook_install_previews_without_assent_and_writes_the_launcher_path(tmp_path, monkeypatch, capsys):
+    """BUG-000051 (fw-BEHAVIOR-000004): `hook install` previews and waits for --yes. BUG-000052: a home deployment's
+    hook falls back to the launcher, not a `.criterion/bin/catalyst.pyz` it does not have."""
+    from catalyst.__main__ import main
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    project = make_project(tmp_path / "w", git=True)
+    move.to_home(project, runtime=False)
+    monkeypatch.chdir(project)
+    hook = project / ".git" / "hooks" / "commit-msg"
+    assert main(["hook", "install"]) == 3
+    assert f"would write {hook}" in capsys.readouterr().out and not hook.exists()
+    assert main(["hook", "install", "--yes"]) == 0
+    launcher = (tmp_path / "home" / "bin" / "catalyst").as_posix()
+    assert f'ROUTER = "{launcher}"' in hook.read_text(encoding="utf-8")
+
+
+def test_share_create_says_it_stages_catalyst_toml(tmp_path, monkeypatch, capsys):
+    from catalyst.__main__ import main
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    project = make_project(tmp_path / "w", git=True)
+    move.to_home(project, runtime=False)
+    monkeypatch.chdir(project)
+    assert main(["share", "create", str(tmp_path / "remote.git")]) == 3
+    assert "catalyst.toml records it and is staged in the project" in capsys.readouterr().out
+
+
+def test_criterion_protect_without_assent_previews_and_exits_3(tmp_path, monkeypatch, capsys):
+    """BUG-000051 (fw-BEHAVIOR-000004): protecting the shared branch waits for --yes, as every publishing command."""
+    from catalyst.__main__ import main
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    project = make_project(tmp_path / "w", git=True)
+    move.to_home(project, runtime=False)
+    criterion = pf.home_criterion("app")
+    if subprocess.run(["git", "-C", str(criterion), "rev-parse", "--git-dir"], capture_output=True).returncode:
+        git(criterion, "init", "-q")
+    git(criterion, "remote", "add", "origin", "git@github.com:o/criterion.git")
+    monkeypatch.chdir(project)
+    assert main(["criterion", "protect"]) == 3
+    out = capsys.readouterr()
+    assert "would PUT repos/o/criterion/branches/" in out.out and "--yes" in out.err

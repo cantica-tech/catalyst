@@ -1,7 +1,7 @@
 # ADR-020: Fewer slash commands, the old names kept as aliases (R2)
 
 **Date:** 2026-10-15  
-**Status:** Accepted  
+**Status:** Accepted; as recorded in catalyst's criterion, `ADR-000044-yCNjAMXO`  
 **Author:** Olivier Steck (owner: "go with the recommendations", 2026-10-15)  
 **Affected scope:** kernel, SE module
 

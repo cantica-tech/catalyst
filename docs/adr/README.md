@@ -8,7 +8,7 @@ Since 2026-10-18 (decision E) a decision is an entity of the process module, an 
 (`decisions/`), with the rules it shapes; record a new one with `/create adr`, not here. Each file below is recorded
 there as written, its number moved up by 24, since the journal still names the files by theirs: `ADR-0NN` here is
 `ADR-0000(NN+24)` there (`ADR-001` is `ADR-000025`, `ADR-022` is `ADR-000046`). These files stay as the public copy
-and are not edited, and the index below follows the record's statuses (the twelve still pending were decided by
+and are not edited, except their **Status** line, which, like the index below, follows the record's statuses (the twelve still pending were decided by
 the owner on 2026-10-18); a change of mind is a new decision in the record that supersedes the old one.
 
 ## Format
@@ -21,7 +21,7 @@ ADRs follow [Nygard's ADR format](https://adr.github.io/madr/). See [TEMPLATE.md
 
 | # | Title | Status | Scope |
 |---|-------|--------|-------|
-| [ADR-001](ADR-001-one-file-per-rule-document.md) | One file per rule document, not per rule ID | ✅ Accepted | kernel |
+| [ADR-001](ADR-001-one-file-per-rule-document.md) | One file per rule document, not per rule ID | 🔄 Superseded by `ADR-000047` | kernel |
 | [ADR-002](ADR-002-session-scoped-stop-hook.md) | Session-scoped stop hook (block only session edits) | ✅ Accepted | kernel |
 | [ADR-003](ADR-003-rule-domains-define-seams.md) | Rule domains define seams; rule documents map to domains | ✅ Accepted (owner, 2026-10-18) | kernel |
 | [ADR-004](ADR-004-meta-rules-govern-rule-system.md) | Meta-rules (rr-\*) govern the rule system itself | ✅ Accepted (owner, 2026-10-18) | kernel |
@@ -83,11 +83,12 @@ When making a significant architectural decision or design choice:
 
 ## Future ADRs (R2–R7)
 
-See [PARKING.md](PARKING.md) for decisions planned in future phases (R2–R7) and post-1.0 evolution.
+[PARKING.md](PARKING.md) is historical: the decisions it anticipated were made in catalyst's record, and its
+numbers are not ADR numbers.
 
 ## See Also
 
-- [PARKING.md](PARKING.md) — Future ADRs for R2–R7 phases
+- [PARKING.md](PARKING.md) — historical: the decisions anticipated on 2026-10-07
 - [TEMPLATE.md](TEMPLATE.md) — ADR format template
 - `framework/kernel/INVARIANTS.md` — Invariants and hard rules
 - `framework/kernel/BOOTSTRAP.md` — Installation and setup decisions

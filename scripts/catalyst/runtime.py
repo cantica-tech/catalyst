@@ -16,7 +16,9 @@ vendored `.criterion/bin/catalyst.pyz`.
 
 from __future__ import annotations
 
+import contextlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -108,6 +110,67 @@ def install_into(criterion: Path, version: str, pyz: Path) -> tuple[Path, bool]:
     if "/.venv" not in lines:
         ignore.write_text("\n".join([*lines, "/.venv"]) + "\n", encoding="utf-8")
     return venv, changed
+
+
+# --- prune (REQ-000104) ---------------------------------------------------------
+def _version_key(name: str, path: Path) -> tuple[list[int], float]:
+    """The launcher's order: the highest X.Y.Z, then the latest built."""
+    head = re.match(r"[\d.]*", name)
+    return [int(n) for n in re.findall(r"\d+", head.group() if head else "")], path.stat().st_mtime
+
+
+def _size(path: Path) -> int:
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            with contextlib.suppress(OSError):  # a file gone meanwhile
+                total += (Path(root) / f).lstat().st_size
+    return total
+
+
+def criteria_runtimes() -> dict[str, list[str]]:
+    """Each runtime version a criterion of the home carries in its `.venv`,
+    with those criteria (`projects/<name>` or `workspaces/<name>`)."""
+    used: dict[str, list[str]] = {}
+    for kind in ("projects", "workspaces"):
+        for criterion in sorted((project_file.home() / kind).glob("*/criterion")):
+            version = installed_version(criterion / ".venv")
+            if version:
+                used.setdefault(version, []).append(f"{kind}/{criterion.parent.name}")
+    return used
+
+
+def prune(running: str, apply: bool = False) -> dict:
+    """The runtimes no criterion of the home uses, removed when `apply`.
+
+    A runtime is a build cache (each criterion runs its own `.venv` copy), so
+    one is kept only when a criterion's `.venv` carries its version, when it is
+    the running catalyst's, or when it is the newest (the launcher's runtime
+    outside any project). Half-built `.<version>.building` directories go too."""
+    used = criteria_runtimes()
+    built = [p for p in runtimes().glob("*") if p.is_dir() and not p.name.startswith(".")]
+    newest = max(built, key=lambda p: _version_key(p.name, p)).name if built else None
+    kept, removed = [], []
+    for path in sorted(built, key=lambda p: _version_key(p.name, p)):
+        reasons = [f"used by {', '.join(used[path.name])}"] if path.name in used else []
+        reasons += ["running"] if path.name == running else []
+        reasons += ["newest"] if path.name == newest else []
+        if reasons:
+            kept.append({"version": path.name, "why": "; ".join(reasons)})
+        else:
+            removed.append({"version": path.name, "path": str(path), "bytes": _size(path)})
+    for path in sorted(runtimes().glob(".*.building")):
+        removed.append({"version": path.name, "path": str(path), "bytes": _size(path)})
+    if apply:
+        for item in removed:
+            shutil.rmtree(item["path"], ignore_errors=True)
+    return {
+        "home": str(project_file.home()),
+        "applied": apply,
+        "kept": kept,
+        "removed": removed,
+        "bytes": sum(item["bytes"] for item in removed),
+    }
 
 
 # --- launcher --------------------------------------------------------------

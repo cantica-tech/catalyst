@@ -322,6 +322,9 @@ def _identity_step(dep: Deployment) -> Step | None:
     parts = []
     if not (dep.root / provider.POINTER).is_file() and (dep.pointer or {}).get("identity_issuer"):
         parts.append("write IAM/identity.json from catalyst.toml's identity_* keys")
+    own = provider.read_pointer(dep.root)
+    if own is not None and provider.normalised(own) != own:
+        parts.append("name IAM/identity.json's provider by its issuer instead of url and realm (migration 0.120.0)")
     for kept in ("users/users.json", "roles/roles.json"):
         if (iam / kept).is_file():
             parts.append(f"retire IAM/{kept} as {kept.split('/')[1].replace('.json', '.retired.json')}")
@@ -359,6 +362,12 @@ def _take_identity(dep: Deployment, kernel: Path | None, stamp: str) -> tuple[li
         if toml is not None:
             project_file.write(toml, data)
         done.append(f"wrote IAM/identity.json ({doc['issuer']}); catalyst.toml's identity keys removed")
+    own = provider.read_pointer(dep.root)
+    if own is not None and provider.normalised(own) != own:  # one shape (migration 0.120.0, BUG-000057)
+        doc = provider.normalised(own)
+        (dep.root / provider.POINTER).write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+        touched.append(dep.root / provider.POINTER)
+        done.append(f"IAM/identity.json names its provider by its issuer ({doc['issuer']})")
     ids = _kernel_role_ids(kernel)
     roles = iam / "roles" / "roles.json"
     if roles.is_file():

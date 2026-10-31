@@ -1,14 +1,15 @@
 {
   "name": "catalyst",
-  "description": "catalyst for Claude Code, at user level: the catalyst MCP server (the project's commands as prompts, the CLI as a tool, the invariants as instructions) the end-of-turn deployment check, and a silent session-start hook that records what the check already fails on, so a session blocks only on what it breaks. Writes nothing into a project.",
+  "description": "catalyst for Claude Code, at user level: the catalyst MCP server (the project's commands as prompts, the CLI as a tool, the invariants as instructions) the end-of-turn deployment check, and a silent session-start hook that records what the check already fails on, so a session blocks only on what it breaks. Writes nothing into a project. Runs the launcher in $CATALYST_HOME/bin (default ~/.catalyst/bin).",
   "author": {
     "name": "cantica-tech"
   },
   "mcpServers": {
     "catalyst": {
-      "command": "${HOME}/.catalyst/bin/catalyst",
+      "command": "sh",
       "args": [
-        "mcp"
+        "-c",
+        "exec \"${CATALYST_HOME:-$HOME/.catalyst}/bin/catalyst\" mcp"
       ]
     }
   },
@@ -18,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.catalyst/bin/catalyst\" hook stop"
+            "command": "\"${CATALYST_HOME:-$HOME/.catalyst}/bin/catalyst\" hook stop"
           }
         ]
       }
@@ -28,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$HOME/.catalyst/bin/catalyst\" hook start --quiet"
+            "command": "\"${CATALYST_HOME:-$HOME/.catalyst}/bin/catalyst\" hook start --quiet"
           }
         ]
       }

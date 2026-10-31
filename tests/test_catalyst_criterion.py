@@ -56,7 +56,8 @@ def world(tmp_path, monkeypatch):
     git_init(agent)
     git_init(project)
     monkeypatch.chdir(project)
-    steps = cr.create(load(project), str(remote), "criterion", cr.CI_TEMPLATE)
+    ada = load_corpus(load(project)).user("Ada Lovelace")  # two people: the CLI's resolved signer
+    steps = cr.create(load(project), str(remote), "criterion", cr.CI_TEMPLATE, signer=ada)
     git(project, "commit", "-q", "-m", "share the deployment")
     git(project, "remote", "add", "origin", str(product))
     git(project, "push", "-q", "origin", "HEAD:refs/heads/main")
@@ -65,7 +66,7 @@ def world(tmp_path, monkeypatch):
     for r in (bob,):
         git(r, "config", "user.name", "Bob")
         git(r, "config", "user.email", "bob@example.com")
-    cr.join(bob)
+    cr.join(bob, signer={"name": "Bob", "git_username": "bob"})
     for wc, name in ((bob / ".criterion", "Bob"), (project / ".criterion", "Ada Lovelace")):
         git(wc, "config", "user.name", name)
         git(wc, "config", "user.email", f"{name.split()[0].lower()}@example.com")
