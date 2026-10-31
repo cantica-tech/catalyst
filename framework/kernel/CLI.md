@@ -520,16 +520,19 @@ Through the launcher, `mcp` always runs the newest installed runtime.
 ### `catalyst agent install|uninstall <agent>`, `catalyst agent status`
 
 Wires catalyst into an agent at user level — never into a project — or
-removes it: `claude-code` (`claude mcp add --scope user` and the Stop hook
-in `~/.claude/settings.json`), `copilot` (`~/.copilot/mcp-config.json`,
+removes it: `claude-code` (`claude mcp add --scope user`, and the Stop and
+SessionStart hooks in `~/.claude/settings.json`), `copilot` (`~/.copilot/mcp-config.json`,
 `~/.copilot/hooks/catalyst.json` — read by VS Code's agent too), `vscode`
 (the user profile's `mcp.json`), `cursor` (`~/.cursor/mcp.json`,
-`hooks.json`), `codex` (`[mcp_servers.catalyst]` in `~/.codex/config.toml`,
-`~/.codex/hooks.json`), `gemini` (`~/.gemini/settings.json`). Only
+`hooks.json`), `codex` (`[mcp_servers.catalyst]` in `config.toml`, and the
+Stop and SessionStart hooks in `hooks.json`, both in `$CODEX_HOME`, else
+`~/.codex`), `gemini` (`~/.gemini/settings.json`). `vscode` gets no hooks:
+VS Code's agent runs Copilot's (`agent install copilot`). Only
 catalyst's entries change (found by the launcher path); each file is backed
 up once as `<file>.before-catalyst`; a file that is not plain JSON is left
 alone and the snippet to add is printed. `agents/claude-code/plugin` is the
-same wiring as a Claude Code plugin. `status` reports each agent.
+same wiring as a Claude Code plugin; it runs the launcher in
+`$CATALYST_HOME/bin` (default `~/.catalyst/bin`). `status` reports each agent.
 
 ### `catalyst agent run <command> [<arguments>…] [--agent <id>] [--json]`
 
