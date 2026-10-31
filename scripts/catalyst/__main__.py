@@ -887,16 +887,27 @@ def _sync_run(args, dep, src, plan_only: bool) -> int:
 def cmd_module(args) -> int:
     """`module list|verify` (roadmap R4.9, N1): the criterion's record of its
     modules, and each module's tree against it."""
-    from catalyst import modules
-
     dep = open_deployment(args)
     if args.module_command in ("install", "upgrade"):
-        from module_loader import REPO_ROOT
+        import tempfile
 
-        args.kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
-        if not (args.kernel / "rules-of-rules.template.md").is_file() and args.kernel.suffix != ".zip":
-            print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
-            return 2
+        from catalyst.bundle import default_kernel
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # no --kernel: this checkout's, else the one this catalyst.pyz carries (REQ-000106)
+            args.kernel = args.kernel or default_kernel(Path(tmp))
+            if args.kernel is None or (
+                not (args.kernel / "rules-of-rules.template.md").is_file() and args.kernel.suffix != ".zip"
+            ):
+                print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
+                return 2
+            return _module_command(args, dep)
+    return _module_command(args, dep)
+
+
+def _module_command(args, dep) -> int:
+    from catalyst import modules
+
     if args.module_command == "install":
         from catalyst.corpus import load_corpus
         from catalyst.ids import resolve_signer
@@ -2429,13 +2440,22 @@ def _identity_doc(args) -> dict | None:
 
 
 def cmd_init(args) -> int:
-    from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
-    from module_loader import REPO_ROOT
+    import tempfile
 
-    kernel = args.kernel or (REPO_ROOT / "framework" / "kernel")
-    if not (kernel / "rules-of-rules.template.md").is_file():
-        print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
-        return 2
+    from catalyst.bundle import default_kernel
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # no --kernel: this checkout's, else the one this catalyst.pyz carries (REQ-000106)
+        kernel = args.kernel or default_kernel(Path(tmp))
+        if kernel is None or not (kernel / "rules-of-rules.template.md").is_file():
+            print("catalyst: pass --kernel <framework/kernel of a catalyst checkout or release>", file=sys.stderr)
+            return 2
+        return _init(args, kernel)
+
+
+def _init(args, kernel: Path) -> int:
+    from catalyst.init import InitError, InitRequest, git_user_name, init, local_modules
+
     project = Path(os.path.abspath(args.project)) if args.project else Path.cwd()
     if args.module and args.no_module:
         print("catalyst: --module and --no-module exclude each other", file=sys.stderr)
@@ -2758,7 +2778,10 @@ def build_parser() -> argparse.ArgumentParser:
         "catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level)",
     )
     p.add_argument(
-        "--kernel", type=Path, help="framework/kernel of a catalyst checkout or release (default: this checkout's)"
+        "--kernel",
+        type=Path,
+        help="framework/kernel of a catalyst checkout or release (default: this checkout's, else the kernel this "
+        "catalyst carries)",
     )
     p.add_argument("--module-dir", type=Path, help="the module's directory (default: searched)")
     p.add_argument(
@@ -3249,7 +3272,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.set_defaults(func=cmd_module)
     q = mods.add_parser("install", help="install a module into a deployment that has none (seeded as init does)")
     q.add_argument("source", help="the module: its directory, release zip, or git URL[@ref]")
-    q.add_argument("--kernel", type=Path, help="framework/kernel of the release this deployment is at")
+    q.add_argument(
+        "--kernel",
+        type=Path,
+        help="framework/kernel of the release this deployment is at (default: this checkout's, else the kernel "
+        "this catalyst carries)",
+    )
     q.add_argument("--as", dest="as_user", help="signer (name or git_username)")
     q.add_argument("--intent", action="append", help="why (repeatable; journaled)")
     q.add_argument("--json", action="store_true")
@@ -3261,7 +3289,12 @@ def build_parser() -> argparse.ArgumentParser:
     q = mods.add_parser("upgrade", help="move the installed module to another release, through `sync plan|apply`")
     q.add_argument("id", help="the installed module")
     q.add_argument("source", nargs="?", help="directory, release zip or git URL[@ref] (default: the recorded URL)")
-    q.add_argument("--kernel", type=Path, help="framework/kernel of the release this deployment is at")
+    q.add_argument(
+        "--kernel",
+        type=Path,
+        help="framework/kernel of the release this deployment is at (default: this checkout's, else the kernel "
+        "this catalyst carries)",
+    )
     q.add_argument("--base-kernel", type=Path, help="the kernel the deployment was composed from (default: --kernel)")
     q.add_argument("--cli", type=Path, help=argparse.SUPPRESS)
     q.add_argument("--commands-dir", type=Path, help=argparse.SUPPRESS)

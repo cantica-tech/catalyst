@@ -264,8 +264,11 @@ it (`INSTANTIATION-GUIDE.md` §1).
   agent file into the project: `catalyst agent install <agent>` wires the
   agent once per machine, at user level.
 - `--kernel` is the `framework/kernel` directory of a catalyst checkout or
-  kernel release. It defaults to the checkout the CLI runs from, so it is
-  required when running a vendored `catalyst.pyz`.
+  kernel release. It defaults to the checkout the CLI runs from, else to the
+  kernel the running `catalyst.pyz` carries (every build bundles its
+  `framework/kernel`): `catalyst init` runs from the installed launcher, whose
+  runtime holds that pyz, with no checkout and no `--kernel`. `init` vendors
+  the `catalyst.pyz` it runs from into the criterion's `bin/`.
 
 What it writes, in order (the tree: `ARTIFACT-LAYOUT.md`):
 
@@ -869,7 +872,7 @@ zip, or a git repository (a URL, or a bare repository on this machine) with
 an optional `@<ref>`: a branch, a tag or a commit. A repository is cloned
 shallow into a temporary directory, removed afterwards. `--kernel` is the
 `framework/kernel` of the release the deployment is at (default: this
-checkout's).
+checkout's, else the kernel the running `catalyst.pyz` carries).
 
 It seeds the module as `init --module` does — its tree and record, a folder
 per entity type, its definitions and invariants — merges the module's part
@@ -2098,7 +2101,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--at` `AT` | legacy: an agent-owned location reached through a .criterion symlink (default, ADR-010: $HOME/.catalyst/projects/<name>/criterion, nothing in the project) |
 |  | `--no-runtime` | do not fill the criterion's .venv now (`catalyst runtime install` later) |
 |  | `--agent` `AGENT` | the running agent's id, e.g. claude-code (recorded in catalyst.toml; `catalyst agent install <agent>` wires the agent, at user level) (default `unknown`) |
-|  | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout or release (default: this checkout's) |
+|  | `--kernel` `KERNEL` | framework/kernel of a catalyst checkout or release (default: this checkout's, else the kernel this catalyst carries) |
 |  | `--module-dir` `MODULE_DIR` | the module's directory (default: searched) |
 |  | `--no-module` | install the kernel only; `catalyst module install` adds a module later |
 |  | `--identity-issuer` `IDENTITY_ISSUER` | catalyst-users: the provider's issuer URL people sign through (design 29); log in first with `catalyst identity login --issuer <url>` |
@@ -2344,7 +2347,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module list` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module install` | `<source>` | the module: its directory, release zip, or git URL[@ref] |
-|  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at |
+|  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at (default: this checkout's, else the kernel this catalyst carries) |
 |  | `--as` `AS_USER` | signer (name or git_username) |
 |  | `--intent` `INTENT` | why (repeatable; journaled) |
 |  | `--json` | machine-readable output (JSON on stdout) |
@@ -2352,7 +2355,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst module upgrade` | `<id>` | the installed module |
 |  | `<source>` | directory, release zip or git URL[@ref] (default: the recorded URL) |
-|  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at |
+|  | `--kernel` `KERNEL` | framework/kernel of the release this deployment is at (default: this checkout's, else the kernel this catalyst carries) |
 |  | `--base-kernel` `BASE_KERNEL` | the kernel the deployment was composed from (default: --kernel) |
 |  | `--plan` | list what would change, write nothing |
 |  | `--as` `AS_USER` | signer (name or git_username) |

@@ -19,7 +19,6 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -233,8 +232,10 @@ def _module_dir(req: InitRequest) -> Path:
 
 def _vendor_cli(dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    running = Path(sys.argv[0])
-    if running.suffix == ".pyz" and running.is_file():
+    from catalyst.bundle import running_pyz
+
+    running = running_pyz()  # `python catalyst.pyz`, or a runtime's `python -m catalyst` (REQ-000106)
+    if running is not None:
         shutil.copyfile(running, dest)
         return
     try:  # from catalyst's own checkout
