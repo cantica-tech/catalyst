@@ -124,7 +124,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst journal redact <blob>` | redact journaled content: a tombstone entry, the blobs out of the pins | `--as`, `--intent`, `--json`, `--tier` |
 | `catalyst journal pin` | pin every referenced blob so git gc keeps it | `--share` |
 | `catalyst list <type>` | read-only: artifacts of a type, rules, users, roles or templates | `--filter`, `--json`, `--type` |
-| `catalyst view <id>` | read-only: one artifact or rule, its links both ways and its history | `--json` |
+| `catalyst view <id>` | read-only: artifacts or rules, their links both ways and their history | `--json` |
 | `catalyst backlog` | read-only: open work by type and status, missing links, idle rules | `--json` |
 | `catalyst repair derived` | every derived field (another type's back-reference) from its sources, journaled | `--as`, `--json`, `--tier` |
 | `catalyst graph` | read-only: every rule, domain and artifact with its links, and the entity types | `--json` |
@@ -1244,7 +1244,11 @@ generate its types from.
 - `catalyst view <ID>`: one artifact or rule, its fields, the IDs it links
   to, the artifacts linking to it and its journal entries; a rule also
   gives its `title`, `status`, `domain` and `text` (its own section, read
-  as `graph` reads it).
+  as `graph` reads it). Several IDs (`catalyst view <ID> <ID> ...`) are
+  read in one process: each view is printed in turn, and with `--json` they
+  are one JSON array of the single views, in the order given. An ID that
+  does not resolve fails the whole call (exit `1`, naming it) and prints
+  nothing on stdout.
 - `catalyst backlog`: open items per type and status ("open" is any status
   outside the ETD's closed states), open items missing a required link,
   rules no open item targets, and `coverage`: the project's active rules
@@ -2174,7 +2178,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--filter` `KEY=VALUE` | keep items whose KEY matches VALUE (* and ? wildcards; repeatable) |
 |  | `--type` `TEMPLATE_TYPE` | with `template`: one template family |
 |  | `--json` | machine-readable output (JSON on stdout) |
-| `catalyst view` | `<id>` | an entity or rule ID |
+| `catalyst view` | `<id>` … | an artifact or rule ID; several print each view in turn (with --json, one JSON array) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst backlog` | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst repair derived` | `--as` `AS_USER` | signer (name or git_username) |

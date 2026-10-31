@@ -11,7 +11,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `history.schema.json` | `catalyst journal show --artifact <id> --content --json` | `GET /v1/history/<id>` |
 | `inbox.schema.json` | `catalyst inbox --json` | `GET /v1/inbox` |
 | `list.schema.json` | `catalyst list <type> --json` | `GET /v1/list?type=<type>` |
-| `view.schema.json` | `catalyst view <id> --json` | `GET /v1/view/<id>` |
+| `view.schema.json` | `catalyst view <id> --json` (several IDs: a JSON array of these) | `GET /v1/view/<id>` |
 | `backlog.schema.json` | `catalyst backlog --json` | `GET /v1/backlog` |
 | `graph.schema.json` | `catalyst graph --json` | `GET /v1/graph` |
 | `journal.schema.json` | `catalyst journal show --json` | `GET /v1/journal` |

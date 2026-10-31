@@ -433,6 +433,12 @@ def cmd_check(args) -> int:
     return 1 if failing else 0
 
 
+def _render_views(views: list) -> str:
+    from catalyst import views as v
+
+    return "\n".join(v.render_view(one) for one in views)
+
+
 def cmd_view(args) -> int:
     """Read-only views (R2 W1): list, journal show, view, backlog."""
     from catalyst import views as v
@@ -455,8 +461,11 @@ def cmd_view(args) -> int:
             if args.view == "list":
                 data = v.list_items(dep, corpus, args.type, v.parse_filters(args.filter), args.template_type)
                 text = v.render_list
-            elif args.view == "view":
-                data, text = v.view(dep, corpus, args.id), v.render_view
+            elif args.view == "view" and len(args.ids) == 1:
+                data, text = v.view(dep, corpus, args.ids[0]), v.render_view
+            elif args.view == "view":  # several IDs, one process: a JSON array, or each view in turn
+                data = [v.view(dep, corpus, i) for i in args.ids]
+                text = _render_views
             elif args.view == "graph":
                 data, text = v.graph(dep, corpus), v.render_graph
             else:
@@ -2957,8 +2966,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="list")
 
-    p = sub.add_parser("view", help="read-only: one artifact or rule, its links both ways and its history")
-    p.add_argument("id")
+    p = sub.add_parser("view", help="read-only: artifacts or rules, their links both ways and their history")
+    p.add_argument(
+        "ids",
+        nargs="+",
+        metavar="id",
+        help="an artifact or rule ID; several print each view in turn (with --json, one JSON array)",
+    )
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_view, view="view")
 

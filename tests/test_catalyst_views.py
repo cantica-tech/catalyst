@@ -294,3 +294,24 @@ def test_a_table_row_is_listed_with_its_place_and_viewed_from_it(tmp_path):
         assert shown["fields"] == {"ID": f"`{row}`", "Title": "First row", "Status": "Open"}
         assert shown["text"].startswith(f"| `{row}`") and shown["links"] == {} and shown["journal"] == []
     assert "First row" in views.render_view(views.view(dep, corpus, row))
+
+
+def test_view_takes_several_ids_in_one_process(tmp_path, capsys):
+    """REQ-000105: `view --json ID ID` is one JSON array of the single views; one ID prints as before."""
+    project = make_project(tmp_path)
+    singles = []
+    for i in (ITEM, RULE):
+        assert main(["--project", str(project), "view", i, "--json"]) == 0
+        singles.append(json.loads(capsys.readouterr().out))
+    assert main(["--project", str(project), "view", ITEM, RULE, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out) == singles
+    assert main(["--project", str(project), "view", ITEM, RULE]) == 0
+    out = capsys.readouterr().out
+    assert out.index(ITEM) < out.index(f"{RULE}  (rule)")
+
+
+def test_view_of_several_ids_fails_whole_on_an_unknown_one(tmp_path, capsys):
+    project = make_project(tmp_path)
+    assert main(["--project", str(project), "view", ITEM, "ITEM-999999-nope", "--json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == "" and "ITEM-999999-nope" in captured.err
