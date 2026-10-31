@@ -41,7 +41,7 @@ exactly that.
 | R0.9 one model for rule storage | done (0.87.0; owner decision B7) | two shapes, both read, numbered and checked alike: a heading in a rule document or its own file listed by one; ADR-000047 supersedes ADR-001 (ADR-000025); `check` accepts a one-file rule (BUG-000016, 0.85.0) and refuses one that also holds a rule heading (`rule-file-heading`) |
 | R0.21 Python floor, Windows | done | CI runs Ubuntu, macOS and Windows on 3.11 and 3.13 |
 | R1.1, R1.2, R1.4, R1.5, R1.6 | done | `12`; `tests/test_token_budgets.py`, `docs/golden-corpus`, `docs/adr` (19 ADRs) |
-| R1.3 feature register | done | accepted by the owner 2026-10-16 (all proposed verdicts); refreshed against kernel 0.71.0 and module 3.2.0 (163 shipped, 11 settled, 29 no item, 35 open) |
+| R1.3 feature register | done | accepted by the owner 2026-10-16 (all proposed verdicts); re-derived from this roadmap on 2026-10-31 (169 shipped, 34 settled, 29 no item, 6 open, all R7) |
 | R2 W1–W5 verbs | done | `list`, `view`, `backlog`, `journal show`, `new`, `status set`, `link`, `user`, `role`, `freeze`, `unfreeze`, `definition migrate`, `sync plan\|apply`, `move` |
 | R2 slash surface 38 → ~16 | done | 34 → 17 (2026-10-15/16): ADR-020 (kernel 0.68.0, module 3.1.1) merged the user, role, audit, commands, journal-restore and roadmap commands; ADR-021 (kernel 0.69.0, module 3.2.0) made one `/create <type>` with a part per type and dropped `/meta-tag` (B4). Old names stay aliases |
 | R2 one command registry | done | kernel 0.70.0: the deployed §4 is the registry; MCP prompts and the Taskfile are generated from it; command names for collisions read from bullet heads. `module.yaml` `commands:` is optional, cross-checked by the parity script |
@@ -222,7 +222,6 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | Impact simulation (decision T): `catalyst try <verb …>` on a scratch copy | done, 0.82.0 (design `27`, REQ-000054): the real verb on a shared clone of the criterion, the findings added and cleared, the files, the impact and the approvals left waiting; `--proposal` |
 | Rule strength (decision S): a rule states `must`, `should` or `may` | done, 0.83.0 (REQ-000056): the `**Strength**` line, `must` when none; `check`'s `rule-strength`; `view`, `list` and `graph` carry it; a breach reported as a violation, warning or note |
 | Decisions as entities (decision E): the process module's `ADR-` type | done, 0.83.0 with module 3.3.0 (REQ-000057): `ADR-` with the rules it shapes and its supersessions; a sync scaffolds a new type's folder; catalyst's 22 decisions in its record (`ADR-000025` to `ADR-000046`) |
-| A proposal path for rules and changes; a rule typing field (must, should, may) | open |
 | `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | open |
 
 ## R7 — Prove and release 1.0 (M)
