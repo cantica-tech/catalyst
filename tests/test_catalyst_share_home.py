@@ -53,6 +53,36 @@ def test_create_publishes_the_home_criterion_without_a_submodule(shared):
     assert cr.status(load(ada)).mode == "home"
 
 
+def test_create_signs_its_entries_as_the_verified_identity(tmp_path, monkeypatch):
+    """BUG-000049 (fw-IDENTITY-000002): sharing journals as the verified signer, never the users file's first person
+    or a fixed "catalyst"."""
+    from catalyst import ids
+    from catalyst_fixtures import journal_entries
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    ada = make_project(tmp_path / "ada", git=True)
+    move.to_home(ada, runtime=False)
+    monkeypatch.setattr(ids, "resolve_signer", lambda *_a, **_k: {"name": "Verified", "git_username": "verified"})
+    cr.create(load(ada), None, "criterion", cr.CI_TEMPLATE)
+    entries = [e for e in journal_entries(pf.home_criterion("app")) if e["command"] == "catalyst criterion create"]
+    assert entries and {e["actor"] for e in entries} == {"verified"}
+
+
+def test_create_without_a_verified_identity_journals_nothing(tmp_path, monkeypatch):
+    from catalyst import ids
+
+    monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
+    ada = make_project(tmp_path / "ada", git=True)
+    move.to_home(ada, runtime=False)
+
+    def nobody(*_a, **_k):
+        raise ids.IdError("no verified identity")
+
+    monkeypatch.setattr(ids, "resolve_signer", nobody)
+    with pytest.raises(cr.CriterionError, match="no verified signer"):
+        cr.create(load(ada), None, "criterion", cr.CI_TEMPLATE)
+
+
 def test_a_collaborator_joins_by_cloning_into_their_own_home(shared, monkeypatch):
     monkeypatch.setenv("CATALYST_HOME", str(shared["bob_home"]))
     head = cr.join_home(shared["bob"], runtime=False)

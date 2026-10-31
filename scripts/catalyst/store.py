@@ -235,17 +235,20 @@ def share_for(dep: Deployment) -> Share:
     return DRIVERS[name](dep)
 
 
-def create(dep: Deployment, url: str, branch: str = "criterion", protect: bool = False) -> list[str]:
+def create(
+    dep: Deployment, url: str, branch: str = "criterion", protect: bool = False, signer: dict | None = None
+) -> list[str]:
     """Publish a local-only criterion for the first time, to a git
     repository (the git driver); `protect` also makes pull requests and the
     `catalyst` check required on the shared branch (GitHub). Call only with
-    the user's assent (INV-4)."""
+    the user's assent (INV-4). `signer`, the verified identity, signs its
+    journal entries (fw-IDENTITY-000002)."""
     from catalyst import criterion as cr
     from catalyst.deployment import load
 
     if cr.remote_url(dep.root):
         raise ShareError(f"this criterion is already shared ({cr.remote_url(dep.root)})")
-    notes = cr.create(dep, url, branch, cr.CI_TEMPLATE)
+    notes = cr.create(dep, url, branch, cr.CI_TEMPLATE, signer=signer)
     if protect:
         notes.append(cr.protect(load(dep.project_root), apply=True))
     return notes

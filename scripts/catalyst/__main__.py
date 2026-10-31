@@ -1966,7 +1966,11 @@ def cmd_criterion(args) -> int:
     if sub == "create":
         if args.url and not _assented(args, f"publish this criterion to {args.url} (shared branch {args.branch})"):
             return NEEDS_ASSENT
-        for note in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE):
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import resolve_signer
+
+        signer = resolve_signer(dep, load_corpus(dep), getattr(args, "as_user", None), "share")
+        for note in cr.create(dep, args.url, args.branch, cr.CI_TEMPLATE, signer=signer):
             print(f"- {note}")
         print("Commit the product repository's staged changes when ready.")
         return 0
@@ -2053,14 +2057,16 @@ def cmd_share(args) -> int:
         where = args.url if args.driver == "serve" else f"{args.url} (shared branch {args.branch})"
         if not _assented(args, f"publish this criterion to {where}"):
             return NEEDS_ASSENT
+        from catalyst.corpus import load_corpus
+        from catalyst.ids import resolve_signer
+
+        signer = resolve_signer(dep, load_corpus(dep), args.as_user, "share")
         if args.driver == "serve":
             from catalyst import serve
-            from catalyst.corpus import load_corpus
-            from catalyst.ids import resolve_signer
 
-            notes = serve.create(dep, args.url, resolve_signer(dep, load_corpus(dep), args.as_user, "share"))
+            notes = serve.create(dep, args.url, signer)
         else:
-            notes = store.create(dep, args.url, args.branch, protect=args.protect)
+            notes = store.create(dep, args.url, args.branch, protect=args.protect, signer=signer)
         for note in notes:
             print(f"- {note}")
         return 0
