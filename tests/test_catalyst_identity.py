@@ -7,6 +7,7 @@ machine's system account signs (design 29 §3.4a)."""
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -448,7 +449,7 @@ def test_login_with_a_password_from_stdin_or_a_command(monkeypatch, capsys):
     assert provider.logged_in(POINTER)
     assert main(["identity", "logout", "--issuer", ISSUER]) == 0
     assert not provider.logged_in(POINTER)
-    command = f"{sys.executable} -c \"print('s3cret')\""
+    command = shlex.join([sys.executable, "-c", "print('s3cret')"])  # quoted: a Windows path keeps its backslashes
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     args = ["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice", "--password-command", command]
     assert main(args) == 0
