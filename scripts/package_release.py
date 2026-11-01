@@ -5,26 +5,30 @@ The catalyst framework is the kernel (framework/kernel/, everything
 independent of process modules) plus its process modules
 (framework/modules/). Each ships as its own versioned release.
 
-1. Every module listed in framework/modules/catalog.md, from its own
-   repository checked out as a sibling of catalyst (../catalyst-<id>/).
-   Modules are full repositories, not catalyst submodules; a module that is
-   not checked out is skipped. Id, name and description come from the
-   module's module.yaml, its version from its version.txt.
+1. Every module listed in framework/modules/catalog.md (or only those named
+   with --module), from its own repository checked out as a sibling of
+   catalyst (../catalyst-<id>/). Modules are full repositories, not catalyst
+   submodules; a module that is not checked out is skipped. Id, name and
+   description come from the module's module.yaml, its version from its
+   version.txt.
    - Zips the module contents (excluding .git, node_modules, catalyst output).
-   - Includes manifest.json inside the zip and alongside it.
-   - Saves to <module repo>/catalyst/modules/<id>/v[version]/
-   - With --push only: commits it onto origin main of the module
-     repository, through a temporary worktree (whatever branch the
-     checkout is on), and pushes it.
+   - Includes manifest.json inside the zip and alongside it; its `entry`
+     names the module's built UI bundle only when it ships one.
+   - Saves to catalyst/modules/<id>/v[version]/ at the root workspace (this
+     checkout's ignored output). Nothing is written into, committed to or
+     pushed from a module repository: the distribution repository is the
+     only home of a release (REQ-000112).
 
-2. Catalyst Kernel:
+2. Catalyst Kernel (unless --no-kernel):
    - Zips framework/kernel/, plus the `catalyst` CLI as bin/catalyst.pyz.
    - Includes manifest.json inside the zip and alongside it.
    - Saves to catalyst/kernel/v[version]/ at the root workspace.
 
-3. With --publish-dir DIR: copies every release into DIR/catalyst/ (a
+3. With --publish-dir DIR: copies those releases into DIR/catalyst/ (a
    distribution repository checkout) and refreshes its release READMEs;
-   with --push as well, commits and pushes DIR to origin main.
+   with --push as well, commits and pushes DIR to origin main. Only tagged
+   releases are published: the kernel's checkout and each module's must be
+   at its version's tag (`<version>` or `v<version>`), unless --unreleased.
 
 Nothing is committed or pushed without --push (INV-4: no push without the
 user's explicit assent).
@@ -56,6 +60,7 @@ class ModuleInfo:
     version: str
     dir: Path
     kernel_version: str | None = None  # module.yaml's declared requirement
+    entry: str | None = None  # the built UI bundle a release ships, if any
 
 
 def module_repo_dir(root: Path, module_id: str) -> Path:
@@ -82,6 +87,8 @@ def module_info_at(module_dir: Path, module_id: str | None = None) -> ModuleInfo
         version = version_file.read_text(encoding="utf-8").strip()
     else:
         version = str(data.get("version") or "1.0.0")
+    from catalyst.modules import ui_entry
+
     mid = str(data.get("id") or module_id or module_dir.name)
     return ModuleInfo(
         id=mid,
@@ -90,14 +97,21 @@ def module_info_at(module_dir: Path, module_id: str | None = None) -> ModuleInfo
         version=version,
         dir=module_dir,
         kernel_version=str(data["kernel_version"]) if data.get("kernel_version") else None,
+        entry=ui_entry(module_dir, data.get("entry")),
     )
 
 
-def catalogued_modules(root: Path) -> list[ModuleInfo]:
-    """Modules listed in framework/modules/catalog.md that are checked out."""
-    catalog = root / "framework" / "modules" / "catalog.md"
+def catalog_ids(root: Path) -> list[str]:
+    return catalog_module_ids(root / "framework" / "modules" / "catalog.md")
+
+
+def catalogued_modules(root: Path, only: list[str] | None = None) -> list[ModuleInfo]:
+    """Modules listed in framework/modules/catalog.md that are checked out
+    (only those in `only`, when given)."""
     found: list[ModuleInfo] = []
-    for module_id in catalog_module_ids(catalog):
+    for module_id in catalog_ids(root):
+        if only is not None and module_id not in only:
+            continue
         info = read_module_info(root, module_id)
         if info is None:
             print(f"Skipping module {module_id}: not checked out at {module_repo_dir(root, module_id)}")
@@ -137,7 +151,7 @@ def shipped_files(src: Path):
 
 
 def module_manifest(module: ModuleInfo, requires: str) -> dict:
-    return {
+    manifest = {
         "id": module.id,
         "name": module.name,
         "version": module.version,
@@ -146,11 +160,19 @@ def module_manifest(module: ModuleInfo, requires: str) -> dict:
         # Legacy name of kernelVersion. Host UIs that predate kernelVersion
         # only read this field and skip manifests without it.
         "frameworkVersion": requires,
-        "entry": "ui/index.js",
     }
+    if module.entry:  # only a bundle the release ships (a module with no UI, or only its sources, has none)
+        manifest["entry"] = module.entry
+    return manifest
 
 
-def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
+def module_release_dir(root: Path, module: ModuleInfo) -> Path:
+    """Where a module release is staged: this checkout's own ignored output,
+    never the module's repository."""
+    return root / "catalyst" / "modules" / module.id / f"v{module.version}"
+
+
+def package_module(root: Path, module: ModuleInfo) -> Path:
     module_dir = module.dir
     # The module's own declaration; the packaging kernel only when it has none
     # (and then the release claims more than the module may need).
@@ -162,7 +184,7 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
             f"says {requires}, the kernel packaging it"
         )
 
-    dest_dir = module_dir / "catalyst" / "modules" / module.id / f"v{module.version}"
+    dest_dir = module_release_dir(root, module)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     manifest_data = module_manifest(module, requires)
@@ -190,50 +212,12 @@ def package_module(root: Path, module: ModuleInfo, push: bool = False) -> Path:
         canonical_zip_path.unlink()
 
     print(f"Packaged {module.id} module v{module.version} -> {dest_dir}")
-
-    if not push:
-        return dest_dir
-
-    try:
-        commit_module_release(module, dest_dir)
-    except Exception as exc:
-        print(f"Warning: Git commit/push in module repository failed: {exc}")
-
     return dest_dir
 
 
-def commit_module_release(module: ModuleInfo, dest_dir: Path) -> None:
-    """Commit the packaged release onto the module repository's origin main
-    and push it, through a temporary worktree: the module checkout is
-    usually on development, whose branch must not receive the archive (and
-    pushing main from that checkout would push a stale local main)."""
-    module_dir = module.dir
-    rel = dest_dir.relative_to(module_dir)
-    run_cmd(["git", "fetch", "origin", "main"], cwd=module_dir)
-    with tempfile.TemporaryDirectory() as tmp:
-        worktree = Path(tmp) / "main"
-        run_cmd(["git", "worktree", "add", "--detach", str(worktree), "origin/main"], cwd=module_dir)
-        try:
-            target = worktree / rel
-            target.mkdir(parents=True, exist_ok=True)
-            for f in dest_dir.iterdir():
-                if f.is_file():
-                    shutil.copy2(f, target / f.name)
-            run_cmd(["git", "add", "-f", str(rel)], cwd=worktree)
-            status = run_cmd(["git", "status", "--porcelain"], cwd=worktree)
-            if status:
-                run_cmd(["git", "commit", "-m", f"Release {module.id} module v{module.version}"], cwd=worktree)
-                run_cmd(["git", "push", "origin", "HEAD:main"], cwd=worktree)
-                print(f"Committed and pushed module release to {module.id} origin main")
-            else:
-                print(f"No changes to commit in {module.id} module repository.")
-        finally:
-            run_cmd(["git", "worktree", "remove", "--force", str(worktree)], cwd=module_dir)
-
-
-def package_modules(root: Path, push: bool = False) -> list[Path]:
-    """Package every catalogued module that is checked out."""
-    return [package_module(root, m, push) for m in catalogued_modules(root)]
+def package_modules(root: Path, only: list[str] | None = None) -> list[Path]:
+    """Package every catalogued module that is checked out (only those in `only`, when given)."""
+    return [package_module(root, m) for m in catalogued_modules(root, only)]
 
 
 def read_kernel_version(root: Path) -> str:
@@ -542,10 +526,13 @@ def update_publish_readmes(publish_dir: Path) -> None:
     (mod_root_dir / "README.md").write_text("\n".join(mod_overview_lines) + "\n", encoding="utf-8")
 
 
-def publish_releases(root: Path, publish_dir: Path, push: bool = False) -> Path | None:
-    """Copy the kernel and every catalogued module release into
-    publish_dir/catalyst/ and refresh its release READMEs; with push, commit
-    and push publish_dir to origin main."""
+def publish_releases(
+    root: Path, publish_dir: Path, push: bool = False, only: list[str] | None = None, kernel: bool = True
+) -> Path | None:
+    """Copy the kernel (unless `kernel` is false) and the catalogued module
+    releases (only those in `only`, when given) staged under root/catalyst/
+    into publish_dir/catalyst/ and refresh its release READMEs; with push,
+    commit and push publish_dir to origin main."""
     if not publish_dir.is_dir():
         print(f"Warning: publish directory not found at {publish_dir}")
         return None
@@ -553,14 +540,15 @@ def publish_releases(root: Path, publish_dir: Path, push: bool = False) -> Path 
     kernel_version = read_kernel_version(root)
 
     # (source, target) directory pairs: the kernel, then each catalogued module.
-    kernel_src = root / "catalyst" / "kernel" / f"v{kernel_version}"
-    kernel_dest = publish_dir / "catalyst" / "kernel" / f"v{kernel_version}"
-    pairs = [(kernel_src, kernel_dest)]
-    released = [f"kernel v{kernel_version}"]
-    for module in catalogued_modules(root):
-        rel = Path("catalyst") / "modules" / module.id / f"v{module.version}"
-        mod_src = module.dir / rel
-        pairs.append((mod_src, publish_dir / rel))
+    pairs: list[tuple[Path, Path]] = []
+    released: list[str] = []
+    if kernel:
+        kernel_src = root / "catalyst" / "kernel" / f"v{kernel_version}"
+        pairs.append((kernel_src, publish_dir / "catalyst" / "kernel" / f"v{kernel_version}"))
+        released.append(f"kernel v{kernel_version}")
+    for module in catalogued_modules(root, only):
+        mod_src = module_release_dir(root, module)
+        pairs.append((mod_src, publish_dir / mod_src.relative_to(root)))
         if mod_src.is_dir():
             released.append(f"{module.id} module v{module.version}")
 
@@ -598,46 +586,75 @@ def publish_releases(root: Path, publish_dir: Path, push: bool = False) -> Path 
     return publish_dir
 
 
-def unreleased_kernel(root: Path) -> str | None:
-    """Why the checkout's kernel is not a release to publish, or None: its version must have a release tag
+def untagged(checkout: Path, version: str, what: str) -> str | None:
+    """Why `checkout` is not the release `what` `version`, or None: the version must have a release tag
     (`<version>` or `v<version>`), and the checkout must be at it (a worktree at the tag)."""
-    version = read_kernel_version(root)
 
     def rev(ref: str) -> str | None:
         done = subprocess.run(
-            ["git", "rev-parse", "-q", "--verify", f"{ref}^{{commit}}"], cwd=root, capture_output=True, text=True
+            ["git", "rev-parse", "-q", "--verify", f"{ref}^{{commit}}"], cwd=checkout, capture_output=True, text=True
         )
         return done.stdout.strip() or None if done.returncode == 0 else None
 
     tagged = next((c for c in (rev(f"refs/tags/{version}"), rev(f"refs/tags/v{version}")) if c), None)
     if tagged is None:
-        return f"kernel {version} has no release tag: release it first (tag {version}), then publish from the tag"
+        return f"{what} {version} has no release tag: release it first (tag {version}), then publish from the tag"
     if rev("HEAD") != tagged:
-        return f"this checkout is not at the {version} tag: publish from a worktree at it (`git worktree add <dir> {version}`)"
+        return (
+            f"the {what} checkout ({checkout}) is not at the {version} tag: "
+            f"publish from a worktree at it (`git worktree add <dir> {version}`)"
+        )
     return None
+
+
+def unreleased_kernel(root: Path) -> str | None:
+    """Why the checkout's kernel is not a release to publish, or None."""
+    return untagged(root, read_kernel_version(root), "kernel")
+
+
+def unreleased_module(module: ModuleInfo) -> str | None:
+    """Why a module checkout is not a release to publish, or None (fleet fix plan 6.3)."""
+    return untagged(module.dir, module.version, f"{module.id} module")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--publish-dir", type=Path, help="distribution repository checkout to copy releases into")
+    parser.add_argument("--push", action="store_true", help="commit and push the publish directory")
     parser.add_argument(
-        "--push", action="store_true", help="commit and push the module repositories and the publish directory"
+        "--module",
+        action="append",
+        metavar="ID",
+        help="package (and publish) only this catalogued module (repeatable; default: every catalogued one)",
     )
+    parser.add_argument("--no-kernel", action="store_true", help="package (and publish) the modules only")
     parser.add_argument(
         "--unreleased",
         action="store_true",
-        help="--publish-dir: publish the checkout's kernel although its version is not a tagged release here",
+        help="--publish-dir: publish the checkouts although they are not at their version's release tag",
     )
     args = parser.parse_args(argv)
-    if args.publish_dir and not args.unreleased and (why := unreleased_kernel(ROOT)):
-        print(f"Refused: {why} (--unreleased publishes it anyway)")
-        return 2
+    if args.module:
+        unknown = sorted(set(args.module) - set(catalog_ids(ROOT)))
+        if unknown:
+            print(f"Refused: not in framework/modules/catalog.md: {', '.join(unknown)}")
+            return 2
+    modules = catalogued_modules(ROOT, args.module)
+    if args.publish_dir and not args.unreleased:
+        why = [w for w in [None if args.no_kernel else unreleased_kernel(ROOT), *map(unreleased_module, modules)] if w]
+        if why:
+            for reason in why:
+                print(f"Refused: {reason} (--unreleased publishes it anyway)")
+            return 2
 
     print("Starting release packaging...")
-    package_modules(ROOT, args.push)
-    package_kernel(ROOT)
+    package_modules(ROOT, args.module)
+    if not args.no_kernel:
+        package_kernel(ROOT)
     if args.publish_dir:
-        publish_releases(ROOT, args.publish_dir.expanduser().resolve(), args.push)
+        publish_releases(
+            ROOT, args.publish_dir.expanduser().resolve(), args.push, only=args.module, kernel=not args.no_kernel
+        )
     print("Release packaging completed successfully.")
     return 0
 

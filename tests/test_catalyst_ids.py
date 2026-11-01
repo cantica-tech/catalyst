@@ -266,3 +266,47 @@ def test_cli_count_reserves_consecutive_ids(tmp_path, capsys):
     assert main(["--project", str(project), "id", "next", "SUB"]) == 0
     assert capsys.readouterr().out.strip() == f"SUB-000005-{USERID}"  # the three stay reserved
     assert main(["--project", str(project), "id", "next", "SUB", "--count", "0"]) == 2
+
+
+def _reservations(dep) -> str | None:
+    from catalyst.ids import state_dir
+
+    store = state_dir(dep) / "ids.json"
+    return store.read_text(encoding="utf-8") if store.is_file() else None
+
+
+def test_peek_shows_the_next_id_and_reserves_nothing(tmp_path, capsys):
+    """REQ-000111: two peeks give the same ID and leave ids.json as it was; a reserve after them gets that ID."""
+    import schema_check
+
+    project, dep, _ = setup(tmp_path)
+    argv = ["--project", str(project), "id", "next", "SUB"]
+    assert main([*argv, "--count", "2"]) == 0  # something already reserved, which a peek counts
+    capsys.readouterr()
+    before = _reservations(dep)
+    assert main([*argv, "--peek"]) == 0
+    first = capsys.readouterr().out.strip()
+    assert main([*argv, "--peek"]) == 0
+    assert capsys.readouterr().out.strip() == first == f"SUB-000004-{USERID}  (not reserved)"
+    assert _reservations(dep) == before
+    assert main([*argv, "--peek", "--json"]) == 0
+    peeked = json.loads(capsys.readouterr().out)
+    assert peeked == {"ids": [f"SUB-000004-{USERID}"], "reserved": False}
+    assert main([*argv, "--json"]) == 0
+    reserved = json.loads(capsys.readouterr().out)
+    assert reserved == {"ids": [f"SUB-000004-{USERID}"], "reserved": True}
+    for payload in (peeked, reserved):
+        assert schema_check.problems(payload, schema_check.load("id-next")) == []
+    assert main([*argv, "--peek", "--count", "2"]) == 2  # a peek is one ID
+
+
+def test_peek_at_a_rule_id(tmp_path, capsys):
+    project, dep, _ = setup(tmp_path)
+    argv = ["--project", str(project), "id", "next-rule", "br", "AUTH", "--as", USER]
+    assert main([*argv, "--peek"]) == 0
+    assert capsys.readouterr().out.strip() == f"br-AUTH-000002-{USERID}  (not reserved)"
+    assert _reservations(dep) is None
+    assert main(argv) == 0
+    assert capsys.readouterr().out.strip() == f"br-AUTH-000002-{USERID}"
+    assert main([*argv, "--peek"]) == 0
+    assert capsys.readouterr().out.strip() == f"br-AUTH-000003-{USERID}  (not reserved)"

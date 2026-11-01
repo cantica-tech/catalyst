@@ -62,7 +62,7 @@ scope, and journal paths outside the working copy are not checked.
 `check`, `validate`, `index`, `journal verify` and `criterion integrity`
 work this way. The commands that find the project themselves — `where`,
 `open`, `mcp`, `task`, `runtime`, `move`, `migrate`, `init`, `serve`,
-`workspace`, `hook start` — refuse it (exit `2`) rather than ignore it.
+`workspace`, `hook start` — refuse it (exit `2`, a usage error) rather than ignore it.
 `--project <dir>` reaches every command, `serve --local` included (it is
 also accepted after `serve`).
 
@@ -71,14 +71,15 @@ also accepted after `serve`).
 | Code | Meaning |
 |---|---|
 | `0` | Success. Also: `check`, `hook stop` and `hook commit-msg` outside any project (below); `hook stop` when it does not block; `hook start`, `inbox`, `report` and `criterion status` always. |
-| `1` | Failure: a check found errors (or warnings under `--strict`), an argument was refused, the signer was refused, or a git operation failed. The reason is on stderr. |
-| `2` | No deployment at or above the directory (`where`, `open` and every command that needs one), or `--working-copy` names none or is given to a command that finds the project itself. **Also** a usage error: argparse's (an unknown option, a missing argument, a bad choice) and a few the commands find themselves — `init` with neither or both of `--module`/`--no-module`, no reachable `--kernel` or no user name; `module install\|upgrade` without a reachable kernel; `workspace init` without a user name; `id next --count 0`; an `agent run` that cannot start (unknown command, no adapter, the agent's CLI not on `PATH`). And `hook stop` when it blocks (Claude Code's protocol: exit `2` with the reason on stderr). Read stderr to tell them apart. |
+| `1` | Failure: a check found errors (or warnings under `--strict`), an argument's value was refused once checked, the signer was refused, a git operation failed, or the environment did not allow it (an `agent run` with no adapter for the agent, or the agent's CLI not on `PATH`). The reason is on stderr. |
+| `2` | A usage error: argparse's (an unknown option, a missing argument, a bad choice) and the arguments the commands refuse themselves — `init` with neither or both of `--module`/`--no-module`, no reachable `--kernel` or no user name; `module install\|upgrade` without a reachable kernel; `workspace init` without a user name; `id next --count 0`, or `--peek` with `--count`; `--working-copy` given to a command that finds the project itself; `agent run` of a command §4 does not have. **Also** `hook stop` when it blocks (Claude Code's protocol: exit `2` with the reason on stderr). |
 | `3` | Not done for lack of the user's assent (INV-4): a command that publishes or writes outside the criterion (`share push`, `share create`, `criterion push`, `criterion create <url>`, a first `--url` on `criterion sync`, `criterion protect`, `hook install`, `serve landing connect`, `serve members open`) printed what it would do; show it to the user and re-run with `--yes` once they agree. On a terminal it asks instead (a "no" also exits `3`). |
+| `4` | No deployment: no `catalyst.toml` (or legacy pointer) at or above the directory or `--project` (`where`, `open`, `move`, `migrate`, `task`, `share join`, `criterion join` and every command that needs one), a project whose criterion is not reachable (`where` and `open` report that one and exit `1`), or `--working-copy` naming no working copy. Until kernel `0.121.0` this was `2` (migration `0.121.0`). |
 
-Other codes: `catalyst task` returns Task's own exit code, and `agent run`
-returns `1` when the agent reports failure or was denied a tool. Splitting
-code `2` into "no deployment" and "usage" would break callers that test for
-it, so it stays as it is until format `1.0` decides.
+Other codes: `catalyst task` returns Task's own exit code once Task runs,
+and `agent run` returns `1` when the agent reports failure or was denied a
+tool. The codes are a rule (`fw-STRUCTURE-000025`): a caller tells the
+outcomes apart by the code, never by parsing stderr.
 
 The deployment is found by walking up from the current directory to the
 nearest `catalyst.toml`, so any directory inside the project works. Run
@@ -88,7 +89,7 @@ from inside a criterion itself (outside any project), give `--project` or
 Outside any catalyst project (no `catalyst.toml`), `catalyst check`,
 `catalyst hook stop` and `catalyst hook commit-msg` exit `0`, so a fresh
 clone or a CI runner is not failed. A project whose pointer exists but whose working copy
-is unreachable fails: `check` exits `1`, `hook stop` exits `2`.
+is unreachable fails: `check` exits `1`, `hook stop` exits `2` (it blocks), every other command `4`.
 
 ### Signer
 
@@ -123,8 +124,8 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
 | `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general`, `--json` |
-| `catalyst id next <prefix>` | next <PREFIX>-NNNNNN-<userid> for an entity type | `--as`, `--count` |
-| `catalyst id next-rule <doc_prefix> <domain>` | next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID | `--as` |
+| `catalyst id next <prefix>` | next <PREFIX>-NNNNNN-<userid> for an entity type | `--as`, `--count`, `--json`, `--peek` |
+| `catalyst id next-rule <doc_prefix> <domain>` | next <doc-prefix>-<DOMAIN>-NNNNNN-<userid> rule ID | `--as`, `--json`, `--peek` |
 | `catalyst journal append` | append one entry with real hashes and time | `--action`, `--allow-unchanged`, `--artifact`, `--as`, `--command`, `--file`, `--intent`, `--json`, `--target`, `--tier` |
 | `catalyst journal adopt <revs>` | record commits made outside catalyst in the journal (origin manual) | `--artifact`, `--as`, `--intent`, `--json`, `--target`, `--tier` |
 | `catalyst journal verify` | check hash chains, blobs, pins and unjournaled edits | `--json`, `--legacy`, `--strict` |
@@ -504,7 +505,7 @@ It then reports the criterion, the kernel `catalyst.toml` pins against the
 criterion's, the runtime, the agent, the shared copy (ahead/behind, changes
 not published) and a to-do list of exact commands — a legacy deployment to
 move, a version drift, a pull to make. Exits `0` when nothing is left to do,
-`1` otherwise, `2` outside a project.
+`1` otherwise, `4` outside a project.
 
 ### `catalyst mcp`
 
@@ -564,9 +565,9 @@ do its work, whatever the agent says; the tools are named, to be allowed in
 the agent's own settings.
 `--json` prints them one per line; without it, a person reads them, the
 cost last. Exit `0` when the agent reports success, `1` when it does not
-(or stops without a result, whose reason is the `end` event's), `2` when
-the run cannot start: an unknown command, an agent without an adapter, or
-its CLI not on `PATH`. Claude Code's adapter reads its stream-json (`claude
+(or stops without a result, whose reason is the `end` event's) or cannot
+start (an agent without an adapter, or its CLI not on `PATH`), `2` for a
+command §4 does not have (a usage error). Claude Code's adapter reads its stream-json (`claude
 -p … --output-format stream-json`): every event, usage and cost. GitHub
 Copilot's (`copilot -p …`) and Gemini CLI's (`gemini -p …`, owner decision
 B2) pass on what they print as text, `ok` when the agent exits `0`, and
@@ -756,7 +757,7 @@ With `--working-copy` there is no product repository: commits are `0`.
 - `where` names the project file (`catalyst.toml`, or a legacy
   `<name>.catalyst`) and the criterion it resolves to:
   `$CATALYST_HOME/projects/<name>/criterion` (`CATALYST_HOME` defaults to
-  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `2` when no project
+  `$HOME/.catalyst`), else a legacy `.criterion`. Exit `4` when no project
   file is found (as `open`), `1` when its criterion is missing.
 - `runtime install` builds this version's runtime once per machine in
   `$CATALYST_HOME/runtimes/<version>/` (uv `--relocatable` when uv is
@@ -1367,7 +1368,7 @@ Exits `1` only when something is found at error level (and on a bad range,
 a standalone working copy, or a pointer with no `journal_since` and no
 `<range>`); `0` otherwise. `/adopt` resolves each one.
 
-### `catalyst id next <PREFIX> [--as <user>]`
+### `catalyst id next <PREFIX> [--count <n> | --peek] [--json] [--as <user>]`
 
 Prints the next ID for an entity type: `<PREFIX>-NNNNNN-<userid>`, where
 `NNNNNN` is one above the highest number ever seen for that prefix (in
@@ -1383,21 +1384,28 @@ or two parallel callers — never print the same ID, and a number printed
 but never used stays a gap (IDs are never reused, INV-26). `--count <n>`
 reserves `n` consecutive IDs at once. Allocate only what you will create;
 `catalyst new` allocates and writes in one step. An identity's first call
-also appends its line to the signers ledger. Whether a non-reserving
-look at the next number is wanted is an open decision.
+also appends its line to the signers ledger.
+
+`--peek` prints the ID a reservation would hand out now — the numbers
+already reserved counted — followed by `(not reserved)`, and reserves
+nothing: `ids.json` is only read, the ID lock is not taken, and the next
+caller may take that number. Its signer and grant check are those of a
+reservation. `--json` prints `{"ids": [...], "reserved": true|false}`
+(`spec/id-next.schema.json`); `reserved` is `false` only with `--peek`.
 
 The number is unique per type and signer, not across contributors: two
 contributors of a shared deployment allocating concurrently can draw the
 same number, each under their own userid. Both IDs are valid and neither
 is renumbered (`Rules-of-Rules.md` §6, §13).
 
-### `catalyst id next-rule <doc-prefix> <DOMAIN> [--as <user>]`
+### `catalyst id next-rule <doc-prefix> <DOMAIN> [--peek] [--json] [--as <user>]`
 
 Prints the next rule ID, `<doc-prefix>-<DOMAIN>-NNNNNN-<userid>`, with
 `NNNNNN` one above the highest number the domain has seen, unique within
 the domain and signer (`Rules-of-Rules.md` §3). The domain
 must be registered in `rules/domains/domains.md` (`META` is always
-accepted).
+accepted). It reserves what it prints, as `id next` does; `--peek` and
+`--json` work as there.
 
 ### `catalyst userid gen`
 
@@ -2069,6 +2077,8 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst audit` | `spec/audit.schema.json` |
 | `catalyst unrecorded` | `spec/unrecorded.schema.json` |
 | `catalyst spec` | `spec/commands.schema.json`, `spec/command-spec.schema.json` |
+| `catalyst id next` | `spec/id-next.schema.json` |
+| `catalyst id next-rule` | `spec/id-next.schema.json` |
 | `catalyst journal append` | `spec/journal-entry.schema.json` |
 | `catalyst journal adopt` | `spec/journal-entry.schema.json` |
 | `catalyst journal verify` | `spec/journal-verify.schema.json` |
@@ -2187,9 +2197,13 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst id next` | `<prefix>` | entity type prefix, e.g. RECON or a module's type |
 |  | `--count` `COUNT` | that many consecutive IDs, one per line (default `1`) |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--peek` | show the next ID without reserving it (it may be taken) |
+|  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst id next-rule` | `<doc_prefix>` | the rule document's prefix, e.g. br |
 |  | `<domain>` | a registered DOMAIN code |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--peek` | show the next ID without reserving it (it may be taken) |
+|  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst journal append` | `--command` `CMD` | the catalyst command, e.g. /status |
 |  | `--action` `ACTION` | create\|update\|close\|retire\|status-change\|sync\|redact (journal.ACTIONS) |
 |  | `--artifact` `ARTIFACT` | the artifact ID or a short description |

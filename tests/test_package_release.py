@@ -71,8 +71,9 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     released = pr.package_modules(root)
     pr.package_kernel(root)
 
-    # 1. Verify module output
-    mod_release_dir = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
+    # 1. Verify module output: staged in catalyst's own output, never in the module's repository (REQ-000112)
+    mod_release_dir = root / "catalyst" / "modules" / "example-process" / "v1.2.0"
+    assert not (mod_dir / "catalyst").exists()
     assert released == [mod_release_dir]
     manifest_data = json.loads((mod_release_dir / "manifest.json").read_text(encoding="utf-8"))
     assert manifest_data == {
@@ -83,7 +84,7 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
         "kernelVersion": ">=0.33.0",
         # Kept for extension builds that predate kernelVersion.
         "frameworkVersion": ">=0.33.0",
-        "entry": "ui/index.js",
+        # no `entry`: the module ships no built UI bundle
     }
 
     zip_file = mod_release_dir / "example-process-v1.2.0.zip"
@@ -136,15 +137,14 @@ def test_package_release_kernel_and_modules(tmp_path: Path, monkeypatch):
     pr.publish_releases(root, publish_dir)
     assert "[example/](example/README.md)" in (publish_dir / "catalyst" / "README.md").read_text(encoding="utf-8")
 
-    # 4. With push, the module repositories and the publish directory are
-    # committed and pushed
-    pr.package_modules(root, push=True)
+    # 4. With push, only the publish directory is committed and pushed: nothing goes into a module repository
+    pr.package_modules(root)
     pr.publish_releases(root, publish_dir, push=True)
     commits = [c for c in calls if c[:2] == ["git", "commit"]]
-    assert commits[0][-1] == "Release example-process module v1.2.0"
-    assert commits[1][-1] == "Deploy release: kernel v0.33.0, example-process module v1.2.0"
-    assert calls.count(["git", "push", "origin", "HEAD:main"]) == 1  # module, from its main worktree
+    assert [c[-1] for c in commits] == ["Deploy release: kernel v0.33.0, example-process module v1.2.0"]
     assert calls.count(["git", "push", "origin", "main"]) == 1  # publish directory
+    assert not any("HEAD:main" in c or "worktree" in c for c in calls)
+    assert not (mod_dir / "catalyst").exists()
 
 
 def test_publish_releases_missing_dir(tmp_path: Path):
@@ -169,41 +169,86 @@ def test_package_modules_without_catalog(tmp_path: Path):
     assert pr.package_modules(root) == []
 
 
-def test_module_release_lands_on_main_from_a_development_checkout(tmp_path: Path):
-    """The module checkout sits on development: the archive is committed on
-    origin main, and development neither receives it nor gets pushed."""
+def test_only_the_named_modules_are_packaged_and_published(tmp_path: Path, monkeypatch):
+    """REQ-000112: --module packages and publishes only the modules asked for; the kernel can be left out."""
+    root = make_workspace(tmp_path)
+    other = tmp_path / "catalyst-other-process"
+    other.mkdir()
+    (other / "module.yaml").write_text("id: other-process\nname: Other\n", encoding="utf-8")
+    (other / "version.txt").write_text("0.1.0\n", encoding="utf-8")
+    catalog = root / "framework" / "modules" / "catalog.md"
+    catalog.write_text(catalog.read_text(encoding="utf-8") + "| `other-process` | `x` | `main` |\n", encoding="utf-8")
+    assert [m.id for m in pr.catalogued_modules(root)] == ["example-process", "other-process"]
+    assert pr.package_modules(root, ["other-process"]) == [root / "catalyst" / "modules" / "other-process" / "v0.1.0"]
+    assert not (root / "catalyst" / "modules" / "example-process").exists()
+    publish_dir = tmp_path / "dist-repo"
+    publish_dir.mkdir()
+    pr.publish_releases(root, publish_dir, only=["other-process"], kernel=False)
+    assert (publish_dir / "catalyst" / "modules" / "other-process" / "v0.1.0" / "manifest.json").is_file()
+    assert not (publish_dir / "catalyst" / "modules" / "example-process").exists()
+    assert not (publish_dir / "catalyst" / "kernel" / "v0.33.0").exists()
 
-    def git(*args, cwd):
-        return subprocess.run(
-            ["git", *args], cwd=cwd, check=True, text=True, encoding="utf-8", capture_output=True
-        ).stdout.strip()
+    monkeypatch.setattr(pr, "ROOT", root)
+    assert pr.main(["--module", "nope-process"]) == 2
 
-    origin = tmp_path / "origin.git"
-    git("init", "-q", "--bare", str(origin), cwd=tmp_path)
+
+def test_publishing_refuses_a_module_checkout_not_at_its_tag(tmp_path: Path, monkeypatch, capsys):
+    """Fleet fix plan 6.3: a module is published only from its release tag, unless --unreleased."""
+    root = make_workspace(tmp_path)
     mod_dir = tmp_path / "catalyst-example-process"
-    git("clone", "-q", str(origin), str(mod_dir), cwd=tmp_path)
-    for k, v in (("user.name", "T"), ("user.email", "t@example.com")):
-        git("config", k, v, cwd=mod_dir)
-    (mod_dir / "module.yaml").write_text("id: example-process\n", encoding="utf-8")
-    git("add", ".", cwd=mod_dir)
-    git("commit", "-q", "-m", "init", cwd=mod_dir)
-    git("push", "-q", "origin", "HEAD:main", cwd=mod_dir)
-    git("checkout", "-q", "-b", "development", cwd=mod_dir)
-    dev_head = git("rev-parse", "HEAD", cwd=mod_dir)
+    import shutil
 
-    dest = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
-    dest.mkdir(parents=True)
-    (dest / "manifest.json").write_text("{}\n", encoding="utf-8")
-    module = pr.ModuleInfo("example-process", "Example", "d", "1.2.0", mod_dir)
-    pr.commit_module_release(module, dest)
+    shutil.rmtree(mod_dir / ".git")
 
-    assert git("rev-parse", "HEAD", cwd=mod_dir) == dev_head
-    assert git("branch", "--show-current", cwd=mod_dir) == "development"
-    files = git("ls-tree", "-r", "--name-only", "main", cwd=origin)
-    assert "catalyst/modules/example-process/v1.2.0/manifest.json" in files
-    assert git("log", "-1", "--format=%s", "main", cwd=origin) == "Release example-process module v1.2.0"
-    assert "development" not in git("branch", cwd=origin)
-    assert git("worktree", "list", "--porcelain", cwd=mod_dir).count("worktree ") == 1
+    def git(*args: str) -> None:
+        subprocess.run(["git", *args], cwd=mod_dir, check=True, capture_output=True)
+
+    git("init", "-q")
+    git("-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "start")
+    module = pr.module_info_at(mod_dir, "example-process")
+    assert module is not None
+    assert "example-process module 1.2.0 has no release tag" in (pr.unreleased_module(module) or "")
+    git("tag", "v1.2.0")
+    assert pr.unreleased_module(module) is None
+    git("-c", "user.name=t", "-c", "user.email=t@x", "commit", "-q", "--allow-empty", "-m", "after")
+    assert "not at the 1.2.0 tag" in (pr.unreleased_module(module) or "")
+
+    monkeypatch.setattr(pr, "ROOT", root)
+    published = []
+    monkeypatch.setattr(pr, "publish_releases", lambda *a, **k: published.append(a))
+    monkeypatch.setattr(pr, "package_kernel", lambda *a, **k: root)
+    assert pr.main(["--publish-dir", str(tmp_path), "--no-kernel"]) == 2
+    assert "Refused: the example-process module checkout" in capsys.readouterr().out and not published
+    assert pr.main(["--publish-dir", str(tmp_path), "--no-kernel", "--unreleased"]) == 0 and published
+
+
+def test_the_manifest_names_a_ui_entry_only_when_the_bundle_ships(tmp_path: Path):
+    """Fleet fix plan 6.4: `entry` only for a built bundle a release ships (module.yaml's `entry`, else ui/index.js)."""
+    root = make_workspace(tmp_path)
+    mod_dir = tmp_path / "catalyst-example-process"
+    release = root / "catalyst" / "modules" / "example-process" / "v1.2.0"
+
+    def manifest() -> dict:
+        pr.package_modules(root)
+        return json.loads((release / "manifest.json").read_text(encoding="utf-8"))
+
+    (mod_dir / "ui").mkdir()
+    (mod_dir / "ui" / "Backlog.tsx").write_text("export {}\n", encoding="utf-8")
+    assert "entry" not in manifest()  # sources only
+    (mod_dir / "ui" / "dist").mkdir()
+    (mod_dir / "ui" / "dist" / "index.js").write_text("x\n", encoding="utf-8")
+    with (mod_dir / "module.yaml").open("a") as f:
+        f.write("entry: ui/dist/index.js\n")
+    assert "entry" not in manifest()  # dist/ is not shipped
+    (mod_dir / "ui" / "index.js").write_text("x\n", encoding="utf-8")
+    yaml = (mod_dir / "module.yaml").read_text(encoding="utf-8").replace("entry: ui/dist/index.js\n", "")
+    (mod_dir / "module.yaml").write_text(yaml, encoding="utf-8")
+    assert manifest()["entry"] == "ui/index.js"
+    (mod_dir / "ui" / "bundle.js").write_text("x\n", encoding="utf-8")
+    (mod_dir / "module.yaml").write_text(yaml + "entry: ui/bundle.js\n", encoding="utf-8")
+    assert manifest()["entry"] == "ui/bundle.js"
+    with zipfile.ZipFile(release / "example-process-v1.2.0.zip") as zf:
+        assert "ui/bundle.js" in zf.namelist()
 
 
 def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
@@ -215,15 +260,7 @@ def test_release_archives_are_reproducible(tmp_path: Path, monkeypatch):
     root = make_workspace(tmp_path)
     monkeypatch.setattr(pr, "run_cmd", lambda cmd, cwd: "")
     (root / "LICENSE").write_text("Apache License\n", encoding="utf-8")
-    mod_zip = (
-        tmp_path
-        / "catalyst-example-process"
-        / "catalyst"
-        / "modules"
-        / "example-process"
-        / "v1.2.0"
-        / "example-process-v1.2.0.zip"
-    )
+    mod_zip = root / "catalyst" / "modules" / "example-process" / "v1.2.0" / "example-process-v1.2.0.zip"
     kernel_dir = root / "catalyst" / "kernel" / "v0.33.0"
 
     pr.package_modules(root)
@@ -246,7 +283,7 @@ def test_a_module_release_states_its_own_kernel_requirement(tmp_path: Path, caps
     mod_dir = tmp_path / "catalyst-example-process"
     with (mod_dir / "module.yaml").open("a") as f:
         f.write('kernel_version: ">=0.30.0"\n')
-    release = mod_dir / "catalyst" / "modules" / "example-process" / "v1.2.0"
+    release = root / "catalyst" / "modules" / "example-process" / "v1.2.0"
 
     pr.package_modules(root)
     manifest = json.loads((release / "manifest.json").read_text(encoding="utf-8"))
@@ -287,5 +324,6 @@ def test_publishing_refuses_a_kernel_that_is_not_a_tagged_release(tmp_path: Path
     monkeypatch.setattr(pr, "package_modules", lambda *a, **k: [])
     monkeypatch.setattr(pr, "package_kernel", lambda *a, **k: root)
     assert pr.main(["--publish-dir", str(tmp_path)]) == 2
-    assert "Refused: this checkout is not at the 0.33.0 tag" in capsys.readouterr().out and not published
+    out = capsys.readouterr().out
+    assert "Refused: the kernel checkout" in out and "is not at the 0.33.0 tag" in out and not published
     assert pr.main(["--publish-dir", str(tmp_path), "--unreleased"]) == 0 and published

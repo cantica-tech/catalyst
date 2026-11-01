@@ -94,7 +94,7 @@ catalyst-<module-id>/
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
 | `definitions` | `list[object]` | No | Entity definitions (`entity_type`, `path`). |
 | `required_paths` | `list[object]` | No | Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`. |
-| `contributions` | `object` | No | Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `taskfile`, `migrations`. |
+| `contributions` | `object` | No | Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `migrations` (`taskfile` is deprecated and ignored). |
 | `skills` | `list[object]` | No | Agent skills (`name`, `spec_path`). |
 
 <!-- end generated: manifest-fields -->
