@@ -30,7 +30,6 @@ import hmac
 import json
 import os
 import secrets
-import shlex
 import subprocess
 import threading
 import time
@@ -150,10 +149,19 @@ def key_account(db: Path) -> str:
     return f"{KEY_SERVICE}:{hashlib.sha256(str(Path(db).resolve()).encode()).hexdigest()[:16]}"
 
 
-def read_master(command: str) -> bytes:
-    """The master key, printed (base64) by `command`: the keychain's read command, or a key-management service's."""
+def read_master(command: str, windows: bool | None = None) -> bytes:
+    """The master key, printed (base64) by `command`: the keychain's read command, or a key-management service's;
+    the command split by this platform's rules (BUG-000062: a Windows path keeps its backslashes)."""
+    from catalyst.identity.provider import split_command
+
     try:
-        done = subprocess.run(shlex.split(command), capture_output=True, text=True, check=False, timeout=30)
+        argv = split_command(command, windows=windows)
+    except ValueError:
+        raise MembershipError("the master key cannot be read: its command cannot be split", 503) from None
+    if not argv:
+        raise MembershipError("the master key cannot be read: its command is empty", 503)
+    try:
+        done = subprocess.run(argv, capture_output=True, text=True, check=False, timeout=30)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise MembershipError(f"the master key cannot be read ({type(exc).__name__})", 503) from None
     if done.returncode != 0:

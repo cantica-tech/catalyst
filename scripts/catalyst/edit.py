@@ -21,7 +21,7 @@ from catalyst import indexes, journal
 from catalyst.corpus import FIELD_ROW_RE, Artifact, Corpus, load_corpus, norm_field, ref_values
 from catalyst.deployment import Deployment
 from catalyst.ids import next_entity_id
-from module_loader import ETD, FieldDefinition
+from module_loader import ETD, FieldDefinition, creating_command
 
 RECONCILIATION = "RECON"  # its Status changes only through /reconcile (role gate)
 REF_KINDS = ("ref", "ref-list")
@@ -51,6 +51,19 @@ def etd_named(dep: Deployment, name: str) -> ETD:
         if name.lower() in {prefix.lower(), etd.name.lower(), etd.plural_name.lower(), etd.folder.lower()}:
             return etd
     raise EditError(f"unknown entity type '{name}' (known: {', '.join(sorted(dep.etds))})")
+
+
+def created_elsewhere(etd: ETD, command: str | None) -> str | None:
+    """Why `command` may not create an `etd`, or None: a type its module creates only through a command of its own
+    (`created_by:`, fw-STRUCTURE-000026) is created only when `catalyst new` runs for that command (`--command`,
+    which the command's procedure passes)."""
+    if not etd.created_by or creating_command(command) == etd.created_by:
+        return None
+    return (
+        f"{etd.id_prefix} ({etd.name.lower()}) is created only by {etd.created_by}, as its module declares "
+        f"(created_by, fw-STRUCTURE-000026): run {etd.created_by}, whose procedure runs "
+        f"`catalyst new {etd.id_prefix} … --command {etd.created_by}`"
+    )
 
 
 def field_def(etd: ETD, name: str) -> FieldDefinition:
@@ -344,6 +357,9 @@ def new(
     etd = etd_named(dep, type_name)
     if etd.naming == "free-form":
         raise EditError(f"{etd.id_prefix} items are table rows, not files: edit them with their module command")
+    refused = created_elsewhere(etd, command)
+    if refused:
+        raise EditError(refused)
     from catalyst import permissions
 
     why = permissions.creation_refusal(dep, signer, etd.id_prefix)

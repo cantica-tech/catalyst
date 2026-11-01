@@ -204,6 +204,32 @@ def _login_credentials(args) -> tuple[str, str]:
     return username, password
 
 
+def _verified_status(doc: dict, state: str) -> dict[str, str]:
+    """`identity status`'s network check (BUG-000059 follow-up): when tokens are stored, ask the provider who the
+    stored login belongs to, through the person's own session only. Never the system account: a lapsed session
+    must read as `no`, not as a verified system account. Unreachable provider -> `unreachable`, so the offline
+    `session` stands."""
+    from catalyst import provider
+    from catalyst.identity.errors import (
+        CatalystUsersError,
+        NotLoggedInError,
+        OIDCError,
+        ProviderUnavailableError,
+    )
+
+    if state == provider.NONE:
+        return {"verified": "not_checked"}
+    try:
+        who = provider.facade(doc).whoami()
+    except ProviderUnavailableError:
+        return {"verified": "unreachable"}
+    except (NotLoggedInError, OIDCError):
+        return {"verified": "no"}
+    except (CatalystUsersError, provider.ProviderError):
+        return {"verified": "unreachable"}  # the backend could not be built or the answer was not understood
+    return {"verified": "yes", "username": who.username}
+
+
 def _identity_session(args, sub: str, doc: dict, dep) -> int:
     """login, logout, status and whoami against `doc`; with `dep`, whoami is the deployment's signer."""
     from catalyst import provider
@@ -239,12 +265,36 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
             print(f"logged out of {provider.issuer_of(doc)}")
             return 0
         if sub == "status":
+            state = provider.session_state(doc)
             out = {
                 "provider": str(doc.get("provider")),
                 "issuer": provider.issuer_of(doc),
                 "logged_in": provider.logged_in(doc),
+                "session": state,  # from the stored tokens' expiry, no network (BUG-000059); `verified` after it
             }
-            print(json.dumps(out) if args.json else "; ".join(f"{k}: {v}" for k, v in out.items()))
+            out.update(_verified_status(doc, state))
+            if args.json:
+                print(json.dumps(out))
+            else:
+                said = {
+                    provider.ACTIVE: "active",
+                    provider.REFRESHABLE: "access token expired, refreshed on next use",
+                    provider.EXPIRED: "logged in, session expired — run catalyst identity login",
+                    provider.NONE: "not logged in",
+                }
+                shown = {
+                    "yes": f"verified as {out['username']}" if "username" in out else "verified",
+                    "no": "provider refused the stored login — run catalyst identity login",
+                    "unreachable": "provider unreachable, not verified",
+                    "not_checked": "not checked",
+                }
+                print(
+                    "; ".join(
+                        f"{k}: {said.get(v, v) if k == 'session' else shown.get(v, v) if k == 'verified' else v}"
+                        for k, v in out.items()
+                        if k != "username"
+                    )
+                )
             return 0
     except CatalystUsersError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
@@ -707,7 +757,10 @@ def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
         except EditError:
             return "create", ()
         names = {etd.id_prefix.lower(), etd.name.lower().replace(" ", "-")}
-        return "create", tuple(sorted(f"create-{n}" for n in names))
+        aliases = tuple(sorted(f"create-{n}" for n in names))
+        if etd.created_by:  # created only by its module's command (fw-STRUCTURE-000026): that command's grant counts
+            return etd.created_by.lstrip("/"), ("create", *aliases)
+        return "create", aliases
     if args.edit in ("rename", "edit", "link", "unlink"):
         return _verb_command(dep, args.edit), ()
     return {"status": "status", "restore": "journal-restore"}.get(args.edit, "create"), ()
@@ -1293,7 +1346,7 @@ def cmd_agent_run(args) -> int:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     try:  # before the adapter: a command §4 does not have is usage, whatever this machine has installed
-        prompt = procedure(section4, args.command, arguments, dep.project_root)
+        prompt = procedure(section4, args.command, arguments, dep.project_root, dep.etds)
     except SpecError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return EXIT_USAGE
@@ -1737,8 +1790,9 @@ def cmd_unrecorded(args) -> int:
     else:
         for c in found:
             print(unrecorded.describe(c))
-        print(f"{len(found)} commit(s) with changes not in the journal (checked as {unrecorded.level(dep)}s)")
-    return 1 if found and unrecorded.level(dep) == "error" else 0
+        level = "error" if args.strict else unrecorded.level(dep)
+        print(f"{len(found)} commit(s) with changes not in the journal (checked as {level}s)")
+    return 1 if found and (args.strict or unrecorded.level(dep) == "error") else 0
 
 
 def cmd_hook(args) -> int:
@@ -2967,6 +3021,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
     p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 on any unrecorded commit, whatever the deployment's format (a release gate, BUG-000060)",
+    )
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_unrecorded)
 
@@ -3866,7 +3925,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("login", "log in with a code shown in your browser (the device flow), or --password"),
         ("logout", "revoke your session and delete your tokens"),
         ("whoami", "who catalyst-users says you are: userid, groups, roles, grants (verified now)"),
-        ("status", "the provider, and whether you are logged in (no network)"),
+        ("status", "the provider, whether you are logged in, and whether the provider confirms it when reachable"),
     ):
         q = ids_.add_parser(verb, help=text)
         q.add_argument("--issuer", help="a provider's issuer URL, outside any deployment (e.g. before `catalyst init`)")

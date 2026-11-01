@@ -68,7 +68,8 @@ A product commit made for the change cites the artifact or rule it serves
 - `/create <type> <title>` — create an artifact of a type the active
   modules declare. Each type is a part of this command, listed after the
   kernel's commands as `/create <type>` with its alias `/create-<type>`;
-  `catalyst spec create <type>` gives that part alone.
+  `catalyst spec create <type>` gives that part alone. A `created_by:`
+  type has none: its module's command creates it.
 - `/list <type> [--filter ...]` — list artifacts, work items, rules, or
   templates of the requested type. Use `all` to list everything. Each
   `--filter` is a property filter expressed as `key=value` or

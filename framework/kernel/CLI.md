@@ -120,7 +120,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
 | `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
 | `catalyst badge` | a README badge: an SVG of check's result or of the rules in use | `--metric`, `--out` |
-| `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
+| `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json`, `--strict` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
 | `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general`, `--json` |
@@ -217,7 +217,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst identity login` | log in with a code shown in your browser (the device flow), or --password | `--client`, `--issuer`, `--json`, `--password`, `--password-command`, `--username` |
 | `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
 | `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
-| `catalyst identity status` | the provider, and whether you are logged in (no network) | `--client`, `--issuer`, `--json` |
+| `catalyst identity status` | the provider, whether you are logged in, and whether the provider confirms it when reachable | `--client`, `--issuer`, `--json` |
 | `catalyst identity link <user>` | keep a retired user's userid as yours, once (migration 0.106.0) | `--as` |
 | `catalyst userid gen` | draw a new unique userid (INV-26) | — |
 
@@ -312,7 +312,7 @@ directory is not empty. On success it prints one line per step, commits nothing 
 project repository, gives the working copy its own git history, and
 journals the install as the first entry. The pointer's `journal_since` is
 the project's `HEAD` at install (`""` with no commit yet): the baseline
-after which [changes made outside catalyst](#catalyst-unrecorded-range---json)
+after which [changes made outside catalyst](#catalyst-unrecorded-range---strict---json)
 are checked.
 
 ### `catalyst recompose --base-kernel <dir> --base-module <dir> --kernel <dir> [--module-dir <dir>] [--check]`
@@ -381,7 +381,7 @@ a **warning** (a deployment from before format `1.0-rc`; migration
 working copy (`--working-copy`) has no pointer and skips this check.
 
 **Unrecorded changes.** Each commit after the pointer's `journal_since`
-with an [unrecorded change](#catalyst-unrecorded-range---json) is reported
+with an [unrecorded change](#catalyst-unrecorded-range---strict---json) is reported
 at that command's level: a warning during the beta, an error from format
 `1.0` or under `"strict_journal": true`. A pointer with no `journal_since`
 is a warning (history not checked; migration `0.42.0` adds the field). A
@@ -629,7 +629,7 @@ deployment checks the message, if there is one; otherwise the commit
 passes. So a commit spanning two projects must trace in both.
 
 A traced message is then checked for staged product files whose content
-no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---json)):
+no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---strict---json)):
 a warning on stderr during the beta, a refusal (exit `1`) from format
 `1.0` or under `"strict_journal": true`. Journal them first, or adopt the
 commit afterwards (`catalyst journal adopt HEAD`). No `journal_since` in
@@ -667,7 +667,7 @@ without a trace, then a summary; exits `1` if any, and on a bad range.
 
 With a working copy (not `--pattern-only`) and a `journal_since` in the
 pointer, it also prints one `unrecorded-change` line per commit of the
-range (after the baseline) with [unrecorded changes](#catalyst-unrecorded-range---json),
+range (after the baseline) with [unrecorded changes](#catalyst-unrecorded-range---strict---json),
 as `WARNING` during the beta and `ERROR` from format `1.0` or under
 `"strict_journal": true`; only at error level do they fail the trace.
 
@@ -1039,7 +1039,16 @@ Who signs (design 29). A criterion holds no user or role registry:
   <cmd>]` (the password from the command's first line, else one line of
   standard input, else asked without echo; never an argument),
   `identity logout` (revokes), `identity whoami` (userid, groups, roles and
-  grants, verified now), `identity status` (no network). With `--issuer
+  grants, verified now), `identity status` (`logged_in` when tokens are
+  stored, and `session` from their expiry — `active`, `refreshable`,
+  `expired` when the access and refresh tokens both expired, or `none` —
+  read with no network; and `verified`, which asks the provider once tokens
+  are stored: `yes` with `username` when it confirms the login through the
+  person's own session, `no` when it refuses it, `unreachable` when it
+  cannot be asked, `not_checked` when no tokens are stored; it never falls
+  back to the system account). A writing verb refreshes an expired access token first; when
+  the session has lapsed it says so on stderr, and who signs instead (the
+  system account). With `--issuer
   <url>` each works outside any deployment, e.g. before `catalyst init`.
   Tokens are kept owner-only, never in a criterion or a project: in
   catalyst-users' own credentials file when this machine's catalyst-users is
@@ -1327,7 +1336,7 @@ generate its types from.
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
 - `catalyst inbox`: what waits for a person, each item with its `evidence`
-  and `settle`, the commands that settle it. Seven kinds: a commit made
+  and `settle`, the commands that settle it. Eight kinds: a commit made
   outside catalyst whose changes the journal does not record
   (`unrecorded-commit`: adopt it or revert it); a changed or new project
   file not journaled yet (`unrecorded-change`); a reconciliation case that
@@ -1339,12 +1348,15 @@ generate its types from.
   being decided (`proposal`: its entity, file, base, proposed blob and
   author; the `reconcile` decisions settle it), listed apart from the
   disputes; an open entity past its type's due date (`overdue`: moving it
-  on, or a new date, settles it). It lists and
+  on, or a new date, settles it); an open bug or requirement awaiting a
+  decision on its status (`review`: each status its type's workflow allows
+  next is a `catalyst status set` decision; "open" is the same as
+  `catalyst backlog`'s, any status outside the type's closed states). It lists and
   settles nothing, and exits `0` whether or not anything waits. A bare
   working copy has no project history and lists the last four kinds only.
   The payload is described by `spec/inbox.schema.json`.
 
-### `catalyst unrecorded [<range>] [--json]`
+### `catalyst unrecorded [<range>] [--strict] [--json]`
 
 Lists the **unrecorded changes**: non-merge product commits that change a
 file to a git blob that was not its latest journaled `after` as of the
@@ -1363,7 +1375,9 @@ subject, files: [{path, before, after}]}`.
 
 Severity follows the format rollout: a **warning** while the pointer's
 `format` is a release candidate (`1.0-rc`, the beta), an **error** from
-format `1.0`, or earlier when the pointer sets `"strict_journal": true`.
+format `1.0`, or earlier when the pointer sets `"strict_journal": true`;
+`--strict` checks at error level whatever the format (a release gate:
+nothing leaves with a commit the journal does not record).
 Exits `1` only when something is found at error level (and on a bad range,
 a standalone working copy, or a pointer with no `journal_since` and no
 `<range>`); `0` otherwise. `/adopt` resolves each one.
@@ -2180,6 +2194,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst badge` | `--metric` `METRIC` | what the badge shows: the deployment's check result, or how many live rules have work resting on them (one of `check`, `chain`; default `check`) |
 |  | `--out` `FILE` | write the SVG there (default: stdout) |
 | `catalyst unrecorded` | `<range>` | git revision range (default: every commit after the baseline) |
+|  | `--strict` | exit 1 on any unrecorded commit, whatever the deployment's format (a release gate, BUG-000060) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst trace` | `<range>` | git revision range (default: HEAD~1..HEAD) |
 |  | `--pattern-only` | no working copy (e.g. CI of a local-only deployment): accept any well-formed ID |
