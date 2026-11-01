@@ -99,6 +99,8 @@ tasks:
     desc: "Package the kernel and modules into versioned zipped archives with manifests under catalyst/ (no commit, no push); refuses first on unjournaled commits (check:journaled)"
     cmds:
       - task: check:journaled
+      - python3 scripts/gen_docs.py
+      - python3 scripts/gen_docs.py --check
       - python3 scripts/package_release.py
       - task: check:command-parity
       - task: check:kernel-purity

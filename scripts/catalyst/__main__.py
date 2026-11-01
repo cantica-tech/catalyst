@@ -204,6 +204,32 @@ def _login_credentials(args) -> tuple[str, str]:
     return username, password
 
 
+def _verified_status(doc: dict, state: str) -> dict[str, str]:
+    """`identity status`'s network check (BUG-000059 follow-up): when tokens are stored, ask the provider who the
+    stored login belongs to, through the person's own session only. Never the system account: a lapsed session
+    must read as `no`, not as a verified system account. Unreachable provider -> `unreachable`, so the offline
+    `session` stands."""
+    from catalyst import provider
+    from catalyst.identity.errors import (
+        CatalystUsersError,
+        NotLoggedInError,
+        OIDCError,
+        ProviderUnavailableError,
+    )
+
+    if state == provider.NONE:
+        return {"verified": "not_checked"}
+    try:
+        who = provider.facade(doc).whoami()
+    except ProviderUnavailableError:
+        return {"verified": "unreachable"}
+    except (NotLoggedInError, OIDCError):
+        return {"verified": "no"}
+    except (CatalystUsersError, provider.ProviderError):
+        return {"verified": "unreachable"}  # the backend could not be built or the answer was not understood
+    return {"verified": "yes", "username": who.username}
+
+
 def _identity_session(args, sub: str, doc: dict, dep) -> int:
     """login, logout, status and whoami against `doc`; with `dep`, whoami is the deployment's signer."""
     from catalyst import provider
@@ -244,8 +270,9 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
                 "provider": str(doc.get("provider")),
                 "issuer": provider.issuer_of(doc),
                 "logged_in": provider.logged_in(doc),
-                "session": state,  # from the stored tokens' expiry, no network (BUG-000059)
+                "session": state,  # from the stored tokens' expiry, no network (BUG-000059); `verified` after it
             }
+            out.update(_verified_status(doc, state))
             if args.json:
                 print(json.dumps(out))
             else:
@@ -255,7 +282,19 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
                     provider.EXPIRED: "logged in, session expired — run catalyst identity login",
                     provider.NONE: "not logged in",
                 }
-                print("; ".join(f"{k}: {said.get(v, v) if k == 'session' else v}" for k, v in out.items()))
+                shown = {
+                    "yes": f"verified as {out['username']}" if "username" in out else "verified",
+                    "no": "provider refused the stored login — run catalyst identity login",
+                    "unreachable": "provider unreachable, not verified",
+                    "not_checked": "not checked",
+                }
+                print(
+                    "; ".join(
+                        f"{k}: {said.get(v, v) if k == 'session' else shown.get(v, v) if k == 'verified' else v}"
+                        for k, v in out.items()
+                        if k != "username"
+                    )
+                )
             return 0
     except CatalystUsersError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
@@ -3886,7 +3925,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("login", "log in with a code shown in your browser (the device flow), or --password"),
         ("logout", "revoke your session and delete your tokens"),
         ("whoami", "who catalyst-users says you are: userid, groups, roles, grants (verified now)"),
-        ("status", "the provider, and whether you are logged in (no network)"),
+        ("status", "the provider, whether you are logged in, and whether the provider confirms it when reachable"),
     ):
         q = ids_.add_parser(verb, help=text)
         q.add_argument("--issuer", help="a provider's issuer URL, outside any deployment (e.g. before `catalyst init`)")

@@ -17,6 +17,26 @@ def test_every_generated_section_is_up_to_date(capsys):
     assert gen_docs.main(["--check"]) == 0, capsys.readouterr().out
 
 
+def test_release_writes_the_generated_sections_before_it_packages():
+    """`SYNCHRONIZE.md`'s migrations table was missed by the 0.120.0 and 0.121.0 releases: `task release` only checked
+    the generated sections. It now writes them (journaled, as any write of gen_docs is), checks them again, and only
+    then packages."""
+    lines = (Path(__file__).resolve().parent.parent / "Taskfile.yml").read_text(encoding="utf-8").splitlines()
+    start = lines.index("  release:")
+    steps = []
+    for line in lines[start + 1 :]:
+        if line.strip() and not line.startswith("    "):
+            break  # the next task, at the task level
+        if line.startswith("      - "):
+            steps.append(line.strip()[2:])
+    assert "python3 scripts/gen_docs.py" in steps, steps
+    write = steps.index("python3 scripts/gen_docs.py")
+    assert steps[write + 1] == "python3 scripts/gen_docs.py --check", steps
+    package = steps.index("python3 scripts/package_release.py")
+    assert package > write + 1, steps
+    assert steps.index("task: check:journaled") < write, steps
+
+
 def test_the_index_lists_every_command_with_its_options():
     index = gen_docs.cli_index()
     for row in (

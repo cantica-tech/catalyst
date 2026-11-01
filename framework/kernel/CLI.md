@@ -217,7 +217,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst identity login` | log in with a code shown in your browser (the device flow), or --password | `--client`, `--issuer`, `--json`, `--password`, `--password-command`, `--username` |
 | `catalyst identity logout` | revoke your session and delete your tokens | `--client`, `--issuer` |
 | `catalyst identity whoami` | who catalyst-users says you are: userid, groups, roles, grants (verified now) | `--as`, `--client`, `--issuer`, `--json` |
-| `catalyst identity status` | the provider, and whether you are logged in (no network) | `--client`, `--issuer`, `--json` |
+| `catalyst identity status` | the provider, whether you are logged in, and whether the provider confirms it when reachable | `--client`, `--issuer`, `--json` |
 | `catalyst identity link <user>` | keep a retired user's userid as yours, once (migration 0.106.0) | `--as` |
 | `catalyst userid gen` | draw a new unique userid (INV-26) | — |
 
@@ -1039,10 +1039,14 @@ Who signs (design 29). A criterion holds no user or role registry:
   <cmd>]` (the password from the command's first line, else one line of
   standard input, else asked without echo; never an argument),
   `identity logout` (revokes), `identity whoami` (userid, groups, roles and
-  grants, verified now), `identity status` (no network: `logged_in` when
-  tokens are stored, and `session` from their expiry — `active`,
-  `refreshable`, `expired` when the access and refresh tokens both expired,
-  or `none`). A writing verb refreshes an expired access token first; when
+  grants, verified now), `identity status` (`logged_in` when tokens are
+  stored, and `session` from their expiry — `active`, `refreshable`,
+  `expired` when the access and refresh tokens both expired, or `none` —
+  read with no network; and `verified`, which asks the provider once tokens
+  are stored: `yes` with `username` when it confirms the login through the
+  person's own session, `no` when it refuses it, `unreachable` when it
+  cannot be asked, `not_checked` when no tokens are stored; it never falls
+  back to the system account). A writing verb refreshes an expired access token first; when
   the session has lapsed it says so on stderr, and who signs instead (the
   system account). With `--issuer
   <url>` each works outside any deployment, e.g. before `catalyst init`.

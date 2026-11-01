@@ -201,7 +201,13 @@ def test_whoami_shows_roles_by_the_template_and_the_grants(deployment, capsys):
     assert schema_check.problems(payload, schema_check.load("identity-whoami")) == []
     assert main(["identity", "status", "--json"]) == 0
     status = json.loads(capsys.readouterr().out)
-    assert status == {"provider": "keycloak", "issuer": ISSUER, "logged_in": False, "session": "none"}
+    assert status == {
+        "provider": "keycloak",
+        "issuer": ISSUER,
+        "logged_in": False,
+        "session": "none",
+        "verified": "not_checked",
+    }
     assert schema_check.problems(status, schema_check.load("identity-status")) == []
 
 
@@ -627,9 +633,16 @@ def _store(access: str, expires_in: float, refresh_in: float | None, refresh: st
     CredentialStore(provider.token_store(POINTER)).save(ISSUER, "catalyst-cli", tokens)
 
 
-def test_status_tells_an_expired_session_from_an_active_one(capsys):
+def test_status_tells_an_expired_session_from_an_active_one(monkeypatch, capsys):
     """BUG-000059: `identity status` read stored tokens as logged in whatever their expiry; it now says, without the
-    network, whether the session is active, refreshable on next use, or expired."""
+    network, whether the session is active, refreshable on next use, or expired. The provider check is stubbed
+    unreachable here, so the offline answer is what is under test."""
+    from catalyst.identity.errors import ProviderUnavailableError
+
+    def down(request, timeout):
+        raise ProviderUnavailableError("identity provider unreachable: offline")
+
+    _with_transport(monkeypatch, down)
 
     def status(json_out: bool = True):
         capsys.readouterr()
@@ -650,6 +663,43 @@ def test_status_tells_an_expired_session_from_an_active_one(capsys):
     assert "logged in, session expired — run catalyst identity login" in status(json_out=False)
     _store("at", -10, None, refresh=None)
     assert status()["session"] == "expired"
+
+
+def test_status_asks_the_provider_when_tokens_are_stored(monkeypatch, capsys):
+    """`identity status` verifies a stored login with the provider when it can: `yes` names the person, `no` is a
+    refused login (a lapsed session never reads as verified through the system account), and an unreachable
+    provider is `unreachable` while the offline session still stands."""
+    from catalyst.identity.errors import ProviderUnavailableError
+
+    real = provider.facade
+    answering = {"transport": None}  # swapped per step: one patch, so the stubs do not stack
+    monkeypatch.setattr(provider, "facade", lambda doc, transport_=None: real(doc, answering["transport"]))
+
+    def status() -> dict:
+        capsys.readouterr()
+        assert main(["identity", "status", "--issuer", ISSUER, "--json"]) == 0
+        return json.loads(capsys.readouterr().out)
+
+    assert status()["verified"] == "not_checked"  # nothing stored, so nothing to ask
+
+    claims = {"sub": "sub-alice", "preferred_username": "alice", "name": "Alice Developer"}
+    _store(_jwt(claims), 300, 3600)
+    answering["transport"] = _keycloak({_jwt(claims): claims})
+    out = status()
+    assert (out["verified"], out["username"], out["session"]) == ("yes", "alice", "active")
+    assert schema_check.problems(out, schema_check.load("identity-status")) == []
+
+    answering["transport"] = _keycloak({})  # the provider no longer knows this token
+    out = status()
+    assert out["verified"] == "no" and "username" not in out
+
+    def down(request, timeout):
+        raise ProviderUnavailableError("identity provider unreachable: offline")
+
+    answering["transport"] = down
+    out = status()
+    assert (out["verified"], out["session"]) == ("unreachable", "active")
+    assert schema_check.problems(out, schema_check.load("identity-status")) == []
 
 
 def _refreshing(base, refreshed: dict[str, str], seen: list[str]):

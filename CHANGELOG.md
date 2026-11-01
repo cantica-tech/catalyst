@@ -6,6 +6,21 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- Changed: `catalyst identity status` asks the provider whether it confirms the stored login, when tokens are stored and
+  the provider is reachable. It adds `verified` (`yes`, `no`, `unreachable`, `not_checked`) and, on `yes`, `username`
+  (`spec/identity-status.schema.json`). The check uses the person's own session only and never the system account, so
+  a lapsed session reads `no`, not as verified. The offline `logged_in` and `session` fields are unchanged; the
+  `status` row of `identity --help` and `CLI.md` say so.
+- Chore: the fleet's modules declare `created_by:` (REQ-000113, fleet fix 6.2) on the types whose creating command is in
+  their `commands:` catalogue: software-engineering 3.6.0's BUG, REQ, TEST, STEP, FEAT and ADR, and knowledge-base 0.6.1's
+  KB and KBUILD. HK and KSOURCE keep the generic path: HK has no creating command in its catalogue, and KSOURCE's
+  `/create knowledge-source` is not in KBM's `commands:`. Declared in those modules' own repositories, not here.
+- Fixed: `task release` writes the generated sections (`gen_docs.py`, journaled as any gen_docs write is) and checks
+  them again before it packages. Before, it only checked them, so `SYNCHRONIZE.md`'s migrations table was missed by the
+  0.120.0 and 0.121.0 releases (the kernel round's "release steps journaling `SYNCHRONIZE.md`").
+
 ## 0.122.0 — 2026-11-01
 
 No layout change; nothing mechanical for a deployment (no migration note). `catalyst sync apply` recomposes
