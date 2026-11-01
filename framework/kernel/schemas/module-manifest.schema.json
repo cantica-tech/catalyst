@@ -217,7 +217,7 @@
     },
     "contributions": {
       "type": "object",
-      "description": "Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `taskfile`, `migrations`.",
+      "description": "Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `migrations` (`taskfile` is deprecated and ignored).",
       "properties": {
         "rules_of_rules": {
           "type": "string",
@@ -233,7 +233,8 @@
         },
         "taskfile": {
           "type": "string",
-          "description": "Module tasks appended to the deployed Taskfile.common.yml (§6.5)."
+          "deprecated": true,
+          "description": "Deprecated, ignored since kernel 0.70.0 (§6.5): a module ships no task; the criterion's Taskfile.common.yml has one task per command of the composed §4. Still accepted, as older module manifests carry it."
         },
         "migrations": {
           "type": "string",

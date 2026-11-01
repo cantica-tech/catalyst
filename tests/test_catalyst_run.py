@@ -200,10 +200,11 @@ def test_a_failed_run_exits_1_and_one_without_a_result_says_why(project, tmp_pat
     assert code == 1 and end["event"] == "end" and end["ok"] is False and end["result"] == "auth expired"
 
 
-def test_an_unknown_command_or_agent_exits_2(project, capsys):
+def test_an_unknown_command_exits_2_and_an_agent_that_cannot_start_1(project, capsys):
+    """REQ-000110: a command §4 does not have is a usage error (2); no adapter for the agent is a failure (1)."""
     assert main(["agent", "run", "nope"]) == 2
     assert "/nope is not in CODE-OF-CONDUCT.md" in capsys.readouterr().err
-    assert main(["agent", "run", "--agent", "codex", "alpha"]) == 2
+    assert main(["agent", "run", "--agent", "codex", "alpha"]) == 1
     assert "no run adapter for agent 'codex'" in capsys.readouterr().err
 
 

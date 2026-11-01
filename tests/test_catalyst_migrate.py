@@ -166,7 +166,7 @@ def test_the_cli_prints_what_its_schema_describes_and_applies(tmp_path, capsys):
 def test_outside_a_project_it_says_so(tmp_path, capsys):
     (tmp_path / "empty").mkdir()
     subprocess.run(["git", "init", "-q", str(tmp_path / "empty")], check=True)
-    assert main(["--project", str(tmp_path / "empty"), "migrate"]) == 1
+    assert main(["--project", str(tmp_path / "empty"), "migrate"]) == 4  # no deployment (REQ-000110)
     assert "no catalyst.toml" in capsys.readouterr().err
 
 

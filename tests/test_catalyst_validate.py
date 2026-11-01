@@ -174,7 +174,7 @@ def test_cli_exit_codes_and_json(tmp_path, capsys):
 
 
 def test_cli_without_deployment(tmp_path, capsys):
-    assert main(["--project", str(tmp_path), "validate"]) == 2
+    assert main(["--project", str(tmp_path), "validate"]) == 4
     assert "no catalyst deployment" in capsys.readouterr().err
 
 

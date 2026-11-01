@@ -148,8 +148,9 @@ template versions the migrations ask for (`CLI.md`).
    - read the module's `INVARIANTS.module.md` together with the kernel's
      `INVARIANTS.md` (§6.4);
    - recompose `Taskfile.common.yml` from
-     `templates/Taskfile.common.template.yml` plus the module's
-     `Taskfile.module.yml` tasks (§6.5);
+     `templates/Taskfile.common.template.yml`, one task per command of the
+     composed §4 (§6.5: a module ships no task; a `Taskfile.module.yml` is
+     not read);
    - apply the module's migrations with the kernel's, in version order
      (item 10 of the slash-command behavior above, §6.6).
    Composition is additive: module content never replaces kernel content,
@@ -227,10 +228,10 @@ template versions the migrations ask for (`CLI.md`).
      conflict (never deleted), and catalyst's hooks leave the project's
      `.claude/settings.json` (its other settings kept). For
      `Taskfile.common.yml` (in the criterion, not the project tree —
-     INV-6) against `templates/Taskfile.common.template.yml` plus
-     the module's `Taskfile.module.yml`: add any task missing relative to
-     §4, refresh a task's `desc`/dispatched command only if this kernel or
-     module version changed that command's §4 spec.
+     INV-6) against `templates/Taskfile.common.template.yml` and the
+     composed §4 (a module ships no task, §6.5): add any task missing
+     relative to §4, refresh a task's `desc`/dispatched command only if this
+     kernel or module version changed that command's §4 spec.
      The project's own `Taskfile.yml`, if it has one, is never read or
      written by a sync: catalyst never touches it.
 8. Update the deployed framework's `version.txt` to the latest released
@@ -307,5 +308,6 @@ changed in the active module has that module's migration instead.
 | `0.108.0` | `0.109.0` | [`0.109.0/criterion-admin-role.md`](migrations/0.109.0/criterion-admin-role.md) | The Criterion Admin, shown (REQ-000091) and `catalyst serve --criterion` (REQ-000090). Mechanical: the roles template gets the kernel's `Criterion Admin` as its next version, once. Judgment: restart a `catalyst serve` server with `--criterion <project_name>`. |
 | `0.115.0` | `0.116.0` | [`0.116.0/landing.md`](migrations/0.116.0/landing.md) | Landing, phase 1 (REQ-000099, design 33): every journal entry says how its change was made, `via` (`agent`, `person`, `server`); a criterion declares how its changes land, `IAM/landing.json`, the kernel's `standard` policy when absent; `catalyst landing init\|show`, `check` validates it. Mechanical: nothing. Judgment: choose the landing policy with the user. |
 | `0.119.2` | `0.120.0` | [`0.120.0/identity-pointer-issuer.md`](migrations/0.120.0/identity-pointer-issuer.md) | One shape for the identity pointer (BUG-000057): `IAM/identity.json` names its provider by its `issuer`, never `url` + `realm`; tokens kept per provider as one provider is named, so a login carries across shapes and loopback spellings; the signers ledger compares issuers the same way, never rewritten. Mechanical: `catalyst migrate --apply` writes the issuer. Judgment: none. |
+| `0.120.0` | `0.121.0` | [`0.121.0/exit-codes.md`](migrations/0.121.0/exit-codes.md) | No deployment exits `4`, `2` is a usage error only (REQ-000110, fw-STRUCTURE-000025); `id next --peek` (REQ-000111); module releases only in the distribution repository (REQ-000112). Mechanical: none. Judgment: a caller that tested `2` for "no deployment" tests `4`. |
 
 <!-- end generated: migrations -->
