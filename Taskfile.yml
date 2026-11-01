@@ -87,9 +87,18 @@ tasks:
     cmds:
       - python3 -m catalyst {{.CLI_ARGS}}
 
-  release:
-    desc: "Package the kernel and modules into versioned zipped archives with manifests under catalyst/ (no commit, no push)"
+  check:journaled:
+    desc: "Refuse when a commit since the journal's baseline changes a governed file the journal does not record (catalyst unrecorded --strict), or a generated section is stale; run before pushing a release"
+    env:
+      PYTHONPATH: scripts
     cmds:
+      - python3 scripts/gen_docs.py --check
+      - python3 -m catalyst unrecorded --strict
+
+  release:
+    desc: "Package the kernel and modules into versioned zipped archives with manifests under catalyst/ (no commit, no push); refuses first on unjournaled commits (check:journaled)"
+    cmds:
+      - task: check:journaled
       - python3 scripts/package_release.py
       - task: check:command-parity
       - task: check:kernel-purity

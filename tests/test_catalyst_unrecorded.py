@@ -290,6 +290,8 @@ def test_unrecorded_command_and_report(proj, capsys):
     sha = manual_commit(proj)
     assert main(["unrecorded", "--json"]) == 0
     listed = json.loads(capsys.readouterr().out)
+    assert main(["unrecorded", "--strict"]) == 1  # the release gate fails whatever the format (BUG-000060)
+    assert "(checked as errors)" in capsys.readouterr().out
     assert listed[0]["commit"] == sha and listed[0]["files"][0]["path"] == "src/app.py"
     assert schema_check.problems(listed, schema_check.load("unrecorded")) == []
     from catalyst.report import build, render

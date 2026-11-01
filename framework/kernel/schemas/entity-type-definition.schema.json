@@ -202,6 +202,10 @@
     "location": {
       "type": "string",
       "description": "Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first."
+    },
+    "created_by": {
+      "type": "string",
+      "description": "The one command of the module's catalogue that creates this type (`/<command>`): no generic `/create <type>` is composed for it, and `catalyst new` refuses unless run with `--command` naming it (fw-STRUCTURE-000026). Default: none."
     }
   },
   "additionalProperties": false

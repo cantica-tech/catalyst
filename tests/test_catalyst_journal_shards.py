@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import replace as dataclass_replace
 
 import pytest
 
@@ -189,6 +190,28 @@ def test_concurrent_appends_are_serialised(project):
     shared = [f for e in rows for f in e["files"] if f["path"] == "shared.txt"]
     assert shared[0]["before"] is None and all(f["before"] == shared[0]["after"] for f in shared[1:])
     assert [i for i in j.verify(dep) if i.level == "error"] == []
+
+
+def test_an_entry_is_stamped_when_written_not_when_requested(project, monkeypatch):
+    """BUG-000061: a request built first but written second (it waited for the lock) is stamped after the one that
+    overtook it, so the journal reads back in the order it was written. Stamped when built, the overtaken entry
+    (a file's later, unchanged state) came first, before the entry that created the file."""
+    write(project / "shared.txt", "same\n")
+    clock = iter(f"2026-10-02T10:00:0{n}Z" for n in range(10))
+    monkeypatch.setattr(j, "now", lambda: next(clock))
+    late = j.AppendRequest(
+        command="/x", action="update", artifact="x", targets=[], intent=["second"], files=["shared.txt"], actor="bob"
+    )
+    first = j.AppendRequest(
+        command="/x", action="create", artifact="x", targets=[], intent=["first"], files=["shared.txt"], actor="ada"
+    )
+    dep = load(project)
+    j.append(dep, first)
+    j.append(dep, dataclass_replace(late, allow_unchanged=True))
+    rows = [e for _, e, _ in j.read(load(project)) if e]
+    assert [e["actor"] for e in rows] == ["ada", "bob"]
+    assert rows[0]["timestamp"] < rows[1]["timestamp"]
+    assert rows[0]["files"][0]["before"] is None
 
 
 def test_an_append_waits_for_the_journal_lock(project):

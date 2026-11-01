@@ -120,7 +120,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst report` | usage report: actors, tiers, traced commits, open artifacts | `--json`, `--since` |
 | `catalyst audit` | the audit pack: each rule's chain and the record's integrity | `--html`, `--json` |
 | `catalyst badge` | a README badge: an SVG of check's result or of the rules in use | `--metric`, `--out` |
-| `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json` |
+| `catalyst unrecorded <range>` | commits whose product changes the journal does not record | `--json`, `--strict` |
 | `catalyst trace <range>` | check that every commit in a range cites an artifact or rule ID | `--pattern-only` |
 | `catalyst recompose` | merge kernel/module template changes into the deployed documents, keeping local edits (three-way) | `--base-kernel`, `--base-module`, `--check`, `--force`, `--kernel`, `--module-dir` |
 | `catalyst spec <command> <part>` | print only what one command needs from CODE-OF-CONDUCT §4 | `--budget`, `--general`, `--json` |
@@ -312,7 +312,7 @@ directory is not empty. On success it prints one line per step, commits nothing 
 project repository, gives the working copy its own git history, and
 journals the install as the first entry. The pointer's `journal_since` is
 the project's `HEAD` at install (`""` with no commit yet): the baseline
-after which [changes made outside catalyst](#catalyst-unrecorded-range---json)
+after which [changes made outside catalyst](#catalyst-unrecorded-range---strict---json)
 are checked.
 
 ### `catalyst recompose --base-kernel <dir> --base-module <dir> --kernel <dir> [--module-dir <dir>] [--check]`
@@ -381,7 +381,7 @@ a **warning** (a deployment from before format `1.0-rc`; migration
 working copy (`--working-copy`) has no pointer and skips this check.
 
 **Unrecorded changes.** Each commit after the pointer's `journal_since`
-with an [unrecorded change](#catalyst-unrecorded-range---json) is reported
+with an [unrecorded change](#catalyst-unrecorded-range---strict---json) is reported
 at that command's level: a warning during the beta, an error from format
 `1.0` or under `"strict_journal": true`. A pointer with no `journal_since`
 is a warning (history not checked; migration `0.42.0` adds the field). A
@@ -629,7 +629,7 @@ deployment checks the message, if there is one; otherwise the commit
 passes. So a commit spanning two projects must trace in both.
 
 A traced message is then checked for staged product files whose content
-no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---json)):
+no journal entry records ([unrecorded changes](#catalyst-unrecorded-range---strict---json)):
 a warning on stderr during the beta, a refusal (exit `1`) from format
 `1.0` or under `"strict_journal": true`. Journal them first, or adopt the
 commit afterwards (`catalyst journal adopt HEAD`). No `journal_since` in
@@ -667,7 +667,7 @@ without a trace, then a summary; exits `1` if any, and on a bad range.
 
 With a working copy (not `--pattern-only`) and a `journal_since` in the
 pointer, it also prints one `unrecorded-change` line per commit of the
-range (after the baseline) with [unrecorded changes](#catalyst-unrecorded-range---json),
+range (after the baseline) with [unrecorded changes](#catalyst-unrecorded-range---strict---json),
 as `WARNING` during the beta and `ERROR` from format `1.0` or under
 `"strict_journal": true`; only at error level do they fail the trace.
 
@@ -1039,7 +1039,12 @@ Who signs (design 29). A criterion holds no user or role registry:
   <cmd>]` (the password from the command's first line, else one line of
   standard input, else asked without echo; never an argument),
   `identity logout` (revokes), `identity whoami` (userid, groups, roles and
-  grants, verified now), `identity status` (no network). With `--issuer
+  grants, verified now), `identity status` (no network: `logged_in` when
+  tokens are stored, and `session` from their expiry — `active`,
+  `refreshable`, `expired` when the access and refresh tokens both expired,
+  or `none`). A writing verb refreshes an expired access token first; when
+  the session has lapsed it says so on stderr, and who signs instead (the
+  system account). With `--issuer
   <url>` each works outside any deployment, e.g. before `catalyst init`.
   Tokens are kept owner-only, never in a criterion or a project: in
   catalyst-users' own credentials file when this machine's catalyst-users is
@@ -1344,7 +1349,7 @@ generate its types from.
   working copy has no project history and lists the last four kinds only.
   The payload is described by `spec/inbox.schema.json`.
 
-### `catalyst unrecorded [<range>] [--json]`
+### `catalyst unrecorded [<range>] [--strict] [--json]`
 
 Lists the **unrecorded changes**: non-merge product commits that change a
 file to a git blob that was not its latest journaled `after` as of the
@@ -1363,7 +1368,9 @@ subject, files: [{path, before, after}]}`.
 
 Severity follows the format rollout: a **warning** while the pointer's
 `format` is a release candidate (`1.0-rc`, the beta), an **error** from
-format `1.0`, or earlier when the pointer sets `"strict_journal": true`.
+format `1.0`, or earlier when the pointer sets `"strict_journal": true`;
+`--strict` checks at error level whatever the format (a release gate:
+nothing leaves with a commit the journal does not record).
 Exits `1` only when something is found at error level (and on a bad range,
 a standalone working copy, or a pointer with no `journal_since` and no
 `<range>`); `0` otherwise. `/adopt` resolves each one.
@@ -2180,6 +2187,7 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 | `catalyst badge` | `--metric` `METRIC` | what the badge shows: the deployment's check result, or how many live rules have work resting on them (one of `check`, `chain`; default `check`) |
 |  | `--out` `FILE` | write the SVG there (default: stdout) |
 | `catalyst unrecorded` | `<range>` | git revision range (default: every commit after the baseline) |
+|  | `--strict` | exit 1 on any unrecorded commit, whatever the deployment's format (a release gate, BUG-000060) |
 |  | `--json` | machine-readable output (JSON on stdout) |
 | `catalyst trace` | `<range>` | git revision range (default: HEAD~1..HEAD) |
 |  | `--pattern-only` | no working copy (e.g. CI of a local-only deployment): accept any well-formed ID |

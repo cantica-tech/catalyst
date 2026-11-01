@@ -12,6 +12,14 @@ document, and leaves the prose around them alone:
 
 `gen_docs.py` rewrites every marked section; `gen_docs.py --check` exits 1,
 naming each section that differs, without writing (the tests run it).
+
+In a checkout catalyst governs (a `catalyst.toml` at its root), what it
+rewrites is journaled at once (`catalyst journal append`, BUG-000060): a
+regenerated section is a change to a governed file like any other, and
+twice a release commit carried one the journal did not record. The entry is
+a chore unless the work it belongs to is named: `--target <ID>` (repeatable)
+and `--tier <tier>` are passed on. `--no-journal` leaves the entry to the
+caller; a failed entry exits 1.
 """
 
 from __future__ import annotations
@@ -379,9 +387,35 @@ def render(text: str, name: str, body: str) -> str:
     return pattern.sub(lambda _: f"{begin}\n\n{body}\n\n{end}", text)
 
 
+def _options(args: list[str], name: str) -> list[str]:
+    """Every value of `--name <value>` in `args`."""
+    return [args[i + 1] for i, a in enumerate(args[:-1]) if a == name]
+
+
+def journal(paths: list[Path], sections: list[str], targets: list[str] | None = None, tier: str = "chore") -> int:
+    """Journal the files gen_docs rewrote, through this checkout's own CLI (BUG-000060); 0 when done or when the
+    checkout is not a governed one."""
+    import os
+    import subprocess
+
+    if not paths or not (ROOT / "catalyst.toml").is_file():
+        return 0
+    command = [sys.executable, "-m", "catalyst", "--project", str(ROOT), "journal", "append"]
+    command += ["--command", "catalyst journal append", "--action", "update", "--artifact", "generated sections"]
+    command += ["--intent", f"scripts/gen_docs.py regenerated {', '.join(sections)} from their sources"]
+    command += [arg for path in sorted(set(paths)) for arg in ("--file", str(path.relative_to(ROOT)))]
+    command += [arg for target in targets or [] for arg in ("--target", target)] + ["--tier", tier]
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "scripts")}
+    if subprocess.run(command, cwd=ROOT, env=env, check=False).returncode == 0:
+        return 0
+    print("gen_docs: the rewritten files are not journaled; journal them before committing (law L1)")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
-    check = "--check" in (argv if argv is not None else sys.argv[1:])
-    stale = []
+    args = argv if argv is not None else sys.argv[1:]
+    check = "--check" in args
+    stale, written = [], []
     for name, (path, build) in SECTIONS.items():
         text = path.read_text(encoding="utf-8")
         fresh = render(text, name, build())
@@ -389,6 +423,10 @@ def main(argv: list[str] | None = None) -> int:
             stale.append(f"{path.relative_to(ROOT)} ({name})")
             if not check:
                 path.write_text(fresh, encoding="utf-8")
+                written.append(path)
+    # journaled before any drift check can return: a rewritten file is never left unrecorded
+    tier = (_options(args, "--tier") or ["chore"])[-1]
+    journaled = 0 if check or "--no-journal" in args else journal(written, stale, _options(args, "--target"), tier)
     drift = flag_drift((KERNEL / "CLI.md").read_text(encoding="utf-8"))
     if drift:
         print("CLI.md names options no command has: " + ", ".join(drift))
@@ -407,7 +445,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if stale:
         print(("out of date: " if check else "rewrote: ") + ", ".join(stale))
-        return 1 if check else 0
+        return 1 if check else journaled
     print("generated sections up to date")
     return 0
 

@@ -42,6 +42,37 @@ def test_a_stale_section_is_named_and_not_written_by_check(tmp_path, monkeypatch
     assert gen_docs.main(["--check"]) == 0
 
 
+def test_what_it_rewrites_in_a_governed_checkout_is_journaled(tmp_path, monkeypatch, capsys):
+    """BUG-000060: a rewritten section is journaled at once in a checkout catalyst governs, before any later check
+    can return; a failed entry fails the run; --no-journal and --check journal nothing."""
+    import subprocess
+
+    doc = tmp_path / "CLI.md"
+    begin, end = gen_docs.BEGIN.format(name="cli-index"), gen_docs.END.format(name="cli-index")
+    stale = f"# CLI\n\n{begin}\n\nold\n\n{end}\n"
+    (tmp_path / "catalyst.toml").write_text('project_name = "x"\n', encoding="utf-8")
+    monkeypatch.setattr(gen_docs, "ROOT", tmp_path)
+    monkeypatch.setattr(gen_docs, "SECTIONS", {"cli-index": (doc, gen_docs.cli_index)})
+    calls: list[list[str]] = []
+    code = {"rc": 0}
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, code["rc"])
+    )
+    doc.write_text(stale, encoding="utf-8")
+    assert gen_docs.main(["--target", "REQ-000001-Ab3xR9pQ", "--tier", "feature"]) == 0
+    (call,) = calls
+    assert call[call.index("journal") + 1] == "append" and call[call.index("--file") + 1] == "CLI.md"
+    assert call[call.index("--target") + 1] == "REQ-000001-Ab3xR9pQ" and call[call.index("--tier") + 1] == "feature"
+    doc.write_text(stale, encoding="utf-8")
+    assert gen_docs.main([]) == 0 and calls[-1][calls[-1].index("--tier") + 1] == "chore"
+    doc.write_text(stale, encoding="utf-8")
+    code["rc"] = 1
+    assert gen_docs.main([]) == 1 and "not journaled" in capsys.readouterr().out
+    doc.write_text(stale, encoding="utf-8")
+    calls.clear()
+    assert gen_docs.main(["--no-journal"]) == 0 and gen_docs.main(["--check"]) == 0 and calls == []
+
+
 def test_a_document_without_its_markers_is_refused(tmp_path):
     with pytest.raises(SystemExit, match="no `<!-- generated: cli-index"):
         gen_docs.render("# no markers\n", "cli-index", "body")

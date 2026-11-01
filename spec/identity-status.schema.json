@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "catalyst identity status",
-  "description": "The provider the deployment points at (IAM/identity.json, design 29) and whether this machine holds a person's tokens for it.",
+  "description": "The provider the deployment points at (IAM/identity.json, design 29), whether this machine holds a person's tokens for it, and, from those tokens' expiry alone (no network), the state of that session.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,18 @@
       "type": "string"
     },
     "logged_in": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Tokens for this provider are stored on this machine, valid or not."
+    },
+    "session": {
+      "type": "string",
+      "enum": [
+        "active",
+        "refreshable",
+        "expired",
+        "none"
+      ],
+      "description": "`active`: the access token is valid; `refreshable`: it expired and the refresh token has not (the next use refreshes it); `expired`: both expired, the session lapsed and the system account signs instead (`catalyst identity login`); `none`: no tokens stored."
     }
   }
 }

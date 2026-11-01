@@ -239,12 +239,23 @@ def _identity_session(args, sub: str, doc: dict, dep) -> int:
             print(f"logged out of {provider.issuer_of(doc)}")
             return 0
         if sub == "status":
+            state = provider.session_state(doc)
             out = {
                 "provider": str(doc.get("provider")),
                 "issuer": provider.issuer_of(doc),
                 "logged_in": provider.logged_in(doc),
+                "session": state,  # from the stored tokens' expiry, no network (BUG-000059)
             }
-            print(json.dumps(out) if args.json else "; ".join(f"{k}: {v}" for k, v in out.items()))
+            if args.json:
+                print(json.dumps(out))
+            else:
+                said = {
+                    provider.ACTIVE: "active",
+                    provider.REFRESHABLE: "access token expired, refreshed on next use",
+                    provider.EXPIRED: "logged in, session expired — run catalyst identity login",
+                    provider.NONE: "not logged in",
+                }
+                print("; ".join(f"{k}: {said.get(v, v) if k == 'session' else v}" for k, v in out.items()))
             return 0
     except CatalystUsersError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
@@ -707,7 +718,10 @@ def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
         except EditError:
             return "create", ()
         names = {etd.id_prefix.lower(), etd.name.lower().replace(" ", "-")}
-        return "create", tuple(sorted(f"create-{n}" for n in names))
+        aliases = tuple(sorted(f"create-{n}" for n in names))
+        if etd.created_by:  # created only by its module's command (fw-STRUCTURE-000026): that command's grant counts
+            return etd.created_by.lstrip("/"), ("create", *aliases)
+        return "create", aliases
     if args.edit in ("rename", "edit", "link", "unlink"):
         return _verb_command(dep, args.edit), ()
     return {"status": "status", "restore": "journal-restore"}.get(args.edit, "create"), ()
@@ -1293,7 +1307,7 @@ def cmd_agent_run(args) -> int:
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
     try:  # before the adapter: a command §4 does not have is usage, whatever this machine has installed
-        prompt = procedure(section4, args.command, arguments, dep.project_root)
+        prompt = procedure(section4, args.command, arguments, dep.project_root, dep.etds)
     except SpecError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return EXIT_USAGE
@@ -1737,8 +1751,9 @@ def cmd_unrecorded(args) -> int:
     else:
         for c in found:
             print(unrecorded.describe(c))
-        print(f"{len(found)} commit(s) with changes not in the journal (checked as {unrecorded.level(dep)}s)")
-    return 1 if found and unrecorded.level(dep) == "error" else 0
+        level = "error" if args.strict else unrecorded.level(dep)
+        print(f"{len(found)} commit(s) with changes not in the journal (checked as {level}s)")
+    return 1 if found and (args.strict or unrecorded.level(dep) == "error") else 0
 
 
 def cmd_hook(args) -> int:
@@ -2967,6 +2982,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("unrecorded", help="commits whose product changes the journal does not record")
     p.add_argument("range", nargs="?", help="git revision range (default: every commit after the baseline)")
+    p.add_argument(
+        "--strict",
+        action="store_true",
+        help="exit 1 on any unrecorded commit, whatever the deployment's format (a release gate, BUG-000060)",
+    )
     p.add_argument("--json", action="store_true")
     p.set_defaults(func=cmd_unrecorded)
 

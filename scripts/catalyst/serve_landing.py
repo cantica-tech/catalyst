@@ -31,7 +31,6 @@ import datetime
 import json
 import os
 import re
-import shlex
 import subprocess
 import tempfile
 import threading
@@ -705,8 +704,21 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-") or "someone"
 
 
-def read_token(command: str) -> str:
-    done = subprocess.run(shlex.split(command), capture_output=True, text=True, check=False)
+def read_token(command: str, windows: bool | None = None) -> str:
+    """The token `command` prints; the command split by this platform's rules (BUG-000062: a Windows path keeps its
+    backslashes)."""
+    from catalyst.identity.provider import split_command
+
+    try:
+        argv = split_command(command, windows=windows)
+    except ValueError:
+        raise LandingError("the token command cannot be split into a program and its arguments") from None
+    if not argv:
+        raise LandingError("the token command is empty")
+    try:
+        done = subprocess.run(argv, capture_output=True, text=True, check=False)
+    except OSError as exc:
+        raise LandingError(f"the token command cannot be run ({type(exc).__name__})") from None
     token = done.stdout.strip()
     if done.returncode != 0 or not token:
         raise LandingError(f"the token command failed: {done.stderr.strip() or 'it printed nothing'}")
