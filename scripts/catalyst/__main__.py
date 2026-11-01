@@ -1289,15 +1289,19 @@ def cmd_agent_run(args) -> int:
     arguments = " ".join(rest)
     try:
         section4 = load_section4(dep)
-        adapter = runs.adapter_for(agent)
-    except (SpecError, runs.RunError) as exc:  # the deployment or this machine: a failure
+    except SpecError as exc:  # the deployment: a failure
         print(f"catalyst: {exc}", file=sys.stderr)
         return 1
-    try:
+    try:  # before the adapter: a command §4 does not have is usage, whatever this machine has installed
         prompt = procedure(section4, args.command, arguments, dep.project_root)
-    except SpecError as exc:  # a command §4 does not have: usage
+    except SpecError as exc:
         print(f"catalyst: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    try:
+        adapter = runs.adapter_for(agent)
+    except runs.RunError as exc:  # this machine: no adapter, or the agent's CLI not on PATH
+        print(f"catalyst: {exc}", file=sys.stderr)
+        return 1
 
     def show(event: dict) -> None:
         if args.json:
