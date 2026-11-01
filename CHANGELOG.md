@@ -17,10 +17,8 @@ messages.
   (`spec/identity-status.schema.json`). The check uses the person's own session only and never the system account, so
   a lapsed session reads `no`, not as verified. The offline `logged_in` and `session` fields are unchanged; the
   `status` row of `identity --help` and `CLI.md` say so.
-- Chore: the fleet's modules declare `created_by:` (REQ-000113, fleet fix 6.2) on the types whose creating command is in
-  their `commands:` catalogue: software-engineering 3.6.0's BUG, REQ, TEST, STEP, FEAT and ADR, and knowledge-base 0.6.1's
-  KB and KBUILD. HK and KSOURCE keep the generic path: HK has no creating command in its catalogue, and KSOURCE's
-  `/create knowledge-source` is not in KBM's `commands:`. Declared in those modules' own repositories, not here.
+- Chore: the process modules declare `created_by:` (REQ-000113, fleet fix 6.2) on the types whose creating command is in
+  their `commands:` catalogue. The modules' own changelogs and migrations say which types; none is declared here.
 - Fixed: `task release` writes the generated sections (`gen_docs.py`, journaled as any gen_docs write is) and checks
   them again before it packages. Before, it only checked them, so `SYNCHRONIZE.md`'s migrations table was missed by the
   0.120.0 and 0.121.0 releases (the kernel round's "release steps journaling `SYNCHRONIZE.md`").
