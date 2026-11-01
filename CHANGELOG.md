@@ -8,6 +8,10 @@ messages.
 
 ## Unreleased
 
+- Added: `catalyst inbox` lists open work to review (kind `review`): each BUG or REQ whose status is outside its type's
+  closed states (the same "open" as `catalyst backlog`), with the status changes its workflow allows as its settle
+  commands (`catalyst status set`). The payload is `spec/inbox.schema.json`, now with eight kinds.
+
 - Changed: `catalyst identity status` asks the provider whether it confirms the stored login, when tokens are stored and
   the provider is reachable. It adds `verified` (`yes`, `no`, `unreachable`, `not_checked`) and, on `yes`, `username`
   (`spec/identity-status.schema.json`). The check uses the person's own session only and never the system account, so

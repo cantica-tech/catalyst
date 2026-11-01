@@ -1336,7 +1336,7 @@ generate its types from.
   unknown ID exits `1`. The payload is described by
   `spec/impact.schema.json` in the catalyst repository.
 - `catalyst inbox`: what waits for a person, each item with its `evidence`
-  and `settle`, the commands that settle it. Seven kinds: a commit made
+  and `settle`, the commands that settle it. Eight kinds: a commit made
   outside catalyst whose changes the journal does not record
   (`unrecorded-commit`: adopt it or revert it); a changed or new project
   file not journaled yet (`unrecorded-change`); a reconciliation case that
@@ -1348,7 +1348,10 @@ generate its types from.
   being decided (`proposal`: its entity, file, base, proposed blob and
   author; the `reconcile` decisions settle it), listed apart from the
   disputes; an open entity past its type's due date (`overdue`: moving it
-  on, or a new date, settles it). It lists and
+  on, or a new date, settles it); an open bug or requirement awaiting a
+  decision on its status (`review`: each status its type's workflow allows
+  next is a `catalyst status set` decision; "open" is the same as
+  `catalyst backlog`'s, any status outside the type's closed states). It lists and
   settles nothing, and exits `0` whether or not anything waits. A bare
   working copy has no project history and lists the last four kinds only.
   The payload is described by `spec/inbox.schema.json`.
