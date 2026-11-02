@@ -237,7 +237,7 @@ class Server:
     def procedure(self, name: str, arguments: str, hint: str | None = None) -> str:
         dep, s = self.section4(hint)
         try:
-            return procedure(s, name, arguments, dep.project_root)
+            return procedure(s, name, arguments, dep.project_root, dep.etds)
         except SpecError as exc:
             raise RpcError(-32602, str(exc)) from exc
 

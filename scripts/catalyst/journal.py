@@ -42,7 +42,7 @@ import secrets
 import string
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import project_file
@@ -557,7 +557,9 @@ class AppendRequest:
     files: list[str]
     actor: str
     allow_unchanged: bool = False
-    timestamp: str = field(default_factory=now)
+    # empty: stamped when written, under the journal lock, so append order is time order (BUG-000061); a
+    # request stamped when built could be overtaken by one built later and read back after it
+    timestamp: str = ""
     tier: str | None = None
     # fields a verb adds to its entry (`proposed_by`, `proposal`: a proposal accepted, design 26)
     extra: dict | None = None
@@ -647,7 +649,8 @@ def _validate(req: AppendRequest) -> None:
         raise JournalError("at least one --file is required")
     if not all(str(f).strip() for f in req.files):
         raise JournalError("an empty --file names no file")
-    parse_time(req.timestamp)
+    if req.timestamp:
+        parse_time(req.timestamp)
 
 
 def _append(dep: Deployment, req: AppendRequest) -> dict:
@@ -682,7 +685,7 @@ def _append(dep: Deployment, req: AppendRequest) -> dict:
         if after:
             to_pin.setdefault(repo, set()).add(after)
     entry = {
-        "timestamp": req.timestamp,
+        "timestamp": req.timestamp or now(),
         "actor": req.actor,
         "command": req.command,
         "action": req.action,

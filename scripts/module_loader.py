@@ -85,6 +85,9 @@ class ETD:
     generated: bool = False  # declared in a v3 module.yaml: its template and definition are generated
     # whether a person who is not an admin may create it (design 31 §4.1): a module's types by default
     contributors_create: bool = True
+    # the one command that creates it (`/open-case`), when its module declares one (`created_by:`): the kernel
+    # composes no generic `/create <type>` for it, and `catalyst new` refuses outside that command (REQ-000113)
+    created_by: str | None = None
 
 
 @dataclass
@@ -438,7 +441,15 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
     etd.definition = str(spec.get("definition") or "").strip()
     etd.generated = True
     etd.contributors_create = spec.get("contributors_create", True) is not False
+    etd.created_by = creating_command(spec.get("created_by"))
     return etd
+
+
+def creating_command(value: Any) -> str | None:
+    """A declared `created_by:` as `/<command>` (`open-case`, `/open-case` and `/create case` read as `/open-case`,
+    `/open-case` and `/create-case`), or None when there is none."""
+    words = str(value or "").strip().lstrip("/").split()
+    return "/" + "-".join(words) if words else None
 
 
 def parse_etd_dict(d: dict[str, Any]) -> ETD:
@@ -490,7 +501,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
     else:
         wf = WorkflowDefinition(initial="Open", states=["Open"], closed_states=[])
 
-    return ETD(
+    etd = ETD(
         id_prefix=id_prefix,
         name=name,
         plural_name=plural_name,
@@ -502,6 +513,8 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
         fields=fields,
         workflow=wf,
     )
+    etd.created_by = creating_command(d.get("created_by"))
+    return etd
 
 
 def load_etd_file(path: Path) -> ETD | None:

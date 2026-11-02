@@ -44,6 +44,13 @@ change that alters what gets deployed into a project also needs:
    `framework/kernel/SYNCHRONIZE.md`;
 3. a `CHANGELOG.md` entry.
 
+Then run `python3 scripts/gen_docs.py` (in a governed checkout it journals
+the sections it rewrites, `SYNCHRONIZE.md`'s migrations table among them;
+`--target <ID> --tier <tier>` names the work), journal every other file
+you changed, commit, and run `task check:journaled` before pushing: it
+refuses when a commit changes a governed file the journal does not record
+(`catalyst unrecorded --strict`). `task release` runs it first.
+
 Two hard rules for kernel sources: the kernel names no process module or
 module entity (`INVARIANTS.md` INV-30, checked by
 `scripts/check_kernel_purity.py`), and it references no downstream product.

@@ -17,6 +17,26 @@ def test_every_generated_section_is_up_to_date(capsys):
     assert gen_docs.main(["--check"]) == 0, capsys.readouterr().out
 
 
+def test_release_writes_the_generated_sections_before_it_packages():
+    """`SYNCHRONIZE.md`'s migrations table was missed by the 0.120.0 and 0.121.0 releases: `task release` only checked
+    the generated sections. It now writes them (journaled, as any write of gen_docs is), checks them again, and only
+    then packages."""
+    lines = (Path(__file__).resolve().parent.parent / "Taskfile.yml").read_text(encoding="utf-8").splitlines()
+    start = lines.index("  release:")
+    steps = []
+    for line in lines[start + 1 :]:
+        if line.strip() and not line.startswith("    "):
+            break  # the next task, at the task level
+        if line.startswith("      - "):
+            steps.append(line.strip()[2:])
+    assert "python3 scripts/gen_docs.py" in steps, steps
+    write = steps.index("python3 scripts/gen_docs.py")
+    assert steps[write + 1] == "python3 scripts/gen_docs.py --check", steps
+    package = steps.index("python3 scripts/package_release.py")
+    assert package > write + 1, steps
+    assert steps.index("task: check:journaled") < write, steps
+
+
 def test_the_index_lists_every_command_with_its_options():
     index = gen_docs.cli_index()
     for row in (
@@ -40,6 +60,37 @@ def test_a_stale_section_is_named_and_not_written_by_check(tmp_path, monkeypatch
     assert "old" in doc.read_text(encoding="utf-8")  # --check writes nothing
     assert gen_docs.main([]) == 0 and "`catalyst init`" in doc.read_text(encoding="utf-8")
     assert gen_docs.main(["--check"]) == 0
+
+
+def test_what_it_rewrites_in_a_governed_checkout_is_journaled(tmp_path, monkeypatch, capsys):
+    """BUG-000060: a rewritten section is journaled at once in a checkout catalyst governs, before any later check
+    can return; a failed entry fails the run; --no-journal and --check journal nothing."""
+    import subprocess
+
+    doc = tmp_path / "CLI.md"
+    begin, end = gen_docs.BEGIN.format(name="cli-index"), gen_docs.END.format(name="cli-index")
+    stale = f"# CLI\n\n{begin}\n\nold\n\n{end}\n"
+    (tmp_path / "catalyst.toml").write_text('project_name = "x"\n', encoding="utf-8")
+    monkeypatch.setattr(gen_docs, "ROOT", tmp_path)
+    monkeypatch.setattr(gen_docs, "SECTIONS", {"cli-index": (doc, gen_docs.cli_index)})
+    calls: list[list[str]] = []
+    code = {"rc": 0}
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **kw: calls.append(cmd) or subprocess.CompletedProcess(cmd, code["rc"])
+    )
+    doc.write_text(stale, encoding="utf-8")
+    assert gen_docs.main(["--target", "REQ-000001-Ab3xR9pQ", "--tier", "feature"]) == 0
+    (call,) = calls
+    assert call[call.index("journal") + 1] == "append" and call[call.index("--file") + 1] == "CLI.md"
+    assert call[call.index("--target") + 1] == "REQ-000001-Ab3xR9pQ" and call[call.index("--tier") + 1] == "feature"
+    doc.write_text(stale, encoding="utf-8")
+    assert gen_docs.main([]) == 0 and calls[-1][calls[-1].index("--tier") + 1] == "chore"
+    doc.write_text(stale, encoding="utf-8")
+    code["rc"] = 1
+    assert gen_docs.main([]) == 1 and "not journaled" in capsys.readouterr().out
+    doc.write_text(stale, encoding="utf-8")
+    calls.clear()
+    assert gen_docs.main(["--no-journal"]) == 0 and gen_docs.main(["--check"]) == 0 and calls == []
 
 
 def test_a_document_without_its_markers_is_refused(tmp_path):
