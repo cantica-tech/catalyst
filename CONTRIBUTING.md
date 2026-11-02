@@ -51,6 +51,24 @@ you changed, commit, and run `task check:journaled` before pushing: it
 refuses when a commit changes a governed file the journal does not record
 (`catalyst unrecorded --strict`). `task release` runs it first.
 
+CI checks the journal too (`.github/workflows/deployment-rules.yml`, job
+`journal`): it clones the private criterion with a read-only deploy key
+(the secret `CRITERION_DEPLOY_KEY`) and runs `catalyst unrecorded --strict`
+and `catalyst trace` over the pushed or proposed commits. A commit's
+journal entries reach the shared criterion only when its criterion pull
+request is merged, so the order is:
+
+1. push `development` and share the criterion (`catalyst share push`); the
+   `journal` job only warns on the development push while the criterion
+   pull request is open;
+2. merge the criterion pull request;
+3. open (or re-run) the code pull request into `main`, then into
+   `release`: there the `journal` job is required and fails on any commit
+   whose changes the merged criterion does not record.
+
+Without the secret (a fork's pull request) the job says so and checks
+nothing.
+
 Two hard rules for kernel sources: the kernel names no process module or
 module entity (`INVARIANTS.md` INV-30, checked by
 `scripts/check_kernel_purity.py`), and it references no downstream product.
