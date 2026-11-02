@@ -7,6 +7,7 @@ machine's system account signs (design 29 §3.4a)."""
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -200,7 +201,13 @@ def test_whoami_shows_roles_by_the_template_and_the_grants(deployment, capsys):
     assert schema_check.problems(payload, schema_check.load("identity-whoami")) == []
     assert main(["identity", "status", "--json"]) == 0
     status = json.loads(capsys.readouterr().out)
-    assert status == {"provider": "keycloak", "issuer": ISSUER, "logged_in": False}
+    assert status == {
+        "provider": "keycloak",
+        "issuer": ISSUER,
+        "logged_in": False,
+        "session": "none",
+        "verified": "not_checked",
+    }
     assert schema_check.problems(status, schema_check.load("identity-status")) == []
 
 
@@ -449,7 +456,9 @@ def test_login_with_a_password_from_stdin_or_a_command(monkeypatch, capsys):
     assert provider.logged_in(POINTER)
     assert main(["identity", "logout", "--issuer", ISSUER]) == 0
     assert not provider.logged_in(POINTER)
-    command = shlex.join([sys.executable, "-c", "print('s3cret')"])  # quoted: a Windows path keeps its backslashes
+    argv = [sys.executable, "-c", "print('s3cret')"]
+    # quoted by the platform's rules (catalyst-users 0.11.1's split_command): a Windows path keeps its backslashes
+    command = subprocess.list2cmdline(argv) if os.name == "nt" else shlex.join(argv)
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     args = ["identity", "login", "--issuer", ISSUER, "--password", "--username", "alice", "--password-command", command]
     assert main(args) == 0
@@ -603,3 +612,196 @@ def test_catalyst_users_home_is_in_catalysts(tmp_path, monkeypatch):
     monkeypatch.setenv("CATALYST_HOME", str(tmp_path / "home"))
     assert users_config.home() == tmp_path / "home" / "users"
     assert users_config.settings_file() == tmp_path / "home" / "users" / "IAM" / "settings.json"
+
+
+# --- a lapsed session (BUG-000059) -----------------------------------------------------------
+def _jwt(claims: dict) -> str:
+    import base64
+
+    part = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+    return f"e30.{part}.sig"
+
+
+def _store(access: str, expires_in: float, refresh_in: float | None, refresh: str | None = "rt") -> None:
+    import time
+
+    from catalyst.identity.credentials import CredentialStore
+    from catalyst.identity.oidc import Tokens
+
+    now = time.time()
+    tokens = Tokens(access, refresh, now + expires_in, None if refresh_in is None else now + refresh_in)
+    CredentialStore(provider.token_store(POINTER)).save(ISSUER, "catalyst-cli", tokens)
+
+
+def test_status_tells_an_expired_session_from_an_active_one(monkeypatch, capsys):
+    """BUG-000059: `identity status` read stored tokens as logged in whatever their expiry; it now says, without the
+    network, whether the session is active, refreshable on next use, or expired. The provider check is stubbed
+    unreachable here, so the offline answer is what is under test."""
+    from catalyst.identity.errors import ProviderUnavailableError
+
+    def down(request, timeout):
+        raise ProviderUnavailableError("identity provider unreachable: offline")
+
+    _with_transport(monkeypatch, down)
+
+    def status(json_out: bool = True):
+        capsys.readouterr()
+        assert main(["identity", "status", "--issuer", ISSUER, *(["--json"] if json_out else [])]) == 0
+        out = capsys.readouterr().out
+        return json.loads(out) if json_out else out
+
+    assert (status()["logged_in"], status()["session"]) == (False, "none")
+    _store("at", 300, 3600)
+    assert (status()["logged_in"], status()["session"]) == (True, "active")
+    assert schema_check.problems(status(), schema_check.load("identity-status")) == []
+    _store("at", -10, 3600)
+    assert status()["session"] == "refreshable"
+    _store("at", -10, None)  # a refresh token with no stated expiry: the provider decides
+    assert status()["session"] == "refreshable"
+    _store("at", -10, -5)
+    assert (status()["logged_in"], status()["session"]) == (True, "expired")
+    assert "logged in, session expired — run catalyst identity login" in status(json_out=False)
+    _store("at", -10, None, refresh=None)
+    assert status()["session"] == "expired"
+
+
+def test_status_asks_the_provider_when_tokens_are_stored(monkeypatch, capsys):
+    """`identity status` verifies a stored login with the provider when it can: `yes` names the person, `no` is a
+    refused login (a lapsed session never reads as verified through the system account), and an unreachable
+    provider is `unreachable` while the offline session still stands."""
+    from catalyst.identity.errors import ProviderUnavailableError
+
+    real = provider.facade
+    answering = {"transport": None}  # swapped per step: one patch, so the stubs do not stack
+    monkeypatch.setattr(provider, "facade", lambda doc, transport_=None: real(doc, answering["transport"]))
+
+    def status() -> dict:
+        capsys.readouterr()
+        assert main(["identity", "status", "--issuer", ISSUER, "--json"]) == 0
+        return json.loads(capsys.readouterr().out)
+
+    assert status()["verified"] == "not_checked"  # nothing stored, so nothing to ask
+
+    claims = {"sub": "sub-alice", "preferred_username": "alice", "name": "Alice Developer"}
+    _store(_jwt(claims), 300, 3600)
+    answering["transport"] = _keycloak({_jwt(claims): claims})
+    out = status()
+    assert (out["verified"], out["username"], out["session"]) == ("yes", "alice", "active")
+    assert schema_check.problems(out, schema_check.load("identity-status")) == []
+
+    answering["transport"] = _keycloak({})  # the provider no longer knows this token
+    out = status()
+    assert out["verified"] == "no" and "username" not in out
+
+    def down(request, timeout):
+        raise ProviderUnavailableError("identity provider unreachable: offline")
+
+    answering["transport"] = down
+    out = status()
+    assert (out["verified"], out["session"]) == ("unreachable", "active")
+    assert schema_check.problems(out, schema_check.load("identity-status")) == []
+
+
+def _refreshing(base, refreshed: dict[str, str], seen: list[str]):
+    """`base`, also answering the refresh grant: `refreshed` maps a refresh token to the new access token."""
+    from catalyst.identity.http import Response
+
+    def transport(request, timeout):
+        if request.url.endswith("token_endpoint"):
+            form = dict(parse_qsl((request.body or b"").decode()))
+            if form.get("grant_type") == "refresh_token":
+                seen.append(form.get("refresh_token", ""))
+                new = refreshed.get(form.get("refresh_token", ""))
+                if new:
+                    body = {"access_token": new, "refresh_token": "rt2", "expires_in": 300, "refresh_expires_in": 1800}
+                    return Response(200, {}, json.dumps(body).encode())
+                return Response(400, {}, json.dumps({"error": "invalid_grant"}).encode())
+        return base(request, timeout)
+
+    return transport
+
+
+def test_an_expired_access_token_is_refreshed_before_anyone_else_signs(capsys):
+    claims = {"sub": "s1", "preferred_username": "alice", "name": "Alice"}
+    seen: list[str] = []
+    transport = _refreshing(_keycloak({"at-new": claims}), {"rt": "at-new"}, seen)
+    _system_account()
+    _store(_jwt({"preferred_username": "alice"}), -10, 3600)
+    assert provider.verify(POINTER, None, transport).username == "alice"
+    assert seen == ["rt"] and "system account" not in capsys.readouterr().err
+    assert provider.session_state(POINTER) == "active"  # the refreshed tokens are stored
+
+
+def test_a_lapsed_session_says_so_and_who_signs_instead(capsys):
+    """The person's session lapsed (the refresh is refused): the system account signs, and stderr says whose session
+    lapsed and who signs instead — never "no one is logged in"."""
+    sys_claims = {"sub": "sub-sys", "preferred_username": "sysadmin", "name": "System"}
+    seen: list[str] = []
+    transport = _refreshing(_keycloak({"at-sysadmin": sys_claims}, {"sysadmin": "sys-pw"}), {}, seen)
+    _system_account()
+    _store(_jwt({"preferred_username": "alice"}), -10, -5)
+    capsys.readouterr()
+    assert provider.verify(POINTER, None, transport).username == "sysadmin"
+    err = capsys.readouterr().err
+    assert "alice's session at" in err and "has lapsed" in err and "signing as the system account sysadmin" in err
+    assert "no one is logged in" not in err and seen == ["rt"]  # the refresh was tried first
+
+
+def test_a_lapsed_session_with_no_system_account_says_it_lapsed():
+    _store("opaque", -10, -5)
+    with pytest.raises(provider.ProviderError, match=r"the stored session at .* has lapsed"):
+        provider.verify(POINTER, None, _refreshing(_keycloak({}), {}, []))
+
+
+def test_the_session_start_says_a_session_lapsed(deployment, monkeypatch, capsys):
+    import io
+
+    project, _ = deployment
+    _system_account()
+    _store(_jwt({"preferred_username": "alice"}), -10, -5)
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    capsys.readouterr()
+    assert main(["--project", str(project), "hook", "start", "--quiet"]) == 0
+    out = capsys.readouterr().out
+    assert "alice's session" in out and "has lapsed" in out and "signed by the system account sysadmin" in out
+    _store("at", -10, 3600)  # refreshable: nothing to say
+    monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
+    assert main(["--project", str(project), "hook", "start", "--quiet"]) == 0
+    assert capsys.readouterr().out == ""
+
+
+# --- commands split by the platform's rules (BUG-000062) -------------------------------------
+@pytest.mark.parametrize(
+    ("windows", "program"), [(True, "C:\\Tools\\print token.exe"), (False, "/opt/tools/print token")]
+)
+def test_the_landing_token_and_master_key_commands_split_by_the_platform_s_rules(monkeypatch, windows, program):
+    """`serve_landing.read_token` and `membership.read_master` split their command with the vendored
+    `split_command`, Windows rules on Windows (a path keeps its backslashes), POSIX rules elsewhere; both splitters
+    are exercised whatever the runner's OS."""
+    import base64
+
+    from catalyst import membership, serve_landing
+
+    key = base64.b64encode(b"k" * 32).decode()
+    seen: list[list[str]] = []
+
+    def run(argv, **kw):
+        seen.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=key + "\n", stderr="")
+
+    monkeypatch.setattr(serve_landing.subprocess, "run", run)
+    monkeypatch.setattr(membership.subprocess, "run", run)
+    command = subprocess.list2cmdline([program, "--name", "a b"]) if windows else shlex.join([program, "--name", "a b"])
+    assert serve_landing.read_token(command, windows=windows) == key
+    assert membership.read_master(command, windows=windows) == b"k" * 32
+    assert seen == [[program, "--name", "a b"]] * 2
+
+
+def test_an_unsplittable_or_empty_command_is_refused_without_running():
+    from catalyst import membership, serve_landing
+
+    for bad in ("'unterminated", ""):
+        with pytest.raises(serve_landing.LandingError):
+            serve_landing.read_token(bad, windows=False)
+        with pytest.raises(membership.MembershipError):
+            membership.read_master(bad, windows=False)

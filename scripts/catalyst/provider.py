@@ -172,6 +172,59 @@ def logged_in(doc: dict[str, Any]) -> bool:
     return any(store.load(issuer, client) is not None for client in clients)
 
 
+ACTIVE, REFRESHABLE, EXPIRED, NONE = "active", "refreshable", "expired", "none"
+
+
+def _stored_tokens(doc: dict[str, Any]) -> list:
+    from catalyst.identity.credentials import CredentialStore
+    from catalyst.identity.providers.keycloak import DEFAULT_PASSWORD_CLIENT
+
+    if doc.get("provider") != "keycloak":
+        return []
+    store, issuer = CredentialStore(token_store(doc)), issuer_of(doc)
+    clients = {str(doc.get("client") or DEFAULT_CLIENT), str(doc.get("password_client") or DEFAULT_PASSWORD_CLIENT)}
+    return [t for t in (store.load(issuer, client) for client in sorted(clients)) if t is not None]
+
+
+def session_state(doc: dict[str, Any], now: float | None = None) -> str:
+    """The stored login's state, from its tokens' expiry alone (no network, BUG-000059): `active` (the access token
+    is valid), `refreshable` (it expired, the refresh token has not: the next use refreshes it), `expired` (both
+    expired: the session lapsed, and the system account would sign) or `none` (no login stored). A refresh token
+    with no stated expiry counts as refreshable; the provider may still refuse it (an idle or revoked session)."""
+    tokens = _stored_tokens(doc)
+    if not tokens:
+        return NONE
+    at = time.time() if now is None else now
+    if any(t.expires_at > at for t in tokens):
+        return ACTIVE
+    if any(t.refresh_token and (t.refresh_expires_at is None or t.refresh_expires_at > at) for t in tokens):
+        return REFRESHABLE
+    return EXPIRED
+
+
+def stored_username(doc: dict[str, Any]) -> str | None:
+    """The username the stored access token names (`preferred_username`), read without verifying it: only to say
+    whose session lapsed, never to sign."""
+    import base64
+
+    for tokens in _stored_tokens(doc):
+        try:
+            payload = tokens.access_token.split(".")[1]
+            claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        except (IndexError, ValueError):
+            continue
+        name = claims.get("preferred_username") if isinstance(claims, dict) else None
+        if name:
+            return str(name)
+    return None
+
+
+def lapsed(doc: dict[str, Any]) -> str:
+    """How to name a lapsed session in a message: `<user>'s session` or `the session`."""
+    who = stored_username(doc)
+    return f"{who}'s session" if who else "the stored session"
+
+
 def facade(doc: dict[str, Any], transport: Any = None):
     """The catalyst-users backend the pointer names."""
     from catalyst.identity.errors import CatalystUsersError
@@ -197,12 +250,17 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
 
     backend = facade(doc, transport)
     try:
+        # a stored login whose access token expired is refreshed here (catalyst-users' Session.tokens)
         return backend.whoami(as_user if backend.kind == "static" else None)
     except NotLoggedInError:
+        # tokens stored, but neither valid nor refreshable: the person's session lapsed (BUG-000059), not "nobody"
+        expired = f"{lapsed(doc)} at {backend.issuer} has lapsed" if logged_in(doc) else None
         system = system_backend(backend.issuer, transport)
         if system is None:
             raise ProviderError(
-                f"no verified identity: not logged in to {backend.issuer} (`catalyst identity login`)"
+                f"no verified identity: {expired}, and no system account can sign (`catalyst identity login`)"
+                if expired
+                else f"no verified identity: not logged in to {backend.issuer} (`catalyst identity login`)"
             ) from None
         try:
             who = system.system_whoami()
@@ -214,7 +272,14 @@ def verify(doc: dict[str, Any], as_user: str | None = None, transport: Any = Non
                 f"system account is {who.username} ({who.name}); log in as {as_user} (`catalyst identity login`), "
                 "or leave the name out to sign as the system account"
             ) from None
-        print(f"catalyst: no one is logged in: signing as the system account {who.username}", file=sys.stderr)
+        if expired:
+            print(
+                f"catalyst: {expired} (its tokens expired and could not be refreshed): signing as the system account "
+                f"{who.username} instead; `catalyst identity login` to sign as yourself",
+                file=sys.stderr,
+            )
+        else:
+            print(f"catalyst: no one is logged in: signing as the system account {who.username}", file=sys.stderr)
         return who
     except CatalystUsersError as exc:
         raise ProviderError(f"no verified identity ({exc}): `catalyst identity login`, then try again") from None
@@ -244,9 +309,24 @@ def nobody_logged_in(dep: Deployment) -> str | None:
     from catalyst.identity.errors import CatalystUsersError
 
     doc = pointer(dep)
-    if doc is None or doc.get("provider") != "keycloak" or logged_in(doc):
+    if doc is None or doc.get("provider") != "keycloak":
+        return None
+    state = session_state(doc)
+    if state in (ACTIVE, REFRESHABLE):
         return None
     issuer = issuer_of(doc)
+    if state == EXPIRED:  # a login is stored, but lapsed: say so, not "no one is logged in" (BUG-000059)
+        who = f"{lapsed(doc)} at {issuer} has lapsed"
+        try:
+            system = users_config.system_pointer(issuer)
+        except CatalystUsersError:
+            system = None
+        if system is not None:
+            return (
+                f"catalyst: {who}: this session's entries will be signed by the system account "
+                f"{system.get('username')}; `catalyst identity login` to sign as yourself"
+            )
+        return f"catalyst: {who}, and no system account can sign: `catalyst identity login`"
     try:
         system = users_config.system_pointer(issuer)
     except CatalystUsersError:

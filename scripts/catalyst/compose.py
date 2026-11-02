@@ -157,7 +157,8 @@ def generated_commands(module: Path | None, existing: str) -> list:
     """The v3 types whose `/create-<type>` the module's catalogue part does
     not define (module v3, M3): catalyst generates those commands. A
     catalogue entry counts with its arguments (`/create-x <id>`); a type
-    stored as rows gets none."""
+    stored as rows gets none, nor does a type its module creates only
+    through a command of its own (`created_by:`, REQ-000113)."""
     from catalyst import generate
     from module_loader import load_module
 
@@ -171,6 +172,7 @@ def generated_commands(module: Path | None, existing: str) -> list:
         for etd in manifest.entity_types.values()
         if etd.generated
         and etd.naming != "free-form"  # rows of a file: no document to create
+        and not etd.created_by  # created only by its module's own command: no generic create
         and not re.search(rf"`/{re.escape(generate.create_command(etd))}[` :]", existing)
     ]
 

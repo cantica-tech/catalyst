@@ -13,7 +13,9 @@ Six sources, each of which already has a verb that settles it:
 - gated changes waiting for their approvals, a gated rule's text or an
   entity one move away from a gated state (`catalyst approve`; design 25);
 - open entities past their type's due date, with the role a governing
-  workflow escalates to (`catalyst status set`, or a new date; W2).
+  workflow escalates to (`catalyst status set`, or a new date; W2);
+- open bugs and requirements, each awaiting a decision on its status
+  (`catalyst status set`), the same "open" as `catalyst backlog`.
 
 The inbox lists; it settles nothing and proposes no decision. A bare working
 copy or a served criterion has no project history, so it lists the cases
@@ -26,9 +28,20 @@ from catalyst import analysis, gates, proposals, unrecorded
 from catalyst.corpus import Corpus
 from catalyst.deployment import Deployment
 
-KINDS = ("unrecorded-commit", "unrecorded-change", "reconciliation", "analysis", "approval", "proposal", "overdue")
+KINDS = (
+    "unrecorded-commit",
+    "unrecorded-change",
+    "reconciliation",
+    "analysis",
+    "approval",
+    "proposal",
+    "overdue",
+    "review",
+)
 RECONCILIATION = "RECON"
 DECISIONS = ("accept", "accept-with-edits", "reject", "propose")
+# the work items a person decides on (review), by type: a bug still open, a requirement not yet completed
+REVIEWED = ("BUG", "REQ")
 
 
 def _item(kind: str, item_id: str, title: str, evidence: dict, settle: list[str]) -> dict:
@@ -91,6 +104,23 @@ def inbox(dep: Deployment, corpus: Corpus) -> dict:
         title = f"{o['title']}: due {o['due']}, {o['days']} day(s) over"
         settle = [f"catalyst status set {o['id']} <state> --intent <why>", f"a new `{o['field']}`, journaled"]
         items.append(_item(KINDS[6], o["id"], title, evidence, settle))
+    for prefix in REVIEWED:
+        if prefix not in dep.etds:
+            continue
+        etd = dep.etds[prefix]
+        closed = set(etd.workflow.closed_states)
+        for art in corpus.by_prefix.get(prefix, []):
+            status = (art.get("Status") or "").strip()
+            if not status or status in closed:
+                continue  # the same "open" as `catalyst backlog`: any status outside the type's closed states
+            evidence = {"status": status, "entity": art.id}
+            # its own states it can move to next (the type's workflow), each one a decision
+            settle = [
+                f"catalyst status set {art.id} {state} --intent <why>"
+                for state in etd.workflow.states
+                if state != status
+            ]
+            items.append(_item(KINDS[7], art.id, art.title, evidence, settle))
     counts = {kind: sum(1 for i in items if i["kind"] == kind) for kind in KINDS}
     return {"items": items, "counts": counts}
 
@@ -106,6 +136,7 @@ def render(found: dict) -> str:
         KINDS[4]: "approvals waiting",
         KINDS[5]: "proposals to decide",
         KINDS[6]: "overdue",
+        KINDS[7]: "open work to review",
     }
     lines = []
     for kind in KINDS:

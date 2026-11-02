@@ -184,6 +184,8 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
         capsys,
         "new",
         "KB",
+        "--command",
+        "/kb-setup",  # the command the module declares as its creator (created_by, fw-STRUCTURE-000026)
         "--title",
         "Support knowledge base",
         "--field",
@@ -239,6 +241,8 @@ def test_the_knowledge_base_module_runs_end_to_end(project, capsys):
         capsys,
         "new",
         "KBUILD",
+        "--command",
+        "/kb-build",  # the command the module declares as its creator (created_by, fw-STRUCTURE-000026)
         "--title",
         "Support knowledge base 1.0.0",
         "--field",

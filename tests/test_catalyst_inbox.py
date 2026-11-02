@@ -79,6 +79,107 @@ def test_an_open_case_and_an_analysis_to_decide_wait(tmp_path, monkeypatch):
     assert [i for i in _inbox(project)["items"] if i["kind"] in ("reconciliation", "analysis")] == []
 
 
+REVIEW_MODULE = """id: review-process
+name: Review Process
+version: 1.0.0
+description: A module declaring the two work types the inbox reviews, with the software-engineering module's states.
+grounding_type: rule
+format: 3
+entities:
+  BUG:
+    name: Bug
+    folder: bugs
+    grounding: required
+    grounding_field: Targets
+    fields:
+      Targets: { kind: ref-list, to: rule, required: true }
+    states: [Open, "Under Review", Fixed, Closed, WontFix]
+    closed: [Closed, WontFix]
+    sections:
+      - Description: What is wrong.
+  REQ:
+    name: Requirement
+    folder: requirements
+    grounding: required
+    grounding_field: Targets
+    fields:
+      Targets: { kind: ref-list, to: rule, required: true }
+    states: [Draft, Proposed, Vetted, Active, Completed, Abandoned]
+    closed: [Completed, Abandoned]
+    sections:
+      - Description: What is needed.
+"""
+
+
+def _review_deployment():
+    """The two work types the review reads, as the software-engineering module declares them (its `states` and
+    `closed`), built from a v3 module spec, with no project behind them."""
+    from types import SimpleNamespace
+
+    from module_loader import parse_simple_yaml, v3_entity
+
+    spec = parse_simple_yaml(REVIEW_MODULE)["entities"]
+    etds = {p: v3_entity(p, spec[p]) for p in ("BUG", "REQ")}
+    return SimpleNamespace(etds=etds)
+
+
+def _review_corpus(*artifacts: tuple[str, str, str]):
+    """A corpus holding (prefix, ID, status) artifacts."""
+    from types import SimpleNamespace
+
+    from catalyst.corpus import Artifact
+
+    by_prefix: dict[str, list] = {}
+    for prefix, art_id, status in artifacts:
+        art = Artifact(
+            id=art_id, prefix=prefix, file=Path(f"{art_id}.md"), title=f"A {prefix}", fields={"Status": status}
+        )
+        by_prefix.setdefault(prefix, []).append(art)
+    return SimpleNamespace(by_prefix=by_prefix, artifacts={}, rules={}, domains=set(), users=[], index_rows={})
+
+
+def _review_items(dep, corpus) -> list[dict]:
+    """The `review` items of an inbox run; the other sources need a project, so the test isolates this one."""
+    from unittest.mock import patch
+
+    with (
+        patch.object(inbox.unrecorded, "since_baseline", return_value=[]),
+        patch("catalyst.check.unrecorded_changes", return_value=[]),
+        patch.object(inbox.gates, "waiting", return_value=[]),
+        patch("catalyst.workflows.overdue", return_value=[]),
+    ):
+        found = inbox.inbox(dep, corpus)
+    return [i for i in found["items"] if i["kind"] == "review"]
+
+
+def test_an_open_bug_or_requirement_waits_for_review_until_it_is_closed():
+    """Open work to review (`review`): a BUG or REQ whose status is outside its type's closed states, the same
+    "open" as `catalyst backlog`. Its settle commands are the status changes its type's workflow allows."""
+    dep = _review_deployment()
+    bug, req = f"BUG-000001-{USERID}", f"REQ-000001-{USERID}"
+    review = _review_items(dep, _review_corpus(("BUG", bug, "Open"), ("REQ", req, "Draft")))
+    assert sorted(i["id"] for i in review) == sorted([bug, req])
+    bug_item = next(i for i in review if i["id"] == bug)
+    assert bug_item["kind"] == "review" and bug_item["evidence"] == {"status": "Open", "entity": bug}
+    assert f"catalyst status set {bug} Fixed --intent <why>" in bug_item["settle"]
+    assert (
+        f"catalyst status set {bug} Open --intent <why>" not in bug_item["settle"]
+    )  # its current status is not a move
+    # closed (Closed for a bug, Completed for a requirement): not waiting
+    assert _review_items(dep, _review_corpus(("BUG", bug, "Closed"), ("REQ", req, "Completed"))) == []
+    # a WontFix bug is closed too; an Under Review bug is still open
+    assert _review_items(dep, _review_corpus(("BUG", bug, "WontFix"))) == []
+    assert [i["id"] for i in _review_items(dep, _review_corpus(("BUG", bug, "Under Review")))] == [bug]
+
+
+def test_the_review_items_validate_against_the_schema(capsys):
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    dep = _review_deployment()
+    found = {"items": _review_items(dep, _review_corpus(("BUG", f"BUG-000001-{USERID}", "Open"))), "counts": {}}
+    found["counts"] = dict.fromkeys(inbox.KINDS, 0) | {"review": len(found["items"])}
+    assert _valid(found, schema, schema) == []
+
+
 def test_the_verb_prints_what_the_schema_describes(tmp_path, monkeypatch, capsys):
     project = fresh_project(tmp_path, monkeypatch)
     sha = manual_commit(project)

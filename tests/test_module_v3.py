@@ -244,3 +244,60 @@ def test_a_catalogue_entry_with_arguments_is_the_type_s_own_command_and_rows_get
     assert names("- `/create-task <CASE-id>` — create a task.") == ["CASE"]
     assert names("When the user enters `/create-case: ...`") == ["TASK"]
     assert names("- `/create-tasks` — something else.") == ["CASE", "TASK"]
+
+
+OPEN_CASE = """# Case process
+
+## 3. Standard document types
+
+## 4. Slash-command entry points
+
+- `/open-case <title>` — open a case once its intake is done.
+
+When the user enters `/open-case <title>`, check the intake with the user, then run `catalyst new CASE --title "<t>"
+--field Targets=<IDs> --field Domain=<code> --command /open-case --as <signer>`.
+"""
+
+
+def test_a_type_created_by_its_module_s_command_gets_no_generic_create(tmp_path, monkeypatch, capsys):
+    """fw-STRUCTURE-000026 (REQ-000113): `created_by:` keeps a type to its module's own command."""
+    mod = v3_module(tmp_path / "mods")
+    write(mod / "module.yaml", V3.replace("    name: Case\n", "    name: Case\n    created_by: /open-case\n", 1))
+    write(mod / "code-of-conduct.module.md", OPEN_CASE)
+    req = request(tmp_path, module_id="case-process", module=mod)
+    init(req)
+    root = req.at
+    assert root is not None
+    conduct = (root / "CODE-OF-CONDUCT.md").read_text(encoding="utf-8")
+    assert "`/open-case <title>`" in conduct and "`/create task <title>`" in conduct
+    assert "`/create case" not in conduct and "/create-case" not in conduct
+    monkeypatch.chdir(req.project)
+    capsys.readouterr()
+    assert main(["spec", "create", "case"]) == 0
+    spec = capsys.readouterr().out
+    assert "created only by /open-case" in spec and "--command /open-case" in spec
+    assert main(["spec", "create-case"]) == 0 and "created only by /open-case" in capsys.readouterr().out
+    write(root / "rules" / "domains" / "br-CORE-core.md", "# `CORE` — core\n")
+    with (root / "rules" / "domains" / "domains.md").open("a", encoding="utf-8") as fh:
+        fh.write("| [`CORE`](br-CORE-core.md) | rules/business-rules.md | 2026-10-11 |\n")
+    assert main(["id", "next-rule", "br", "CORE", "--as", "ada"]) == 0
+    rule = capsys.readouterr().out.strip().splitlines()[-1]
+    with (root / "rules" / "business-rules.md").open("a", encoding="utf-8") as fh:
+        fh.write(f"\n### `{rule}` Cases are handled\n\n✅ working.\n")
+    with (root / "rules" / "rules.md").open("a", encoding="utf-8") as fh:
+        fh.write(f"- `{rule}` — Cases are handled\n")
+    args = ["new", "CASE", "--title", "First", "--field", f"Targets={rule}", "--field", "Domain=CORE", "--as", "ada"]
+    for command in ([], ["--command", "/create-case"], ["--command", "/create case"]):
+        assert main([*args, *command]) == 1
+        assert "created only by /open-case" in capsys.readouterr().err
+    assert not list((root / "cases").glob("CASE-*.md"))
+    assert main([*args, "--command", "/open-case"]) == 0
+    assert len(list((root / "cases").glob("CASE-*.md"))) == 1
+    capsys.readouterr()
+    assert main(["check"]) == 0, capsys.readouterr().out
+
+
+def test_created_by_reads_as_one_command():
+    assert v3_entity("CASE", {"name": "Case"}).created_by is None
+    assert v3_entity("CASE", {"name": "Case", "created_by": "open-case"}).created_by == "/open-case"
+    assert v3_entity("CASE", {"name": "Case", "created_by": "/create adr"}).created_by == "/create-adr"

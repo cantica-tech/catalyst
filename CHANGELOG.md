@@ -6,6 +6,56 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## Unreleased
+
+- Added: `catalyst inbox` lists open work to review (kind `review`): each BUG or REQ whose status is outside its type's
+  closed states (the same "open" as `catalyst backlog`), with the status changes its workflow allows as its settle
+  commands (`catalyst status set`). The payload is `spec/inbox.schema.json`, now with eight kinds.
+
+- Changed: `catalyst identity status` asks the provider whether it confirms the stored login, when tokens are stored and
+  the provider is reachable. It adds `verified` (`yes`, `no`, `unreachable`, `not_checked`) and, on `yes`, `username`
+  (`spec/identity-status.schema.json`). The check uses the person's own session only and never the system account, so
+  a lapsed session reads `no`, not as verified. The offline `logged_in` and `session` fields are unchanged; the
+  `status` row of `identity --help` and `CLI.md` say so.
+- Chore: the process modules declare `created_by:` (REQ-000113, fleet fix 6.2) on the types whose creating command is in
+  their `commands:` catalogue. The modules' own changelogs and migrations say which types; none is declared here.
+- Fixed: `task release` writes the generated sections (`gen_docs.py`, journaled as any gen_docs write is) and checks
+  them again before it packages. Before, it only checked them, so `SYNCHRONIZE.md`'s migrations table was missed by the
+  0.120.0 and 0.121.0 releases (the kernel round's "release steps journaling `SYNCHRONIZE.md`").
+
+## 0.122.0 — 2026-11-01
+
+No layout change; nothing mechanical for a deployment (no migration note). `catalyst sync apply` recomposes
+`CODE-OF-CONDUCT.md` with the `/create` bullet's new sentence.
+
+- Added: a module may declare, per type in `module.yaml`, the one command that creates it, `created_by: /<command>`
+  (REQ-000113, fw-STRUCTURE-000026, new; `MODULE-SPECIFICATION.md` §3.3, both schemas). For such a type the kernel
+  composes no generic `/create <type>` part, `catalyst new <PREFIX>` refuses unless it runs with `--command
+  /<command>` (which that command's procedure passes) and names the command, the grant of that command also allows the
+  creation, and `catalyst spec create <type>` (and the MCP prompt, `agent run`) gives the command's procedure. A module
+  that declares nothing keeps the generic part. Optional for module authors.
+- Fixed: `catalyst identity status` no longer reads stored tokens as a live session (BUG-000059, fw-IDENTITY-000002).
+  It adds `session` (`active`, `refreshable`, `expired`, `none`), read from the tokens' expiry without the network,
+  and says "logged in, session expired — run catalyst identity login" when the access and refresh tokens have both
+  expired. A writing verb still refreshes an expired access token first; when the session has lapsed, it says on
+  stderr whose session lapsed and that the system account signs instead (and `hook start` says the same), instead of
+  "no one is logged in".
+- Fixed: generated sections are journaled when written (BUG-000060, fw-BEHAVIOR-000005). `scripts/gen_docs.py`, which
+  rewrites `SYNCHRONIZE.md`'s migrations table among others, journals what it rewrites in a governed checkout (a chore,
+  or `--target <ID> --tier <tier>`); twice a release commit carried such a rewrite unrecorded. `catalyst unrecorded
+  --strict` fails on any unrecorded commit whatever the format, and `task check:journaled` (run first by `task
+  release`) refuses a release with one.
+- Fixed: a journal entry is stamped when it is written, under the journal lock, not when its request is built
+  (BUG-000061, fw-STRUCTURE-000009). A process that built its request first but took the lock second wrote an earlier
+  time after a later one, and concurrent entries read back out of the order they were written (the intermittent
+  `test_concurrent_appends_are_serialised` failure on Windows).
+- Fixed: the landing token command (`serve landing`) and a served criterion's master-key command are split by the
+  platform's rules (BUG-000062, fw-IDENTITY-000013, fw-STRUCTURE-000024): on Windows a path keeps its backslashes;
+  an unsplittable or empty command is refused without being run. catalyst-users 0.11.1's core is vendored for its
+  `split_command` (fw-IDENTITY-000006), which a password command already used.
+- Chore: the four `fw-PLUGINS` rules of catalyst's own criterion, whose plugin system went in 0.72.0, are retired in
+  place.
+
 ## 0.121.0 — 2026-10-31
 
 Exit-code change for callers of the CLI (migration 0.121.0: nothing mechanical for a deployment).

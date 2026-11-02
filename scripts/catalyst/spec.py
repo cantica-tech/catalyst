@@ -152,7 +152,34 @@ def load_section4(dep: Deployment) -> Section4:
     return parse(text)
 
 
-def spec_text(s: Section4, command: str, part: str | None = None) -> str:
+def created_by(etds: dict | None, command: str, part: str | None) -> tuple[str, str] | None:
+    """For `/create <type>` (or `/create-<type>`) of a type its module creates only through a command of its own
+    (`created_by:`, fw-STRUCTURE-000026): the type as asked and that command; else None."""
+    asked = command.strip().lstrip("/")
+    typed = part if asked == "create" and part else asked.removeprefix("create-") if asked.startswith("create-") else ""
+    if not typed or not etds:
+        return None
+    key = typed.lower()
+    for prefix, etd in etds.items():
+        names = {prefix.lower(), etd.name.lower().replace(" ", "-"), etd.plural_name.lower(), etd.folder.lower()}
+        by = getattr(etd, "created_by", None)
+        if key in names and by and by != f"/create-{key}":  # `/create <type>` declared as its own creator stays
+            return typed, by
+    return None
+
+
+def spec_text(s: Section4, command: str, part: str | None = None, etds: dict | None = None) -> str:
+    redirect = created_by(etds, command, part)
+    if redirect:
+        typed, by = redirect
+        out = [
+            f"# /create {typed} — from CODE-OF-CONDUCT.md §4",
+            "",
+            f"A {typed} is created only by {by}, as its module declares (created_by, fw-STRUCTURE-000026): there "
+            f"is no `/create {typed}`. Run {by}; its procedure follows.",
+            "",
+        ]
+        return "\n".join(out) + spec_text(s, by)
     asked = command.lstrip("/")
     if part and f"{asked}-{part}" in s.aliases and _parted(s, asked):  # `catalyst spec create item`
         asked = f"{asked}-{part}"
@@ -182,11 +209,11 @@ def spec_text(s: Section4, command: str, part: str | None = None) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
-def procedure(s: Section4, name: str, arguments: str, project_root) -> str:
+def procedure(s: Section4, name: str, arguments: str, project_root, etds: dict | None = None) -> str:
     """What an agent is given to run a command: the command and its
     arguments, where, and its spec (`/create item …` reads item's part).
     The MCP server's prompts and `catalyst agent run` send the same text."""
-    text = spec_text(s, name, (arguments.split() or [None])[0])
+    text = spec_text(s, name, (arguments.split() or [None])[0], etds)
     return (
         f"Run the catalyst command /{name.lstrip('/')}"
         + (f" with the arguments: {arguments}" if arguments else "")
@@ -196,7 +223,7 @@ def procedure(s: Section4, name: str, arguments: str, project_root) -> str:
 
 
 def spec(dep: Deployment, command: str, part: str | None = None) -> str:
-    return spec_text(load_section4(dep), command, part)
+    return spec_text(load_section4(dep), command, part, dep.etds)
 
 
 def general(dep: Deployment) -> str:
