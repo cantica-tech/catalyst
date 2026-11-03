@@ -97,3 +97,26 @@ def refusal(dep: Deployment, signer: dict, command: str, also: tuple[str, ...] =
         f"Grant it in catalyst-users: `cmd:{needed[-1]}` composed into one of their roles, or a role that has it "
         "(fw-IDENTITY-000008, rr-META-011)"
     )
+
+
+def roles_document(dep: Deployment, kernel_roles: list[dict]) -> tuple[dict, list[str]]:
+    """The roles document to give `catalyst-users roles provision` (fw-IDENTITY-000014): the kernel's roles template,
+    with each installed module's `roles` actions added to the role of that id, in install order, each once; a role
+    holding `*` gains nothing. The deployment's own roles template is left alone: it only shapes how roles are shown
+    (fw-IDENTITY-000010). Returns the document and what was left out, one line each."""
+    import copy
+
+    roles = copy.deepcopy(kernel_roles)
+    by_id = {str(r.get("id") or ""): r for r in roles if r.get("id")}
+    skipped: list[str] = []
+    for m in dep.installed():
+        for grant in m.roles:
+            role = by_id.get(grant.id)
+            if role is None:
+                skipped.append(f"module {m.id}: the kernel has no role {grant.id!r}; its actions are left out")
+                continue
+            actions = role.setdefault("actions", [])
+            if EVERYTHING in actions:
+                continue
+            actions += [a for a in grant.actions if a not in actions]
+    return {"roles": roles}, skipped

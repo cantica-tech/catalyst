@@ -142,3 +142,76 @@ def test_warn_mode_lets_an_ungranted_verb_through_with_a_warning(team, capsys):
     pointer.write_text(json.dumps(data), encoding="utf-8")
     assert main(["id", "next", "ITEM", "--as", "cy"]) == 0
     assert "may not run /create" in capsys.readouterr().err
+
+
+def test_every_full_reconciler_of_the_kernels_roles_may_run_reconcile():
+    """BUG-000064: a `full` level is only usable with the `/reconcile` grant (fw-IDENTITY-000008)."""
+    from pathlib import Path
+
+    template = Path(__file__).resolve().parents[1] / "framework" / "kernel" / "templates" / "roles.template.json"
+    roles = json.loads(template.read_text(encoding="utf-8"))["roles"]
+    full = [r for r in roles if r.get("reconciliation") == "full" and r.get("scope") != "criterion"]
+    assert {r["id"] for r in full} >= {"tech-lead", "release-manager"}
+    for role in full:
+        assert {"/reconcile", "*"} & set(role["actions"]), role["id"]
+
+
+MODULE_ROLES = """id: planner
+name: Planner
+version: 1.0.0
+description: A module with role grants.
+grounding_type: rule
+roles:
+  - id: product-owner
+    actions: ["/plan", "/review"]
+  - id: scrum-master
+    actions: ["/review"]
+  - id: catalyst-admin
+    actions: ["/plan"]
+  - id: nobody
+    actions: ["/plan"]
+"""
+
+
+def test_a_module_names_the_commands_it_adds_to_kernel_roles(tmp_path):
+    """REQ-000118, fw-IDENTITY-000014: `roles` in module.yaml."""
+    from module_loader import load_module
+
+    write(tmp_path / "planner" / "module.yaml", MODULE_ROLES)
+    manifest = load_module(module_dir=tmp_path / "planner")
+    assert [(g.id, g.actions) for g in manifest.roles][:2] == [
+        ("product-owner", ["/plan", "/review"]),
+        ("scrum-master", ["/review"]),
+    ]
+
+
+def test_the_roles_document_adds_each_modules_commands_once(tmp_path):
+    from types import SimpleNamespace
+
+    from module_loader import load_module
+
+    write(tmp_path / "planner" / "module.yaml", MODULE_ROLES)
+    planner = load_module(module_dir=tmp_path / "planner")
+    kernel = [
+        {"id": "product-owner", "name": "Product Owner", "actions": ["/status", "/review"]},
+        {"id": "scrum-master", "name": "Scrum Master", "actions": []},
+        {"id": "catalyst-admin", "name": "Admin", "actions": ["*"]},
+    ]
+    dep = SimpleNamespace(installed=lambda: [planner, planner])
+    document, skipped = permissions.roles_document(dep, kernel)
+    roles = {r["id"]: r["actions"] for r in document["roles"]}
+    assert roles == {
+        "product-owner": ["/status", "/review", "/plan"],
+        "scrum-master": ["/review"],
+        "catalyst-admin": ["*"],
+    }
+    assert kernel[0]["actions"] == ["/status", "/review"]  # the kernel's template is left as it is
+    assert skipped and all("'nobody'" in line for line in skipped)
+
+
+def test_role_document_prints_the_kernels_roles_and_other_role_verbs_refuse(team, capsys):
+    assert main(["role", "document"]) == 0
+    roles = {r["id"]: r for r in json.loads(capsys.readouterr().out)["roles"]}
+    assert "/reconcile" in roles["tech-lead"]["actions"]
+    assert main(["role", "add", "Planner"]) == 1
+    assert "catalyst role document" in capsys.readouterr().err
