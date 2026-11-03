@@ -54,22 +54,26 @@ which `catalyst criterion protect` turns on (§4).
 |---|---|---|---|
 | Product Owner | everything | create the active module's planning and new-work artifacts, approve/prioritize new work, `/create`, `/status`, `/adopt`, `/journal` | `propose` |
 | Scrum Master / Delivery Lead | everything | review the active module's open work, `/status`, `/journal` | `propose` |
-| Tech Lead / Architect | everything | approve rule changes and new domains, vet a development artifact's rule target(s), `/create`, `/status`, `/adopt`, `/journal`, `/freeze`, `/migrate-definition`, `/run-analysis` | `full` |
+| Tech Lead / Architect | everything | approve rule changes and new domains, vet a development artifact's rule target(s), `/create`, `/status`, `/adopt`, `/journal`, `/freeze`, `/migrate-definition`, `/run-analysis`, `/reconcile` | `full` |
 | Developer | everything | create the active module's development artifacts (implementation-driven), implement the active module's development artifacts, `/create`, `/status`, `/adopt`, `/journal`, `/run-analysis` | `propose` |
 | QA / Tester | everything | report defects through the active module's development artifacts, verify a rule's verification coverage, `/create`, `/status`, `/adopt`, `/journal` | `propose` |
 | Stakeholder | everything | propose ideas and planning items to the active module | `none` |
-| Release Manager | everything | `/sync-framework`, `/share`, cutting releases | `full` |
+| Release Manager | everything | `/sync-framework`, `/share`, `/reconcile`, cutting releases | `full` |
 | Admin | everything | `*` | `full` |
 
-The table is the kernel's roles template (`templates/roles.template.json`),
-which `catalyst-users roles provision` writes into the provider once: each
+The table is the kernel's roles template (`templates/roles.template.json`).
+`catalyst role document` prints it with each installed module's commands
+added to the kernel role its `module.yaml` `roles` names
+(fw-IDENTITY-000014), and `catalyst-users roles provision` writes that
+document into the provider once: each
 role becomes a provider role composed of a `cmd:<command>` grant per
 `/command` of its "Write" column (`*` and the `Admin` role: `cmd:*`) and a
 `reconcile:<level>` grant for its reconciliation level. The descriptive
 entries grant nothing. From then on a role's grants are changed in the
 provider, never in the criterion; the deployment's roles template only
-names the roles and shapes how they are shown. The active process module
-names its own commands in its documentation.
+names the roles and shapes how they are shown. A module grants its own
+commands this way and names them in its documentation; a provider
+provisioned before then gets them when the document is provisioned again.
 
 Role does not scope what `/share push` carries: every contributor's
 push holds their whole change, and the pull request is where it is
