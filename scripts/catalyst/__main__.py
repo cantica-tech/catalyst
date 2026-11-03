@@ -759,6 +759,8 @@ def _edit_command(dep, args) -> tuple[str, tuple[str, ...]]:
         names = {etd.id_prefix.lower(), etd.name.lower().replace(" ", "-")}
         aliases = tuple(sorted(f"create-{n}" for n in names))
         if etd.created_by:  # created only by its module's command (fw-STRUCTURE-000026): that command's grant counts
+            if etd.created_by_exclusive:  # and only it: no general create, no alias (REQ-000119)
+                return etd.created_by.lstrip("/"), ()
             return etd.created_by.lstrip("/"), ("create", *aliases)
         return "create", aliases
     if args.edit in ("rename", "edit", "link", "unlink"):

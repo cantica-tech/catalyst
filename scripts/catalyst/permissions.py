@@ -59,7 +59,9 @@ def is_admin(signer: dict) -> bool:
 def creation_refusal(dep: Deployment, signer: dict, prefix: str) -> str | None:
     """Why the signer may not create an entity of type `prefix`, or None (design 31 §4.1, `fw-STRUCTURE-000020`).
     An admin (`cmd:*`) creates any type. Anyone else creates a module's type only, one its module leaves open to
-    contributors (`contributors_create`, true by default), with `cmd:create` (or an alias of it) or `create:<TYPE>`."""
+    contributors (`contributors_create`, true by default), with `cmd:create` (or an alias of it) or `create:<TYPE>`,
+    or, for a type its module creates through a command of its own (`created_by:`), that command's grant; with
+    `created_by_exclusive: true` that grant alone (fw-STRUCTURE-000026, REQ-000119)."""
     held = grants(dep, signer)
     if EVERYTHING in held or ADMIN in (signer.get("roles") or []):
         return None
@@ -69,6 +71,15 @@ def creation_refusal(dep: Deployment, signer: dict, prefix: str) -> str | None:
         return f"{who} may not create {prefix}: it is the kernel's, created by an admin only (design 31)"
     if not owners[-1].entity_types[prefix].contributors_create:
         return f"{who} may not create {prefix}: module {owners[-1].id} keeps it to admins (contributors_create: false)"
+    etd = owners[-1].entity_types[prefix]
+    by = (etd.created_by or "").lstrip("/")
+    if by and by in held:
+        return None
+    if by and etd.created_by_exclusive:
+        return (
+            f"{who} may not create {prefix}: only /{by} creates it, and only its grant allows it (`cmd:{by}`, from "
+            "catalyst-users; created_by_exclusive, fw-STRUCTURE-000026)"
+        )
     typed = {str(g)[len(TYPED_CREATE) :] for g in signer.get("grants") or [] if str(g).startswith(TYPED_CREATE)}
     if prefix in typed or held & set(required(dep, CREATE) or [CREATE]):
         return None

@@ -88,6 +88,9 @@ class ETD:
     # the one command that creates it (`/open-case`), when its module declares one (`created_by:`): the kernel
     # composes no generic `/create <type>` for it, and `catalyst new` refuses outside that command (REQ-000113)
     created_by: str | None = None
+    # whether that command's grant alone lets a signer create it (`created_by_exclusive: true`): no `cmd:create`,
+    # no `create-<type>` alias (REQ-000119); without it the general create's grant counts too
+    created_by_exclusive: bool = False
 
 
 @dataclass
@@ -451,6 +454,7 @@ def v3_entity(prefix: str, spec: dict[str, Any]) -> ETD:
     etd.generated = True
     etd.contributors_create = spec.get("contributors_create", True) is not False
     etd.created_by = creating_command(spec.get("created_by"))
+    etd.created_by_exclusive = spec.get("created_by_exclusive") is True
     return etd
 
 
@@ -523,6 +527,7 @@ def parse_etd_dict(d: dict[str, Any]) -> ETD:
         workflow=wf,
     )
     etd.created_by = creating_command(d.get("created_by"))
+    etd.created_by_exclusive = d.get("created_by_exclusive") is True
     return etd
 
 

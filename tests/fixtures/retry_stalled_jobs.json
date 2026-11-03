@@ -1,0 +1,53 @@
+{
+  "total_count": 6,
+  "jobs": [
+    {
+      "name": "pytest (windows-latest, Python 3.11)",
+      "status": "completed",
+      "conclusion": "success",
+      "labels": [
+        "windows-latest"
+      ]
+    },
+    {
+      "name": "pytest (macos-latest, Python 3.11)",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "labels": [
+        "macos-latest"
+      ]
+    },
+    {
+      "name": "pytest (ubuntu-latest, Python 3.11)",
+      "status": "completed",
+      "conclusion": "success",
+      "labels": [
+        "ubuntu-latest"
+      ]
+    },
+    {
+      "name": "pytest (windows-latest, Python 3.13)",
+      "status": "completed",
+      "conclusion": "success",
+      "labels": [
+        "windows-latest"
+      ]
+    },
+    {
+      "name": "pytest (macos-latest, Python 3.13)",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "labels": [
+        "macos-latest"
+      ]
+    },
+    {
+      "name": "pytest (ubuntu-latest, Python 3.13)",
+      "status": "completed",
+      "conclusion": "success",
+      "labels": [
+        "ubuntu-latest"
+      ]
+    }
+  ]
+}

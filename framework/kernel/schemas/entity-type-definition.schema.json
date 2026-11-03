@@ -206,6 +206,11 @@
     "created_by": {
       "type": "string",
       "description": "The one command of the module's catalogue that creates this type (`/<command>`): no generic `/create <type>` is composed for it, and `catalyst new` refuses unless run with `--command` naming it (fw-STRUCTURE-000026). Default: none."
+    },
+    "created_by_exclusive": {
+      "type": "boolean",
+      "default": false,
+      "description": "With `created_by`: `true` makes that command's grant (`cmd:<command>`) the only one that lets a signer create this type, so neither `cmd:create` nor a `create-<type>` alias nor `create:<TYPE>` counts; `false` lets the general create's grant count too (fw-STRUCTURE-000026). Default: `false`."
     }
   },
   "additionalProperties": false
