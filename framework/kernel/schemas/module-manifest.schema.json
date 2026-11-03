@@ -215,6 +215,32 @@
         "additionalProperties": false
       }
     },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "actions"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A role id of the kernel's roles template (e.g. `developer`)."
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^/"
+            },
+            "description": "The module's own `/commands` the role may run."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "The module's commands each kernel role may run, added to `catalyst role document` (fw-IDENTITY-000014)."
+    },
     "contributions": {
       "type": "object",
       "description": "Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `migrations` (`taskfile` is deprecated and ignored).",

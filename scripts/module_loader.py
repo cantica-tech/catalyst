@@ -105,6 +105,14 @@ class SkillRegistration:
 
 
 @dataclass
+class RoleGrant:
+    """The `/commands` a module adds to the kernel role of `id` (fw-IDENTITY-000014)."""
+
+    id: str
+    actions: list[str] = field(default_factory=list)
+
+
+@dataclass
 class TemplateRegistration:
     entity_type: str
     template_path: str
@@ -155,6 +163,7 @@ class ModuleManifest:
     skills: list[SkillRegistration] = field(default_factory=list)
     templates: list[TemplateRegistration] = field(default_factory=list)
     required_paths: list[RequiredPath] = field(default_factory=list)
+    roles: list[RoleGrant] = field(default_factory=list)
     tiers: list[Tier] = field(default_factory=list)  # empty: DEFAULT_TIERS
     # module v3 M4: the module's own meta-rule and invariant namespace
     # (`rr-<NS>-NNN`, `INV-<NS>-n`) and old IDs that now name new ones
@@ -657,6 +666,12 @@ def load_module(
                 )
             )
 
+    roles: list[RoleGrant] = []
+    for r in data.get("roles") or []:
+        if isinstance(r, dict) and r.get("id"):
+            acts = r.get("actions") or []
+            roles.append(RoleGrant(str(r["id"]), [str(a) for a in (acts if isinstance(acts, list) else [acts])]))
+
     tiers: list[Tier] = []
     for t in data.get("tiers") or []:
         if isinstance(t, dict) and t.get("id"):
@@ -680,6 +695,7 @@ def load_module(
         commands=cmds,
         templates=templates,
         required_paths=required_paths,
+        roles=roles,
         tiers=tiers,
         namespace=str(data["namespace"]).upper() if data.get("namespace") else None,
         aliases={str(k): str(v) for k, v in (data.get("aliases") or {}).items()},

@@ -53,3 +53,20 @@ def default_kernel(tmp: Path) -> Path | None:
         return kernel
     pyz = running_pyz()
     return extract_kernel(pyz, tmp) if pyz is not None else None
+
+
+def kernel_text(relative: str) -> str | None:
+    """One file of the kernel this runs with (the checkout's, else the one bundled in the pyz), as text; None if
+    it has none."""
+    kernel = checkout_kernel()
+    if kernel is not None:
+        path = kernel / relative
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+    pyz = running_pyz()
+    if pyz is None:
+        return None
+    with zipfile.ZipFile(pyz) as zf:
+        try:
+            return zf.read(PREFIX + relative).decode("utf-8")
+        except KeyError:
+            return None

@@ -6,8 +6,24 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
-## Unreleased
+## 0.123.0 — 2026-11-03
 
+- Added: a module may give the kernel's roles its own commands, and `catalyst role document` prints the roles to
+  provision (REQ-000118). In `module.yaml`, `roles` is a list of `{id, actions}`, where `id` is a kernel role and
+  `actions` are the module's `/commands`. `catalyst role document` prints the kernel's roles template with each
+  installed module's actions merged in, as the file to give `catalyst-users roles provision`. A provider already set up
+  gets the commands when that document is provisioned again.
+- Fixed: the kernel's default roles let Tech Lead / Architect and Release Manager run `/reconcile` (BUG-000064). Both
+  had the reconciliation level `full` but no `cmd:reconcile` grant, so only an Admin could decide a `RECON-` case. A
+  provider that is already provisioned gets the grant when `catalyst-users roles provision` is run again with the
+  template.
+- Added: CI checks that every pushed commit's changes are in the journal (REQ-000117). The Deployment Rules workflow's
+  new `journal` job clones the private criterion named in `catalyst.toml` with a read-only deploy key (the secret
+  `CRITERION_DEPLOY_KEY`) and runs `catalyst unrecorded --strict` and a full `catalyst trace` over the pushed range or
+  the pull request's range. It fails a pull request into `main` or `release` and warns elsewhere, since a commit's
+  entries reach the shared criterion only when its criterion pull request is merged (CONTRIBUTING.md gives the order).
+  Without the secret it prints a notice and checks nothing. The range logic is `scripts/ci_range.py`, shared with the
+  trace step.
 - Changed: `catalyst identity status` asks the provider whether it confirms the stored login, when tokens are stored and
   the provider is reachable. It adds `verified` (`yes`, `no`, `unreachable`, `not_checked`) and, on `yes`, `username`
   (`spec/identity-status.schema.json`). The check uses the person's own session only and never the system account, so

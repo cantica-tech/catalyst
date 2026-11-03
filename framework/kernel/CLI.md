@@ -150,7 +150,7 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst link <id> <field> <ids>` | cite IDs in a reference field, keeping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst unlink <id> <field> <ids>` | stop citing IDs in a reference field, dropping the back-reference | `--as`, `--command`, `--forewarned`, `--intent`, `--json`, `--preview`, `--tier` |
 | `catalyst user <rest>` | people are catalyst-users' (design 29): refuses and says where to change them | — |
-| `catalyst role <rest>` | roles are catalyst-users' (design 29): refuses and says where to change them | — |
+| `catalyst role <rest>` | roles are catalyst-users' (design 29): refuses and says where to change them; `role document` prints the roles to provision there | — |
 | `catalyst freeze <item>` | protect an item from /sync-framework (.frozen) | `--as`, `--intent`, `--json` |
 | `catalyst unfreeze <item>` | remove an item from .frozen | `--as`, `--intent`, `--json` |
 | `catalyst definition list` | each deployed definition: its slug, version and description | `--json` |
@@ -963,8 +963,14 @@ Each refuses what its slash command refuses, writes, and journals one entry
   add|modify` always refuse, exit `1`: people, roles and what each role
   grants are catalyst-users' (design 29). The refusal names where to make
   the change: `catalyst-users users …` for people, `catalyst-users roles
-  provision` to write the roles template into the provider; a grant is then
+  provision` to write the roles into the provider; a grant is then
   changed in the provider.
+- `catalyst role document`: read-only, needs no grant. It prints the roles
+  document to give `catalyst-users roles provision`: the kernel's roles
+  template, with each installed module's `roles` actions (`module.yaml`)
+  added to the kernel role of that id, each once. A role holding `*` gains
+  nothing. A module role id the kernel does not have is reported on stderr
+  and left out (fw-IDENTITY-000014).
 - `catalyst freeze <item>` / `unfreeze <item>`: an artifact ID, entity type,
   template name or working-copy path, listed in (or removed from) the
   working copy's `.frozen`.

@@ -894,13 +894,36 @@ def cmd_edit(args) -> int:
 
 
 def cmd_people(args) -> int:
-    """`user …` / `role …`: people and roles are catalyst-users' (design 29), changed there; this only says so."""
+    """`user …` / `role …`: people and roles are catalyst-users' (design 29), changed there; this only says so.
+    `role document` prints the roles to provision there (fw-IDENTITY-000014)."""
+    if args.people == "role" and args.rest[:1] == ["document"]:
+        return cmd_role_document(args)
     print(
         "catalyst: people and roles are catalyst-users' (design 29): add, disable or change people, and what each "
-        "role grants, there (`catalyst-users users …`, `catalyst-users roles provision`); fw-IDENTITY-000007",
+        "role grants, there (`catalyst-users users …`, `catalyst-users roles provision` with what `catalyst role "
+        "document` prints); fw-IDENTITY-000007",
         file=sys.stderr,
     )
     return 1
+
+
+def cmd_role_document(args) -> int:
+    """`role document`: the kernel's roles template with the installed modules' commands, for `catalyst-users roles
+    provision` (fw-IDENTITY-000014). Reads only."""
+    from catalyst import bundle, permissions
+
+    dep = open_deployment(args)
+    text = bundle.kernel_text("templates/roles.template.json")
+    if text is None:
+        print(
+            "catalyst: this runtime carries no kernel roles template (templates/roles.template.json)", file=sys.stderr
+        )
+        return 1
+    document, skipped = permissions.roles_document(dep, json.loads(text)["roles"])
+    for line in skipped:
+        print(f"catalyst: warning: {line}", file=sys.stderr)
+    print(json.dumps(document, indent=2, ensure_ascii=False))
+    return 0
 
 
 def cmd_admin(args) -> int:
@@ -3367,9 +3390,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     # people and roles are catalyst-users' (design 29, fw-IDENTITY-000007): these only say where to change them
     for verb, what in (("user", "people"), ("role", "roles")):
-        p = sub.add_parser(verb, help=f"{what} are catalyst-users' (design 29): refuses and says where to change them")
+        p = sub.add_parser(
+            verb,
+            help=f"{what} are catalyst-users' (design 29): refuses and says where to change them"
+            + ("; `role document` prints the roles to provision there" if verb == "role" else ""),
+        )
         p.add_argument("rest", nargs=argparse.REMAINDER, help="anything: the refusal is the same")
-        p.set_defaults(func=cmd_people)
+        p.set_defaults(func=cmd_people, people=verb)
 
     for verb, text in (
         ("freeze", "protect an item from /sync-framework (.frozen)"),

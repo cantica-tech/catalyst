@@ -15,7 +15,7 @@
     {
       "name": "Tech Lead / Architect",
       "id": "tech-lead",
-      "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)", "/create", "/status", "/adopt", "/journal", "/freeze", "/migrate-definition", "/run-analysis"],
+      "actions": ["approve rule changes and new domains", "vet a development artifact's rule target(s)", "/create", "/status", "/adopt", "/journal", "/freeze", "/migrate-definition", "/run-analysis", "/reconcile"],
       "reconciliation": "full"
     },
     {
@@ -39,7 +39,7 @@
     {
       "name": "Release Manager",
       "id": "release-manager",
-      "actions": ["/sync-framework", "/share", "cutting releases"],
+      "actions": ["/sync-framework", "/share", "/reconcile", "cutting releases"],
       "reconciliation": "full"
     },
     {

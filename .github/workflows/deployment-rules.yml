@@ -70,16 +70,72 @@ jobs:
       - name: Every new commit cites an artifact or rule ID, or is a chore (catalyst trace)
         env:
           PYTHONPATH: scripts
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
-          elif ! git cat-file -e "${{ github.event.before }}^{commit}" 2>/dev/null \
-            && git rev-parse -q --verify origin/main >/dev/null; then
-            # a force push: the previous tip is gone, so check whatever main does not have yet
-            range="origin/main..${{ github.sha }}"
-          elif [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            range="${{ github.event.before }}..${{ github.sha }}"
-          else
-            range="${{ github.sha }}~1..${{ github.sha }}"
-          fi
+          range=$(python3 scripts/ci_range.py --event "$EVENT" --sha "$SHA" --before "$BEFORE" --base "$BASE" --head "$HEAD")
           python3 -m catalyst trace --pattern-only "$range"
+
+  # Every pushed commit's changes are in the journal (REQ-000117). The journal is in the private criterion
+  # repository named by catalyst.toml, cloned with a read-only deploy key (the secret CRITERION_DEPLOY_KEY) into a
+  # scratch catalyst home; this checkout's CLI then runs `unrecorded --strict` and a full `trace` over the range.
+  # A commit's entries reach the shared criterion only when its criterion pull request is merged, so the check is
+  # required on a pull request into main or release (merge the criterion PR first, CONTRIBUTING.md) and a warning
+  # elsewhere (a development push lands before its criterion PR is merged). Without the secret (a fork's pull
+  # request, or before it is configured) the job says so and checks nothing.
+  journal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.11'
+      - name: Clone the criterion (private, read-only deploy key)
+        id: criterion
+        env:
+          CRITERION_DEPLOY_KEY: ${{ secrets.CRITERION_DEPLOY_KEY }}
+        run: |
+          if [ -z "$CRITERION_DEPLOY_KEY" ]; then
+            echo "::notice title=Journal not checked::the secret CRITERION_DEPLOY_KEY is not available (a fork's pull request, or not configured), so the criterion cannot be cloned; unrecorded changes are not checked"
+            echo "cloned=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          export CATALYST_HOME="$RUNNER_TEMP/catalyst"
+          echo "CATALYST_HOME=$CATALYST_HOME" >> "$GITHUB_ENV"
+          install -d -m 700 ~/.ssh
+          key="$RUNNER_TEMP/criterion-key"
+          (umask 077 && printf '%s\n' "$CRITERION_DEPLOY_KEY" > "$key")
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          read -r name url branch < <(python3 -c 'import tomllib; d = tomllib.load(open("catalyst.toml", "rb")); print(d["project_name"], d["catalyst_repo_url"], d.get("criterion_branch") or "criterion")')
+          GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes" \
+            git clone -q -b "$branch" "$url" "$CATALYST_HOME/projects/$name/criterion"
+          rm -f "$key"
+          echo "cloned=true" >> "$GITHUB_OUTPUT"
+      - name: Every commit's changes are in the journal (catalyst unrecorded --strict, catalyst trace)
+        if: steps.criterion.outputs.cloned == 'true'
+        env:
+          PYTHONPATH: scripts
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          range=$(python3 scripts/ci_range.py --event "$EVENT" --sha "$SHA" --before "$BEFORE" --base "$BASE" --head "$HEAD")
+          python3 -m catalyst where
+          status=0
+          python3 -m catalyst unrecorded --strict "$range" || status=1
+          python3 -m catalyst trace "$range" || status=1
+          [ "$status" -eq 0 ] && exit 0
+          if [ "$EVENT" = "pull_request" ] && { [ "$BASE_REF" = "main" ] || [ "$BASE_REF" = "release" ]; }; then
+            echo "::error title=Unjournaled changes::a commit in $range changes a governed file the criterion's journal does not record, or cites no artifact; merge its criterion pull request first (CONTRIBUTING.md), or journal it (catalyst journal adopt)"
+            exit 1
+          fi
+          echo "::warning title=Unjournaled changes::a commit in $range is not in the shared criterion's journal yet; expected until its criterion pull request is merged, required before the pull request into main (CONTRIBUTING.md)"

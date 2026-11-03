@@ -94,6 +94,7 @@ catalyst-<module-id>/
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
 | `definitions` | `list[object]` | No | Entity definitions (`entity_type`, `path`). |
 | `required_paths` | `list[object]` | No | Paths every deployment must carry (`path`, optional `invariant`, optional `seed` template); checked by `scripts/check_deployment.py`. |
+| `roles` | `list[object]` | No | The module's commands each kernel role may run, added to `catalyst role document` (fw-IDENTITY-000014). |
 | `contributions` | `object` | No | Content composed into a deployment (§6): `rules_of_rules`, `code_of_conduct`, `invariants`, `migrations` (`taskfile` is deprecated and ignored). |
 | `skills` | `list[object]` | No | Agent skills (`name`, `spec_path`). |
 
@@ -322,7 +323,11 @@ parentheses. A module adds a type to the kernel's `/create` as a part: a
 bullet `/create <type> <title>` (`/create-<type>`), and procedures that name
 `/create <type>` or the alias, so `catalyst spec create <type>` reads that
 part alone (ADR-021). `module.yaml`'s `commands`, when present, must match
-§4's names (`scripts/check_command_parity.py`).
+§4's names (`scripts/check_command_parity.py`). `module.yaml`'s `roles`
+gives a kernel role, by its id, the module's own `/commands` it may run.
+They reach the provider through `catalyst role document`
+(fw-IDENTITY-000014), so a module never asks its admin to grant them by
+hand.
 
 ### 6.3 Definitions (`definitions/`)
 
