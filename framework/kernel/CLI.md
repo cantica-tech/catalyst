@@ -1087,7 +1087,10 @@ Who signs (design 29). A criterion holds no user or role registry:
   grants nothing. An approval records the signer's roles, and its gate
   counts it with them.
 - Every writing verb checks the grant of the command its change is for:
-  `new` `create` (or a `create-<type>` alias), `status set` `status`,
+  `new` `create` (or a `create-<type>` alias; for a type its module
+  creates through its own command, `created_by:`, that command too, and
+  that command alone with `created_by_exclusive: true`), `status set`
+  `status`,
   `restore` `journal-restore`, `journal append` its `--command`, `propose`
   and `reconcile` `reconcile` (and the reconciliation level), `share` and
   `criterion` `share`, `sync`, `module` `sync-framework`. `id next|next-rule`,

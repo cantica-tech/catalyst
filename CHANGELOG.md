@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.124.0 — 2026-11-03
+
+- Added: a module may make a type's creating command the only grant that creates it (REQ-000119,
+  fw-STRUCTURE-000026). Next to `created_by: /<command>`, an entity in `module.yaml` (or an ETD file) may declare
+  `created_by_exclusive: true`. `catalyst new` for that type then checks the declared command's grant alone
+  (`cmd:<command>`, or `cmd:*`): neither `cmd:create`, nor a `create-<type>` alias, nor `create:<TYPE>` lets a signer
+  create it. Without the flag (the default, `false`) the general create's grant still counts, as before. The creation
+  check also accepts the declared command's grant, so a role holding that command alone may create the type.
+  `role_check = "warn"` warns instead of refusing, as for any grant. Opt-in: no deployment needs a step.
+
 ## 0.123.0 — 2026-11-03
 
 - Added: a module may give the kernel's roles its own commands, and `catalyst role document` prints the roles to

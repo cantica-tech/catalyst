@@ -8,8 +8,9 @@ import json
 import subprocess
 from pathlib import Path
 
-from catalyst import generate
+from catalyst import generate, permissions
 from catalyst.__main__ import main
+from catalyst.deployment import load
 from catalyst.init import init
 from catalyst_fixtures import write
 from module_loader import load_module, parse_simple_yaml, v3_entity
@@ -301,3 +302,73 @@ def test_created_by_reads_as_one_command():
     assert v3_entity("CASE", {"name": "Case"}).created_by is None
     assert v3_entity("CASE", {"name": "Case", "created_by": "open-case"}).created_by == "/open-case"
     assert v3_entity("CASE", {"name": "Case", "created_by": "/create adr"}).created_by == "/create-adr"
+
+
+def _case_deployment(tmp_path, monkeypatch, capsys, exclusive: bool):
+    """A deployment whose CASE is created by /open-case (`created_by_exclusive: <exclusive>`), with three people:
+    Ada (Admin), Bob, whose role grants /create only, and Cy, whose role grants /open-case only."""
+    flag = "    created_by_exclusive: true\n" if exclusive else ""
+    mod = v3_module(tmp_path / "mods")
+    write(mod / "module.yaml", V3.replace("    name: Case\n", f"    name: Case\n    created_by: /open-case\n{flag}", 1))
+    write(mod / "code-of-conduct.module.md", OPEN_CASE)
+    req = request(tmp_path, module_id="case-process", module=mod)
+    init(req)
+    root = req.at
+    assert root is not None
+    pointer = root / "IAM" / "identity.json"  # the static provider init wrote (catalyst's tests only)
+    doc = json.loads(pointer.read_text(encoding="utf-8"))
+    doc["people"] += [
+        {"username": "bob", "name": "Bob", "subject": "bob", "roles": ["creator"]},
+        {"username": "cy", "name": "Cy", "subject": "cy", "roles": ["opener"]},
+    ]
+    doc["roles"] += [
+        {"id": "creator", "name": "Creator", "grants": ["cmd:create"]},
+        {"id": "opener", "name": "Opener", "grants": ["cmd:open-case"]},
+    ]
+    write(pointer, json.dumps(doc))
+    write(root / "rules" / "domains" / "br-CORE-core.md", "# `CORE` — core\n")
+    with (root / "rules" / "domains" / "domains.md").open("a", encoding="utf-8") as fh:
+        fh.write("| [`CORE`](br-CORE-core.md) | rules/business-rules.md | 2026-10-11 |\n")
+    monkeypatch.chdir(req.project)
+    capsys.readouterr()
+    assert main(["id", "next-rule", "br", "CORE", "--as", "ada"]) == 0
+    rule = capsys.readouterr().out.strip().splitlines()[-1]
+    with (root / "rules" / "business-rules.md").open("a", encoding="utf-8") as fh:
+        fh.write(f"\n### `{rule}` Cases are handled\n\n✅ working.\n")
+    with (root / "rules" / "rules.md").open("a", encoding="utf-8") as fh:
+        fh.write(f"- `{rule}` — Cases are handled\n")
+    return root, ["new", "CASE", "--title", "First", "--field", f"Targets={rule}", "--field", "Domain=CORE"]
+
+
+def test_an_exclusive_creating_command_is_the_only_grant_that_creates(tmp_path, monkeypatch, capsys):
+    """fw-STRUCTURE-000026 (REQ-000119): `created_by_exclusive: true` — /create's grant no longer creates the type."""
+    root, args = _case_deployment(tmp_path, monkeypatch, capsys, exclusive=True)
+    assert main([*args, "--command", "/open-case", "--as", "bob"]) == 1  # holds /create only
+    err = capsys.readouterr().err
+    assert "Bob (creator) may not run /open-case" in err and "`cmd:open-case`" in err
+    dep = load()  # from the project, the working directory
+    bob, cy = {"name": "Bob", "grants": ["cmd:create", "create:CASE"]}, {"name": "Cy", "grants": ["cmd:open-case"]}
+    assert "only /open-case creates it" in (permissions.creation_refusal(dep, bob, "CASE") or "")
+    assert permissions.creation_refusal(dep, cy, "CASE") is None
+    assert not list((root / "cases").glob("CASE-*.md"))
+    assert main([*args, "--command", "/open-case", "--as", "cy"]) == 0  # holds /open-case
+    assert main([*args, "--command", "/open-case", "--as", "ada"]) == 0  # an admin (`*`)
+    assert len(list((root / "cases").glob("CASE-*.md"))) == 2
+
+
+def test_a_non_exclusive_creating_command_still_takes_the_general_create(tmp_path, monkeypatch, capsys):
+    """fw-STRUCTURE-000026 (REQ-000113): without the flag, /create's grant and the command's both create the type."""
+    root, args = _case_deployment(tmp_path, monkeypatch, capsys, exclusive=False)
+    assert main([*args, "--command", "/open-case", "--as", "bob"]) == 0, capsys.readouterr().err  # holds /create
+    assert main([*args, "--command", "/open-case", "--as", "cy"]) == 0, capsys.readouterr().err  # holds /open-case
+    assert len(list((root / "cases").glob("CASE-*.md"))) == 2
+
+
+def test_created_by_exclusive_reads_as_a_flag():
+    assert v3_entity("CASE", {"name": "Case", "created_by": "open-case"}).created_by_exclusive is False
+    assert v3_entity(
+        "CASE", {"name": "Case", "created_by": "/open-case", "created_by_exclusive": True}
+    ).created_by_exclusive
+    assert not v3_entity("CASE", {"name": "Case", "created_by_exclusive": "yes"}).created_by_exclusive  # a boolean only
+    parsed = parse_simple_yaml("entities:\n  CASE:\n    created_by: /open-case\n    created_by_exclusive: true\n")
+    assert v3_entity("CASE", parsed["entities"]["CASE"]).created_by_exclusive is True
