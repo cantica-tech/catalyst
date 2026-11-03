@@ -69,6 +69,15 @@ request is merged, so the order is:
 Without the secret (a fork's pull request) the job says so and checks
 nothing.
 
+Every CI job has a `timeout-minutes` of about twice its usual duration.
+GitHub's macOS runners now and then stall, ending cancelled or timed out
+with no log; `.github/workflows/retry-stalled.yml` then reruns that Tests
+run's failed jobs once, from its first attempt only, and only when every
+job that did not pass is a cancelled or timed-out macOS job (a real
+failure is never retried). It says why in one line;
+`scripts/retry_stalled.py` decides, tested by
+`tests/test_retry_stalled.py`.
+
 Two hard rules for kernel sources: the kernel names no process module or
 module entity (`INVARIANTS.md` INV-30, checked by
 `scripts/check_kernel_purity.py`), and it references no downstream product.
