@@ -88,7 +88,7 @@ catalyst-<module-id>/
 | `namespace` | `string` | No | The module's own meta-rule and invariant namespace (`SE`): its meta-rules are `rr-<NS>-NNN`, its invariants `INV-<NS>-n` (ADR-019). Composition widens and signs them like `rr-META-`. |
 | `aliases` | `map` | No | Old ID → the ID it is now (`rr-META-009: rr-SE-001`). An old ID, short or widened and signed, keeps resolving: `validate` and `view` take it as the rule it now is, and `catalyst why <old>` explains the new one. |
 | `tiers` | `list[object]` | No | The module's ceremony tiers (`rr-META-006`), each `id`, `artifact` (the entity type the tier opens, or `none` when it needs no artifact, only its journal entry) and, for a tier with no artifact, `commit` (the commit-subject prefix that marks it, e.g. `chore:`). Every `--tier` and journal entry is checked against them, and `catalyst trace` accepts as ID-less only commits with a no-artifact tier's prefix. Without it: `chore` (no artifact, `chore:`), `fix` and `feature`. |
-| `entities` | `map` | Conditional | Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, `due`, `created_by`, sections and definition. Required unless the module lists `entity_types`. |
+| `entities` | `map` | Conditional | Format 3: the module's types, by ID prefix, each declared in this file (§3.3): its name, folder, fields, states, guards, `due`, `created_by` (and `created_by_exclusive`), sections and definition. Required unless the module lists `entity_types`. |
 | `entity_types` | `list[object]` | Conditional | The module's ETD files (`id`, `schema`). Format 2; required unless the module declares `entities` (format 3). |
 | `commands` | `list[object]` | No | Slash commands the module adds (`name`, `description`, `argument_hint`); the command's text is its `code-of-conduct.module.md` §4 entry. `spec_path` is optional and unused. |
 | `templates` | `list[object]` | No | Document templates (`entity_type`, `template_path`). |
@@ -152,7 +152,9 @@ generates what the module would otherwise ship (module v3, M3):
   for a type kept as table rows, `contributors_create` (default `true`;
   `false` keeps creating it to admins: design 31, `fw-STRUCTURE-000020`),
   `created_by: /<command>` (optional: the one command of the module's
-  catalogue that creates it). It reads into the same type a §4 schema gives.
+  catalogue that creates it) and, with it, `created_by_exclusive` (default
+  `false`; `true` makes that command's grant the only one that creates it).
+  It reads into the same type a §4 schema gives.
 - **Its template**: the title, the field table `catalyst new` fills (a
   field's `hint`, or `status_hint` for `Status`, is what its cell tells the
   author; otherwise a placeholder for its kind), `Signed-off-by`, then each
@@ -166,8 +168,13 @@ generates what the module would otherwise ship (module v3, M3):
   `created_by:`. Then the declared command alone creates it: no generic part
   is composed, `catalyst new <PREFIX>` refuses unless it runs with
   `--command /<command>` (which that command's procedure passes), and
-  `catalyst spec create <type>` gives the command's procedure. A module that
-  declares nothing keeps the generic part.
+  `catalyst spec create <type>` gives the command's procedure. The signer
+  needs that command's grant (`cmd:<command>`) or, unless the type declares
+  `created_by_exclusive: true`, the general create's (`cmd:create`, a
+  `create-<type>` alias, `create:<TYPE>`). A module whose roles create the
+  type through `/create` leaves it `false`; one that keeps the type to the
+  role holding its command sets it. A module that declares nothing keeps
+  the generic part.
 
 A file the module still ships for a type — a template, a definition — wins
 over the generated one. For a generated type, a shipped template named
@@ -201,6 +208,7 @@ format and live in `framework/kernel/entities/`.
 | `naming` | `string` | No | `id-summary` (default: `<ID>-<short-summary>.md`, INV-7) or `free-form` (files keyed by a free name, exempt from INV-7). |
 | `location` | `string` | No | Parent of `folder` inside the working copy, e.g. `development` for `development/<folder>/`. Default: the working-copy root. `catalyst init` creates the folder there and the CLI looks for it there first. |
 | `created_by` | `string` | No | The one command of the module's catalogue that creates this type (`/<command>`): no generic `/create <type>` is composed for it, and `catalyst new` refuses unless run with `--command` naming it (fw-STRUCTURE-000026). Default: none. |
+| `created_by_exclusive` | `boolean` | No | With `created_by`: `true` makes that command's grant (`cmd:<command>`) the only one that lets a signer create this type, so neither `cmd:create` nor a `create-<type>` alias nor `create:<TYPE>` counts; `false` lets the general create's grant count too (fw-STRUCTURE-000026). Default: `false`. |
 
 <!-- end generated: etd-fields -->
 

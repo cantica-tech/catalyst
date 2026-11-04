@@ -12,6 +12,7 @@ permissions:
 jobs:
   validate-deployment:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # seconds when it passes
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
@@ -88,6 +89,7 @@ jobs:
   # request, or before it is configured) the job says so and checks nothing.
   journal:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # seconds when it passes
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:

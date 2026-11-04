@@ -13,6 +13,9 @@ jobs:
   pytest:
     name: pytest (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
+    # About twice the usual duration (Linux ~4, macOS ~10, Windows ~33 minutes): a stalled runner ends in a clear
+    # timeout; retry-stalled.yml reruns a stalled macOS job once.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 65 || matrix.os == 'macos-latest' && 20 || 10 }}
     strategy:
       fail-fast: false
       matrix:
