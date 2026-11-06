@@ -68,7 +68,7 @@ exactly that.
 | R5.2 `catalyst serve` | done differently | HTTP with events (0.53.0, 0.54.0), not JSON-RPC over stdio |
 | R5.3 parity suite, TS parser deleted | done (audited 2026-10-18) | parity green on 2026-10-10 (design `19` §12); the UI's parser, validator and parity suite deleted on 2026-10-11; since 0.88.0 it reads commands (`spec --json`), users, roles and definitions (`GET /v1/definitions`) from catalyst too, its last file readers deleted; what it still reads is description text of the files the graph names |
 | R5.4 MCP for agents | done differently | `catalyst mcp` (stdio), not `serve --mcp` |
-| R5.5 agent dispatch with streamed output | done (Claude Code adapter) | 0.76.0 (2026-10-16, REQ-000048): `catalyst agent run <command> [--json]`, events with turns, token usage, cost and denied tools (`spec/run-event.schema.json`); catalyst widens no permission and a denied run is not ok; no `serve` route starts a run (a UI's host starts it, owner decision C2). Copilot and Gemini CLI adapters open (B2) |
+| R5.5 agent dispatch with streamed output | done (Claude Code, Gemini CLI, Copilot CLI) | 0.76.0 (2026-10-16, REQ-000048): `catalyst agent run <command> [--json]`, events with turns, token usage, cost and denied tools (`spec/run-event.schema.json`); catalyst widens no permission and a denied run is not ok; no `serve` route starts a run (a UI's host starts it, owner decision C2). Copilot and Gemini CLI: as text from 0.89.0 (REQ-000068), their JSON event streams read from 0.125.0 (REQ-000120, B2): tools, denials, Gemini's token usage |
 | R5.6–R5.9 | done | 0.61.0–0.64.0 (2026-10-13/14): `impact`, an entity's history, `inbox`, `serve --static`, with schemas in `spec/` for the first three |
 
 Measured against "Expected outcome" (below): session start 634 tokens since 0.75.2 (HK-000004; was 785, target ≤ 700);
@@ -214,21 +214,21 @@ this roadmap owns is the engine's side: what a UI can read, and what it may run.
 | Runs: `catalyst agent run --json`, started by a UI's host after the person confirms; no `serve` route starts one | done, 0.76.0 (R5.5) |
 | Writes: a UI's host runs catalyst's own verbs after the person confirms (owner decision W1, recorded with the UI); no `serve` route writes | the verbs exist; each needs `--json` output where it lacks one |
 | `catalyst restore <id> --to <timestamp|#N>`: an earlier version written back as a new journaled change, its derived fields recomputed | done, 0.77.0 (REQ-000049) |
-| `check --json` names the entity of each finding, so a UI can mark drift where it shows the entity | open |
-| Coverage counts (rules with targeting work, linked tests) in `backlog` or `graph` | open |
-| A run log kept by `agent run` (who, command, ok, usage, cost), for run history and a cost meter | open |
+| `check --json` names the entity of each finding, so a UI can mark drift where it shows the entity | done, 0.78.0 (REQ-000050) |
+| Coverage counts (rules with targeting work, linked tests) in `backlog` or `graph` | done, 0.78.0 (REQ-000050): `backlog`'s `coverage` |
+| A run log kept by `agent run` (who, command, ok, usage, cost), for run history and a cost meter | done, 0.78.0 (REQ-000050): `agent runs` |
 | Approval gates, opt-in (decision G): a gate model, approvals journaled, enforced by `status set`, rule edits and `check` | done, 0.79.0 and 0.80.0 (design `25`, REQ-000051, REQ-000052): `IAM/gates.json`, `approve`, `approvals`; `status set`, `new` and `restore` refuse a gated state, `check` errors on a gated rule's unapproved text, `inbox` kind `approval`, `GET approvals/<id>` |
 | Proposals (decision P): a change offered for review before it lands, decided with the reconciliation verbs | done, 0.81.0 (design `26`, REQ-000053): `catalyst propose`, `accept` writes it, gates count the proposed version, `inbox` kind `proposal` |
 | Impact simulation (decision T): `catalyst try <verb …>` on a scratch copy | done, 0.82.0 (design `27`, REQ-000054): the real verb on a shared clone of the criterion, the findings added and cleared, the files, the impact and the approvals left waiting; `--proposal` |
 | Rule strength (decision S): a rule states `must`, `should` or `may` | done, 0.83.0 (REQ-000056): the `**Strength**` line, `must` when none; `check`'s `rule-strength`; `view`, `list` and `graph` carry it; a breach reported as a violation, warning or note |
 | Decisions as entities (decision E): the process module's `ADR-` type | done, 0.83.0 with module 3.3.0 (REQ-000057): `ADR-` with the rules it shapes and its supersessions; a sync scaffolds a new type's folder; catalyst's 22 decisions in its record (`ADR-000025` to `ADR-000046`) |
-| `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | open |
+| `analysis` and `module` verbs with `--json`, a dry run of `module upgrade` | done: `module` verbs and `module upgrade --plan --json` (0.58.0–0.60.0, R4.9); the analysis verbs that write, 0.125.0 (REQ-000121) |
 
 ## R7 — Prove and release 1.0 (M)
 
 * Second module as CI fixture and a real pilot: **knowledge-base** since 2026-10-22 (`cantica-tech/catalyst-knowledge-base`; first released as `cantica-knowledge-base`) (owner decision B1, revised: knowledge bases, project or reflective of the Cantica ecosystem, classified, with versioned vector-database builds; REQ-000083), after **risk management**, out of scope for now (B1, 2026-10-17; its repository and 0.1.0 release kept); not a 1.0 product promise. **A CI fixture since 2026-10-19** (HK-000005: `tests/test_second_module.py`, the published module at its release tag, driven end to end on every change).
 * Human beta trial (RM-026/028/029 in the existing roadmap were waiting on this) using `beta/` material rewritten for the new flow — **the owner is the first beta tester** (D3, 2026-10-17), so it can start.
-* First-class agents at 1.0: **Claude Code, GitHub Copilot and Gemini CLI** (B2, 2026-10-17): `catalyst agent install` wires all three; `catalyst agent run` needs Copilot and Gemini CLI adapters (R5.5 follow-up).
+* First-class agents at 1.0: **Claude Code, GitHub Copilot and Gemini CLI** (B2, 2026-10-17): `catalyst agent install` wires all three; `catalyst agent run` runs all three, reading each one's event stream (0.125.0, REQ-000120).
 * Format changes keep coming as many small releases, each with its migration (B6, 2026-10-17).
 * Signed releases from an org-owned feed; deprecation window for 0.x pointers (read-only support for one minor): **the window is built (0.94.0, REQ-000073)** — `check` warns about a legacy pointer or in-project criterion now, and writes refuse once the project declares format 1.0.
 * Manual-change detection: warn at 1.0-rc, error at 1.0 (existing plan, kept): **built since 0.42.0** (`unrecorded.level`, tested); it flips when a deployment declares format 1.0, which `check` reads since 0.95.0 (REQ-000075); declaring 1.0 is the owner's, at the 1.0 release.

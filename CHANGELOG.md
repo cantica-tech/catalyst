@@ -6,6 +6,25 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.125.0 — 2026-11-06
+
+- Added: `catalyst agent run` reads Gemini CLI's and GitHub Copilot CLI's JSON event streams (REQ-000120, roadmap R5.5,
+  owner decision B2). Gemini CLI runs with `--output-format stream-json`: its replies (chunks joined into one text per
+  reply), its tool calls and their results, a tool its policy refused (named in `denied`, and the run is then not
+  `ok`), and its token usage and duration. It reports no cost, so `cost_usd` is null. Copilot CLI runs with
+  `--output-format json`: its replies, tool calls, denied permissions, turns and duration. Its `end` is made when it
+  exits, `ok` on exit `0` with no `session.error` and nothing denied. It is `measured: false` unless the CLI wrote
+  token usage, and `cost_usd` is null (Copilot bills premium requests, not dollars). Until now both were run in `-p`
+  mode and only their printed text was passed on. As before, catalyst passes neither agent a flag that widens its
+  permissions. A run whose agent reported no tokens keeps `measured: false` in the run log (`agent runs`,
+  `spec/runs.schema.json`), and its summary line says "tokens not reported" instead of zeros.
+- Added: `--json` on the analysis verbs that write (REQ-000121, roadmap R6). `catalyst analysis start`, `record`,
+  `diff`, `reconcile`, `decide`, `close` and `abandon` print one object
+  (`spec/analysis-change.schema.json`): the verb, the analysis's phase after it, its warnings, what it did, and the
+  analysis as `analysis status --json` reports it. Checks, refusals and journal entries are unchanged.
+- Changed: CI comments and CONTRIBUTING.md say that a stalled macOS job is one that never gets a runner, not a
+  timeout.
+
 ## 0.124.0 — 2026-11-03
 
 - Added: a module may make a type's creating command the only grant that creates it (REQ-000119,

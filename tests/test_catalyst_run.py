@@ -241,8 +241,8 @@ class Talker(runs.PlainText):
         return [sys.executable, "-c", self.script]
 
 
-def test_copilot_and_gemini_run_as_plain_text_and_measure_nothing(tmp_path):
-    """Decision B2: both agents run, their output as text; `ok` from the exit; no usage claimed."""
+def test_a_plain_text_agent_runs_from_its_exit_and_measures_nothing(tmp_path):
+    """The fallback for an agent without a stream: its output as text; `ok` from the exit; no usage claimed."""
     assert runs.adapter_for("copilot", which=lambda name: f"/bin/{name}").binary == "/bin/copilot"
     assert runs.adapter_for("gemini", which=lambda name: f"/bin/{name}").binary == "/bin/gemini"
     seen: list[dict] = []
@@ -256,3 +256,184 @@ def test_copilot_and_gemini_run_as_plain_text_and_measure_nothing(tmp_path):
         Talker("", code=3, stderr="quota exceeded"), "gemini", "/check-rules", "", "p", tmp_path, seen.append
     )
     assert failed["ok"] is False and failed["result"] == "quota exceeded"
+
+
+# --- REQ-000120: Gemini CLI's stream-json and Copilot CLI's JSONL --------------
+GEMINI = [
+    {"type": "init", "timestamp": "t", "session_id": "g-1", "model": "gemini-3-pro"},
+    {"type": "message", "timestamp": "t", "role": "user", "content": "the procedure"},
+    {"type": "message", "timestamp": "t", "role": "assistant", "content": "Checking ", "delta": True},
+    {"type": "message", "timestamp": "t", "role": "assistant", "content": "the rules.", "delta": True},
+    {
+        "type": "tool_use",
+        "timestamp": "t",
+        "tool_name": "run_shell_command",
+        "tool_id": "a",
+        "parameters": {"command": "catalyst check"},
+    },
+    {"type": "tool_result", "timestamp": "t", "tool_id": "a", "status": "success", "output": "ok"},
+    {
+        "type": "tool_use",
+        "timestamp": "t",
+        "tool_name": "write_file",
+        "tool_id": "b",
+        "parameters": {"file_path": "/x"},
+    },
+    {
+        "type": "tool_result",
+        "timestamp": "t",
+        "tool_id": "b",
+        "status": "error",
+        "error": {"type": "policy_violation", "message": "not allowed"},
+    },
+    {"type": "message", "timestamp": "t", "role": "assistant", "content": "No errors.", "delta": True},
+    {
+        "type": "result",
+        "timestamp": "t",
+        "status": "success",
+        "stats": {
+            "total_tokens": 1660,
+            "input_tokens": 1500,
+            "output_tokens": 160,
+            "cached": 1200,
+            "input": 300,
+            "duration_ms": 3100,
+            "tool_calls": 2,
+            "models": {},
+        },
+    },
+]
+
+
+def test_a_gemini_stream_joins_replies_counts_its_tokens_and_names_a_policy_denial():
+    adapter = runs.Gemini()
+    assert adapter.argv("p") == ["gemini", "-p", "p", "--output-format", "stream-json"]
+    events = list(runs.stream(adapter, lines(GEMINI))) + list(adapter.close(0, ""))
+    assert [e["event"] for e in events] == [
+        "session",
+        "text",
+        "tool",
+        "tool_result",
+        "tool",
+        "tool_result",
+        "text",
+        "end",
+    ]
+    assert events[0] == {"event": "session", "model": "gemini-3-pro", "session": "g-1"}
+    assert events[1] == {"event": "text", "text": "Checking the rules."}  # chunks joined, one reply
+    assert events[2] == {"event": "tool", "name": "run_shell_command", "input": "catalyst check"}
+    assert events[5] == {"event": "tool_result", "name": "write_file", "ok": False}
+    end = events[-1]
+    assert end["ok"] is False and end["denied"] == ["write_file"]  # refused by its policy: not done
+    assert end["usage"] == {"input": 300, "output": 160, "cache_read": 1200, "cache_write": 0}
+    assert end["cost_usd"] is None and end["duration_ms"] == 3100 and end["turns"] == 2
+    assert "measured" not in end and end["result"] == "No errors."
+    clean = [g for g in GEMINI if g.get("tool_id") != "b"]
+    assert list(runs.stream(runs.Gemini(), lines(clean)))[-1]["ok"] is True
+    schema = schema_check.load("run-event")
+    for event in events:
+        assert schema_check.problems(event, schema) == [], event
+
+
+def test_a_gemini_stream_cut_short_ends_from_its_error_and_exit():
+    adapter = runs.Gemini()
+    cut = [GEMINI[0], GEMINI[2], {"type": "error", "timestamp": "t", "severity": "error", "message": "quota exceeded"}]
+    events = list(runs.stream(adapter, lines(cut))) + list(adapter.close(1, "stderr text"))
+    assert [e["event"] for e in events] == ["session", "text", "end"]
+    assert events[-1]["ok"] is False and events[-1]["result"] == "quota exceeded"
+
+
+COPILOT = [
+    {
+        "type": "session.start",
+        "id": "1",
+        "timestamp": "t",
+        "parentId": None,
+        "data": {"sessionId": "c-1", "selectedModel": "claude-sonnet-5-5"},
+    },
+    {"type": "assistant.turn_start", "data": {}},
+    {"type": "assistant.message_delta", "ephemeral": True, "data": {"messageId": "m", "deltaContent": "Check"}},
+    {"type": "assistant.message", "data": {"messageId": "m", "content": "Checking the rules."}},
+    {
+        "type": "tool.execution_start",
+        "data": {"toolCallId": "a", "toolName": "bash", "arguments": {"command": "catalyst check"}},
+    },
+    {"type": "tool.execution_complete", "data": {"toolCallId": "a", "success": True, "result": {"content": "ok"}}},
+    {"type": "assistant.turn_end", "data": {}},
+    {"type": "assistant.message", "data": {"messageId": "n", "content": "No errors."}},
+    {"type": "assistant.turn_end", "data": {}},
+    {"type": "result", "usage": {"premiumRequests": 1, "sessionDurationMs": 5200, "totalApiDurationMs": 4000}},
+]
+
+
+def test_a_copilot_stream_names_its_tools_and_measures_nothing_it_does_not_report():
+    adapter = runs.Copilot()
+    assert adapter.argv("p") == ["copilot", "-p", "p", "--output-format", "json"]
+    events = list(runs.stream(adapter, lines(COPILOT))) + list(adapter.close(0, ""))
+    assert [e["event"] for e in events] == ["session", "text", "tool", "tool_result", "text", "end"]
+    assert events[0] == {"event": "session", "model": "claude-sonnet-5-5", "session": "c-1"}
+    assert events[2] == {"event": "tool", "name": "bash", "input": "catalyst check"}
+    end = events[-1]
+    assert end["ok"] is True and end["turns"] == 2 and end["duration_ms"] == 5200
+    assert end["measured"] is False and end["cost_usd"] is None and end["result"] == "No errors."
+    schema = schema_check.load("run-event")
+    for event in events:
+        assert schema_check.problems(event, schema) == [], event
+
+
+def test_a_copilot_denial_usage_and_exit_decide_its_end():
+    denied = [
+        *COPILOT[:4],
+        {"type": "permission.requested", "data": {"requestId": "r", "permissionRequest": {"kind": "write"}}},
+        {
+            "type": "permission.completed",
+            "data": {"requestId": "r", "result": {"kind": "denied-no-approval-rule-and-could-not-request-from-user"}},
+        },
+        {
+            "type": "assistant.usage",
+            "data": {
+                "model": "m",
+                "inputTokens": 1000,
+                "outputTokens": 50,
+                "cacheReadTokens": 700,
+                "cacheWriteTokens": 100,
+            },
+        },
+    ]
+    adapter = runs.Copilot()
+    end = [*runs.stream(adapter, lines(denied)), *adapter.close(0, "")][-1]
+    assert end["ok"] is False and end["denied"] == ["write"]
+    assert end["measured"] is True
+    assert end["usage"] == {"input": 200, "output": 50, "cache_read": 700, "cache_write": 100}
+    failed = runs.Copilot()
+    list(
+        runs.stream(
+            failed,
+            lines(
+                [*COPILOT[:2], {"type": "session.error", "data": {"errorType": "quota", "message": "quota exceeded"}}]
+            ),
+        )
+    )
+    end = list(failed.close(1, ""))[-1]
+    assert end["ok"] is False and end["result"] == "quota exceeded"
+    assert list(runs.Copilot().close(2, "bad flag"))[-1]["result"] == "bad flag"
+
+
+def test_gemini_and_copilot_are_their_agents_adapters():
+    assert isinstance(runs.adapter_for("gemini", which=lambda n: f"/bin/{n}"), runs.Gemini)
+    assert isinstance(runs.adapter_for("copilot", which=lambda n: f"/bin/{n}"), runs.Copilot)
+
+
+def test_an_unmeasured_run_is_logged_and_shown_as_unmeasured(tmp_path, monkeypatch):
+    """REQ-000120: a run whose agent reported no tokens keeps `measured: false` in the log, and a person reads
+    "not reported", not zeros."""
+    end = list(runs.Copilot().close(0, ""))[-1]
+    assert "tokens not reported by the agent" in (runs.render(end) or "")
+    log = tmp_path / "runs.jsonl"
+    monkeypatch.setattr(runs, "log_path", lambda project: log)
+    runs.record(tmp_path, "me", "copilot", "/check-rules", "", end)
+    measured = list(runs.ClaudeCode().close(1, "x"))[-1]
+    runs.record(tmp_path, "me", "claude-code", "/check-rules", "", measured)
+    items = runs.runs(tmp_path)
+    assert items[0]["measured"] is False and "measured" not in items[1]
+    assert schema_check.problems(items, schema_check.load("runs")) == []
