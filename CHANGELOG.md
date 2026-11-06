@@ -6,6 +6,16 @@ that `/sync-framework` applies to an existing deployment. Versions before
 0.37.0 are described by that migrations index and by the tagged commit
 messages.
 
+## 0.125.1 — 2026-11-06
+
+- Fixed: a project moved to a folder with another name keeps a valid journal chain (BUG-000067, fw-STRUCTURE-000009).
+  Journal entries written before kernel 0.38 name project files with a repository prefix (`<project>:<path>`). That
+  prefix was matched only against the folder's name, so after a move those entries counted as another repository's
+  files and `catalyst check` reported a chain error. The prefix now also matches the name `catalyst.toml` records
+  (a legacy pointer's `project_name`). No deployment needs a step.
+- Changed: catalyst's own repository is a member of a VS Code workspace's meta criterion (`workspace` in
+  `catalyst.toml`).
+
 ## 0.125.0 — 2026-11-06
 
 - Added: `catalyst agent run` reads Gemini CLI's and GitHub Copilot CLI's JSON event streams (REQ-000120, roadmap R5.5,

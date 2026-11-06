@@ -2,7 +2,7 @@
 project_name = "catalyst"
 format = "1.0-rc"
 journal_since = "52748da373d800274faa92d227a58d9c37082960"
-kernel_version = "0.125.0"
+kernel_version = "0.125.1"
 module = "software-engineering"
 agent = "claude-code"
 repoed = false
@@ -12,3 +12,4 @@ created_by = "Olivier Steck"
 criterion_branch = "criterion"
 created = "2026-08-23"
 updated = "2026-11-06"
+workspace = "catalyst-fleet"
