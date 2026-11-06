@@ -180,13 +180,13 @@ Every command and its options, from the CLI itself; the sections below describe 
 | `catalyst workspace init <file>` | create the meta criterion and make the folders with a catalyst.toml members | `--catalyst-client`, `--git-username`, `--identity-client`, `--identity-issuer`, `--kernel`, `--user` |
 | `catalyst workspace status <file>` | the workspace's criterion and which folders are members | `--json` |
 | `catalyst index regen` | rewrite every <folder>/<folder>.md index | `--check`, `--diff` |
-| `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--mode`, `--name`, `--passes` |
-| `catalyst analysis record <id> <file>` | store one independent pass's findings (JSON) | `--as`, `--pass`, `--replace` |
-| `catalyst analysis diff <id>` | match the two passes: agreed, conflicting, A-only, B-only | `--as` |
-| `catalyst analysis reconcile <id> <file>` | store the reconciler's list (every finding accounted for) | `--as` |
-| `catalyst analysis decide <id> <finding> <verdict>` | record the user's decision on one reconciled finding | `--artifact`, `--as`, `--reason` |
-| `catalyst analysis close <id>` | close once every finding is decided and accepted ones exist | `--as` |
-| `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--reason` |
+| `catalyst analysis start <scope>` | open an analysis: scope, mode, code state, inventory | `--as`, `--json`, `--mode`, `--name`, `--passes` |
+| `catalyst analysis record <id> <file>` | store one independent pass's findings (JSON) | `--as`, `--json`, `--pass`, `--replace` |
+| `catalyst analysis diff <id>` | match the two passes: agreed, conflicting, A-only, B-only | `--as`, `--json` |
+| `catalyst analysis reconcile <id> <file>` | store the reconciler's list (every finding accounted for) | `--as`, `--json` |
+| `catalyst analysis decide <id> <finding> <verdict>` | record the user's decision on one reconciled finding | `--artifact`, `--as`, `--json`, `--reason` |
+| `catalyst analysis close <id>` | close once every finding is decided and accepted ones exist | `--as`, `--json` |
+| `catalyst analysis abandon <id>` | stop an analysis, with the reason | `--as`, `--json`, `--reason` |
 | `catalyst analysis status <id>` | an analysis's phase and what it still needs | `--json` |
 | `catalyst analysis list` | every analysis in brief, newest first | `--json` |
 | `catalyst reconcile <case> <verb>` | decide a reconciliation case (role-gated: full, propose, none) | `--as`, `--forewarned`, `--from`, `--intent`, `--preview`, `--text` |
@@ -568,10 +568,19 @@ cost last. Exit `0` when the agent reports success, `1` when it does not
 (or stops without a result, whose reason is the `end` event's) or cannot
 start (an agent without an adapter, or its CLI not on `PATH`), `2` for a
 command §4 does not have (a usage error). Claude Code's adapter reads its stream-json (`claude
--p … --output-format stream-json`): every event, usage and cost. GitHub
-Copilot's (`copilot -p …`) and Gemini CLI's (`gemini -p …`, owner decision
-B2) pass on what they print as text, `ok` when the agent exits `0`, and
-report no tool call, usage or cost: their `end` event says `measured: false`. No route of `catalyst serve`
+-p … --output-format stream-json`): every event, usage and cost. Gemini
+CLI's (owner decision B2) reads its stream-json (`gemini -p …
+--output-format stream-json`): its replies (chunks joined), tools, a tool
+its policy refused (`policy_violation`) as denied, and its token usage
+and duration; it reports no cost, so `cost_usd` is null. GitHub Copilot's
+reads its JSONL of session events (`copilot -p … --output-format json`):
+its replies, tools, a denied permission, turns and duration; its `end` is
+made when it exits (`ok` on `0` with no `session.error` and nothing
+denied), with `measured: false` unless it wrote token usage
+(`assistant.usage`), and `cost_usd` null (Copilot bills premium requests,
+not dollars). A line an adapter cannot read is skipped. An unmeasured run's
+summary says its tokens were not reported, and the run log keeps
+`measured: false` for it. No route of `catalyst serve`
 starts a run (roadmap R5.5; whether the UI launches agents is open).
 
 ### `catalyst agent runs [--limit <n>] [--json]`
@@ -1627,6 +1636,14 @@ exit `1` and a reason on stderr when a precondition does not hold.
   passes, findings decided, accepted and rejected
   (`spec/analyses.schema.json`; `GET /v1/analyses`).
 
+With `--json`, each verb that writes — `start`, `record`, `diff`,
+`reconcile`, `decide`, `close`, `abandon` — prints one object instead of
+its prose: the verb, the analysis's ID and its phase after the change,
+the verb's warnings, what it did (`result`), and the analysis as `status
+--json` reports it (`spec/analysis-change.schema.json`, REQ-000121). Its
+checks, refusals and journal entries are those of the verb without the
+flag; a refused verb prints nothing on stdout and exits `1`.
+
 `catalyst check` applies the same rules to every record: a record in
 `Reconciling` or later without its passes and the diff, in `Deciding` or
 later without a complete reconciliation, or `Closed` with an undecided
@@ -2141,6 +2158,13 @@ What each command prints with `--json`, and the JSON Schema in `spec/` that desc
 | `catalyst runtime prune` | `spec/runtime-prune.schema.json` |
 | `catalyst migrate` | `spec/migrate.schema.json` |
 | `catalyst workspace status` | `spec/workspace-status.schema.json` |
+| `catalyst analysis start` | `spec/analysis-change.schema.json` |
+| `catalyst analysis record` | `spec/analysis-change.schema.json` |
+| `catalyst analysis diff` | `spec/analysis-change.schema.json` |
+| `catalyst analysis reconcile` | `spec/analysis-change.schema.json` |
+| `catalyst analysis decide` | `spec/analysis-change.schema.json` |
+| `catalyst analysis close` | `spec/analysis-change.schema.json` |
+| `catalyst analysis abandon` | `spec/analysis-change.schema.json` |
 | `catalyst analysis status` | `spec/analysis.schema.json` |
 | `catalyst analysis list` | `spec/analyses.schema.json` |
 | `catalyst try` | `spec/try.schema.json` |
@@ -2461,27 +2485,34 @@ Every command's arguments and options, generated from the CLI's own parser; `cat
 |  | `--name` `NAME` | a short name for the record |
 |  | `--passes` `PASSES` | independent passes: 2, four-eyes (default), or 1; the deployment's default is catalyst.toml's analysis_passes (one of `1`, `2`) |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis record` | `<id>` | an entity or rule ID |
 |  | `--pass` `WHICH` | the pass it records, A or B (one of `A`, `B`, `a`, `b`) |
 |  | `<file>` | the pass's findings file |
 |  | `--replace` | replace a pass recorded by mistake |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis diff` | `<id>` | an entity or rule ID |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis reconcile` | `<id>` | an entity or rule ID |
 |  | `<file>` | the reconciler's list of findings, every one accounted for |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis decide` | `<id>` | an entity or rule ID |
 |  | `<finding>` | the reconciled finding's ID, e.g. F1 |
 |  | `<verdict>` | accept the finding, or reject it (one of `accept`, `reject`) |
 |  | `--artifact` `ARTIFACT` | the domain code, rule ID or artifact ID an accepted finding became |
 |  | `--reason` `REASON` | why |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis close` | `<id>` | an entity or rule ID |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis abandon` | `<id>` | an entity or rule ID |
 |  | `--reason` `REASON` | why the analysis is abandoned |
 |  | `--as` `AS_USER` | you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002) |
+|  | `--json` | what the verb did and the analysis after it (JSON) |
 | `catalyst analysis status` | `<id>` | an entity or rule ID |
 |  | `--json` | the full report: passes, diff, findings and decisions |
 | `catalyst analysis list` | `--json` | machine-readable output (JSON on stdout) |
