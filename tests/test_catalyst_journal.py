@@ -183,7 +183,8 @@ def test_a_moved_project_keeps_its_own_repository_prefixed_paths(project, tmp_pa
     """BUG-000067: a legacy `app:` path names the project by the name its pointer records, so it stays the
     project's own file after the folder is moved to one of another name."""
     moved = tmp_path / "app-core"
-    shutil.move(str(project), str(moved))
+    monkeypatch.chdir(tmp_path)  # Windows renames no folder a process is in
+    project.rename(moved)
     monkeypatch.chdir(moved)
     dep = load(moved)
     assert j.normalise(dep, "app:src/x.py") == "src/x.py"  # the recorded name
