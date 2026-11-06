@@ -1989,6 +1989,24 @@ def cmd_analysis(args) -> int:
             ),
         )
 
+    def answer(analysis_id: str, result: dict, warnings: list[str] | None = None) -> int:
+        """`--json` (REQ-000121): what the verb did, and the analysis as it now stands."""
+        after = an.context(dep, analysis_id)
+        print(
+            json.dumps(
+                {
+                    "verb": sub,
+                    "id": after.art.id,
+                    "phase": an.phase(after.art),
+                    "warnings": warnings or [],
+                    "result": result,
+                    "analysis": an.report(after),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
     def read_json(path: str):
         try:
             return json.loads(Path(path).read_text(encoding="utf-8"))
@@ -2006,6 +2024,17 @@ def cmd_analysis(args) -> int:
             f"{args.mode} analysis of {' '.join(inv['scope'])}" + (", single-pass" if single else ""),
             who,
         )
+        if args.json:
+            return answer(
+                ctx.art.id,
+                {
+                    "files": len(inv["files"]),
+                    "code_state": inv["code_state"],
+                    "passes": inv["passes"],
+                    "scope": inv["scope"],
+                    "mode": args.mode,
+                },
+            )
         print(
             f"{ctx.art.id}: {len(inv['files'])} file(s) at {inv['code_state'][:10]}; "
             + (
@@ -2055,14 +2084,20 @@ def cmd_analysis(args) -> int:
         return 0
     who = signer()
     if sub == "record":
-        for w in an.record(ctx, args.which, read_json(args.file), replace=args.replace):
-            print(f"WARNING   {w}")
+        warnings = an.record(ctx, args.which, read_json(args.file), replace=args.replace)
         journaled(ctx, "update", f"pass {args.which.upper()} recorded", who)
+        if args.json:
+            return answer(ctx.art.id, {"pass": args.which.upper(), "replaced": bool(args.replace)}, warnings)
+        for w in warnings:
+            print(f"WARNING   {w}")
         print(f"pass {args.which.upper()} recorded for {ctx.art.id}")
         return 0
     if sub == "diff":
         d = an.run_diff(ctx)
         journaled(an.context(dep, ctx.art.id), "update", "passes matched for reconciliation", who)
+        if args.json:
+            counts = ("agreed", "conflicting", "a_only", "b_only")
+            return answer(ctx.art.id, {k: len(d[k]) for k in counts})
         print(
             f"{len(d['agreed'])} agreed, {len(d['conflicting'])} conflicting, {len(d['a_only'])} A-only, "
             f"{len(d['b_only'])} B-only — reconcile every one (`catalyst analysis reconcile`)"
@@ -2072,6 +2107,8 @@ def cmd_analysis(args) -> int:
         an.reconcile(ctx, read_json(args.file))
         journaled(an.context(dep, ctx.art.id), "update", "reconciled list accepted: every finding accounted for", who)
         n = len(an.context(dep, ctx.art.id).load("reconciled.json")["findings"])
+        if args.json:
+            return answer(ctx.art.id, {"findings": n})
         print(f"{n} reconciled finding(s): each needs the user's decision (`catalyst analysis decide`)")
         return 0
     if sub == "decide":
@@ -2082,11 +2119,17 @@ def cmd_analysis(args) -> int:
             f"finding {args.finding}: {args.verdict}" + (f" as {args.artifact}" if args.artifact else ""),
             who,
         )
+        if args.json:
+            return answer(
+                ctx.art.id, {"finding": args.finding, "verdict": args.verdict, "artifact": args.artifact or None}
+            )
         print(f"{args.finding}: {args.verdict}" + (f" → {args.artifact}" if args.artifact else ""))
         return 0
     if sub == "close":
         counts = an.close(ctx)
         journaled(an.context(dep, ctx.art.id), "close", "every finding decided; accepted ones exist", who)
+        if args.json:
+            return answer(ctx.art.id, {"counts": counts})
         print(
             f"{ctx.art.id} closed: "
             + (
@@ -2097,6 +2140,8 @@ def cmd_analysis(args) -> int:
         return 0
     an.abandon(ctx, args.reason)
     journaled(an.context(dep, ctx.art.id), "close", f"abandoned: {args.reason}", who)
+    if args.json:
+        return answer(ctx.art.id, {"reason": args.reason})
     print(f"{ctx.art.id} abandoned")
     return 0
 
@@ -3678,6 +3723,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="as_user",
         help="you, as logged in: names only the verified identity, never another person (fw-IDENTITY-000002)",
     )
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("record", help="store one independent pass's findings (JSON)")
     q.add_argument("id")
@@ -3685,15 +3731,18 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("file", help="the pass's findings file")
     q.add_argument("--replace", action="store_true", help="replace a pass recorded by mistake")
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("diff", help="match the two passes: agreed, conflicting, A-only, B-only")
     q.add_argument("id")
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("reconcile", help="store the reconciler's list (every finding accounted for)")
     q.add_argument("id")
     q.add_argument("file")
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("decide", help="record the user's decision on one reconciled finding")
     q.add_argument("id")
@@ -3702,15 +3751,18 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--artifact", help="the domain code, rule ID or artifact ID an accepted finding became")
     q.add_argument("--reason")
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("close", help="close once every finding is decided and accepted ones exist")
     q.add_argument("id")
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("abandon", help="stop an analysis, with the reason")
     q.add_argument("id")
     q.add_argument("--reason", required=True)
     q.add_argument("--as", dest="as_user")
+    q.add_argument("--json", action="store_true", help="what the verb did and the analysis after it (JSON)")
     q.set_defaults(func=cmd_analysis)
     q = an_sub.add_parser("status", help="an analysis's phase and what it still needs")
     q.add_argument("id")

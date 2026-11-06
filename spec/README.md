@@ -28,6 +28,7 @@ against its schema, with the checker in `tests/schema_check.py`.
 | `try.schema.json` | `catalyst try <verb …> --json` | — (the host runs it, design 27) |
 | `analyses.schema.json` | `catalyst analysis list --json` | `GET /v1/analyses` |
 | `analysis.schema.json` | `catalyst analysis status <id> --json` | `GET /v1/analyses/<id>` |
+| `analysis-change.schema.json` | `catalyst analysis start --json`, `catalyst analysis record --json`, `catalyst analysis diff --json`, `catalyst analysis reconcile --json`, `catalyst analysis decide --json`, `catalyst analysis close --json`, `catalyst analysis abandon --json` | — (the host runs the verb, decision W1) |
 | `module-releases.schema.json` | `catalyst module available <id> --json` | `GET /v1/modules/<id>/available` (local mode) |
 | `audit.schema.json` | `catalyst audit --json` | `GET /v1/audit` (local mode) |
 | `definitions.schema.json` | `catalyst definition list --json` | `GET /v1/definitions` |

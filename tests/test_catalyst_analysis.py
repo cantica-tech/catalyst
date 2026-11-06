@@ -375,3 +375,59 @@ def test_the_report_and_the_list_hold_to_their_schemas_and_are_served(project, c
     finally:
         httpd.shutdown()
         httpd.server_close()
+
+
+def test_every_writing_verb_answers_in_json_as_its_schema_says(project, tmp_path, capsys):
+    """REQ-000121: with --json each verb prints what it did and the analysis after it; it journals as without."""
+    import schema_check
+    from catalyst.__main__ import main
+
+    change, status = schema_check.load("analysis-change"), schema_check.load("analysis")
+    aid = f"ANALYSIS-000001-{USERID}"
+
+    def run(*argv: str) -> dict:
+        capsys.readouterr()
+        assert main(["analysis", *argv, "--json"]) == 0
+        out = json.loads(capsys.readouterr().out)
+        assert schema_check.problems(out, change) == [], out
+        assert schema_check.problems(out["analysis"], status) == [], out["analysis"]
+        assert out["verb"] == argv[0] and out["id"] == aid
+        return out
+
+    started = run("start", "src", "--name", "json run")
+    assert started["phase"] == "Extracting" and started["result"]["files"] == 2
+    assert started["result"]["passes"] == 2 and started["result"]["scope"] == ["src"]
+    for which, data in (("A", PASS_A), ("B", PASS_B)):
+        write(tmp_path / f"{which}.json", json.dumps(data))
+        assert run("record", aid, "--pass", which, str(tmp_path / f"{which}.json"))["result"]["pass"] == which
+    diffed = run("diff", aid)
+    assert diffed["phase"] == "Reconciling" and set(diffed["result"]) == {"agreed", "conflicting", "a_only", "b_only"}
+    write(tmp_path / "r.json", json.dumps(RECONCILED))
+    assert run("reconcile", aid, str(tmp_path / "r.json"))["result"] == {"findings": 3}
+    assert run("decide", aid, "F1", "reject", "--reason", "covered")["result"]["verdict"] == "reject"
+    run("decide", aid, "F2", "accept", "--artifact", ITEM)
+    decided = run("decide", aid, "F3", "accept", "--artifact", RULE)
+    assert decided["result"] == {"finding": "F3", "verdict": "accept", "artifact": RULE}
+    closed = run("close", aid)
+    assert closed["phase"] == "Closed" and closed["analysis"]["problems"] == []
+    assert sum(c["accept"] for c in closed["result"]["counts"].values()) == 2
+    commands = [
+        c for c in (e["command"] for e in journal_entries(project / ".criterion")) if c.startswith("catalyst analysis")
+    ]
+    assert len(commands) == 9  # journaled as without --json
+    capsys.readouterr()
+    assert main(["analysis", "record", aid, "--pass", "A", str(tmp_path / "A.json"), "--json"]) == 1
+    refused = capsys.readouterr()
+    assert refused.out == "" and "Closed" in refused.err
+
+
+def test_abandon_answers_in_json(project, capsys):
+    import schema_check
+    from catalyst.__main__ import main
+
+    assert main(["analysis", "start", "src"]) == 0
+    capsys.readouterr()
+    assert main(["analysis", "abandon", f"ANALYSIS-000001-{USERID}", "--reason", "scope moved", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert schema_check.problems(out, schema_check.load("analysis-change")) == []
+    assert out["phase"] == "Abandoned" and out["result"] == {"reason": "scope moved"}
