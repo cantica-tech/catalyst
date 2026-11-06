@@ -140,6 +140,16 @@ def canonical(dep: Deployment, path: str) -> str:
     raise JournalError(f"{path} is outside the project and its working copy")
 
 
+def _project_names(dep: Deployment) -> set[str]:
+    """The names a journal path's `<repo>:` prefix may give the project: its
+    folder's, and the name `catalyst.toml` records, which a move keeps."""
+    names = {dep.project_root.name}
+    for key in ("project_name", "name"):
+        if dep.pointer.get(key):
+            names.add(str(dep.pointer[key]))
+    return names
+
+
 def normalise(dep: Deployment, recorded: str, shas: tuple = ()) -> str:
     """Read a (possibly legacy) journal path as a canonical one. `shas`
     (the entry's before/after) settle a bare path that exists in neither
@@ -149,7 +159,7 @@ def normalise(dep: Deployment, recorded: str, shas: tuple = ()) -> str:
         repo, rest = path.split(":", 1)
         if repo == "criterion":
             return WC + rest
-        if repo == dep.project_root.name:
+        if repo in _project_names(dep):  # the project's own files, wherever its folder now is (BUG-000067)
             return rest
         return path  # another repository: kept as recorded, not verifiable here
     if path.startswith("/"):

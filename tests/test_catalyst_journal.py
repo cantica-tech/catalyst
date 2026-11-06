@@ -179,6 +179,18 @@ def test_normalise_legacy_paths(project):
     assert j.normalise(dep, "app.catalyst") == "app.catalyst"
 
 
+def test_a_moved_project_keeps_its_own_repository_prefixed_paths(project, tmp_path, monkeypatch):
+    """BUG-000067: a legacy `app:` path names the project by the name its pointer records, so it stays the
+    project's own file after the folder is moved to one of another name."""
+    moved = tmp_path / "app-core"
+    shutil.move(str(project), str(moved))
+    monkeypatch.chdir(moved)
+    dep = load(moved)
+    assert j.normalise(dep, "app:src/x.py") == "src/x.py"  # the recorded name
+    assert j.normalise(dep, "app-core:src/x.py") == "src/x.py"  # the folder's
+    assert j.normalise(dep, "other-repo:LICENSE") == "other-repo:LICENSE"
+
+
 def test_canonical_path_through_symlink(tmp_path, monkeypatch):
     project = make_project(tmp_path)
     real = tmp_path / "agent-space" / ".criterion"
